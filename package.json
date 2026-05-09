@@ -1,0 +1,84 @@
+{
+  "name": "@btr-protocol/sdk",
+  "version": "0.3.1",
+  "main": "./src/index.ts",
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "@types/node": "^20.10.0",
+    "@typescript/native-preview": "^7.0.0-dev.20251227.1"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./abis": {
+      "types": "./src/abis/index.ts",
+      "default": "./src/abis/index.ts"
+    },
+    "./eth": {
+      "types": "./src/eth/index.ts",
+      "default": "./src/eth/index.ts"
+    },
+    "./flows": {
+      "types": "./src/flows/index.ts",
+      "default": "./src/flows/index.ts"
+    },
+    "./guardians": {
+      "types": "./src/guardians/index.ts",
+      "default": "./src/guardians/index.ts"
+    },
+    "./oracles": {
+      "types": "./src/oracles/index.ts",
+      "default": "./src/oracles/index.ts"
+    },
+    "./pool": {
+      "types": "./src/pool/index.ts",
+      "default": "./src/pool/index.ts"
+    },
+    "./rewards": {
+      "types": "./src/rewards/index.ts",
+      "default": "./src/rewards/index.ts"
+    },
+    "./utils": {
+      "types": "./src/utils/index.ts",
+      "default": "./src/utils/index.ts"
+    },
+    "./utils/logger": {
+      "types": "./src/utils/logger.ts",
+      "default": "./src/utils/logger.ts"
+    }
+  },
+  "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "btr",
+    "evm",
+    "rpc",
+    "abi",
+    "dex",
+    "amm",
+    "oracle",
+    "circuit-breaker"
+  ],
+  "scripts": {
+    "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "typecheck": "bunx tsgo -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "lint": "bunx biome check src",
+    "format": "bunx biome format --write src"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0"
+  }
+}
