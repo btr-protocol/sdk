@@ -10,8 +10,10 @@
 
 export * from './Admin.js';
 export * from './Bridge.js';
+export * from './BridgeableERC20.js';
 export * from './Distributor.js';
 export * from './Flash.js';
+export * from './GovToken.js';
 export * from './Pool.js';
 export * from './PoolFactory.js';
 export * from './Router.js';
