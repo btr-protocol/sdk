@@ -2,7 +2,7 @@
  * Staking Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton staking entrypoints. Pool address is first arg of pool-scoped fns.
+ * Singleton staking module. Pool address is first arg of pool-scoped fns.
  * Source: dex/evm/src/Staking.sol.
  */
 
@@ -1299,6 +1299,11 @@ export const STAKING_ABI = [
         "internalType": "uint48"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
   },
   {
     "type": "error",
