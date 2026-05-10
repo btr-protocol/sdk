@@ -2,15 +2,44 @@
  * Admin Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Diamond facet: protocol/governance admin entrypoints.
- * Source: dex/evm/src/modules/Admin.sol.
+ * Singleton admin entrypoints. Pool address is first arg of pool-scoped fns.
+ * Source: dex/evm/src/Admin.sol.
  */
 
 export const ADMIN_ABI = [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "ac_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "AC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "function",
     "name": "addAsset",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -171,6 +200,11 @@ export const ADMIN_ABI = [
     "name": "cancelOracleUpdate",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "internalType": "address"
@@ -184,6 +218,11 @@ export const ADMIN_ABI = [
     "name": "cancelTimelock",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "opType",
         "type": "uint8",
         "internalType": "uint8"
@@ -196,6 +235,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "collectProtocolFees",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -215,39 +259,10 @@ export const ADMIN_ABI = [
     "name": "executeAddAsset",
     "inputs": [
       {
-        "name": "token",
+        "name": "pool",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeBaseMigration",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeBridgeUpdate",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeModuleUpdate",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeOracleUpdate",
-    "inputs": [
+      },
       {
         "name": "token",
         "type": "address",
@@ -259,22 +274,71 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "executeOwnershipTransfer",
-    "inputs": [],
+    "name": "executeBaseMigration",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeBridgeUpdate",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeOracleUpdate",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "executeTreasuryUpdate",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "executeUpdateFeeParams",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -282,6 +346,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "executeUpdateRiskConfig",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -296,6 +365,11 @@ export const ADMIN_ABI = [
     "name": "freezeAsset",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "internalType": "address"
@@ -306,45 +380,38 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "getAc",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getAuthorizedBridge",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "bridge",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getModule",
+    "name": "pendingData",
     "inputs": [
       {
-        "name": "sel",
-        "type": "bytes4",
-        "internalType": "bytes4"
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingOps",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint96",
+        "internalType": "uint96"
       }
     ],
     "stateMutability": "view"
@@ -353,6 +420,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "requestAddAsset",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -488,6 +560,11 @@ export const ADMIN_ABI = [
     "name": "requestBaseMigration",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "newBase",
         "type": "address",
         "internalType": "address"
@@ -501,6 +578,11 @@ export const ADMIN_ABI = [
     "name": "requestBridgeUpdate",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "newBridge",
         "type": "address",
         "internalType": "address"
@@ -511,31 +593,13 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "requestModuleUpdate",
+    "name": "requestOracleUpdate",
     "inputs": [
       {
-        "name": "impl",
+        "name": "pool",
         "type": "address",
         "internalType": "address"
       },
-      {
-        "name": "selectors",
-        "type": "bytes4[]",
-        "internalType": "bytes4[]"
-      },
-      {
-        "name": "initData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "requestOracleUpdate",
-    "inputs": [
       {
         "name": "token",
         "type": "address",
@@ -584,21 +648,13 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "requestOwnershipTransfer",
-    "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "requestTreasuryUpdate",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "newTreasury",
         "type": "address",
@@ -612,6 +668,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "requestUpdateFeeParams",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "params",
         "type": "tuple",
@@ -642,6 +703,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "requestUpdateRiskConfig",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -695,21 +761,13 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "setAc",
-    "inputs": [
-      {
-        "name": "ac",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setAnchor",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -728,6 +786,11 @@ export const ADMIN_ABI = [
     "type": "function",
     "name": "setAssetParams",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -782,6 +845,11 @@ export const ADMIN_ABI = [
     "name": "setFlowCooldown",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "cooldownSeconds",
         "type": "uint16",
         "internalType": "uint16"
@@ -792,34 +860,13 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
-    "name": "setGovToken",
-    "inputs": [
-      {
-        "name": "govToken",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setStakedGovToken",
-    "inputs": [
-      {
-        "name": "sGov",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "unfreezeAsset",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -831,27 +878,14 @@ export const ADMIN_ABI = [
   },
   {
     "type": "event",
-    "name": "AcUpdated",
+    "name": "AnchorUpdated",
     "inputs": [
       {
-        "name": "oldAc",
+        "name": "pool",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
-      {
-        "name": "newAc",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "AnchorUpdated",
-    "inputs": [
       {
         "name": "asset",
         "type": "address",
@@ -878,6 +912,12 @@ export const ADMIN_ABI = [
     "name": "AssetAdded",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "indexed": true,
@@ -902,6 +942,12 @@ export const ADMIN_ABI = [
     "type": "event",
     "name": "AssetParamsUpdated",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -928,6 +974,12 @@ export const ADMIN_ABI = [
     "name": "BaseTokenMigrated",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "oldBase",
         "type": "address",
         "indexed": true,
@@ -946,6 +998,12 @@ export const ADMIN_ABI = [
     "type": "event",
     "name": "BridgeUpdated",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "oldBridge",
         "type": "address",
@@ -966,6 +1024,12 @@ export const ADMIN_ABI = [
     "name": "EmergencyFreeze",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "indexed": true,
@@ -979,6 +1043,12 @@ export const ADMIN_ABI = [
     "name": "EmergencyUnfreeze",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "indexed": true,
@@ -991,6 +1061,12 @@ export const ADMIN_ABI = [
     "type": "event",
     "name": "FeeParamsUpdated",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "protoShare",
         "type": "uint16",
@@ -1011,6 +1087,12 @@ export const ADMIN_ABI = [
     "name": "FlowCooldownUpdated",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "oldCooldown",
         "type": "uint16",
         "indexed": false,
@@ -1027,99 +1109,16 @@ export const ADMIN_ABI = [
   },
   {
     "type": "event",
-    "name": "GovTokenSet",
-    "inputs": [
-      {
-        "name": "govToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "HooksUpdated",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "hook",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "LiquidityProfileUpdated",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "segmentCount",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ModulesUpdated",
-    "inputs": [
-      {
-        "name": "impl",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "selectors",
-        "type": "bytes4[]",
-        "indexed": false,
-        "internalType": "bytes4[]"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "OracleUpdated",
     "inputs": [
       {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipTransferred",
-    "inputs": [
-      {
-        "name": "previousOwner",
+        "name": "pool",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "newOwner",
+        "name": "token",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1131,6 +1130,12 @@ export const ADMIN_ABI = [
     "type": "event",
     "name": "ProtocolFeesCollected",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -1157,6 +1162,12 @@ export const ADMIN_ABI = [
     "name": "RiskConfigUpdated",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "indexed": true,
@@ -1179,21 +1190,14 @@ export const ADMIN_ABI = [
   },
   {
     "type": "event",
-    "name": "StakedGovTokenSet",
+    "name": "TimelockCancelled",
     "inputs": [
       {
-        "name": "sGov",
+        "name": "pool",
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "TimelockCancelled",
-    "inputs": [
+      },
       {
         "name": "id",
         "type": "bytes32",
@@ -1213,6 +1217,12 @@ export const ADMIN_ABI = [
     "type": "event",
     "name": "TimelockRequested",
     "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "id",
         "type": "bytes32",
@@ -1239,6 +1249,12 @@ export const ADMIN_ABI = [
     "name": "TreasuryUpdated",
     "inputs": [
       {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "oldTreasury",
         "type": "address",
         "indexed": true,
@@ -1255,78 +1271,8 @@ export const ADMIN_ABI = [
   },
   {
     "type": "error",
-    "name": "AlreadyConfigured",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
-      },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "AssetNotInTree",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "CycleDetected",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "DepthExceeded",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "depth",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "Expired",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidAnchor",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "anchor",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   },
   {
     "type": "error",
@@ -1340,33 +1286,17 @@ export const ADMIN_ABI = [
   },
   {
     "type": "error",
-    "name": "NotFound",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
-      },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "NotReady",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "OperationFailed",
+    "name": "Unauthorized",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Unauthorized",
+    "name": "ZeroAddr",
     "inputs": []
   },
   {
