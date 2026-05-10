@@ -11,7 +11,7 @@ export const BRIDGE_ABI = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "endpoint",
+        "name": "endpoint_",
         "type": "address",
         "internalType": "address"
       }
@@ -70,12 +70,12 @@ export const BRIDGE_ABI = [
   },
   {
     "type": "function",
-    "name": "cancelOperation",
+    "name": "cancelConfigChange",
     "inputs": [
       {
-        "name": "id",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -87,6 +87,19 @@ export const BRIDGE_ABI = [
     "inputs": [],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "cancelSetPeer",
+    "inputs": [
+      {
+        "name": "eid",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -214,7 +227,7 @@ export const BRIDGE_ABI = [
     "name": "initialize",
     "inputs": [
       {
-        "name": "newOwner",
+        "name": "newOwner_",
         "type": "address",
         "internalType": "address"
       }
