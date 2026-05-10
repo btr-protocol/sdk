@@ -2,7 +2,7 @@
  * Pool Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Flat Pool surface (init, deposit, withdraw, swap, getters) + restricted setters callable only by Admin/Staking/Flash singletons.
+ * Per-pool clone (EIP-1167). Flat surface — singleton helpers (Admin/Staking/Distributor/Flash) wrap pool-scoped operations.
  * Source: dex/evm/src/Pool.sol.
  */
 
@@ -2024,11 +2024,6 @@ export const POOL_ABI = [
   },
   {
     "type": "error",
-    "name": "OperationFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Overflow",
     "inputs": []
   },
@@ -2047,6 +2042,11 @@ export const POOL_ABI = [
         "internalType": "uint64"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
   },
   {
     "type": "error",

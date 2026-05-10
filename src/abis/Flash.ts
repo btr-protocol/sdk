@@ -192,6 +192,11 @@ export const FLASH_ABI = [
   },
   {
     "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ZeroValue",
     "inputs": []
   }
