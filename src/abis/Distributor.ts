@@ -2,7 +2,7 @@
  * Distributor Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton Merkle reward distributor. Leaves include (pool, campaignId) for domain separation.
+ * Singleton reward distributor. Pool address is first arg of pool-scoped fns.
  * Source: dex/evm/src/Distributor.sol.
  */
 
@@ -533,6 +533,11 @@ export const DISTRIBUTOR_ABI = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
   },
   {
     "type": "error",
