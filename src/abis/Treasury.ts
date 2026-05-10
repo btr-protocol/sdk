@@ -2,8 +2,8 @@
  * Treasury Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Protocol fee + vesting sink.
- * Source: dex/evm/src/Treasury.sol (V-free post-V1 drop).
+ * Protocol treasury / fee accrual.
+ * Source: dex/evm/src/Treasury.sol.
  */
 
 export const TREASURY_ABI = [
@@ -148,6 +148,11 @@ export const TREASURY_ABI = [
     "name": "collectProtocolFees",
     "inputs": [
       {
+        "name": "admin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "pool",
         "type": "address",
         "internalType": "address"
@@ -271,6 +276,19 @@ export const TREASURY_ABI = [
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getBridge",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

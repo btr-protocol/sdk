@@ -1,6 +1,6 @@
 {
   "name": "@btr-protocol/sdk",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "main": "./src/index.ts",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

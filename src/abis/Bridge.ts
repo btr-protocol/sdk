@@ -2,8 +2,8 @@
  * Bridge Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * LayerZero v2 OApp endpoint.
- * Source: dex/evm/src/Bridge.sol (V-free post-V1 drop).
+ * Cross-chain bridge module.
+ * Source: dex/evm/src/Bridge.sol.
  */
 
 export const BRIDGE_ABI = [

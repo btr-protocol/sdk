@@ -2,8 +2,8 @@
  * Router Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Multi-hop swap router.
- * Source: dex/evm/src/Router.sol (V-free post-V1 drop).
+ * Multi-pool swap router.
+ * Source: dex/evm/src/Router.sol.
  */
 
 export const ROUTER_ABI = [

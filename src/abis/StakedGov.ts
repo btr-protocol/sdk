@@ -2,8 +2,8 @@
  * StakedGov Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Staked governance token (BTR governance staking receipt).
- * Source: dex/evm/src/tokens/StakedGov.sol (extends StakedToken).
+ * Governance staked token. Constructor: (staking, underlying, pool).
+ * Source: dex/evm/src/tokens/StakedGov.sol.
  */
 
 export const STAKED_GOV_ABI = [
@@ -17,6 +17,11 @@ export const STAKED_GOV_ABI = [
       },
       {
         "name": "_gov",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_pool",
         "type": "address",
         "internalType": "address"
       },
@@ -42,6 +47,19 @@ export const STAKED_GOV_ABI = [
         "name": "result",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "POOL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
