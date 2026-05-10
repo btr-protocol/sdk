@@ -2,8 +2,8 @@
  * StakedLP Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Staked LP token (BTR LP staking receipt).
- * Source: dex/evm/src/tokens/StakedLP.sol (extends StakedToken).
+ * LP staked token. Constructor: (staking, underlying, pool).
+ * Source: dex/evm/src/tokens/StakedLP.sol.
  */
 
 export const STAKED_LP_ABI = [
@@ -21,7 +21,7 @@ export const STAKED_LP_ABI = [
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_pool",
         "type": "address",
         "internalType": "address"
       }
@@ -37,6 +37,19 @@ export const STAKED_LP_ABI = [
         "name": "result",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "POOL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
