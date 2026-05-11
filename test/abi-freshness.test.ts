@@ -1,12 +1,12 @@
 /**
- * ABI freshness test — Phase 42H.D · Round 4 · G16
+ * ABI freshness test, Phase 42H.D · Round 4 · G16
  *
  * For each ABI in src/abis/, run `forge inspect <Contract> abi --json` against
  * the canonical source repo (dex/evm) and assert ABI parity. Catches drift when
  * Solidity sources change without ABI regen.
  *
  * Comparison is structural (function/event/error/constructor selectors + types).
- * Param `name` fields and `internalType` strings are stripped before compare —
+ * Param `name` fields and `internalType` strings are stripped before compare -
  * these are cosmetic and do NOT affect on-wire ABI encoding. Anything else
  * (added/removed/renamed function, changed type, changed mutability) → fail.
  */
