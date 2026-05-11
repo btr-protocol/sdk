@@ -2,7 +2,7 @@
  * Pool Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Per-pool clone (EIP-1167). Flat surface — singleton helpers (Admin/Staking/Distributor/Flash) wrap pool-scoped operations.
+ * Per-pool clone (EIP-1167). Flat surface -singleton helpers (Admin/Staking/Distributor/Flash) wrap pool-scoped operations.
  * Source: dex/evm/src/Pool.sol.
  */
 
