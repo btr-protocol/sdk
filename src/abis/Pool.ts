@@ -1091,7 +1091,7 @@ export const POOL_ABI = [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct IPoolModule.SwapQuote",
+        "internalType": "struct IPool.SwapQuote",
         "components": [
           {
             "name": "amountOut",
