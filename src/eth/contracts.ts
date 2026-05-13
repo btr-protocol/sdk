@@ -8,8 +8,12 @@
  */
 
 import type { Address } from './types';
+import { zeroAddress } from './types';
 
-export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
+/**
+ * @deprecated use `zeroAddress` (viem-style) from `@btr-protocol/sdk/eth`. Kept as alias.
+ */
+export const ZERO_ADDRESS: Address = zeroAddress;
 
 // ─────────────────────────────────────────────────────────────
 // Contract Addresses by Chain

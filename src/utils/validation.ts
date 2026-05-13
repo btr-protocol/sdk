@@ -4,12 +4,9 @@
 
 import type { Address, Eip1193Provider } from '../eth/index.js';
 
-/**
- * Validate address format
- */
-export function isValidAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
-}
+// Canonical address validator lives in ../eth/types.ts (`isAddress`).
+// Re-export here for backward compatibility within @btr-protocol/sdk/utils.
+export { isAddress } from '../eth/types.js';
 
 /**
  * Check if address has code (is contract)
