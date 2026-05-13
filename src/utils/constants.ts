@@ -32,15 +32,13 @@ export const DEFAULT_PRICE_DIVERGENCE_BPS = 500; // 5%
 export const DEFAULT_CB_CHECK_INTERVAL = FIVE_MINUTES * 1000; // 5 minutes in ms
 export const DEFAULT_CB_COOLDOWN = ONE_HOUR; // 1 hour
 
-// Supported chains (example)
-export const SUPPORTED_CHAINS = {
-  ETHEREUM: 1,
-  ARBITRUM: 42161,
-  OPTIMISM: 10,
-  BASE: 8453,
-} as const;
+// Supported chains — derived from the canonical CHAINS registry in eth/chains.ts.
+// Kept as a numeric array (single source of truth = CHAINS).
+// For named accessors (ETHEREUM, ARBITRUM, ...) import from `@btr-protocol/sdk/eth` directly.
+import { CHAINS } from '../eth/chains.js';
+export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Number);
 
-export type SupportedChainId = typeof SUPPORTED_CHAINS[keyof typeof SUPPORTED_CHAINS];
+export type SupportedChainId = number;
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -49,12 +47,8 @@ export type SupportedChainId = typeof SUPPORTED_CHAINS[keyof typeof SUPPORTED_CH
 export type TokenAddress = Address;
 export type PoolAddress = Address;
 
-export interface TokenInfo {
-  address: TokenAddress;
-  symbol: string;
-  name: string;
-  decimals: number;
-}
+// Note: legacy single-chain `TokenInfo` removed. Use `TokenMetadata` from
+// `@btr-protocol/sdk/eth` (multi-chain registry) for token metadata.
 
 export interface PoolAsset {
   reserves: bigint;

@@ -76,7 +76,6 @@ export {
   SUPPORTED_CHAINS,
   type TokenAddress,
   type PoolAddress,
-  type TokenInfo,
   type OraclePrice,
   type CircuitBreakerConfig,
   type GuardianConfig,
