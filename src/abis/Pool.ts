@@ -1286,6 +1286,35 @@ export const POOL_ABI = [
   },
   {
     "type": "function",
+    "name": "previewWithdraw",
+    "inputs": [
+      {
+        "name": "tk",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "lp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "amountOut",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "haircut",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "pushFeed",
     "inputs": [
       {
