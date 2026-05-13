@@ -89,6 +89,9 @@ export * from './utils/maths.js';
 export * from './utils/format.js';
 export * from './utils/encoding.js';
 
+// Shared types (TimeFrame enum + helpers)
+export * from './types/index.js';
+
 // Oracles and Guardians
 export * from './oracles/index.js';
 export * from './guardians/index.js';
