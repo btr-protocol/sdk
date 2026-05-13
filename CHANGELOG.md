@@ -2,6 +2,15 @@
 
 All notable changes to `@btr-protocol/sdk` are documented here.
 
+## [0.4.6] - 2026-05-14
+
+### Changed (Track-1 Wave-1)
+- `POOL_ABI`: `getMidPrice` split into `midPrice` (view, pure read of last cached `lastPriceB64`) and `pokeMidPrice` (nonpayable, refresh-then-read keeper path). Audit Cohort-1 finding: prior `getMidPrice` was declared view in `IPoolModule` but impl mutated oracle accumulators via `_readOracle`.
+- `POOL_ABI`: added `getCoverageRatio(address)` view (previously declared in `IPoolModule`, missing from impl).
+- `POOL_ABI`: removed `pushFeed` (deleted disabled stub) and 6 public-getter selectors (`DEFAULT_TTL`, `FAST_VOL_ALPHA`, `FAST_WINDOW`, `MAX_VOLATILITY`, `SLOW_VOL_ALPHA`, `SLOW_WINDOW`) -constants demoted to internal in `Pool.sol` for bytecode reduction; read from `PoolOracle` library directly if needed off-chain.
+- `ADMIN_ABI`: removed `pendingData` and `pendingOps` public-mapping getters -consumers should read via `TimelockRequested` events.
+- `pool/index.ts` inline `POOL_ABI`: `getMidPrice` → `midPrice` + `pokeMidPrice` split.
+
 ## [0.3.0] - 2026-05-10
 
 ### Changed
