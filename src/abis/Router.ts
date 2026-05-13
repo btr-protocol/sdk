@@ -276,7 +276,7 @@ export const ROUTER_ABI = [
       {
         "name": "quote",
         "type": "tuple",
-        "internalType": "struct IPoolModule.SwapQuote",
+        "internalType": "struct IPool.SwapQuote",
         "components": [
           {
             "name": "amountOut",
@@ -508,7 +508,7 @@ export const ROUTER_ABI = [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct IPoolModule.SwapQuote",
+        "internalType": "struct IPool.SwapQuote",
         "components": [
           {
             "name": "amountOut",
