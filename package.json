@@ -45,6 +45,10 @@
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
     },
+    "./types": {
+      "types": "./src/types/index.ts",
+      "default": "./src/types/index.ts"
+    },
     "./utils/logger": {
       "types": "./src/utils/logger.ts",
       "default": "./src/utils/logger.ts"
