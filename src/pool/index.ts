@@ -77,7 +77,14 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
-    name: 'getMidPrice',
+    name: 'midPrice',
+    stateMutability: 'view',
+    inputs: [{ name: 'token', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'pokeMidPrice',
     stateMutability: 'nonpayable',
     inputs: [{ name: 'token', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
