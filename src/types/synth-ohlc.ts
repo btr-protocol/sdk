@@ -286,3 +286,75 @@ export class RollingCorrelation {
   /** Number of observations currently in window. */
   count(): number { return this.filled; }
 }
+
+// ─── Tick-level synth composition (Wave-3a) ────────────────────────────────
+/** Per-leg scalar quote at a single instant. */
+export interface LegTick {
+  bid: number;
+  ask: number;
+  mid: number;
+  /** Confidence in bps ∈ [0, 10000]. 0 = stale / one-sided. */
+  conf: number;
+}
+
+/** Composed synth tick: product/ratio of leg ticks. */
+export interface SynthTick {
+  mid: number;
+  bid: number;
+  ask: number;
+  conf: number;
+}
+
+/**
+ * Compose a synthetic instantaneous tick from signed legs.
+ *
+ * Multiplicative composition: synth = Π leg_i^{e_i}.
+ *   e=+1 → multiply by leg (bid, ask, mid)
+ *   e=-1 → divide by leg, swapping bid↔ask so synth.bid ≤ synth.ask is preserved:
+ *           inv.bid = 1/leg.ask, inv.ask = 1/leg.bid, inv.mid = 1/leg.mid
+ *
+ * Confidence composes via min: synth.conf = min(legConf_i). Any leg conf=0 ⇒ synth=0.
+ * Returns null if any leg is missing or has non-positive bid/ask/mid (degenerate).
+ *
+ * @example
+ *   computeSynthTick(
+ *     [['BTCUSDC', 1], ['USDCUSDT', 1]],   // BTCUSDT = BTCUSDC × USDCUSDT
+ *     { BTCUSDC: { bid: 99_500, ask: 100_500, mid: 100_000, conf: 10000 },
+ *       USDCUSDT: { bid: 0.9999, ask: 1.0001, mid: 1.0, conf: 10000 } },
+ *   )  // → { mid≈100_000, bid≈99_490.05, ask≈100_510.05, conf: 10000 }
+ */
+export function computeSynthTick(
+  legs: readonly Leg[],
+  legTicks: Readonly<Record<string, LegTick>>,
+): SynthTick | null {
+  // Trivial-identity path (e.g. EUREUR with 0 legs) → 1.0 quote, full conf.
+  if (legs.length === 0) return { mid: 1, bid: 1, ask: 1, conf: 10000 };
+
+  let mid = 1;
+  let bid = 1;
+  let ask = 1;
+  let conf = 10000;
+
+  for (let i = 0; i < legs.length; i++) {
+    const [sym, exp] = legs[i];
+    const k = legTicks[sym];
+    if (!k) return null;
+    if (!(k.mid > 0) || !(k.bid > 0) || !(k.ask > 0)) return null;
+    if (exp === 1) {
+      mid *= k.mid;
+      bid *= k.bid;
+      ask *= k.ask;
+    } else {
+      // Inversion swaps bid↔ask to preserve bid ≤ ask after composition.
+      mid /= k.mid;
+      bid /= k.ask;
+      ask /= k.bid;
+    }
+    if (k.conf < conf) conf = k.conf;
+  }
+
+  // Degeneracy guard: collapse one-sided / inverted quote → conf=0 (last-known-good).
+  if (!(ask >= bid) || bid <= 0 || ask <= 0) conf = 0;
+
+  return { mid, bid, ask, conf };
+}
