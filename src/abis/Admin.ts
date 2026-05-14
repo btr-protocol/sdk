@@ -804,6 +804,29 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
+    "name": "setBaseTokenOracle",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "oracle",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "feedId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setFlowCooldown",
     "inputs": [
       {
