@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Protocol treasury / fee accrual.
- * Source: dex/evm/src/Treasury.sol.
+ * Source: shared/evm/src/Treasury.sol.
  */
 
 export const TREASURY_ABI = [
@@ -11,7 +11,7 @@ export const TREASURY_ABI = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_govToken",
+        "name": "ac_",
         "type": "address",
         "internalType": "address"
       }
@@ -21,6 +21,37 @@ export const TREASURY_ABI = [
   {
     "type": "receive",
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "AC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "accrue",
+    "inputs": [
+      {
+        "name": "vault",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "perfShares",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -117,20 +148,6 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "cancelOwnershipHandover",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "cancelOwnershipTransfer",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "cancelUpgrade",
     "inputs": [],
     "outputs": [],
@@ -165,19 +182,6 @@ export const TREASURY_ABI = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "completeOwnershipHandover",
-    "inputs": [
-      {
-        "name": "pendingOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -259,13 +263,6 @@ export const TREASURY_ABI = [
   {
     "type": "function",
     "name": "executeEmissionsCapChange",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeOwnershipTransfer",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -430,7 +427,7 @@ export const TREASURY_ABI = [
     "name": "initialize",
     "inputs": [
       {
-        "name": "newOwner",
+        "name": "govToken_",
         "type": "address",
         "internalType": "address"
       }
@@ -443,7 +440,7 @@ export const TREASURY_ABI = [
     "name": "initializeEmissions",
     "inputs": [
       {
-        "name": "_emissionsCap",
+        "name": "emissionsCap_",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -481,19 +478,6 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "maxSupply",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "mintEmissionsToDistributor",
     "inputs": [
       {
@@ -525,45 +509,13 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "owner",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "result",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ownershipHandoverExpiresAt",
-    "inputs": [
-      {
-        "name": "pendingOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "result",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "pendingEmissionsCap",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "stateMutability": "view"
@@ -596,32 +548,6 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "pendingOwner",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pendingOwnershipOp",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint96",
-        "internalType": "uint96"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "pendingUpgrade",
     "inputs": [],
     "outputs": [
@@ -648,6 +574,25 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
+    "name": "perfShareBalance",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "proxiableUUID",
     "inputs": [],
     "outputs": [
@@ -661,39 +606,12 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "renounceOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "requestEmissionsCapChange",
     "inputs": [
       {
         "name": "newCap",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "requestOwnershipHandover",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "requestOwnershipTransfer",
-    "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -763,19 +681,6 @@ export const TREASURY_ABI = [
   },
   {
     "type": "function",
-    "name": "tgeTimestamp",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "totalVestingAllocation",
     "inputs": [],
     "outputs": [
@@ -786,19 +691,6 @@ export const TREASURY_ABI = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "transferOwnership",
-    "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -1004,45 +896,19 @@ export const TREASURY_ABI = [
   },
   {
     "type": "event",
-    "name": "OwnershipHandoverCanceled",
+    "name": "PerfAccrued",
     "inputs": [
       {
-        "name": "pendingOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipHandoverRequested",
-    "inputs": [
-      {
-        "name": "pendingOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipTransferred",
-    "inputs": [
-      {
-        "name": "oldOwner",
+        "name": "vault",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "newOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "name": "perfShares",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1219,11 +1085,6 @@ export const TREASURY_ABI = [
   },
   {
     "type": "error",
-    "name": "AlreadyInitialized",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ExceedsMaxSupply",
     "inputs": []
   },
@@ -1255,17 +1116,17 @@ export const TREASURY_ABI = [
   },
   {
     "type": "error",
-    "name": "NewOwnerIsZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NoHandoverRequest",
+    "name": "NotAuth",
     "inputs": []
   },
   {
     "type": "error",
     "name": "NotReady",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotVault",
     "inputs": []
   },
   {
