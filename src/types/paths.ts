@@ -38,25 +38,37 @@ export type SynthPath = {
  * (or a previously-declared synth — DAG via SYNTH_PATHS_ORDERED).
  */
 export const SYNTH_PATHS: readonly SynthPath[] = Object.freeze([
-  // Pure inversions (FX-style + stables)
+  // Pure inversions (FX-style + stables) — canonical raw symbols are USDC-quoted.
   { sym: 'USDCBTC',  legs: Object.freeze([['BTCUSDC',  -1]] as const) },
   { sym: 'USDCETH',  legs: Object.freeze([['ETHUSDC',  -1]] as const) },
   { sym: 'USDCSOL',  legs: Object.freeze([['SOLUSDC',  -1]] as const) },
   { sym: 'USDCPAXG', legs: Object.freeze([['PAXGUSDC', -1]] as const) },
 
-  // 2-leg crosses (USDT-denominated → cross via USDT)
-  { sym: 'ETHBTC',   legs: Object.freeze([['ETHUSDT',  1], ['BTCUSDT', -1]] as const) },
-  { sym: 'SOLBTC',   legs: Object.freeze([['SOLUSDT',  1], ['BTCUSDT', -1]] as const) },
-  { sym: 'SOLETH',   legs: Object.freeze([['SOLUSDT',  1], ['ETHUSDT', -1]] as const) },
+  // 2-leg crosses (USDC-denominated → cross via USDC)
+  { sym: 'ETHBTC',   legs: Object.freeze([['ETHUSDC',  1], ['BTCUSDC', -1]] as const) },
+  { sym: 'SOLBTC',   legs: Object.freeze([['SOLUSDC',  1], ['BTCUSDC', -1]] as const) },
+  { sym: 'SOLETH',   legs: Object.freeze([['SOLUSDC',  1], ['ETHUSDC', -1]] as const) },
 
-  // Cross-currency triangulations (sym → EUR via USDT × EURUSD pivot)
-  { sym: 'BTCEUR',   legs: Object.freeze([['BTCUSDT',  1], ['EURUSDT', -1]] as const) },
-  { sym: 'ETHEUR',   legs: Object.freeze([['ETHUSDT',  1], ['EURUSDT', -1]] as const) },
-  { sym: 'PAXGEUR',  legs: Object.freeze([['PAXGUSDT', 1], ['EURUSDT', -1]] as const) },
+  // Cross-currency triangulations (sym → EUR via USDC × EURC/USD pivot)
+  { sym: 'BTCEUR',   legs: Object.freeze([['BTCUSDC',  1], ['EURCUSD', -1]] as const) },
+  { sym: 'ETHEUR',   legs: Object.freeze([['ETHUSDC',  1], ['EURCUSD', -1]] as const) },
+  { sym: 'PAXGEUR',  legs: Object.freeze([['PAXGUSDC', 1], ['EURCUSD', -1]] as const) },
 
-  // Gold crosses
-  { sym: 'BTCPAXG',  legs: Object.freeze([['BTCUSDT',  1], ['PAXGUSDT', -1]] as const) },
-  { sym: 'ETHPAXG',  legs: Object.freeze([['ETHUSDT',  1], ['PAXGUSDT', -1]] as const) },
+  // Gold crosses (USDC-denominated)
+  { sym: 'BTCPAXG',  legs: Object.freeze([['BTCUSDC',  1], ['PAXGUSDC', -1]] as const) },
+  { sym: 'ETHPAXG',  legs: Object.freeze([['ETHUSDC',  1], ['PAXGUSDC', -1]] as const) },
+
+  // ── Back-compat: *USDT synth = *USDC × USDCUSDT ──────────────────────────
+  // Source feeds remain USDT-denominated for liquidity; clients can still
+  // query e.g. BTCUSDT and get back the USDT-quoted price.
+  { sym: 'BTCUSDT',  legs: Object.freeze([['BTCUSDC',  1], ['USDCUSDT', 1]] as const) },
+  { sym: 'ETHUSDT',  legs: Object.freeze([['ETHUSDC',  1], ['USDCUSDT', 1]] as const) },
+  { sym: 'SOLUSDT',  legs: Object.freeze([['SOLUSDC',  1], ['USDCUSDT', 1]] as const) },
+  { sym: 'PAXGUSDT', legs: Object.freeze([['PAXGUSDC', 1], ['USDCUSDT', 1]] as const) },
+
+  // Identity-like declarations (referenced by front agents).
+  { sym: 'USDTUSD',  legs: Object.freeze([['USDCUSDT', -1]] as const) },
+  { sym: 'EUREUR',   legs: Object.freeze([] as const) }, // trivial 1.0; consumers should short-circuit
 ]);
 
 /** Set of synth symbol names (O(1) membership). */
