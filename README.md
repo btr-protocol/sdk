@@ -2,12 +2,12 @@
 
 Protocol-internal TypeScript SDK for the BTR stack. Single source of truth for ABIs, EVM RPC client, chain registry, token list, and shared helpers — consumed by **front**, **back**, **swap**, and contract tooling.
 
-Current version: **0.4.4**. See `CHANGELOG.md`.
+Version pinned in `package.json` (`version` field). See `CHANGELOG.md`.
 
 ## Purpose
 
 - Framework-agnostic EVM JSON-RPC client (`./eth`) — no `ethers`, no `viem` dep.
-- Canonical ABIs (`./abis`) for every deployed BTR contract (Pool, PoolFactory, Admin, Staking, Distributor, Flash, Treasury, Bridge, Router, GovToken, StakedGov, StakedLP, BridgeableERC20).
+- Canonical ABIs (`./abis`) for every deployed BTR contract: AccessControl, Admin, Bridge, BridgeableERC20, BtrPoolAdapter, Dex, Distributor, Factory, Flash, GovToken, Pool, PoolFactory, PriceProvider, Router, StakedGov, StakedLP, Staking, Swapper, Treasury, Vault.
 - Pool helpers: data fetch + swap quoting (`./pool`).
 - High-level flows: swap / deposit / withdraw (`./flows`).
 - Oracles + guardians + rewards: `./oracles`, `./guardians`, `./rewards`.
@@ -36,7 +36,7 @@ bun install
 | Subpath | Purpose |
 |---|---|
 | `@btr-protocol/sdk` | Curated root re-export (utils, ABIs, oracles, guardians, pool, eth) |
-| `@btr-protocol/sdk/abis` | Raw ABIs: `POOL_ABI`, `POOL_FACTORY_ABI`, `ADMIN_ABI`, `STAKING_ABI`, `DISTRIBUTOR_ABI`, `FLASH_ABI`, `TREASURY_ABI`, `BRIDGE_ABI`, `ROUTER_ABI`, `GOV_TOKEN_ABI`, `STAKED_GOV_ABI`, `STAKED_LP_ABI`, `BRIDGEABLE_ERC20_ABI` |
+| `@btr-protocol/sdk/abis` | Raw ABIs: `ACCESS_CONTROL_ABI`, `ADMIN_ABI`, `BRIDGE_ABI`, `BRIDGEABLE_ERC20_ABI`, `BTR_POOL_ADAPTER_ABI`, `DEX_ABI`, `DISTRIBUTOR_ABI`, `FACTORY_ABI`, `FLASH_ABI`, `GOV_TOKEN_ABI`, `POOL_ABI`, `POOL_FACTORY_ABI`, `PRICE_PROVIDER_ABI`, `ROUTER_ABI`, `STAKED_GOV_ABI`, `STAKED_LP_ABI`, `STAKING_ABI`, `SWAPPER_ABI`, `TREASURY_ABI`, `VAULT_ABI` |
 | `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626/7540/777, OFT, signatures, RLP |
 | `@btr-protocol/sdk/flows` | High-level swap / deposit / withdraw flows |
 | `@btr-protocol/sdk/guardians` | Circuit-breaker + base guardian |
