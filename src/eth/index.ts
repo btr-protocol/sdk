@@ -93,6 +93,8 @@ export {
   decode,
   encodeFn,
   decodeFn,
+  encodeAbiParameters,
+  decodeAbiParameters,
 } from './abi';
 
 // Token Standards
