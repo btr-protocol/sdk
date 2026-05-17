@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * ALM BTR-pool adapter -wraps dex/Pool for vault deployment.
- * Source: alm/evm/src/BtrPoolAdapter.sol.
+ * Source: shared/evm/src/adapters/BtrPoolAdapter.sol.
  */
 
 export const BTR_POOL_ADAPTER_ABI = [
@@ -542,7 +542,12 @@ export const BTR_POOL_ADAPTER_ABI = [
   },
   {
     "type": "error",
-    "name": "Killed_",
+    "name": "InvalidInput",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Killed",
     "inputs": []
   },
   {

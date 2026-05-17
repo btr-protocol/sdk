@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * ALM Dex adapter -concentrated-liquidity routing surface.
- * Source: alm/evm/src/Dex.sol.
+ * Source: shared/evm/src/adapters/CLAdapter.sol.
  */
 
 export const DEX_ABI = [
@@ -911,7 +911,7 @@ export const DEX_ABI = [
   },
   {
     "type": "error",
-    "name": "Killed_",
+    "name": "Killed",
     "inputs": []
   },
   {
