@@ -49,6 +49,15 @@ export const BRAND = Object.freeze({
   domain: 'btr.supply',
 });
 
+/**
+ * Canonical AI provider base URLs. Single source of truth for any back/front
+ * consumer needing to talk to an upstream chat/inference API. Override via env
+ * at the consumer level — these are the defaults.
+ */
+export const AI_PROVIDERS = Object.freeze({
+  zai: 'https://api.z.ai/api/coding/paas/v4',
+});
+
 export type SupportedChainId = number;
 
 // ─────────────────────────────────────────────────────────────
