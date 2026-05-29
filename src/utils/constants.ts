@@ -38,6 +38,17 @@ export const DEFAULT_CB_COOLDOWN = ONE_HOUR; // 1 hour
 import { CHAINS } from '../eth/chains.js';
 export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Number);
 
+/**
+ * Canonical BTR brand identity. Single source of truth across front/back/docs.
+ * GitHub org renamed to `btr-supply` (was `btr-markets`) — keep all links in sync.
+ */
+export const BRAND = Object.freeze({
+  name: 'BTR',
+  github: 'https://github.com/btr-supply',
+  githubOrg: 'btr-supply',
+  domain: 'btr.supply',
+});
+
 export type SupportedChainId = number;
 
 // ─────────────────────────────────────────────────────────────
