@@ -81,6 +81,15 @@ export const TOKENS: Record<string, TokenMetadata> = {
       '42161': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
     },
   },
+  WBNB: {
+    symbol: 'WBNB',
+    name: 'Wrapped BNB',
+    decimals: 18,
+    wrapperOf: 'BNB',
+    addresses: {
+      '56': '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+    },
+  },
   WBTC: {
     symbol: 'WBTC',
     name: 'Wrapped Bitcoin',
