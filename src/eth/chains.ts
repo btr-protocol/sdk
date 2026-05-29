@@ -15,6 +15,22 @@ export type { Address } from './types';
 
 export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
+/**
+ * Canonical chain allowlist for BTR swap (atomic + intent).
+ * SVM intentionally excluded — UI shows it greyed w/ "Coming soon".
+ * Single source of truth: keep front (`ChainSelector`, `TokenSelector`)
+ * and back (`services/swap/lib/config.ts ALLOWED_CHAIN_IDS`) in sync via this export.
+ */
+export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
+  1,     // Ethereum mainnet
+  8453,  // Base
+  56,    // BNB Chain
+  42161, // Arbitrum
+  999,   // HyperEVM
+  43114, // Avalanche
+  137,   // Polygon
+]);
+
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────

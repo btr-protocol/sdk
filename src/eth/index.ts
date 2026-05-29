@@ -40,6 +40,7 @@ export {
 export type { ChainConfig, ChainId, ChainInfo } from './chains';
 export {
   CHAINS,
+  SWAP_ALLOWED_EVM_CHAINS,
   getChain,
   getChainInfo,
   getAllChainInfo,
