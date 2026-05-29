@@ -15,6 +15,13 @@ import { zeroAddress } from './types';
  */
 export const ZERO_ADDRESS: Address = zeroAddress;
 
+/**
+ * Canonical LiFi Diamond address — same on all supported EVM chains (LiFi deployment doctrine).
+ * Single source of truth for keeper calldata `to` allowlist + ALM/DEX settler placeholders.
+ * @see https://docs.li.fi/smart-contracts/deployments
+ */
+export const LIFI_DIAMOND: Address = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE';
+
 // ─────────────────────────────────────────────────────────────
 // Contract Addresses by Chain
 // ─────────────────────────────────────────────────────────────

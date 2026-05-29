@@ -79,6 +79,7 @@ export type { SupportedChainId, ContractName } from './contracts';
 export {
   CONTRACTS,
   ZERO_ADDRESS,
+  LIFI_DIAMOND,
   getContractAddress,
   isChainSupported,
   SUPPORTED_CONTRACT_CHAIN_IDS,
