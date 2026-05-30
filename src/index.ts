@@ -87,6 +87,7 @@ export * from './utils/business.js';
 export * from './utils/maths.js';
 export * from './utils/format.js';
 export * from './utils/encoding.js';
+export * from './utils/pair.js';
 
 // Shared types (TimeFrame enum + helpers)
 export * from './types/index.js';
