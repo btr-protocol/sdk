@@ -47,6 +47,9 @@ export const BRAND = Object.freeze({
   github: 'https://github.com/btr-supply',
   githubOrg: 'btr-supply',
   domain: 'btr.supply',
+  twitter: 'btr_supply',
+  telegram: 'btrsupply',
+  supportEmail: 'tech@btr.supply',
 });
 
 /**
