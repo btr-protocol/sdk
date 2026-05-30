@@ -12,3 +12,4 @@ export * from './format.js';
 export * from './constants.js';
 export * from './encoding.js';
 export * from './logger.js';
+export * from './pair.js';
