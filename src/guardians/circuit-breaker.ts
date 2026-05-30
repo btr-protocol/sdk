@@ -16,7 +16,7 @@
 import type { Address, Eip1193Provider } from '../eth/index.js';
 import { BaseGuardian, type OracleProvider, type PricePoint } from './base-guardian.js';
 import type { GuardianConfig } from '../utils/constants.js';
-import { BPS_PRECISION, ONE_DAY } from '../utils/constants.js';
+import { BPS_PRECISION, ONE_DAY, nowSec } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
 
 const log = logger.withContext('circuitBreaker');
@@ -147,7 +147,7 @@ export class CircuitBreakerGuardian {
   }
 
   private async checkCorrelated(assetAddress: Address, refAddress: Address): Promise<number> {
-    const now = Math.floor(Date.now() / 1000);
+    const now = nowSec();
     const weekAgo = now - WEEK_IN_SECONDS;
 
     const [assetPrices, refPrices] = await Promise.all([
