@@ -18,11 +18,21 @@ export const SWAP_GAS_LIMIT = 300_000n;
 export const DEPOSIT_GAS_LIMIT = 250_000n;
 export const WITHDRAW_GAS_LIMIT = 250_000n;
 
-// Time constants
+// Time constants (seconds)
 export const ONE_MINUTE = 60;
 export const FIVE_MINUTES = 300;
 export const ONE_HOUR = 3600;
 export const ONE_DAY = 86400;
+
+// Time constants (milliseconds)
+export const MS_PER_SECOND = 1_000;
+export const MS_PER_MINUTE = 60_000;
+export const MS_PER_HOUR = 3_600_000;
+export const MS_PER_DAY = 86_400_000;
+
+// Time helpers — single source for "now" timestamps.
+export const nowMs = (): number => Date.now();
+export const nowSec = (): number => Math.floor(Date.now() / 1000);
 
 // Oracle constants
 export const DEFAULT_ORACLE_STALENESS = ONE_DAY; // 24 hours
