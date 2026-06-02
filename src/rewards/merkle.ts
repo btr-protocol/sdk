@@ -75,12 +75,10 @@ export function getMerkleProof(tree: MerkleTree, leafIndex: number): Hex[] {
  * keccak256(abi.encodePacked(uint256 index, address account, uint256 amount))
  */
 export function makeLeaf(entry: MerkleLeaf): Hex {
-  // abi.encodePacked does not pad, so we need to manually pack:
-  // uint256 (32 bytes) + address (20 bytes) + uint256 (32 bytes) = 84 bytes total
+  // Manual encodePacked: uint256(32) + address(20) + uint256(32) = 84 bytes
   const indexHex = pad(toHex(BigInt(entry.index)), 32);
   const accountHex = entry.account.toLowerCase() as Hex;
   const amountHex = pad(toHex(entry.amount), 32);
-
   return keccak256(concat([indexHex, accountHex, amountHex]));
 }
 

@@ -4,6 +4,7 @@
  */
 
 import type { Address } from '../eth/index.js';
+import { dampPower } from './earning-power.js';
 
 /**
  * User's voting position (aggregated across all chains)
@@ -39,37 +40,16 @@ export const DEFAULT_MULTIPLIERS: VotingMultipliers = {
   boostCap: 50000,             // 5x
 };
 
-/**
- * Voting power suppression constants (quadratic damping)
- * Suppression formula: y(S) = 1 - scale * S^exponent
- * Higher voting power → greater suppression (concave curve)
- */
+// Suppression constants (quadratic damping): y(S) = 1 - scale * S^exponent
 const votingFactor = 0.00548;     // Scale factor ≈ 5.48×10^-3
 const votingSuppressor = 0.265;    // Power exponent (concave: 0 < b < 1)
 
 /**
- * Apply voting power suppression to linear power
- * Formula: S_eff = S · (1 - scale * S^exponent)
- * Creates concave curve that reduces influence of large holders
- * @param linearPower Linear voting power (dollar-equivalent)
- * @returns Suppressed effective voting power
+ * Apply voting power suppression to linear power (concave curve).
+ * Shares the damping shape with earning-power; constants differ per domain.
  */
 export function applyDamping(linearPower: bigint): bigint {
-  if (linearPower === 0n) return 0n;
-
-  // Convert to float for calculation (S is in dollars, no decimals)
-  const S = Number(linearPower);
-
-  // Calculate suppression factor: y(S) = 1 - scale*S^exponent
-  const suppressionFactor = 1 - votingFactor * Math.pow(S, votingSuppressor);
-
-  // Ensure suppression factor is non-negative
-  const clampedFactor = Math.max(0, suppressionFactor);
-
-  // S_eff = S * y(S)
-  const effectivePower = S * clampedFactor;
-
-  return BigInt(Math.floor(effectivePower));
+  return dampPower(linearPower, votingFactor, votingSuppressor);
 }
 
 /**

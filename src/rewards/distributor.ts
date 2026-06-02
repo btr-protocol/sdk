@@ -42,45 +42,26 @@ export function generateEpochDistribution(
   users: UserStake[],
   poolWeights: Map<Address, number>
 ): EpochDistribution {
-  // Compute earning power for each user
   const earningPowers = computeDistribution(users, poolWeights);
-
-  // Calculate total earning power
-  const totalEarningPower = Array.from(earningPowers.values()).reduce(
-    (sum, power) => sum + power,
-    0n
-  );
+  const totalEarningPower = Array.from(earningPowers.values()).reduce((sum, power) => sum + power, 0n);
 
   if (totalEarningPower === 0n) {
-    // No one has earning power - return empty distribution
-    return {
-      config,
-      merkleRoot: '0x' as Hex,
-      totalAmount: 0n,
-      claims: [],
-    };
+    return { config, merkleRoot: '0x' as Hex, totalAmount: 0n, claims: [] };
   }
 
-  // Allocate rewards proportionally
+  // Allocate rewards pro-rata: amount = (power / totalPower) * totalRewards
   const entries: MerkleLeaf[] = [];
   let index = 0;
-
   for (const [user, power] of earningPowers.entries()) {
     if (power === 0n) continue;
-
-    // User's share: (power / totalPower) * totalRewards
     const amount = (power * config.totalRewards) / totalEarningPower;
-
     if (amount > 0n) {
       entries.push({ index, account: user, amount });
       index++;
     }
   }
 
-  // Build Merkle tree
   const distribution = buildDistribution(entries);
-
-  // Format claims
   const claims = distribution.entries.map(entry => ({
     user: entry.account as Address,
     index: entry.index,

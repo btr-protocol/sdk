@@ -5,37 +5,26 @@
 
 import type { Address } from '../eth/index.js';
 
-/**
- * Earning power suppression constants (quadratic damping)
- * Suppression formula: y(S) = 1 - scale * S^exponent
- * Higher earning power → greater suppression (concave curve)
- */
+// Suppression constants (quadratic damping): y(S) = 1 - scale * S^exponent
 const earningsFactor = 0.00548;     // Scale factor ≈ 5.48×10^-3
 const earningSuppressor = 0.265;    // Power exponent (concave: 0 < b < 1)
 
 /**
- * Apply earning power suppression to linear power
- * Formula: S_eff = S · (1 - scale * S^exponent)
- * Creates concave curve that reduces allocation to large positions
- * @param linearPower Linear earning power (dollar-equivalent)
- * @returns Suppressed effective earning power
+ * Shared concave damping: S_eff = floor(S · max(0, 1 - scale · S^exponent)).
+ * Reduces the weight of large positions/holders. Imported by voting-power.
+ */
+export function dampPower(linearPower: bigint, scale: number, exponent: number): bigint {
+  if (linearPower === 0n) return 0n;
+  const S = Number(linearPower);
+  const clampedFactor = Math.max(0, 1 - scale * Math.pow(S, exponent));
+  return BigInt(Math.floor(S * clampedFactor));
+}
+
+/**
+ * Apply earning power suppression to linear power (concave curve).
  */
 export function applyDamping(linearPower: bigint): bigint {
-  if (linearPower === 0n) return 0n;
-
-  // Convert to float for calculation (S is in dollars, no decimals)
-  const S = Number(linearPower);
-
-  // Calculate suppression factor: y(S) = 1 - scale*S^exponent
-  const suppressionFactor = 1 - earningsFactor * Math.pow(S, earningSuppressor);
-
-  // Ensure suppression factor is non-negative
-  const clampedFactor = Math.max(0, suppressionFactor);
-
-  // S_eff = S * y(S)
-  const effectivePower = S * clampedFactor;
-
-  return BigInt(Math.floor(effectivePower));
+  return dampPower(linearPower, earningsFactor, earningSuppressor);
 }
 
 /**
@@ -85,37 +74,29 @@ export function computeEarningPower(
   const G = user.govValue; // BTR value
   const totalLP = user.lpPositions.reduce((sum, pos) => sum + pos.value, 0n);
 
-  // Boost capacity: 5G
-  const boostCap = G * 5n;
-
   // Total boost to distribute: min(totalLP, 5G)
+  const boostCap = G * 5n;
   const totalBoost = totalLP < boostCap ? totalLP : boostCap;
 
-  // Sort pools by weight (descending) to allocate boost to highest-weight pools first
+  // Sort by weight desc so highest-weight pools allocate first
   const sortedPositions = user.lpPositions
     .map(pos => ({
       ...pos,
       weight: poolWeights.get(pos.pool.toLowerCase() as Address) || 0,
     }))
     .sort((a, b) => b.weight - a.weight);
+  const totalWeight = sortedPositions.reduce((sum, p) => sum + p.weight, 0);
 
-  // Allocate boost pro-rata by pool weight
-  let remainingBoost = totalBoost;
+  // Allocate boost pro-rata by pool weight, capped at each pool's base LP
   const boostedPositions = sortedPositions.map(pos => {
     const baseLP = pos.value;
-
-    // This pool gets boost proportional to its weight
-    // Simple pro-rata: boost allocated = (pos.weight / sum_weights) * totalBoost
-    const totalWeight = sortedPositions.reduce((sum, p) => sum + p.weight, 0);
     const poolBoostShare = totalWeight > 0
       ? (totalBoost * BigInt(Math.floor(pos.weight * 1e18)) / BigInt(Math.floor(totalWeight * 1e18)))
       : 0n;
-
-    // Capped at base LP value (can't boost more than you have)
     const boost = poolBoostShare < baseLP ? poolBoostShare : baseLP;
     const boostedLP = baseLP + boost;
 
-    // Contribution to earning power: w_p * boostedLP
+    // Contribution: w_p * boostedLP
     const contribution = (boostedLP * BigInt(Math.floor(pos.weight * 1e18))) / 1_000_000_000_000_000_000n;
 
     return {
@@ -137,33 +118,21 @@ export function computeEarningPower(
 }
 
 /**
- * Compute pool weights from utilization and coverage ratios
- * Higher weight = more incentives needed (high utilization + low coverage)
- *
- * Simple heuristic:
- * w_p = utilization_p * (1 / coverage_p)
- *
- * Normalize so sum(w_p) = 1
+ * Compute normalized pool weights: w_p = utilization_p / coverage_p, then Σw_p = 1.
+ * High utilization + low coverage = high weight (more incentives needed).
  */
 export function computePoolWeights(pools: {
   pool: Address;
   utilization: number;  // 0-1 (e.g., 0.8 = 80% utilization)
   coverage: number;     // 0-inf (e.g., 1.2 = 120% coverage)
 }[]): Map<Address, number> {
-  // Calculate raw weights
-  const rawWeights = pools.map(p => ({
-    pool: p.pool,
-    weight: p.utilization / p.coverage, // High util + low coverage = high weight
-  }));
-
-  // Normalize
+  const rawWeights = pools.map(p => ({ pool: p.pool, weight: p.utilization / p.coverage }));
   const totalWeight = rawWeights.reduce((sum, p) => sum + p.weight, 0);
-  const normalized = rawWeights.map(p => ({
-    pool: p.pool,
-    weight: totalWeight > 0 ? p.weight / totalWeight : 0,
-  }));
 
-  return new Map(normalized.map(p => [p.pool.toLowerCase() as Address, p.weight]));
+  return new Map(rawWeights.map(p => [
+    p.pool.toLowerCase() as Address,
+    totalWeight > 0 ? p.weight / totalWeight : 0,
+  ]));
 }
 
 /**
