@@ -5,118 +5,13 @@
 
 import { encodeFn, decodeFn } from '../eth/abi';
 import type { Address, Hex, Eip1193Provider } from '../eth/types';
+import { POOL_ABI } from '../abis/Pool.js';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)
 // ─────────────────────────────────────────────────────────────
 
-export const POOL_ABI = [
-  {
-    type: 'function',
-    name: 'getAsset',
-    stateMutability: 'view',
-    inputs: [{ name: 'token', type: 'address' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        components: [
-          { name: 'reserves', type: 'uint128' },
-          { name: 'liabilities', type: 'uint128' },
-          { name: 'minLiquidity', type: 'uint128' },
-          { name: 'liquidityIndex', type: 'uint64' },
-          { name: 'lastUpdate', type: 'uint32' },
-          { name: 'minDispersion', type: 'uint32' },
-          { name: 'anchor', type: 'address' },
-          { name: 'minFeeBps', type: 'uint16' },
-          { name: 'maxFeeBps', type: 'uint16' },
-          { name: 'maxDispersion', type: 'uint32' },
-          { name: 'anchorDepth', type: 'uint8' },
-          { name: 'decimals', type: 'uint8' },
-          { name: '_pad1', type: 'uint8[2]' },
-          { name: 'gamma', type: 'uint16' },
-          { name: 'vega', type: 'uint16' },
-          { name: 'lambda', type: 'uint16' },
-          { name: 'haircutSuppressor', type: 'uint16' },
-          { name: 'reservationPrice', type: 'uint64' },
-          { name: '_pad2', type: 'uint8[16]' },
-        ],
-      },
-    ],
-  },
-  {
-    type: 'function',
-    name: 'getCoverageRatio',
-    stateMutability: 'view',
-    inputs: [{ name: 'token', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'getLPBalance',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'user', type: 'address' },
-      { name: 'token', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'getProtocolFees',
-    stateMutability: 'view',
-    inputs: [{ name: 'token', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'baseToken',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'address' }],
-  },
-  {
-    type: 'function',
-    name: 'midPrice',
-    stateMutability: 'view',
-    inputs: [{ name: 'token', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'pokeMidPrice',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'token', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'getSwapQuote',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'tokenIn', type: 'address' },
-      { name: 'tokenOut', type: 'address' },
-      { name: 'amountIn', type: 'uint256' },
-    ],
-    outputs: [
-      {
-        name: 'quote',
-        type: 'tuple',
-        components: [
-          { name: 'amountOut', type: 'uint256' },
-          { name: 'amountIn', type: 'uint256' },
-          { name: 'spreadBps', type: 'uint16' },
-          { name: 'protoFee', type: 'uint256' },
-          { name: 'lpFee', type: 'uint256' },
-          { name: 'skewIn', type: 'int8' },
-          { name: 'skewOut', type: 'int8' },
-          { name: 'routeHops', type: 'address[]' },
-          { name: 'hopAmounts', type: 'uint256[]' },
-        ],
-      },
-    ],
-  },
-] as const;
+export { POOL_ABI } from '../abis/Pool.js';
 
 // ─────────────────────────────────────────────────────────────
 // Types
