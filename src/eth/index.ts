@@ -71,11 +71,6 @@ export {
   getTokenAddress,
   getAllTokensForChain,
   resolveTokenAlias,
-  resolveFeedBase,
-  canonicalPriceBase,
-  resolvePricePair,
-  isPriceAliasPair,
-  PRICE_CANONICAL_BASES,
   tokenMatchesSearch,
 } from './tokens';
 
