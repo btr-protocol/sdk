@@ -14,6 +14,12 @@ export interface TokenMetadata {
   icon?: string; // Optional override. Default: /tokens/{symbol.toLowerCase()}.svg
 }
 
+/** LST / yield ETH wrappers — keep distinct for NXR index feeds (not ≡ ETH). */
+const INDEX_DISTINCT_WRAPPERS = new Set([
+  'STETH', 'WSTETH', 'RETH', 'EETH', 'WEETH', 'WBETH', 'RSETH', 'LSETH', 'EZETH',
+  'OSETH', 'ETHX', 'SWETH', 'CBETH', 'FRXETH', 'SFRXETH',
+]);
+
 // ─────────────────────────────────────────────────────────────
 // Token Registry
 // ─────────────────────────────────────────────────────────────
@@ -611,6 +617,69 @@ export function resolveTokenAlias(symbol: string): string {
   const symbolUpper = symbol.toUpperCase();
   const token = TOKENS[symbolUpper];
   return token?.wrapperOf || symbolUpper;
+}
+
+/**
+ * Base symbol for NXR / collector spot feed lookup.
+ * 1:1 BTC wrappers → BTC; LSTs stay distinct; WETH/WBNB still unwrap.
+ */
+export function resolveFeedBase(symbol: string): string {
+  const upper = symbol.toUpperCase();
+  if (upper in PRICE_CANONICAL_BASES) {
+    return canonicalPriceBase(upper);
+  }
+  if (INDEX_DISTINCT_WRAPPERS.has(upper)) {
+    return upper;
+  }
+  return resolveTokenAlias(upper);
+}
+
+/**
+ * 1:1 spot wrappers that share the canonical CEX index base (mirrors nx-rates
+ * `cexs.price_canonical`). NOT yield/LST products (cbETH, wstETH, …).
+ */
+export const PRICE_CANONICAL_BASES: Record<string, string> = {
+  CBBTC: 'BTC',
+  WBTC: 'BTC',
+  TBTC: 'BTC',
+  BTCB: 'BTC',
+  BBTC: 'BTC',
+};
+
+/**
+ * Canonical NXR index base for Renko / ML. Only listed 1:1 wrappers collapse;
+ * cbETH and other LSTs stay distinct.
+ */
+export function canonicalPriceBase(symbol: string): string {
+  const upper = symbol.toUpperCase();
+  return PRICE_CANONICAL_BASES[upper] ?? upper;
+}
+
+/**
+ * Canonical NXR index pair for ML / Renko (unwraps 1:1 wrapper base leg only).
+ * `CBBTC-USDC` and `BTC/USDC` both map to `BTC/USDC`.
+ */
+export function resolvePricePair(pair: string): string {
+  const sep = pair.includes('/') ? '/' : pair.includes('-') ? '-' : null;
+  if (!sep) {
+    return canonicalPriceBase(pair);
+  }
+  const [base, quote] = pair.split(sep);
+  if (!base || !quote) {
+    return pair.toUpperCase();
+  }
+  return `${canonicalPriceBase(base)}/${quote.toUpperCase()}`;
+}
+
+/**
+ * True when the pair base is a configured 1:1 index wrapper (not generic wrapperOf).
+ */
+export function isPriceAliasPair(pair: string): boolean {
+  const sep = pair.includes('/') ? '/' : pair.includes('-') ? '-' : null;
+  if (!sep) return false;
+  const [base] = pair.split(sep);
+  if (!base) return false;
+  return base.toUpperCase() in PRICE_CANONICAL_BASES;
 }
 
 /**
