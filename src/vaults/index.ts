@@ -57,6 +57,16 @@ export const VAULTS: readonly VaultRegistryEntry[] = [
     chainId: 8453,
   },
   {
+    address: '0xD52f1B19902Db149490e2C76769461a6dcc2E900',
+    name: 'BTC Short Trend',
+    symbol: 'BTC-SO-T',
+    asset: BASE_USDC,
+    assetDecimals: 6,
+    strategy: 'prime-directional',
+    direction: 'short',
+    chainId: 8453,
+  },
+  {
     address: '0x38FAc67731b3F893d8a26eFE62D33Dd062FBec8D',
     name: 'ETH Long Trend',
     symbol: 'ETH-LO-T',
