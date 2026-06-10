@@ -99,6 +99,9 @@ export * from './guardians/index.js';
 // Pool data and transactions (canonical source for POOL_ABI, SwapQuote, PoolAsset)
 export * from './pool/index.js';
 
+// Vaults registry (typed list of live deployed vaults)
+export * from './vaults/index.js';
+
 // Eth utilities and clients
 export * from './eth/index.js';
 export type { Client } from './eth/client.js';
