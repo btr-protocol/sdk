@@ -3,6 +3,8 @@
  * Supports: All standard Solidity types (static/dynamic arrays, tuples, events, errors)
  */
 
+import { keccak_256 } from '@noble/hashes/sha3.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Hex } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -50,7 +52,8 @@ const numToHex = (n: bigint | number | boolean) => BN(n).toString(16);
 const utf8 = new TextEncoder();
 const decUtf8 = new TextDecoder();
 
-// Common selectors (extracted from forge artifacts)
+// Common selectors (precomputed cache; any other signature is derived via
+// keccak-256 on demand and memoized — see getSelector)
 const SELECTORS: Record<string, string> = {
   // ERC20
   'balanceOf(address)': '70a08231', 'allowance(address,address)': 'dd62ed3e',
@@ -70,8 +73,40 @@ const SELECTORS: Record<string, string> = {
   'withdraw(address,uint256,uint256)': 'b5c5f672',
 };
 
-export const getSelector = (sig: string): Hex =>
-  `0x${SELECTORS[sig] || (() => { throw new Error(`Missing selector: ${sig}`) })()}` as Hex;
+export const getSelector = (sig: string): Hex => {
+  let sel = SELECTORS[sig];
+  if (!sel) {
+    // Derive selector = first 4 bytes of keccak-256(signature). The static
+    // table above is only a precomputed cache — throwing on unknown
+    // signatures broke every ABI function not hand-listed (e.g. ERC-4626).
+    sel = bytesToHex(keccak_256(utf8.encode(sig))).slice(0, 8);
+    SELECTORS[sig] = sel;
+  }
+  return `0x${sel}` as Hex;
+};
+
+// Canonical ABI type for signature building — tuples must be expanded to
+// their component types: 'tuple[]' w/ (address,bool,bytes) → '(address,bool,bytes)[]'.
+// Without this, selector derivation/lookup uses non-canonical signatures.
+export function canonicalType(p: AbiParameter): string {
+  if (p.type.startsWith('tuple')) {
+    return `(${(p.components || []).map(canonicalType).join(',')})${p.type.slice(5)}`;
+  }
+  return p.type;
+}
+
+// True when a type is dynamically-sized per the ABI spec (referenced via
+// offset from its parent): string, bytes, T[] and any tuple/array containing one.
+function isDynamicType(type: string, components?: AbiParameter[]): boolean {
+  if (type === 'string' || type === 'bytes') return true;
+  const arrayMatch = type.match(/(\[\d*\])$/);
+  if (arrayMatch) {
+    if (arrayMatch[1] === '[]') return true;
+    return isDynamicType(type.slice(0, -arrayMatch[1].length), components);
+  }
+  if (type === 'tuple') return (components || []).some(c => isDynamicType(c.type, c.components));
+  return false;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Encoder
@@ -86,14 +121,21 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
     const base = type.slice(0, -arrayMatch[1].length);
     const arr = val as any[];
     const isStatic = arrayMatch[1] !== '[]'; // [N] is static, [] is dynamic
-    return processList(arr.map(v => encode(base, v, components)), !isStatic, isStatic ? arr.length : undefined);
+    const res = processList(arr.map(v => encode(base, v, components)), !isStatic, isStatic ? arr.length : undefined);
+    // Fixed-size array of dynamic elements is itself dynamic (tail-encoded).
+    if (isStatic && isDynamicType(base, components)) return { h: '', t: res.h };
+    return res;
   }
 
   // 2. Handle Tuples (tuple)
   if (type === 'tuple' && components) {
-    return processList(components.map((c, i) => 
+    const res = processList(components.map((c, i) =>
       encode(c.type, (val as any)[c.name || i] ?? (Array.isArray(val) ? val[i] : undefined), c.components)
     ), false);
+    // A tuple containing dynamic members is itself dynamic: its content must
+    // live in the tail so parents (e.g. tuple[] like multicall aggregate3)
+    // reference it via offset instead of inlining it.
+    return isDynamicType(type, components) ? { h: '', t: res.h } : res;
   }
 
   // 3. Handle Primitives
@@ -162,29 +204,30 @@ export function decode(type: string, data: string, offset = 0, components?: any[
     const isDynamic = arrayMatch[1] === '[]';
     const staticLen = !isDynamic ? Number(arrayMatch[1].slice(1, -1)) : 0;
 
+    // Convention: `offset` points at the type's content (containers resolve
+    // pointer indirection for their dynamic children). For dynamic arrays the
+    // content starts with the length word.
     let ptr = offset;
     let len = staticLen;
-
-    // For dynamic arrays, read pointer and then length
     if (isDynamic) {
-      ptr = Number(readInt(offset)) * 2;
-      len = Number(readInt(ptr));
-      ptr += 64;
+      len = Number(readInt(offset));
+      ptr = offset + 64;
     }
 
     const arr = [];
     let childOff = ptr;
 
     for (let i = 0; i < len; i++) {
-      // If dynamic child, read pointer. Else read data directly.
-      const isDyn = base === 'string' || base === 'bytes' || base.endsWith(']');
+      // If dynamic child (incl. tuples w/ dynamic members), read pointer.
+      // Else read data directly.
+      const isDyn = isDynamicType(base, components);
       const start = isDyn ? ptr + (Number(readInt(childOff)) * 2) : childOff;
       const res = decode(base, d, start, components);
       arr.push(res.val);
       childOff += isDyn ? 64 : res.read;
     }
 
-    return { val: arr, read: isDynamic ? 64 : staticLen * 32 };
+    return { val: arr, read: isDynamic ? 64 : childOff - ptr };
   }
 
   // 2. Tuples
@@ -192,11 +235,11 @@ export function decode(type: string, data: string, offset = 0, components?: any[
     const obj: any = Array.isArray(components) ? {} : [];
     let curr = offset;
     components.forEach((c, i) => {
-      const isDyn = c.type === 'string' || c.type === 'bytes' || c.type.endsWith('[]');
+      const isDyn = isDynamicType(c.type, c.components);
       const start = isDyn ? offset + (Number(readInt(curr)) * 2) : curr;
       const res = decode(c.type, d, start, c.components);
       obj[c.name || i] = res.val;
-      curr += 64;
+      curr += isDyn ? 64 : res.read;
     });
     return { val: obj, read: curr - offset };
   }
@@ -204,10 +247,9 @@ export function decode(type: string, data: string, offset = 0, components?: any[
   // 3. Primitives
   const [, base, sizeStr] = type.match(TYPE_RX) || [];
 
-  if (base === 'bytes' && !sizeStr) { // Dynamic bytes
-    const ptr = Number(readInt(offset)) * 2;
-    const len = Number(readInt(ptr));
-    return { val: `0x${d.slice(ptr + 64, ptr + 64 + len * 2)}`, read: 64 };
+  if (base === 'bytes' && !sizeStr) { // Dynamic bytes — offset points at length word
+    const len = Number(readInt(offset));
+    return { val: `0x${d.slice(offset + 64, offset + 64 + len * 2)}`, read: 64 };
   }
   
   if (base === 'string') {
@@ -238,20 +280,20 @@ export function encodeFn({ abi, functionName, args = [] }: any): Hex {
   const fn = abi.find((i: any) => i.name === functionName);
   if (!fn) throw new Error('Fn not found');
   const argsEncoded = processList(fn.inputs.map((i: any, idx: number) => encode(i.type, args[idx], i.components)), false);
-  const sig = `${fn.name}(${fn.inputs.map((i: any) => i.type).join(',')})`;
+  const sig = `${fn.name}(${fn.inputs.map((i: any) => canonicalType(i)).join(',')})`;
   return `${getSelector(sig)}${argsEncoded.h}${argsEncoded.t}`;
 }
 
 export function decodeFn({ abi, functionName, data }: any): any {
   const fn = abi.find((i: any) => i.name === functionName);
   if (!fn || !fn.outputs.length) return undefined;
-  const res = decode(
-    fn.outputs.length > 1 ? 'tuple' : fn.outputs[0].type,
-    data,
-    0,
-    fn.outputs.length > 1 ? fn.outputs : fn.outputs[0].components
-  );
-  return res.val;
+  // Multiple outputs decode as an inline tuple (return data IS the tuple
+  // content). A single dynamic output is referenced via a head pointer.
+  if (fn.outputs.length > 1) return decode('tuple', data, 0, fn.outputs).val;
+  const o = fn.outputs[0];
+  const d = clean(data);
+  const start = isDynamicType(o.type, o.components) ? Number(BN(`0x${d.slice(0, 64)}`)) * 2 : 0;
+  return decode(o.type, d, start, o.components).val;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -280,9 +322,12 @@ export function decodeAbiParameters(params: AbiParameter[], data: string): any[]
   let offset = 0;
 
   for (const param of params) {
-    const decoded = decode(param.type, d, offset, param.components);
+    // Dynamic params live in the tail, referenced by a head pointer.
+    const isDyn = isDynamicType(param.type, param.components);
+    const start = isDyn ? Number(BN(`0x${d.slice(offset, offset + 64)}`)) * 2 : offset;
+    const decoded = decode(param.type, d, start, param.components);
     result.push(decoded.val);
-    offset += decoded.read;
+    offset += isDyn ? 64 : decoded.read;
   }
 
   return result;
@@ -294,7 +339,7 @@ export function decodeAbiParameters(params: AbiParameter[], data: string): any[]
  * @example const topicHash = keccak256(toBytes(getEventSignature(event)))
  */
 export function getEventSignature(event: AbiEvent): string {
-  return `${event.name}(${(event.inputs || []).map(i => i.type).join(',')})`;
+  return `${event.name}(${(event.inputs || []).map(canonicalType).join(',')})`;
 }
 
 /**
@@ -323,7 +368,7 @@ export function encodeEventTopics(event: AbiEvent, args: Record<string, any>): (
  * Get error signature (used in error decoding)
  */
 export function getErrorSignature(error: AbiError): string {
-  return `${error.name}(${(error.inputs || []).map(i => i.type).join(',')})`;
+  return `${error.name}(${(error.inputs || []).map(canonicalType).join(',')})`;
 }
 
 /**
