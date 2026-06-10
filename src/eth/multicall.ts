@@ -51,9 +51,10 @@ export async function multicall(
   const raw = await ethCall(p, multicallAddr, data, opt.block);
 
   // 3. Decode results
-  // The decoder returns an array of objects based on component names: [{s: bool, r: bytes}]
+  // decodeFn returns the single output value directly: an array of
+  // component-named objects [{s: bool, r: bytes}, ...]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [results] = decodeFn({ abi: MC3_ABI, functionName: 'aggregate3', data: raw }) as any[];
+  const results = decodeFn({ abi: MC3_ABI, functionName: 'aggregate3', data: raw }) as any[];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return results.map((res: any, i: number): any => {
