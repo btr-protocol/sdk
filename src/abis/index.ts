@@ -34,6 +34,3 @@ export * from './Factory.js';
 export * from './Swapper.js';
 export * from './AccessControl.js';
 export * from './PriceProvider.js';
-
-// Prime surface (directional leveraged vaults)
-export * from './LevVault.js';

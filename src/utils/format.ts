@@ -37,7 +37,7 @@ export function formatCurrency(n: number | null | undefined, currency = 'USD', s
 
   // Small values: show significant figures
   const decimals = absN >= 0.01 ? 4 : getDigits(absN) + 2;
-  return sign + symbol + absN.toFixed(Math.min(decimals, 8));
+  return sign + symbol + absN.toFixed(Math.max(0, Math.min(decimals, 8)));
 }
 
 /** Format currency with compact notation ($1.5M, $2.3B) */
