@@ -169,17 +169,6 @@ export {
   getInjected,
 } from './wallets';
 
-export {
-  BASE_CHAIN_ID,
-  YIELD_VAULTS,
-  MOONWELL_MARKETS,
-  BASE_ASSETS,
-  route,
-  yieldVaultFor,
-  moonwellMarketFor,
-} from './base-parking';
-export type { RouteKind } from './base-parking';
-
 // ─────────────────────────────────────────────────────────────
 // Re-export formatting and encoding utilities from utils
 // ─────────────────────────────────────────────────────────────
