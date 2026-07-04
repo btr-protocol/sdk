@@ -85,6 +85,8 @@ export {
   SUPPORTED_CONTRACT_CHAIN_IDS,
   getBtrRouter,
   getBtrPoolFactory,
+  getBtrAdmin,
+  getBtrAccessControl,
 } from './contracts';
 
 // ABI
@@ -97,6 +99,7 @@ export {
   decodeFn,
   encodeAbiParameters,
   decodeAbiParameters,
+  getEventSignature,
 } from './abi';
 
 // Token Standards
