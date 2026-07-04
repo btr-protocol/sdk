@@ -37,6 +37,8 @@ export const CONTRACTS = {
     // TODO: real deployment addresses
     ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
   },
 
   // Ethereum Mainnet - Deterministic CREATE3 addresses (to be deployed)
@@ -49,6 +51,8 @@ export const CONTRACTS = {
     // TODO: real deployment addresses
     ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
   },
 
   // BNB Chain - Deterministic CREATE3 addresses (to be deployed)
@@ -61,6 +65,8 @@ export const CONTRACTS = {
     // TODO: real deployment addresses
     ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
   },
 
   // Base - Deterministic CREATE3 addresses (to be deployed)
@@ -73,6 +79,8 @@ export const CONTRACTS = {
     // TODO: real deployment addresses
     ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
   },
 
   // Arbitrum - Deterministic CREATE3 addresses (to be deployed)
@@ -85,6 +93,8 @@ export const CONTRACTS = {
     // TODO: real deployment addresses
     ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
   },
 } as const;
 
@@ -121,6 +131,16 @@ export function getBtrRouter(chainId: number): Address | undefined {
 export function getBtrPoolFactory(chainId: number): Address | undefined {
   const chain = chainId as SupportedChainId;
   return CONTRACTS[chain]?.POOL_FACTORY;
+}
+
+export function getBtrAdmin(chainId: number): Address | undefined {
+  const chain = chainId as SupportedChainId;
+  return CONTRACTS[chain]?.ADMIN;
+}
+
+export function getBtrAccessControl(chainId: number): Address | undefined {
+  const chain = chainId as SupportedChainId;
+  return CONTRACTS[chain]?.ACCESS_CONTROL;
 }
 
 // ─────────────────────────────────────────────────────────────
