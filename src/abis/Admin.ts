@@ -118,9 +118,24 @@ export const ADMIN_ABI = [
             "internalType": "uint16"
           },
           {
+            "name": "kappaCovBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "premCapBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covFlags",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
             "name": "_pad",
-            "type": "uint8[16]",
-            "internalType": "uint8[16]"
+            "type": "uint8[10]",
+            "internalType": "uint8[10]"
           }
         ]
       },
@@ -197,6 +212,47 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
+    "name": "batchRiskOp",
+    "inputs": [
+      {
+        "name": "pools",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "op",
+        "type": "uint8",
+        "internalType": "enum IAdmin.BatchOp"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelAddAsset",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "cancelOracleUpdate",
     "inputs": [
       {
@@ -226,6 +282,24 @@ export const ADMIN_ABI = [
         "name": "opType",
         "type": "uint8",
         "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelUpdateRiskConfig",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -380,6 +454,24 @@ export const ADMIN_ABI = [
   },
   {
     "type": "function",
+    "name": "pauseAsset",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "requestAddAsset",
     "inputs": [
       {
@@ -465,9 +557,24 @@ export const ADMIN_ABI = [
             "internalType": "uint16"
           },
           {
+            "name": "kappaCovBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "premCapBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covFlags",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
             "name": "_pad",
-            "type": "uint8[16]",
-            "internalType": "uint8[16]"
+            "type": "uint8[10]",
+            "internalType": "uint8[10]"
           }
         ]
       },
@@ -512,6 +619,31 @@ export const ADMIN_ABI = [
         "name": "initialSlowVolEMA",
         "type": "uint32",
         "internalType": "uint32"
+      },
+      {
+        "name": "minDispersion",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDispersion",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "gamma",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "vega",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "lambda",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -711,9 +843,24 @@ export const ADMIN_ABI = [
             "internalType": "uint16"
           },
           {
+            "name": "kappaCovBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "premCapBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covFlags",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
             "name": "_pad",
-            "type": "uint8[16]",
-            "internalType": "uint8[16]"
+            "type": "uint8[10]",
+            "internalType": "uint8[10]"
           }
         ]
       }
@@ -862,6 +1009,24 @@ export const ADMIN_ABI = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "unpauseAsset",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "AnchorUpdated",
     "inputs": [
@@ -975,6 +1140,50 @@ export const ADMIN_ABI = [
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BatchLegSkipped",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BatchRiskOp",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "op",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
       }
     ],
     "anonymous": false
@@ -1138,6 +1347,44 @@ export const ADMIN_ABI = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProtocolPause",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProtocolUnpause",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
