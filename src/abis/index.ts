@@ -16,6 +16,7 @@ export * from './Admin.js';
 export * from './Bridge.js';
 export * from './BridgeableERC20.js';
 export * from './Distributor.js';
+export * from './ExternalOracle.js';
 export * from './Flash.js';
 export * from './GovToken.js';
 export * from './Pool.js';
