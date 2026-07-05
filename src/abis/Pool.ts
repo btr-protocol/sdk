@@ -283,9 +283,14 @@ export const POOL_ABI = [
             internalType: 'uint64',
           },
           {
+            name: 'pegB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
             name: '_pad2',
-            type: 'uint8[10]',
-            internalType: 'uint8[10]',
+            type: 'uint8[2]',
+            internalType: 'uint8[2]',
           },
         ],
       },
