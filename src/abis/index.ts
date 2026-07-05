@@ -7,6 +7,7 @@
  * are singletons with `pool` as first arg of pool-scoped fns. Pool surface is flat.
  */
 
+export * from './AccessControl.js';
 export * from './Admin.js';
 export * from './Bridge.js';
 export * from './BridgeableERC20.js';
