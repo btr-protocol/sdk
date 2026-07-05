@@ -2,9 +2,8 @@
  * ExternalOracle Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Push-based external oracle. lastPriceB64 = fresh mark (quote source); emaPriceB64 = on-chain
- * rate-clamped time-decayed reference (getEma). pushFeed/batchPush carry (price, sigma, confidence).
- * Source: dex/evm/src/oracles/ExternalOracle.sol.
+ * Push-based external oracle. pushFeed/batchPush carry (price, sigma, confidence); getEma = rate-clamped reference.
+ * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
  */
 
 export const EXTERNAL_ORACLE_ABI = [
@@ -680,4 +679,4 @@ export const EXTERNAL_ORACLE_ABI = [
     name: 'ZeroValue',
     inputs: [],
   },
-] as const;
+];

@@ -2,556 +2,556 @@
  * Distributor Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton reward distributor. Pool address is first arg of pool-scoped fns.
- * Source: dex/evm/src/Distributor.sol.
+ * Rewards distributor singleton.
+ * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
  */
 
 export const DISTRIBUTOR_ABI = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: 'constructor',
+    inputs: [
       {
-        "name": "ac_",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'ac_',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "AC",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'AC',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "claimCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'claimCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "index",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'index',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "totalEarned",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'totalEarned',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "merkleProof",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
+        name: 'merkleProof',
+        type: 'bytes32[]',
+        internalType: 'bytes32[]',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "createTokenCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'createTokenCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "rewardToken",
-        "type": "address",
-        "internalType": "address"
+        name: 'rewardToken',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "manager",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'manager',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "finalizeCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'finalizeCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "getCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'getCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct IDistributor.Campaign",
-        "components": [
+        name: '',
+        type: 'tuple',
+        internalType: 'struct IDistributor.Campaign',
+        components: [
           {
-            "name": "id",
-            "type": "uint256",
-            "internalType": "uint256"
+            name: 'id',
+            type: 'uint256',
+            internalType: 'uint256',
           },
           {
-            "name": "status",
-            "type": "uint8",
-            "internalType": "enum IDistributor.CampaignStatus"
+            name: 'status',
+            type: 'uint8',
+            internalType: 'enum IDistributor.CampaignStatus',
           },
           {
-            "name": "rewardToken",
-            "type": "address",
-            "internalType": "address"
+            name: 'rewardToken',
+            type: 'address',
+            internalType: 'address',
           },
           {
-            "name": "manager",
-            "type": "address",
-            "internalType": "address"
+            name: 'manager',
+            type: 'address',
+            internalType: 'address',
           },
           {
-            "name": "merkleRoot",
-            "type": "bytes32",
-            "internalType": "bytes32"
+            name: 'merkleRoot',
+            type: 'bytes32',
+            internalType: 'bytes32',
           },
           {
-            "name": "lastUpdate",
-            "type": "uint32",
-            "internalType": "uint32"
+            name: 'lastUpdate',
+            type: 'uint32',
+            internalType: 'uint32',
           },
           {
-            "name": "totalAllocated",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
+            name: 'totalAllocated',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+        ],
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getCampaignClaimable",
-    "inputs": [
+    type: 'function',
+    name: 'getCampaignClaimable',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "index",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'index',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "totalEarned",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'totalEarned',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "merkleProof",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
+        name: 'merkleProof',
+        type: 'bytes32[]',
+        internalType: 'bytes32[]',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getCampaignClaimed",
-    "inputs": [
+    type: 'function',
+    name: 'getCampaignClaimed',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getTotalClaimed",
-    "inputs": [
+    type: 'function',
+    name: 'getTotalClaimed',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "nextCampaignId",
-    "inputs": [
+    type: 'function',
+    name: 'nextCampaignId',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pauseCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'pauseCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "resumeCampaign",
-    "inputs": [
+    type: 'function',
+    name: 'resumeCampaign',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "updateCampaignRoot",
-    "inputs": [
+    type: 'function',
+    name: 'updateCampaignRoot',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "merkleRoot",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        name: 'merkleRoot',
+        type: 'bytes32',
+        internalType: 'bytes32',
       },
       {
-        "name": "updatedAt",
-        "type": "uint32",
-        "internalType": "uint32"
+        name: 'updatedAt',
+        type: 'uint32',
+        internalType: 'uint32',
       },
       {
-        "name": "totalClaimable",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'totalClaimable',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "event",
-    "name": "CampaignClaimed",
-    "inputs": [
+    type: 'event',
+    name: 'CampaignClaimed',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
       },
       {
-        "name": "account",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'account',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "claimable",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'claimable',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "totalEarned",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'totalEarned',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "CampaignCreated",
-    "inputs": [
+    type: 'event',
+    name: 'CampaignCreated',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
       },
       {
-        "name": "rewardToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'rewardToken',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "manager",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
+        name: 'manager',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "CampaignRootUpdated",
-    "inputs": [
+    type: 'event',
+    name: 'CampaignRootUpdated',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
       },
       {
-        "name": "merkleRoot",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
+        name: 'merkleRoot',
+        type: 'bytes32',
+        indexed: false,
+        internalType: 'bytes32',
       },
       {
-        "name": "updatedAt",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
+        name: 'updatedAt',
+        type: 'uint32',
+        indexed: false,
+        internalType: 'uint32',
       },
       {
-        "name": "totalClaimable",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'totalClaimable',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "CampaignStatusUpdated",
-    "inputs": [
+    type: 'event',
+    name: 'CampaignStatusUpdated',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "campaignId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
       },
       {
-        "name": "newStatus",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "enum IDistributor.CampaignStatus"
-      }
+        name: 'newStatus',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'enum IDistributor.CampaignStatus',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "error",
-    "name": "InsufficientAmount",
-    "inputs": [
+    type: 'error',
+    name: 'InsufficientAmount',
+    inputs: [
       {
-        "name": "available",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "required",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "InvalidInput",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidState",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidState',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotConfigured",
-    "inputs": [
+    type: 'error',
+    name: 'NotConfigured',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
       },
       {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "Reentrancy",
-    "inputs": []
+    type: 'error',
+    name: 'Reentrancy',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Unauthorized",
-    "inputs": []
+    type: 'error',
+    name: 'Unauthorized',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroAddr",
-    "inputs": []
+    type: 'error',
+    name: 'ZeroAddr',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroValue",
-    "inputs": []
-  }
-] as const;
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
+  },
+];
