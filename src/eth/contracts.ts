@@ -96,10 +96,46 @@ export const CONTRACTS = {
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
   },
+
+  // BNB Chain Testnet (Chapel, id 97) — ZERO until CREATE3 deploy; override via env (see CONTRACT_ENV_VARS)
+  97: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: ZERO_ADDRESS,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: ZERO_ADDRESS,
+    POOL_STABLE: ZERO_ADDRESS,
+    ROUTER: ZERO_ADDRESS,
+    POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
+  },
 } as const;
 
 export type SupportedChainId = keyof typeof CONTRACTS;
 export type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
+
+/** DEX singleton keys in the per-chain registry (env-overridable on testnet). */
+export const CONTRACT_KEYS = ['ROUTER', 'POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL'] as const;
+export type DexContractKey = (typeof CONTRACT_KEYS)[number];
+
+/**
+ * Env var names for overriding ZERO placeholders until chapel/mainnet CREATE3 deploy.
+ * Front: prefix with `VITE_` (e.g. `VITE_ADMIN_ADDRESS`). Back/keepers: bare names.
+ */
+export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
+  ROUTER: 'BTR_ROUTER_ADDRESS',
+  POOL_FACTORY: 'BTR_POOL_FACTORY_ADDRESS',
+  ADMIN: 'BTR_ADMIN_ADDRESS',
+  ACCESS_CONTROL: 'BTR_ACCESS_CONTROL_ADDRESS',
+} as const;
+
+/** Front (Vite) env var names — `VITE_` + bare key suffix used by Safety Control Center. */
+export const CONTRACT_VITE_ENV_VARS: Record<DexContractKey, string> = {
+  ROUTER: 'VITE_ROUTER_ADDRESS',
+  POOL_FACTORY: 'VITE_POOL_FACTORY_ADDRESS',
+  ADMIN: 'VITE_ADMIN_ADDRESS',
+  ACCESS_CONTROL: 'VITE_ACCESS_CONTROL_ADDRESS',
+} as const;
 
 // ─────────────────────────────────────────────────────────────
 // Helper Functions
