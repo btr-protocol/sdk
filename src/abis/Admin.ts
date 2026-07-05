@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Singleton admin entrypoints. Pool address is first arg of pool-scoped fns.
- * Source: dex/evm/src/Admin.sol.
+ * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
  */
 
 export const ADMIN_ABI = [
@@ -51,16 +51,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.OracleConfig',
         components: [
           {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'secondary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
             name: 'feedId',
             type: 'bytes32',
             internalType: 'bytes32',
@@ -71,24 +61,29 @@ export const ADMIN_ABI = [
             internalType: 'bytes32',
           },
           {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
             name: 'refBandBps',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
-            name: 'modeFlags',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'accDecimals',
+            name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
           },
           {
+            name: 'pegB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
             name: '_pad',
-            type: 'uint8[11]',
-            internalType: 'uint8[11]',
+            type: 'uint8[1]',
+            internalType: 'uint8[1]',
           },
         ],
       },
@@ -128,9 +123,14 @@ export const ADMIN_ABI = [
             internalType: 'uint16',
           },
           {
+            name: 'kappaCovBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
             name: '_pad',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
+            type: 'uint8[14]',
+            internalType: 'uint8[14]',
           },
         ],
       },
@@ -178,11 +178,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'vega',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'lambda',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -470,16 +465,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.OracleConfig',
         components: [
           {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'secondary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
             name: 'feedId',
             type: 'bytes32',
             internalType: 'bytes32',
@@ -490,24 +475,29 @@ export const ADMIN_ABI = [
             internalType: 'bytes32',
           },
           {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
             name: 'refBandBps',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
-            name: 'modeFlags',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'accDecimals',
+            name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
           },
           {
+            name: 'pegB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
             name: '_pad',
-            type: 'uint8[11]',
-            internalType: 'uint8[11]',
+            type: 'uint8[1]',
+            internalType: 'uint8[1]',
           },
         ],
       },
@@ -547,9 +537,14 @@ export const ADMIN_ABI = [
             internalType: 'uint16',
           },
           {
+            name: 'kappaCovBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
             name: '_pad',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
+            type: 'uint8[14]',
+            internalType: 'uint8[14]',
           },
         ],
       },
@@ -597,11 +592,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'vega',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'lambda',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -665,16 +655,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.OracleConfig',
         components: [
           {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'secondary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
             name: 'feedId',
             type: 'bytes32',
             internalType: 'bytes32',
@@ -685,24 +665,29 @@ export const ADMIN_ABI = [
             internalType: 'bytes32',
           },
           {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
             name: 'refBandBps',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
-            name: 'modeFlags',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'accDecimals',
+            name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
           },
           {
+            name: 'pegB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
             name: '_pad',
-            type: 'uint8[11]',
-            internalType: 'uint8[11]',
+            type: 'uint8[1]',
+            internalType: 'uint8[1]',
           },
         ],
       },
@@ -813,9 +798,14 @@ export const ADMIN_ABI = [
             internalType: 'uint16',
           },
           {
+            name: 'kappaCovBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
             name: '_pad',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
+            type: 'uint8[14]',
+            internalType: 'uint8[14]',
           },
         ],
       },
@@ -882,11 +872,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'vega',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'lambda',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -1496,4 +1481,4 @@ export const ADMIN_ABI = [
     name: 'ZeroValue',
     inputs: [],
   },
-] as const;
+];

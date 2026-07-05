@@ -1,8 +1,8 @@
 /**
  * ABI freshness test, Phase 42H.D · Round 4 · G16
  *
- * For each ABI in src/abis/, run `forge inspect <Contract> abi --json` against
- * the canonical source repo (dex/evm) and assert ABI parity. Catches drift when
+ * For each DEX ABI in src/abis/, load the compiled artifact from dex/evm/out
+ * (forge build @ pinned commit) and assert ABI parity. Catches drift when
  * Solidity sources change without ABI regen.
  *
  * Comparison is structural (function/event/error/constructor selectors + types).
@@ -12,8 +12,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -21,13 +20,12 @@ import {
   BRIDGE_ABI,
   BRIDGEABLE_ERC20_ABI,
   DISTRIBUTOR_ABI,
+  EXTERNAL_ORACLE_ABI,
   FLASH_ABI,
   GOV_TOKEN_ABI,
   POOL_ABI,
   POOL_FACTORY_ABI,
   ROUTER_ABI,
-  STAKED_GOV_ABI,
-  STAKED_LP_ABI,
   STAKING_ABI,
   TREASURY_ABI,
 } from '../src/abis/index.js';
@@ -40,13 +38,12 @@ const ABI_MAP: Array<{ name: string; ts: readonly unknown[]; contract: string }>
   { name: 'Bridge', ts: BRIDGE_ABI, contract: 'Bridge' },
   { name: 'BridgeableERC20', ts: BRIDGEABLE_ERC20_ABI, contract: 'BridgeableERC20' },
   { name: 'Distributor', ts: DISTRIBUTOR_ABI, contract: 'Distributor' },
+  { name: 'ExternalOracle', ts: EXTERNAL_ORACLE_ABI, contract: 'ExternalOracle' },
   { name: 'Flash', ts: FLASH_ABI, contract: 'Flash' },
   { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken' },
   { name: 'Pool', ts: POOL_ABI, contract: 'Pool' },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
   { name: 'Router', ts: ROUTER_ABI, contract: 'Router' },
-  { name: 'StakedGov', ts: STAKED_GOV_ABI, contract: 'StakedGov' },
-  { name: 'StakedLP', ts: STAKED_LP_ABI, contract: 'StakedLP' },
   { name: 'Staking', ts: STAKING_ABI, contract: 'Staking' },
   { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury' },
 ];
@@ -57,6 +54,12 @@ type AbiItem = Record<string, unknown> & {
   outputs?: AbiItem[];
   components?: AbiItem[];
 };
+
+function loadForgeAbi(contract: string): AbiItem[] {
+  const artifactPath = resolve(DEX_EVM, `out/${contract}.sol/${contract}.json`);
+  const raw = readFileSync(artifactPath, 'utf8');
+  return (JSON.parse(raw) as { abi: AbiItem[] }).abi;
+}
 
 /**
  * Strip cosmetic fields (`name`, `internalType`) from a parsed ABI so structural
@@ -106,17 +109,11 @@ describe('ABI freshness vs dex/evm sources', () => {
   if (!dexExists) return;
 
   for (const { name, ts, contract } of ABI_MAP) {
-    test(`${name} ABI matches forge inspect output`, () => {
-      const raw = execSync(`forge inspect ${contract} abi --json`, {
-        cwd: DEX_EVM,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const onChain = JSON.parse(raw);
+    test(`${name} ABI matches dex/evm compiled artifact`, () => {
+      const onChain = loadForgeAbi(contract);
       const a = canonical(normalize(onChain));
       const b = canonical(normalize(ts));
       if (a !== b) {
-        // Tighter diff hint: surface signature-only sets so failures localise.
         const sig = (abi: AbiItem[]) =>
           abi
             .filter((e) => ['function', 'event', 'error'].includes(e.type))
