@@ -52,10 +52,6 @@
     "./utils/logger": {
       "types": "./src/utils/logger.ts",
       "default": "./src/utils/logger.ts"
-    },
-    "./vaults": {
-      "types": "./src/vaults/index.ts",
-      "default": "./src/vaults/index.ts"
     }
   },
   "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
