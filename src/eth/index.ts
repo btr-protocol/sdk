@@ -75,9 +75,12 @@ export {
 } from './tokens';
 
 // Contracts (deployed addresses)
-export type { SupportedChainId, ContractName } from './contracts';
+export type { SupportedChainId, ContractName, DexContractKey } from './contracts';
 export {
   CONTRACTS,
+  CONTRACT_KEYS,
+  CONTRACT_ENV_VARS,
+  CONTRACT_VITE_ENV_VARS,
   ZERO_ADDRESS,
   LIFI_DIAMOND,
   getContractAddress,
