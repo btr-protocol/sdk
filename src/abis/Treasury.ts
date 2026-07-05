@@ -2,1167 +2,1167 @@
  * Treasury Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Protocol treasury / fee accrual.
- * Source: shared/evm/src/Treasury.sol.
+ * Protocol treasury singleton.
+ * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
  */
 
 export const TREASURY_ABI = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: 'constructor',
+    inputs: [
       {
-        "name": "ac_",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'ac_',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "receive",
-    "stateMutability": "payable"
+    type: 'receive',
+    stateMutability: 'payable',
   },
   {
-    "type": "function",
-    "name": "AC",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'AC',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "accrue",
-    "inputs": [
+    type: 'function',
+    name: 'accrue',
+    inputs: [
       {
-        "name": "vault",
-        "type": "address",
-        "internalType": "address"
+        name: 'vault',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "perfShares",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'perfShares',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "authorizeRemoteDistributor",
-    "inputs": [
+    type: 'function',
+    name: 'authorizeRemoteDistributor',
+    inputs: [
       {
-        "name": "dstEid",
-        "type": "uint32",
-        "internalType": "uint32"
+        name: 'dstEid',
+        type: 'uint32',
+        internalType: 'uint32',
       },
       {
-        "name": "remoteDistributor",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'remoteDistributor',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "authorizedRemoteDistributor",
-    "inputs": [
+    type: 'function',
+    name: 'authorizedRemoteDistributor',
+    inputs: [
       {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
+        name: '',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "bridge",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'bridge',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "bridgeEmissions",
-    "inputs": [
+    type: 'function',
+    name: 'bridgeEmissions',
+    inputs: [
       {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
+        name: '',
+        type: 'uint32',
+        internalType: 'uint32',
       },
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+        name: '',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "payable"
+    outputs: [],
+    stateMutability: 'payable',
   },
   {
-    "type": "function",
-    "name": "burnGovToken",
-    "inputs": [
+    type: 'function',
+    name: 'burnGovToken',
+    inputs: [
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "cancelEmissionsCapChange",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'cancelEmissionsCapChange',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "cancelUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'cancelUpgrade',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "claimVested",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'claimVested',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "collectProtocolFees",
-    "inputs": [
+    type: 'function',
+    name: 'collectProtocolFees',
+    inputs: [
       {
-        "name": "admin",
-        "type": "address",
-        "internalType": "address"
+        name: 'admin',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "distributor",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'distributor',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "emissionsCap",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'emissionsCap',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "emissionsMinted",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'emissionsMinted',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "emissionsSchedule",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'emissionsSchedule',
+    inputs: [],
+    outputs: [
       {
-        "name": "totalAllocation",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'totalAllocation',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "claimed",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'claimed',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "cliffTime",
-        "type": "uint48",
-        "internalType": "uint48"
+        name: 'cliffTime',
+        type: 'uint48',
+        internalType: 'uint48',
       },
       {
-        "name": "endTime",
-        "type": "uint48",
-        "internalType": "uint48"
+        name: 'endTime',
+        type: 'uint48',
+        internalType: 'uint48',
       },
       {
-        "name": "cliffAmount",
-        "type": "uint128",
-        "internalType": "uint128"
+        name: 'cliffAmount',
+        type: 'uint128',
+        internalType: 'uint128',
       },
       {
-        "name": "suppressor",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
+        name: 'suppressor',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "executeEmissionsCapChange",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'executeEmissionsCapChange',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "executeUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'executeUpgrade',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "getBridge",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getBridge',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getClaimableVested",
-    "inputs": [
+    type: 'function',
+    name: 'getClaimableVested',
+    inputs: [
       {
-        "name": "beneficiary",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'beneficiary',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getMaxSupply",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getMaxSupply',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getRemainingMintable",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getRemainingMintable',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getTGETimestamp",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getTGETimestamp',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getTotalSupply",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getTotalSupply',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getVestingSchedule",
-    "inputs": [
+    type: 'function',
+    name: 'getVestingSchedule',
+    inputs: [
       {
-        "name": "beneficiary",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'beneficiary',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct ITreasury.VestingSchedule",
-        "components": [
+        name: '',
+        type: 'tuple',
+        internalType: 'struct ITreasury.VestingSchedule',
+        components: [
           {
-            "name": "totalAllocation",
-            "type": "uint256",
-            "internalType": "uint256"
+            name: 'totalAllocation',
+            type: 'uint256',
+            internalType: 'uint256',
           },
           {
-            "name": "claimed",
-            "type": "uint256",
-            "internalType": "uint256"
+            name: 'claimed',
+            type: 'uint256',
+            internalType: 'uint256',
           },
           {
-            "name": "cliffTime",
-            "type": "uint48",
-            "internalType": "uint48"
+            name: 'cliffTime',
+            type: 'uint48',
+            internalType: 'uint48',
           },
           {
-            "name": "endTime",
-            "type": "uint48",
-            "internalType": "uint48"
+            name: 'endTime',
+            type: 'uint48',
+            internalType: 'uint48',
           },
           {
-            "name": "cliffAmount",
-            "type": "uint128",
-            "internalType": "uint128"
+            name: 'cliffAmount',
+            type: 'uint128',
+            internalType: 'uint128',
           },
           {
-            "name": "suppressor",
-            "type": "uint16",
-            "internalType": "uint16"
-          }
-        ]
-      }
+            name: 'suppressor',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+        ],
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "govToken",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'govToken',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "initialize",
-    "inputs": [
+    type: 'function',
+    name: 'initialize',
+    inputs: [
       {
-        "name": "govToken_",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'govToken_',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "initializeEmissions",
-    "inputs": [
+    type: 'function',
+    name: 'initializeEmissions',
+    inputs: [
       {
-        "name": "emissionsCap_",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'emissionsCap_',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "initializeTGE",
-    "inputs": [
+    type: 'function',
+    name: 'initializeTGE',
+    inputs: [
       {
-        "name": "treasuryAmount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'treasuryAmount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "seedingAmount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'seedingAmount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "beneficiaries",
-        "type": "address[]",
-        "internalType": "address[]"
+        name: 'beneficiaries',
+        type: 'address[]',
+        internalType: 'address[]',
       },
       {
-        "name": "allocations",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
+        name: 'allocations',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "mintEmissionsToDistributor",
-    "inputs": [
+    type: 'function',
+    name: 'mintEmissionsToDistributor',
+    inputs: [
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "mintGovToken",
-    "inputs": [
+    type: 'function',
+    name: 'mintGovToken',
+    inputs: [
       {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
+        name: 'to',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "pendingEmissionsCap",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingEmissionsCap',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint128",
-        "internalType": "uint128"
-      }
+        name: '',
+        type: 'uint128',
+        internalType: 'uint128',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingEmissionsCapOp",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingEmissionsCapOp',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint96",
-        "internalType": "uint96"
-      }
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingImplementation",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingImplementation',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingUpgrade",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingUpgrade',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingUpgradeOp",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingUpgradeOp',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint96",
-        "internalType": "uint96"
-      }
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "perfShareBalance",
-    "inputs": [
+    type: 'function',
+    name: 'perfShareBalance',
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "proxiableUUID",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'proxiableUUID',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "requestEmissionsCapChange",
-    "inputs": [
+    type: 'function',
+    name: 'requestEmissionsCapChange',
+    inputs: [
       {
-        "name": "newCap",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'newCap',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "requestUpgrade",
-    "inputs": [
+    type: 'function',
+    name: 'requestUpgrade',
+    inputs: [
       {
-        "name": "newImplementation",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'newImplementation',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "salvage",
-    "inputs": [
+    type: 'function',
+    name: 'salvage',
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
+        name: 'to',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "setBridge",
-    "inputs": [
+    type: 'function',
+    name: 'setBridge',
+    inputs: [
       {
-        "name": "_bridge",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '_bridge',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "setDistributor",
-    "inputs": [
+    type: 'function',
+    name: 'setDistributor',
+    inputs: [
       {
-        "name": "_distributor",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '_distributor',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "totalVestingAllocation",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'totalVestingAllocation',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "upgradeToAndCall",
-    "inputs": [
+    type: 'function',
+    name: 'upgradeToAndCall',
+    inputs: [
       {
-        "name": "newImplementation",
-        "type": "address",
-        "internalType": "address"
+        name: 'newImplementation',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "data",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+        name: 'data',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "payable"
+    outputs: [],
+    stateMutability: 'payable',
   },
   {
-    "type": "function",
-    "name": "vestingSchedules",
-    "inputs": [
+    type: 'function',
+    name: 'vestingSchedules',
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "totalAllocation",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'totalAllocation',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "claimed",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'claimed',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "cliffTime",
-        "type": "uint48",
-        "internalType": "uint48"
+        name: 'cliffTime',
+        type: 'uint48',
+        internalType: 'uint48',
       },
       {
-        "name": "endTime",
-        "type": "uint48",
-        "internalType": "uint48"
+        name: 'endTime',
+        type: 'uint48',
+        internalType: 'uint48',
       },
       {
-        "name": "cliffAmount",
-        "type": "uint128",
-        "internalType": "uint128"
+        name: 'cliffAmount',
+        type: 'uint128',
+        internalType: 'uint128',
       },
       {
-        "name": "suppressor",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
+        name: 'suppressor',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "event",
-    "name": "BridgeSet",
-    "inputs": [
+    type: 'event',
+    name: 'BridgeSet',
+    inputs: [
       {
-        "name": "bridge",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'bridge',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "DistributorSet",
-    "inputs": [
+    type: 'event',
+    name: 'DistributorSet',
+    inputs: [
       {
-        "name": "distributor",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'distributor',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "EmissionsBridged",
-    "inputs": [
+    type: 'event',
+    name: 'EmissionsBridged',
+    inputs: [
       {
-        "name": "dstEid",
-        "type": "uint32",
-        "indexed": true,
-        "internalType": "uint32"
+        name: 'dstEid',
+        type: 'uint32',
+        indexed: true,
+        internalType: 'uint32',
       },
       {
-        "name": "remoteDistributor",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'remoteDistributor',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "EmissionsCapChanged",
-    "inputs": [
+    type: 'event',
+    name: 'EmissionsCapChanged',
+    inputs: [
       {
-        "name": "oldCap",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'oldCap',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "newCap",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'newCap',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "EmissionsInitialized",
-    "inputs": [
+    type: 'event',
+    name: 'EmissionsInitialized',
+    inputs: [
       {
-        "name": "emissionsCap",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'emissionsCap',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "EmissionsMinted",
-    "inputs": [
+    type: 'event',
+    name: 'EmissionsMinted',
+    inputs: [
       {
-        "name": "distributor",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'distributor',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "GovTokenBurned",
-    "inputs": [
+    type: 'event',
+    name: 'GovTokenBurned',
+    inputs: [
       {
-        "name": "from",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'from',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "GovTokenMinted",
-    "inputs": [
+    type: 'event',
+    name: 'GovTokenMinted',
+    inputs: [
       {
-        "name": "to",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'to',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "PerfAccrued",
-    "inputs": [
+    type: 'event',
+    name: 'PerfAccrued',
+    inputs: [
       {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'vault',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "perfShares",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'perfShares',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "ProtocolFeesCollected",
-    "inputs": [
+    type: 'event',
+    name: 'ProtocolFeesCollected',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "RemoteDistributorAuthorized",
-    "inputs": [
+    type: 'event',
+    name: 'RemoteDistributorAuthorized',
+    inputs: [
       {
-        "name": "dstEid",
-        "type": "uint32",
-        "indexed": true,
-        "internalType": "uint32"
+        name: 'dstEid',
+        type: 'uint32',
+        indexed: true,
+        internalType: 'uint32',
       },
       {
-        "name": "remoteDistributor",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'remoteDistributor',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "Salvaged",
-    "inputs": [
+    type: 'event',
+    name: 'Salvaged',
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "to",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'to',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "TGEInitialized",
-    "inputs": [
+    type: 'event',
+    name: 'TGEInitialized',
+    inputs: [
       {
-        "name": "govToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'govToken',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "treasuryAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'treasuryAmount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "seedingAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'seedingAmount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "timestamp",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
+        name: 'timestamp',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "UpgradeAuthorized",
-    "inputs": [
+    type: 'event',
+    name: 'UpgradeAuthorized',
+    inputs: [
       {
-        "name": "upgradeId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
+        name: 'upgradeId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
       },
       {
-        "name": "newImplementation",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        name: 'newImplementation',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
       },
       {
-        "name": "executableAt",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
+        name: 'executableAt',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "UpgradeCancelled",
-    "inputs": [
+    type: 'event',
+    name: 'UpgradeCancelled',
+    inputs: [
       {
-        "name": "upgradeId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
+        name: 'upgradeId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "Upgraded",
-    "inputs": [
+    type: 'event',
+    name: 'Upgraded',
+    inputs: [
       {
-        "name": "implementation",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'implementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "VestingClaimed",
-    "inputs": [
+    type: 'event',
+    name: 'VestingClaimed',
+    inputs: [
       {
-        "name": "beneficiary",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'beneficiary',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "error",
-    "name": "ExceedsMaxSupply",
-    "inputs": []
+    type: 'error',
+    name: 'ExceedsMaxSupply',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Expired",
-    "inputs": []
+    type: 'error',
+    name: 'Expired',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "FeatureDisabled",
-    "inputs": [
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
-      }
-    ]
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "InvalidInput",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidState",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidState',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotAuth",
-    "inputs": []
+    type: 'error',
+    name: 'NotAuth',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotReady",
-    "inputs": []
+    type: 'error',
+    name: 'NotReady',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotVault",
-    "inputs": []
+    type: 'error',
+    name: 'NotVault',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "PendingTimelock",
-    "inputs": [
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [
       {
-        "name": "executeAt",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
-    ]
+        name: 'executeAt',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "Reentrancy",
-    "inputs": []
+    type: 'error',
+    name: 'Reentrancy',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Unauthorized",
-    "inputs": []
+    type: 'error',
+    name: 'Unauthorized',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "UnauthorizedCallContext",
-    "inputs": []
+    type: 'error',
+    name: 'UnauthorizedCallContext',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "UpgradeFailed",
-    "inputs": []
+    type: 'error',
+    name: 'UpgradeFailed',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroValue",
-    "inputs": []
-  }
-] as const;
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
+  },
+];
