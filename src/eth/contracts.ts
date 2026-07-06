@@ -108,6 +108,8 @@ export const CONTRACTS = {
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
+    ORACLE: ZERO_ADDRESS,
+    FAUCET: ZERO_ADDRESS,
   },
 } as const;
 
@@ -115,7 +117,7 @@ export type SupportedChainId = keyof typeof CONTRACTS;
 export type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
 
 /** DEX singleton keys in the per-chain registry (env-overridable on testnet). */
-export const CONTRACT_KEYS = ['ROUTER', 'POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL'] as const;
+export const CONTRACT_KEYS = ['ROUTER', 'POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL', 'ORACLE', 'FAUCET'] as const;
 export type DexContractKey = (typeof CONTRACT_KEYS)[number];
 
 /**
@@ -127,6 +129,8 @@ export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
   POOL_FACTORY: 'BTR_POOL_FACTORY_ADDRESS',
   ADMIN: 'BTR_ADMIN_ADDRESS',
   ACCESS_CONTROL: 'BTR_ACCESS_CONTROL_ADDRESS',
+  ORACLE: 'BTR_ORACLE_ADDRESS',
+  FAUCET: 'BTR_FAUCET_ADDRESS',
 } as const;
 
 /** Front (Vite) env var names — `VITE_` + bare key suffix used by Safety Control Center. */
@@ -135,6 +139,8 @@ export const CONTRACT_VITE_ENV_VARS: Record<DexContractKey, string> = {
   POOL_FACTORY: 'VITE_POOL_FACTORY_ADDRESS',
   ADMIN: 'VITE_ADMIN_ADDRESS',
   ACCESS_CONTROL: 'VITE_ACCESS_CONTROL_ADDRESS',
+  ORACLE: 'VITE_ORACLE_ADDRESS',
+  FAUCET: 'VITE_FAUCET_ADDRESS',
 } as const;
 
 // ─────────────────────────────────────────────────────────────
