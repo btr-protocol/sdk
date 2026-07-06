@@ -37,7 +37,7 @@ export function formatCurrency(n: number | null | undefined, currency = 'USD', s
 
   // Small values: show significant figures
   const decimals = absN >= 0.01 ? 4 : getDigits(absN) + 2;
-  return sign + symbol + absN.toFixed(Math.min(decimals, 8));
+  return sign + symbol + absN.toFixed(Math.max(0, Math.min(decimals, 8)));
 }
 
 /** Format currency with compact notation ($1.5M, $2.3B) */
@@ -176,6 +176,18 @@ export function formatPercent(n: number | null | undefined, decimals = 2, signed
   // Handle multipliers (>200% shown as Nx)
   if (Math.abs(n) >= 200) return `${sign}${round(n / 100, 1)}x`;
   return `${sign}${round(n, decimals)}%`;
+}
+
+/**
+ * Percent with `sig` significant figures — small values keep precision (0.024%, 0.06%) instead of
+ * collapsing to "0%". Input is already in percent units (2.4 → "2.4%"). Use for spreads / tiny rates.
+ */
+export function formatPercentSig(n: number | null | undefined, sig = 2): string {
+  if (n == null || !isFinite(n) || n === 0) return '0%';
+  const abs = Math.abs(n);
+  const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
+  const s = abs.toFixed(decimals).replace(/\.?0+$/, '');
+  return `${n < 0 ? '-' : ''}${s}%`;
 }
 
 // ─────────────────────────────────────────────────────────────
