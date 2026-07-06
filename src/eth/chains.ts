@@ -25,6 +25,7 @@ export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
   1,     // Ethereum mainnet
   8453,  // Base
   56,    // BNB Chain
+  97,    // BNB Smart Chain testnet (chapel)
   42161, // Arbitrum
   999,   // HyperEVM
   43114, // Avalanche
