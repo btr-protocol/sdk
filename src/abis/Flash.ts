@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Singleton flash loan / flash account module.
- * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const FLASH_ABI = [

@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Singleton admin entrypoints. Pool address is first arg of pool-scoped fns.
- * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const ADMIN_ABI = [
