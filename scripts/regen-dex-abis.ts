@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const DEX_EVM = resolve(import.meta.dir, '../../../dex/evm');
+const DEX_EVM = resolve(import.meta.dir, '../../dex/evm');
 const ABI_DIR = resolve(import.meta.dir, '../src/abis');
 
 const CONTRACTS: Array<{
@@ -134,7 +134,7 @@ for (const { contract, file, constName, title, blurb } of CONTRACTS) {
  * @module @btr-protocol/sdk/abis
  *
  * ${blurb}
- * Source: dex/evm from dex/evm out/ — regen via \`bun scratchpad/regen-dex-abis.ts\`.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const ${constName} = ${abiToTs(artifact.abi)};
