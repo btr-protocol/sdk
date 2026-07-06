@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Push-based external oracle. pushFeed/batchPush carry (price, sigma, confidence); getEma = rate-clamped reference.
- * Source: dex/evm @ 8c13bc0 — regen via `bun scratchpad/regen-dex-abis.ts`.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const EXTERNAL_ORACLE_ABI = [
@@ -95,7 +95,7 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint64',
       },
       {
-        name: 'sigma',
+        name: 'sigmaSample',
         type: 'uint32',
         internalType: 'uint32',
       },
@@ -106,8 +106,13 @@ export const EXTERNAL_ORACLE_ABI = [
       },
       {
         name: 'tau',
-        type: 'uint32',
-        internalType: 'uint32',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'tauSigma',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
         name: 'maxDeviation',
@@ -216,7 +221,7 @@ export const EXTERNAL_ORACLE_ABI = [
             internalType: 'uint64',
           },
           {
-            name: 'sigma',
+            name: 'sigmaEma',
             type: 'uint32',
             internalType: 'uint32',
           },
@@ -237,8 +242,13 @@ export const EXTERNAL_ORACLE_ABI = [
           },
           {
             name: 'tau',
-            type: 'uint32',
-            internalType: 'uint32',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'tauSigma',
+            type: 'uint16',
+            internalType: 'uint16',
           },
         ],
       },
@@ -399,7 +409,7 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint64',
       },
       {
-        name: 'newSigma',
+        name: 'sigmaSample',
         type: 'uint32',
         internalType: 'uint32',
       },
@@ -453,10 +463,10 @@ export const EXTERNAL_ORACLE_ABI = [
     name: 'BatchPushed',
     inputs: [
       {
-        name: 'feedIds',
-        type: 'bytes32[]',
+        name: 'count',
+        type: 'uint256',
         indexed: false,
-        internalType: 'bytes32[]',
+        internalType: 'uint256',
       },
       {
         name: 'pusher',
@@ -496,7 +506,7 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint64',
       },
       {
-        name: 'sigma',
+        name: 'sigmaSample',
         type: 'uint32',
         indexed: false,
         internalType: 'uint32',
@@ -509,9 +519,15 @@ export const EXTERNAL_ORACLE_ABI = [
       },
       {
         name: 'tau',
-        type: 'uint32',
+        type: 'uint16',
         indexed: false,
-        internalType: 'uint32',
+        internalType: 'uint16',
+      },
+      {
+        name: 'tauSigma',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
       },
       {
         name: 'maxDeviation',
@@ -596,7 +612,13 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint64',
       },
       {
-        name: 'sigma',
+        name: 'sigmaSample',
+        type: 'uint32',
+        indexed: false,
+        internalType: 'uint32',
+      },
+      {
+        name: 'sigmaEma',
         type: 'uint32',
         indexed: false,
         internalType: 'uint32',
