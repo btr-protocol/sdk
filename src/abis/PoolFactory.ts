@@ -2,771 +2,632 @@
  * PoolFactory Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * EIP-1167 minimal-clone deployer for Pool instances.
- * Source: dex/evm/src/PoolFactory.sol.
+ * EIP-1167 minimal-clone factory for pool instances.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const POOL_FACTORY_ABI = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: 'constructor',
+    inputs: [
       {
-        "name": "_referencePool",
-        "type": "address",
-        "internalType": "address"
+        name: 'referencePool_',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "_protocolDeployer",
-        "type": "address",
-        "internalType": "address"
+        name: 'protocolDeployer_',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "_ac",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'ac_',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "receive",
-    "stateMutability": "payable"
+    type: 'receive',
+    stateMutability: 'payable',
   },
   {
-    "type": "function",
-    "name": "AC",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'AC',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "UPGRADE_TIMELOCK",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'UPGRADE_TIMELOCK',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "allPools",
-    "inputs": [
+    type: 'function',
+    name: 'allPools',
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "cancelOwnershipHandover",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
+    type: 'function',
+    name: 'cancelReferenceUpgrade',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "cancelReferenceUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "checkRoute",
-    "inputs": [
+    type: 'function',
+    name: 'checkRoute',
+    inputs: [
       {
-        "name": "tokenA",
-        "type": "address",
-        "internalType": "address"
+        name: 'tokenA',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "tokenB",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'tokenB',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "hasDirectRoute",
-        "type": "bool",
-        "internalType": "bool"
+        name: 'hasDirectRoute',
+        type: 'bool',
+        internalType: 'bool',
       },
       {
-        "name": "commonPools",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: 'commonPools',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "completeOwnershipHandover",
-    "inputs": [
+    type: 'function',
+    name: 'createPool',
+    inputs: [
       {
-        "name": "pendingOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "createPool",
-    "inputs": [
-      {
-        "name": "baseToken",
-        "type": "address",
-        "internalType": "address"
+        name: 'baseToken',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "tokens",
-        "type": "address[]",
-        "internalType": "address[]"
+        name: 'tokens',
+        type: 'address[]',
+        internalType: 'address[]',
       },
       {
-        "name": "initdata",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+        name: 'initdata',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "executeReferenceUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    type: 'function',
+    name: 'executeReferenceUpgrade',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "getAllPoolsCount",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getAllPoolsCount',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getCommonPools",
-    "inputs": [
+    type: 'function',
+    name: 'getCommonPools',
+    inputs: [
       {
-        "name": "tokenA",
-        "type": "address",
-        "internalType": "address"
+        name: 'tokenA',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "tokenB",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'tokenB',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "pools",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: 'pools',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getOfficialPoolsCount",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'getOfficialPoolsCount',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getPoolTokens",
-    "inputs": [
+    type: 'function',
+    name: 'getPoolTokens',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: '',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getPoolsForToken",
-    "inputs": [
+    type: 'function',
+    name: 'getPoolsForToken',
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: '',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "isOfficialPool",
-    "inputs": [
+    type: 'function',
+    name: 'isOfficialPool',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "isPool",
-    "inputs": [
+    type: 'function',
+    name: 'isPool',
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "officialPools",
-    "inputs": [
+    type: 'function',
+    name: 'officialPools',
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "owner",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'pendingReferencePool',
+    inputs: [],
+    outputs: [
       {
-        "name": "result",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "ownershipHandoverExpiresAt",
-    "inputs": [
+    type: 'function',
+    name: 'poolBaseTokens',
+    inputs: [
       {
-        "name": "pendingOwner",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "result",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingReferencePool",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'poolToTokens',
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "poolBaseTokens",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "poolToTokens",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "protocolDeployer",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'protocolDeployer',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "referencePool",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'referencePool',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "registerTokens",
-    "inputs": [
+    type: 'function',
+    name: 'registerTokens',
+    inputs: [
       {
-        "name": "tokens",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: 'tokens',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "renounceOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "requestOwnershipHandover",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "requestReferenceUpgrade",
-    "inputs": [
+    type: 'function',
+    name: 'requestReferenceUpgrade',
+    inputs: [
       {
-        "name": "newImplementation",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'newImplementation',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "setProtocolDeployer",
-    "inputs": [
+    type: 'function',
+    name: 'setProtocolDeployer',
+    inputs: [
       {
-        "name": "newDeployer",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'newDeployer',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "tokenInPool",
-    "inputs": [
+    type: 'function',
+    name: 'tokenInPool',
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "tokenToPools",
-    "inputs": [
+    type: 'function',
+    name: 'tokenToPools',
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "transferOwnership",
-    "inputs": [
+    type: 'function',
+    name: 'upgradeTimelock',
+    inputs: [],
+    outputs: [
       {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "payable"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "upgradeTimelock",
-    "inputs": [],
-    "outputs": [
+    type: 'event',
+    name: 'PoolCreated',
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "event",
-    "name": "OwnershipHandoverCanceled",
-    "inputs": [
-      {
-        "name": "pendingOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipHandoverRequested",
-    "inputs": [
-      {
-        "name": "pendingOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipTransferred",
-    "inputs": [
-      {
-        "name": "oldOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "newOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'creator',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'baseToken',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'official',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "PoolCreated",
-    "inputs": [
+    type: 'event',
+    name: 'ProtocolDeployerUpdated',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'oldDeployer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "creator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'newDeployer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "baseToken",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "official",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "ProtocolDeployerUpdated",
-    "inputs": [
+    type: 'event',
+    name: 'ReferencePoolUpgradeRequested',
+    inputs: [
       {
-        "name": "oldDeployer",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'oldImplementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "newDeployer",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'newImplementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'executeAt',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "ReferencePoolUpgradeRequested",
-    "inputs": [
+    type: 'event',
+    name: 'ReferencePoolUpgraded',
+    inputs: [
       {
-        "name": "oldImplementation",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'oldImplementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "newImplementation",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'newImplementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "executeAt",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "ReferencePoolUpgraded",
-    "inputs": [
+    type: 'event',
+    name: 'TokensRegistered',
+    inputs: [
       {
-        "name": "oldImplementation",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "newImplementation",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "TokensRegistered",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'tokens',
+        type: 'address[]',
+        indexed: false,
+        internalType: 'address[]',
       },
-      {
-        "name": "tokens",
-        "type": "address[]",
-        "indexed": false,
-        "internalType": "address[]"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "error",
-    "name": "AlreadyInitialized",
-    "inputs": []
+    type: 'error',
+    name: 'DeploymentFailed',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "DeploymentFailed",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidInput",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidState',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidState",
-    "inputs": []
+    type: 'error',
+    name: 'OperationFailed',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NewOwnerIsZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NoHandoverRequest",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "OperationFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PendingTimelock",
-    "inputs": [
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [
       {
-        "name": "executeAt",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
-    ]
+        name: 'executeAt',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "Unauthorized",
-    "inputs": []
+    type: 'error',
+    name: 'Unauthorized',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroValue",
-    "inputs": []
-  }
-] as const;
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
+  },
+];

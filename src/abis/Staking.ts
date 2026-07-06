@@ -2,1322 +2,891 @@
  * Staking Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton staking module. Pool address is first arg of pool-scoped fns.
- * Source: dex/evm/src/Staking.sol.
+ * Gov + LP staking singleton.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const STAKING_ABI = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: 'constructor',
+    inputs: [
       {
-        "name": "ac_",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'ac_',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "AC",
-    "inputs": [],
-    "outputs": [
+    type: 'function',
+    name: 'AC',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'contract AccessControl',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "configurePool",
-    "inputs": [
+    type: 'function',
+    name: 'delegate',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
       {
-        "name": "gov",
-        "type": "address",
-        "internalType": "address"
+        name: 'to',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "sGov",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "cooldownSeconds",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "delegateOfBy",
-    "inputs": [
+    type: 'function',
+    name: 'delegateOf',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "owner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "delegateVoting",
-    "inputs": [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeStakeLockDurationUpdate",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "flowCooldownSeconds",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getDelegateOf",
-    "inputs": [
+    type: 'function',
+    name: 'govCooldownSeconds',
+    inputs: [],
+    outputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: '',
+        type: 'uint16',
+        internalType: 'uint16',
       },
-      {
-        "name": "owner_",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getLPTokens",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
+    type: 'function',
+    name: 'govPaused',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getSLPToken",
-    "inputs": [
+    type: 'function',
+    name: 'govStakeLockDuration',
+    inputs: [],
+    outputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getStakeLockDuration",
-    "inputs": [
+    type: 'function',
+    name: 'govStaked',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getStakedBalance",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
+    type: 'function',
+    name: 'govToken',
+    inputs: [],
+    outputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: '',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getStakedGov",
-    "inputs": [
+    type: 'function',
+    name: 'govUnlockTime',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getStakedLP",
-    "inputs": [
+    type: 'function',
+    name: 'isWhitelisted',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "getTotalLPStaked",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    type: 'function',
+    name: 'pauseGov',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "getTotalStaked",
-    "inputs": [
+    type: 'function',
+    name: 'pauseStakable',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "getUnlockTime",
-    "inputs": [
+    type: 'function',
+    name: 'setGovStakeConfig',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'lockDuration',
+        type: 'uint48',
+        internalType: 'uint48',
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: 'cooldownSeconds_',
+        type: 'uint16',
+        internalType: 'uint16',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "govStaked",
-    "inputs": [
+    type: 'function',
+    name: 'setGovToken',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'gov',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "govTokenOf",
-    "inputs": [
+    type: 'function',
+    name: 'setStakableConfig',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
+      },
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IStaking.StakableConfig',
+        components: [
+          {
+            name: 'stakeLockDuration',
+            type: 'uint48',
+            internalType: 'uint48',
+          },
+          {
+            name: 'cooldownSeconds',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'paused',
+            type: 'bool',
+            internalType: 'bool',
+          },
+        ],
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "govUnlockTime",
-    "inputs": [
+    type: 'function',
+    name: 'stakableConfig',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
+        name: '',
+        type: 'tuple',
+        internalType: 'struct IStaking.StakableConfig',
+        components: [
+          {
+            name: 'stakeLockDuration',
+            type: 'uint48',
+            internalType: 'uint48',
+          },
+          {
+            name: 'cooldownSeconds',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'paused',
+            type: 'bool',
+            internalType: 'bool',
+          },
+        ],
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "isStakingPaused",
-    "inputs": [
+    type: 'function',
+    name: 'stake',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
+      },
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: 'shares',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "lastGovStakeTime",
-    "inputs": [
+    type: 'function',
+    name: 'stakeGov',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "lastLPStakeTime",
-    "inputs": [
+    type: 'function',
+    name: 'stakeWeight',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "lpStaked",
-    "inputs": [
+    type: 'function',
+    name: 'stakedAssetToken',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "lpUnlockTime",
-    "inputs": [
+    type: 'function',
+    name: 'stakedBalance',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pause",
-    "inputs": [
+    type: 'function',
+    name: 'stakedGovToken',
+    inputs: [],
+    outputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingData",
-    "inputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
+    type: 'function',
+    name: 'totalGovStaked',
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "pendingOps",
-    "inputs": [
+    type: 'function',
+    name: 'totalStaked',
+    inputs: [
       {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint96",
-        "internalType": "uint96"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "poolConfig",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
+    type: 'function',
+    name: 'unlockTime',
+    inputs: [
       {
-        "name": "stakeLockDuration",
-        "type": "uint48",
-        "internalType": "uint48"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
       {
-        "name": "paused",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "requestStakeLockDurationUpdate",
-    "inputs": [
+    outputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
       },
-      {
-        "name": "newLockDuration",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "sGovTokenOf",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
+    type: 'function',
+    name: 'unpauseGov',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "sLPTokens",
-    "inputs": [
+    type: 'function',
+    name: 'unpauseStakable',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "sLP",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "setFlowCooldown",
-    "inputs": [
+    type: 'function',
+    name: 'unstake',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "cooldownSeconds",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "stakeGov",
-    "inputs": [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'shares',
+        type: 'uint256',
+        internalType: 'uint256',
       },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "stakeLP",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
+    type: 'function',
+    name: 'unstakeGov',
+    inputs: [
       {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "totalGovStaked",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
+    type: 'function',
+    name: 'unwhitelistStakable',
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "totalLPStakedByPool",
-    "inputs": [
+    type: 'function',
+    name: 'whitelistStakable',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        internalType: 'contract IStakable',
       },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "unpause",
-    "inputs": [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IStaking.StakableConfig',
+        components: [
+          {
+            name: 'stakeLockDuration',
+            type: 'uint48',
+            internalType: 'uint48',
+          },
+          {
+            name: 'cooldownSeconds',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'paused',
+            type: 'bool',
+            internalType: 'bool',
+          },
+        ],
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "unstakeGov",
-    "inputs": [
+    type: 'event',
+    name: 'DelegateSet',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "unstakeLP",
-    "inputs": [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
+        name: 'oldDelegate',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'newDelegate',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    anonymous: false,
   },
   {
-    "type": "function",
-    "name": "updateStakingConfig",
-    "inputs": [
+    type: 'event',
+    name: 'GovStaked',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "lpToken",
-        "type": "address",
-        "internalType": "address"
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
+        name: 'unlockTime',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "DelegateSet",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
+    type: 'event',
+    name: 'GovUnstaked',
+    inputs: [
       {
-        "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "oldDelegate",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
-      {
-        "name": "newDelegate",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "GovStaked",
-    "inputs": [
+    type: 'event',
+    name: 'StakableConfigUpdated',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakeLockDuration',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'cooldownSeconds',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
       },
-      {
-        "name": "unlockTime",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "GovUnstaked",
-    "inputs": [
+    type: 'event',
+    name: 'StakablePaused',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "LPStaked",
-    "inputs": [
+    type: 'event',
+    name: 'StakableUnpaused',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "lpToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "unlockTime",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "LPUnstaked",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
+    type: 'event',
+    name: 'StakableUnwhitelisted',
+    inputs: [
       {
-        "name": "lpToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "PoolConfigured",
-    "inputs": [
+    type: 'event',
+    name: 'StakableWhitelisted',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "gov",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        name: 'sAsset',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
-      {
-        "name": "sGov",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "cooldownSeconds",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "StakingConfigUpdateRequested",
-    "inputs": [
+    type: 'event',
+    name: 'Staked',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "newLockDuration",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "executableAt",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "StakingConfigUpdated",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'shares',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "newLockDuration",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
+        name: 'unlockTime',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "StakingConfigured",
-    "inputs": [
+    type: 'event',
+    name: 'Unstaked',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'stakable',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "lpToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "sLPToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'shares',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "StakingPaused",
-    "inputs": [
+    type: 'error',
+    name: 'AlreadyConfigured',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
       },
       {
-        "name": "by",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "anonymous": false
   },
   {
-    "type": "event",
-    "name": "StakingUnpaused",
-    "inputs": [
+    type: 'error',
+    name: 'CooldownActive',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'remainingSeconds',
+        type: 'uint32',
+        internalType: 'uint32',
       },
-      {
-        "name": "by",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
     ],
-    "anonymous": false
   },
   {
-    "type": "error",
-    "name": "AlreadyConfigured",
-    "inputs": [
+    type: 'error',
+    name: 'InsufficientAmount',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
       },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "CooldownActive",
-    "inputs": [
-      {
-        "name": "remainingSeconds",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "DeploymentFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Expired",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InsufficientAmount",
-    "inputs": [
       {
-        "name": "available",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
       },
-      {
-        "name": "required",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    ],
   },
   {
-    "type": "error",
-    "name": "InvalidInput",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidState",
-    "inputs": []
+    type: 'error',
+    name: 'InvalidState',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotConfigured",
-    "inputs": [
+    type: 'error',
+    name: 'NotConfigured',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
       },
       {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "NotFound",
-    "inputs": [
+    type: 'error',
+    name: 'NotFound',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
       },
       {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotReady",
-    "inputs": []
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "PendingTimelock",
-    "inputs": [
-      {
-        "name": "executeAt",
-        "type": "uint48",
-        "internalType": "uint48"
-      }
-    ]
+    type: 'error',
+    name: 'Reentrancy',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Reentrancy",
-    "inputs": []
+    type: 'error',
+    name: 'Unauthorized',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Unauthorized",
-    "inputs": []
+    type: 'error',
+    name: 'ZeroAddr',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroAddr",
-    "inputs": []
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
   },
-  {
-    "type": "error",
-    "name": "ZeroValue",
-    "inputs": []
-  }
-] as const;
+];

@@ -2,202 +2,202 @@
  * Flash Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton flash loan / flash account module. Pool address is first arg of pool-scoped fns.
- * Source: dex/evm/src/Flash.sol.
+ * Singleton flash loan / flash account module.
+ * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const FLASH_ABI = [
   {
-    "type": "function",
-    "name": "flashFee",
-    "inputs": [
+    type: 'function',
+    name: 'flashFee',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        name: '',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "function",
-    "name": "flashLoan",
-    "inputs": [
+    type: 'function',
+    name: 'flashLoan',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "receiver",
-        "type": "address",
-        "internalType": "contract IERC3156FlashBorrower"
+        name: 'receiver',
+        type: 'address',
+        internalType: 'contract IERC3156FlashBorrower',
       },
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "data",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+        name: 'data',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: 'nonpayable',
   },
   {
-    "type": "function",
-    "name": "maxFlashLoan",
-    "inputs": [
+    type: 'function',
+    name: 'maxFlashLoan',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
       },
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: 'view',
   },
   {
-    "type": "event",
-    "name": "FlashLoanExecuted",
-    "inputs": [
+    type: 'event',
+    name: 'FlashLoanExecuted',
+    inputs: [
       {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "initiator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'initiator',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "receiver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: 'receiver',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
       {
-        "name": "token",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        name: 'token',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
       {
-        "name": "fee",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: 'fee',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "error",
-    "name": "FeatureDisabled",
-    "inputs": [
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
-      }
-    ]
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "InsufficientAmount",
-    "inputs": [
+    type: 'error',
+    name: 'InsufficientAmount',
+    inputs: [
       {
-        "name": "available",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
       },
       {
-        "name": "required",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "NotFound",
-    "inputs": [
+    type: 'error',
+    name: 'NotFound',
+    inputs: [
       {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum Err.Resource"
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
       },
       {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
   {
-    "type": "error",
-    "name": "OperationFailed",
-    "inputs": []
+    type: 'error',
+    name: 'OperationFailed',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Reentrancy",
-    "inputs": []
+    type: 'error',
+    name: 'Reentrancy',
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ZeroValue",
-    "inputs": []
-  }
-] as const;
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
+  },
+];

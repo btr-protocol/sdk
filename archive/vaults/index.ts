@@ -9,7 +9,11 @@
 
 import type { Address } from '../eth/types.js';
 
-/** Strategy family backing a vault. */
+/** Strategy family backing a vault.
+ *
+ * `'prime-directional'` is retained as a dormant union member only — BTR is
+ * ALM-only and no live vault uses it. Kept so downstream `Record<VaultStrategy>`
+ * maps stay valid without churn; no registry row references it. */
 export type VaultStrategy = 'prime-directional' | 'alm' | 'dex-pool';
 
 /** Market direction for directional strategies. */
@@ -38,45 +42,11 @@ export interface VaultRegistryEntry {
 /** USDC on Base (8453), 6 decimals. */
 export const BASE_USDC: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
-/** LevVault implementation on Base. */
-export const LEV_VAULT_IMPL_BASE: Address = '0xFF4dCC8C224fD40a850B452afad4CE018AA368A8';
-
-/** LevFactory on Base. */
-export const LEV_FACTORY_BASE: Address = '0x05705Ac3915A094b345629B02D5aa8d52Bb99DDB';
-
-/** Live vault registry. Append-only; order = display order. */
-export const VAULTS: readonly VaultRegistryEntry[] = [
-  {
-    address: '0x0b9CCa59CeFDE03Ad8e41DA272D946861fA7717f',
-    name: 'BTC Long Trend',
-    symbol: 'BTC-LO-T',
-    asset: BASE_USDC,
-    assetDecimals: 6,
-    strategy: 'prime-directional',
-    direction: 'long',
-    chainId: 8453,
-  },
-  {
-    address: '0xD52f1B19902Db149490e2C76769461a6dcc2E900',
-    name: 'BTC Short Trend',
-    symbol: 'BTC-SO-T',
-    asset: BASE_USDC,
-    assetDecimals: 6,
-    strategy: 'prime-directional',
-    direction: 'short',
-    chainId: 8453,
-  },
-  {
-    address: '0x38FAc67731b3F893d8a26eFE62D33Dd062FBec8D',
-    name: 'ETH Long Trend',
-    symbol: 'ETH-LO-T',
-    asset: BASE_USDC,
-    assetDecimals: 6,
-    strategy: 'prime-directional',
-    direction: 'long',
-    chainId: 8453,
-  },
-] as const;
+/** Live vault registry. Append-only; order = display order.
+ *
+ * Empty: the leveraged-directional (`prime-directional`) vaults were removed
+ * when BTR became ALM-only. ALM/DEX vaults appear here once deployed. */
+export const VAULTS: readonly VaultRegistryEntry[] = [] as const;
 
 /** Vaults filtered by chain (all chains when omitted). */
 export function getVaultsForChain(chainId?: number): VaultRegistryEntry[] {

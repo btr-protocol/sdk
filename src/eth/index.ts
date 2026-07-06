@@ -75,9 +75,12 @@ export {
 } from './tokens';
 
 // Contracts (deployed addresses)
-export type { SupportedChainId, ContractName } from './contracts';
+export type { SupportedChainId, ContractName, DexContractKey } from './contracts';
 export {
   CONTRACTS,
+  CONTRACT_KEYS,
+  CONTRACT_ENV_VARS,
+  CONTRACT_VITE_ENV_VARS,
   ZERO_ADDRESS,
   LIFI_DIAMOND,
   getContractAddress,
@@ -85,6 +88,8 @@ export {
   SUPPORTED_CONTRACT_CHAIN_IDS,
   getBtrRouter,
   getBtrPoolFactory,
+  getBtrAdmin,
+  getBtrAccessControl,
 } from './contracts';
 
 // ABI
@@ -97,6 +102,7 @@ export {
   decodeFn,
   encodeAbiParameters,
   decodeAbiParameters,
+  getEventSignature,
 } from './abi';
 
 // Token Standards
@@ -168,17 +174,6 @@ export {
   getPhantom,
   getInjected,
 } from './wallets';
-
-export {
-  BASE_CHAIN_ID,
-  YIELD_VAULTS,
-  MOONWELL_MARKETS,
-  BASE_ASSETS,
-  route,
-  yieldVaultFor,
-  moonwellMarketFor,
-} from './base-parking';
-export type { RouteKind } from './base-parking';
 
 // ─────────────────────────────────────────────────────────────
 // Re-export formatting and encoding utilities from utils
