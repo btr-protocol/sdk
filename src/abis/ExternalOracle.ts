@@ -377,6 +377,25 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'maxDeviations',
+    inputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'oracles',
     inputs: [
       {
