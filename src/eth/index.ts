@@ -158,6 +158,17 @@ export {
   onDisconnect,
 } from './rpc';
 
+// Transport (resilient HTTP JSON-RPC: timeout/retry/failover/batch, typed errors)
+export type { TransportOpts } from './transport';
+export {
+  httpTransport,
+  RpcError,
+  RpcRevertError,
+  RpcRateLimitError,
+  RpcTimeoutError,
+  RpcNetworkError,
+} from './transport';
+
 // Signature Verification
 export { recoverAddress, verifySignature } from './signature';
 
