@@ -5,6 +5,8 @@
 
 import { keccak_256 } from '@noble/hashes/sha3.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { isAddress } from './types';
+import type { Address } from './types';
 
 // Re-export @noble/hashes utilities for convenience
 export { bytesToHex, hexToBytes };
@@ -31,10 +33,25 @@ export type {
 export {
   isAddress,
   isHex,
-  checksumAddress,
   zeroAddress,
   isZeroAddress,
 } from './types';
+
+/**
+ * EIP-55 checksum casing for addresses.
+ * Input may be any-case; output is checksummed mixed-case.
+ */
+export function checksumAddress(address: string): Address {
+  const lower = address.toLowerCase();
+  if (!isAddress(lower)) throw new Error('Invalid address');
+  const hex = lower.slice(2);
+  const hash = bytesToHex(keccak_256(new TextEncoder().encode(hex)));
+  let out = '0x';
+  for (let i = 0; i < hex.length; i++) {
+    out += parseInt(hash[i], 16) >= 8 ? hex[i].toUpperCase() : hex[i];
+  }
+  return out as Address;
+}
 
 // Chains
 export type { ChainConfig, ChainId, ChainInfo } from './chains';

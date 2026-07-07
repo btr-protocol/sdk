@@ -18,7 +18,8 @@ function encodeItem(input: string | number | bigint | Uint8Array): Uint8Array {
 
   if (typeof input === 'string') {
     if (input.startsWith('0x')) {
-      bytes = hexToBytes(input.slice(2));
+      const h = input.slice(2);
+      bytes = hexToBytes(h.length % 2 ? '0' + h : h);
     } else {
       bytes = new TextEncoder().encode(input);
     }

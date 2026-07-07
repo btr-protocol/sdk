@@ -110,16 +110,21 @@ async function signTransaction(
   const nonce = tx.nonce ?? (await getNonce(provider, tx.from!));
   const gasLimit = tx.gas ?? (await estimateGas(provider, tx));
 
+  // Quantity fields arrive as JSON-RPC hex strings (often odd-nibble like 0x0 / 0x5).
+  // Normalize to bigint at the tx boundary so RLP scalar encoding is canonical.
+  const q = (v: Hex | bigint | number | undefined, fallback: bigint) => (v === undefined ? fallback : BigInt(v as any));
+  const q0 = (v: Hex | bigint | number | undefined) => q(v, 0n);
+
   // EIP-1559 (Type 2)
   if (tx.maxFeePerGas && tx.maxPriorityFeePerGas) {
     const txData = [
       chainId,
-      nonce,
-      tx.maxPriorityFeePerGas,
-      tx.maxFeePerGas,
-      gasLimit,
+      q(nonce as any, 0n),
+      q(tx.maxPriorityFeePerGas as any, 0n),
+      q(tx.maxFeePerGas as any, 0n),
+      q(gasLimit as any, 0n),
       tx.to || '0x',
-      tx.value || 0n,
+      q0(tx.value),
       tx.data || '0x',
       [], // accessList (empty)
     ];
@@ -131,20 +136,21 @@ async function signTransaction(
     const signature = secp256k1.sign(hexToBytes(txHash.slice(2)), hexToBytes(privateKey.slice(2)));
     const r = signature.r;
     const s = signature.s;
-    const v = BigInt(signature.recovery!) + BigInt(chainId) * 2n + 35n;
+    // Type-2 txs carry yParity (0/1) instead of legacy EIP-155 v.
+    const yParity = BigInt(signature.recovery!);
 
     // Encode signed transaction
     const signedTx = [
       chainId,
-      nonce,
-      tx.maxPriorityFeePerGas,
-      tx.maxFeePerGas,
-      gasLimit,
+      q(nonce as any, 0n),
+      q(tx.maxPriorityFeePerGas as any, 0n),
+      q(tx.maxFeePerGas as any, 0n),
+      q(gasLimit as any, 0n),
       tx.to || '0x',
-      tx.value || 0n,
+      q0(tx.value),
       tx.data || '0x',
       [],
-      v,
+      yParity,
       r,
       s,
     ];
@@ -156,11 +162,11 @@ async function signTransaction(
   const gasPrice = tx.gasPrice ?? (await getGasPrice(provider));
 
   const txData = [
-    nonce,
-    gasPrice,
-    gasLimit,
+    q(nonce as any, 0n),
+    q(gasPrice as any, 0n),
+    q(gasLimit as any, 0n),
     tx.to || '0x',
-    tx.value || 0n,
+    q0(tx.value),
     tx.data || '0x',
     chainId,
     0n,
@@ -178,11 +184,11 @@ async function signTransaction(
 
   // Encode signed transaction
   const signedTx = [
-    nonce,
-    gasPrice,
-    gasLimit,
+    q(nonce as any, 0n),
+    q(gasPrice as any, 0n),
+    q(gasLimit as any, 0n),
     tx.to || '0x',
-    tx.value || 0n,
+    q0(tx.value),
     tx.data || '0x',
     v,
     r,
