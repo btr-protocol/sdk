@@ -4,7 +4,7 @@
  */
 
 import { keccak_256 } from '@noble/hashes/sha3.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { Hex } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -355,6 +355,18 @@ export function encodeEventTopics(event: AbiEvent, args: Record<string, any>): (
     const value = args[input.name || ''];
     if (value === undefined || value === null) {
       topics.push(null);
+    } else if (input.type === 'string') {
+      // Spec: indexed string topic = keccak256(raw UTF-8 bytes)
+      const raw = utf8.encode(String(value));
+      topics.push(`0x${bytesToHex(keccak_256(raw))}` as Hex);
+    } else if (input.type === 'bytes') {
+      // Spec: indexed bytes topic = keccak256(raw bytes)
+      const raw = hexToBytes(clean(String(value)));
+      topics.push(`0x${bytesToHex(keccak_256(raw))}` as Hex);
+    } else if (isDynamicType(input.type, input.components)) {
+      // Spec: indexed dynamic array/tuple topic = keccak256(abi.encode(value))
+      const e = encode(input.type, value, input.components);
+      topics.push(`0x${bytesToHex(keccak_256(hexToBytes(e.h + e.t)))}` as Hex);
     } else {
       const encoded = encode(input.type, value, input.components);
       topics.push(`0x${pad(encoded.h)}` as Hex);
