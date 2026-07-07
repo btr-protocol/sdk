@@ -524,7 +524,7 @@ export const POOL_ABI = [
         ],
       },
     ],
-    stateMutability: 'nonpayable',
+    stateMutability: 'view',
   },
   {
     type: 'function',

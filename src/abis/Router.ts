@@ -562,7 +562,7 @@ export const ROUTER_ABI = [
         ],
       },
     ],
-    stateMutability: 'nonpayable',
+    stateMutability: 'view',
   },
   {
     type: 'function',
