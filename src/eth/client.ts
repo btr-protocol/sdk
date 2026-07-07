@@ -9,6 +9,7 @@ import { keccak256 } from './index';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { rlpEncode } from './rlp';
+import { httpTransport, type TransportOpts } from './transport';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -51,37 +52,13 @@ export function createWalletClient(provider: Eip1193Provider, account: Address):
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Create an HTTP provider for backend use
+ * Create an HTTP provider (backend or public read fallback).
+ * Resilient transport: timeout, retry+backoff, multi-RPC failover, typed errors,
+ * and tick-batched request coalescing (many eth_calls -> one round-trip).
+ * Pass an array of URLs to enable failover.
  */
-export function createHttpProvider(rpcUrl: string): Eip1193Provider {
-  let id = 0;
-
-  return {
-    request: async ({ method, params }: { method: string; params?: unknown[] }) => {
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: ++id,
-          method,
-          params: params || [],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const json = await response.json() as { error?: { message?: string }; result?: unknown };
-
-      if (json.error) {
-        throw new Error(json.error.message || 'RPC error');
-      }
-
-      return json.result;
-    },
-  };
+export function createHttpProvider(rpcUrl: string | readonly string[], opts?: TransportOpts): Eip1193Provider {
+  return httpTransport(rpcUrl, opts);
 }
 
 /**
