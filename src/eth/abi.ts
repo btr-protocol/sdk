@@ -276,17 +276,34 @@ export function decode(type: string, data: string, offset = 0, components?: any[
 // High Level API
 // ─────────────────────────────────────────────────────────────
 
+// Compiled per-function plan: resolves the ABI entry + selector once and caches
+// it, so hot read paths skip the linear abi.find + signature rebuild + keccak
+// on every call. Keyed by (abi ref, functionName); abi arrays are module consts.
+type FnPlan = { fn: any; selector: Hex };
+const PLANS = new WeakMap<object, Map<string, FnPlan>>();
+export function getPlan(abi: any, functionName: string): FnPlan {
+  let m = PLANS.get(abi);
+  if (!m) { m = new Map(); PLANS.set(abi, m); }
+  let p = m.get(functionName);
+  if (!p) {
+    const fn = abi.find((i: any) => i.name === functionName);
+    if (!fn) throw new Error(`Fn not found: ${functionName}`);
+    const sig = `${fn.name}(${(fn.inputs || []).map(canonicalType).join(',')})`;
+    p = { fn, selector: getSelector(sig) };
+    m.set(functionName, p);
+  }
+  return p;
+}
+
 export function encodeFn({ abi, functionName, args = [] }: any): Hex {
-  const fn = abi.find((i: any) => i.name === functionName);
-  if (!fn) throw new Error('Fn not found');
+  const { fn, selector } = getPlan(abi, functionName);
   const argsEncoded = processList(fn.inputs.map((i: any, idx: number) => encode(i.type, args[idx], i.components)), false);
-  const sig = `${fn.name}(${fn.inputs.map((i: any) => canonicalType(i)).join(',')})`;
-  return `${getSelector(sig)}${argsEncoded.h}${argsEncoded.t}`;
+  return `${selector}${argsEncoded.h}${argsEncoded.t}`;
 }
 
 export function decodeFn({ abi, functionName, data }: any): any {
-  const fn = abi.find((i: any) => i.name === functionName);
-  if (!fn || !fn.outputs.length) return undefined;
+  const { fn } = getPlan(abi, functionName);
+  if (!fn.outputs.length) return undefined;
   // Multiple outputs decode as an inline tuple (return data IS the tuple
   // content). A single dynamic output is referenced via a head pointer.
   if (fn.outputs.length > 1) return decode('tuple', data, 0, fn.outputs).val;
