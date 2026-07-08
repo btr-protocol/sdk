@@ -259,6 +259,24 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'cancelUpdateProfile',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'cancelUpdateRiskConfig',
     inputs: [
       {
@@ -379,6 +397,24 @@ export const ADMIN_ABI = [
     inputs: [
       {
         name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeUpdateProfile',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
         type: 'address',
         internalType: 'address',
       },
@@ -728,6 +764,51 @@ export const ADMIN_ABI = [
             internalType: 'uint8[29]',
           },
         ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'requestUpdateProfile',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'newProfile',
+        type: 'tuple',
+        internalType: 'struct IPool.LiquidityProfile',
+        components: [
+          {
+            name: 'weights',
+            type: 'uint8[16]',
+            internalType: 'uint8[16]',
+          },
+          {
+            name: 'knots',
+            type: 'int8[17]',
+            internalType: 'int8[17]',
+          },
+        ],
+      },
+      {
+        name: 'minDispersion',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'maxDispersion',
+        type: 'uint32',
+        internalType: 'uint32',
       },
     ],
     outputs: [],
@@ -1234,6 +1315,25 @@ export const ADMIN_ABI = [
   {
     type: 'event',
     name: 'OracleUpdated',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'ProfileUpdated',
     inputs: [
       {
         name: 'pool',
