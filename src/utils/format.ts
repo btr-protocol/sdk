@@ -135,13 +135,15 @@ export function formatPrice(n: number | null | undefined): string {
     const decimals = absN >= 100 ? 2 : absN >= 10 ? 3 : 4;
     return n.toFixed(decimals);
   }
-  if (absN >= 0.001) {
+  if (absN > 0) {
+    // Crypto-style decimals with 4 significant digits — inverted majors (e.g. 1/BTC ≈
+    // 0.00001613) read as decimals, not exponentials. Guard absurdly small values.
     const leadingZeros = Math.floor(-Math.log10(absN));
+    if (leadingZeros > 12) return n.toExponential(2);
     return n.toFixed(leadingZeros + 4);
   }
 
-  // Use scientific notation for prices under 0.001 with 4 significant digits
-  return n.toExponential(4);
+  return '0.00';
 }
 
 /** Format for chart axis labels */
