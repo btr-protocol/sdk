@@ -71,6 +71,24 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'function',
+    name: 'clearCampaignRoot',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'createTokenCampaign',
     inputs: [
       {
@@ -384,6 +402,25 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'function',
+    name: 'reservedLiability',
+    inputs: [
+      {
+        name: 'rewardToken',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'resumeCampaign',
     inputs: [
       {
@@ -413,6 +450,29 @@ export const DISTRIBUTOR_ABI = [
         name: 'campaignId',
         type: 'uint256',
         internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setCampaignManager',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'newManager',
+        type: 'address',
+        internalType: 'address',
       },
     ],
     outputs: [],
@@ -482,6 +542,50 @@ export const DISTRIBUTOR_ABI = [
         type: 'address',
         indexed: false,
         internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'CampaignManagerUpdated',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'newManager',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'CampaignRootCleared',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
       },
     ],
     anonymous: false,

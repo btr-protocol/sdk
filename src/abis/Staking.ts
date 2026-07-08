@@ -75,25 +75,6 @@ export const STAKING_ABI = [
   },
   {
     type: 'function',
-    name: 'govCooldownAmount',
-    inputs: [
-      {
-        name: 'user',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'govCooldownEnd',
     inputs: [
       {
@@ -120,6 +101,25 @@ export const STAKING_ABI = [
         name: '',
         type: 'bool',
         internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'govPending',
+    inputs: [
+      {
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -500,13 +500,7 @@ export const STAKING_ABI = [
   {
     type: 'function',
     name: 'unstakeGov',
-    inputs: [
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
   },
