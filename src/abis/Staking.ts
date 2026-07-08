@@ -75,13 +75,38 @@ export const STAKING_ABI = [
   },
   {
     type: 'function',
-    name: 'govCooldownSeconds',
-    inputs: [],
+    name: 'govCooldownAmount',
+    inputs: [
+      {
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
     outputs: [
       {
         name: '',
-        type: 'uint16',
-        internalType: 'uint16',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'govCooldownEnd',
+    inputs: [
+      {
+        name: 'user',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
       },
     ],
     stateMutability: 'view',
@@ -95,19 +120,6 @@ export const STAKING_ABI = [
         name: '',
         type: 'bool',
         internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'govStakeLockDuration',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint48',
-        internalType: 'uint48',
       },
     ],
     stateMutability: 'view',
@@ -140,25 +152,6 @@ export const STAKING_ABI = [
         name: '',
         type: 'address',
         internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'govUnlockTime',
-    inputs: [
-      {
-        name: 'user',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint48',
-        internalType: 'uint48',
       },
     ],
     stateMutability: 'view',
@@ -204,17 +197,12 @@ export const STAKING_ABI = [
   },
   {
     type: 'function',
-    name: 'setGovStakeConfig',
+    name: 'requestUnstakeGov',
     inputs: [
       {
-        name: 'lockDuration',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-      {
-        name: 'cooldownSeconds_',
-        type: 'uint16',
-        internalType: 'uint16',
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
     outputs: [],
@@ -617,8 +605,27 @@ export const STAKING_ABI = [
         indexed: false,
         internalType: 'uint256',
       },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'GovUnstakeRequested',
+    inputs: [
       {
-        name: 'unlockTime',
+        name: 'user',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'cooldownEnd',
         type: 'uint48',
         indexed: false,
         internalType: 'uint48',
