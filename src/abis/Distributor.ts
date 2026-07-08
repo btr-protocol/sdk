@@ -118,6 +118,24 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'function',
+    name: 'finalizeCampaignRoot',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'getCampaign',
     inputs: [
       {
@@ -169,6 +187,26 @@ export const DISTRIBUTOR_ABI = [
           },
           {
             name: 'totalAllocated',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'pendingRoot',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'pendingUpdatedAt',
+            type: 'uint32',
+            internalType: 'uint32',
+          },
+          {
+            name: 'pendingAt',
+            type: 'uint48',
+            internalType: 'uint48',
+          },
+          {
+            name: 'pendingTotalClaimable',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -313,25 +351,7 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'function',
-    name: 'resumeCampaign',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'campaignId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'updateCampaignRoot',
+    name: 'proposeCampaignRoot',
     inputs: [
       {
         name: 'pool',
@@ -355,6 +375,42 @@ export const DISTRIBUTOR_ABI = [
       },
       {
         name: 'totalClaimable',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'resumeCampaign',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'revokeCampaignRoot',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -432,6 +488,68 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'event',
+    name: 'CampaignRootProposed',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'merkleRoot',
+        type: 'bytes32',
+        indexed: false,
+        internalType: 'bytes32',
+      },
+      {
+        name: 'totalClaimable',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'executableAt',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'CampaignRootRevoked',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'campaignId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'merkleRoot',
+        type: 'bytes32',
+        indexed: false,
+        internalType: 'bytes32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'CampaignRootUpdated',
     inputs: [
       {
@@ -491,6 +609,17 @@ export const DISTRIBUTOR_ABI = [
       },
     ],
     anonymous: false,
+  },
+  {
+    type: 'error',
+    name: 'CooldownActive',
+    inputs: [
+      {
+        name: 'remainingSeconds',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
   },
   {
     type: 'error',
