@@ -55,43 +55,6 @@ export const TREASURY_ABI = [
   },
   {
     type: 'function',
-    name: 'authorizeRemoteDistributor',
-    inputs: [
-      {
-        name: 'dstEid',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'remoteDistributor',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'authorizedRemoteDistributor',
-    inputs: [
-      {
-        name: '',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'bridge',
     inputs: [],
     outputs: [
@@ -102,29 +65,6 @@ export const TREASURY_ABI = [
       },
     ],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'bridgeEmissions',
-    inputs: [
-      {
-        name: '',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: '',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -782,25 +722,38 @@ export const TREASURY_ABI = [
   },
   {
     type: 'event',
-    name: 'EmissionsBridged',
+    name: 'EmissionsCapChangeCancelled',
     inputs: [
       {
-        name: 'dstEid',
-        type: 'uint32',
-        indexed: true,
-        internalType: 'uint32',
-      },
-      {
-        name: 'remoteDistributor',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'amount',
+        name: 'cancelledCap',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'EmissionsCapChangeRequested',
+    inputs: [
+      {
+        name: 'oldCap',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'newCap',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'executableAt',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
       },
     ],
     anonymous: false,
@@ -940,25 +893,6 @@ export const TREASURY_ABI = [
   },
   {
     type: 'event',
-    name: 'RemoteDistributorAuthorized',
-    inputs: [
-      {
-        name: 'dstEid',
-        type: 'uint32',
-        indexed: true,
-        internalType: 'uint32',
-      },
-      {
-        name: 'remoteDistributor',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
     name: 'Salvaged',
     inputs: [
       {
@@ -1092,17 +1026,6 @@ export const TREASURY_ABI = [
     type: 'error',
     name: 'Expired',
     inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'FeatureDisabled',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-    ],
   },
   {
     type: 'error',
