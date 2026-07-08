@@ -189,6 +189,55 @@ export const TOKENS: Record<string, TokenMetadata> = {
       '56': '0xd17479997f34dd9156deef8f95a52d81d265be9c',
     },
   },
+  USD1: {
+    symbol: 'USD1',
+    name: 'World Liberty Financial USD',
+    decimals: 18,
+    addresses: {
+      '1': '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
+      '56': '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
+    },
+  },
+  PYUSD: {
+    symbol: 'PYUSD',
+    name: 'PayPal USD',
+    decimals: 6,
+    addresses: {
+      '1': '0x6c3ea9036406852006290770BEdFcAbA0e23A0e8',
+    },
+  },
+  RLUSD: {
+    symbol: 'RLUSD',
+    name: 'Ripple USD',
+    decimals: 18,
+    addresses: {
+      '1': '0x8292Bb45bf1Ee4d140127049757C2E0fF06317eD',
+    },
+  },
+  USDS: {
+    symbol: 'USDS',
+    name: 'Sky USDS',
+    decimals: 18,
+    addresses: {
+      '1': '0xdC035D45d973E3EC169d2276DDab16f1e407384F',
+    },
+  },
+  DAI: {
+    symbol: 'DAI',
+    name: 'Dai',
+    decimals: 18,
+    addresses: {
+      '1': '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      '56': '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3',
+    },
+  },
+  // Fiat reference for pyth-fed X/USD oracle pairs (NXR); no on-chain token.
+  USD: {
+    symbol: 'USD',
+    name: 'US Dollar',
+    decimals: 8,
+    addresses: {},
+  },
   USDP: {
     symbol: 'USDP',
     name: 'Pax Dollar',
@@ -562,7 +611,7 @@ export const BASE_TOKENS = [
 ];
 
 /** Quote currencies for pair generation */
-export const QUOTE_TOKENS = ['USDC', 'USDT', 'ETH', 'BTC', 'USDE'];
+export const QUOTE_TOKENS = ['USDC', 'USDT', 'ETH', 'BTC', 'USDE', 'USD'];
 
 // ─────────────────────────────────────────────────────────────
 // Helper Functions
