@@ -37,13 +37,6 @@ const CONTRACTS: Array<{
     blurb: 'EIP-1167 minimal-clone factory for pool instances.',
   },
   {
-    contract: 'Router',
-    file: 'Router.ts',
-    constName: 'ROUTER_ABI',
-    title: 'Router',
-    blurb: 'On-chain swap executor with min-out guards.',
-  },
-  {
     contract: 'ExternalOracle',
     file: 'ExternalOracle.ts',
     constName: 'EXTERNAL_ORACLE_ABI',

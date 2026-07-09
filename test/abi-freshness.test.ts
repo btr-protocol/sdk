@@ -25,7 +25,6 @@ import {
   GOV_TOKEN_ABI,
   POOL_ABI,
   POOL_FACTORY_ABI,
-  ROUTER_ABI,
   STAKING_ABI,
   TREASURY_ABI,
 } from '../src/abis/index.js';
@@ -43,7 +42,6 @@ const ABI_MAP: Array<{ name: string; ts: readonly unknown[]; contract: string }>
   { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken' },
   { name: 'Pool', ts: POOL_ABI, contract: 'Pool' },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
-  { name: 'Router', ts: ROUTER_ABI, contract: 'Router' },
   { name: 'Staking', ts: STAKING_ABI, contract: 'Staking' },
   { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury' },
 ];
