@@ -1,9 +1,11 @@
 /**
- * Minimal Merkle tree builder for reward distributions
- * Uses @noble/hashes for keccak256
+ * Merkle tree builder for Distributor campaign roots (shared/evm/src/Distributor.sol)
+ * Leaf: keccak256(abi.encodePacked(address pool, uint256 campaignId, uint256 index, address account, uint256 totalEarned))
+ * Cumulative model: totalEarned = lifetime earned, contract pays totalEarned - claimed.
+ * Pair hashing: sorted (commutative), matching solady MerkleProofLib.verify.
  */
 
-import { keccak256, toHex, concat, pad, type Hex } from '../eth/index.js';
+import { type Hex, concat, keccak256, pad, toHex } from '../eth/index.js';
 
 export type MerkleTree = {
   root: Hex;
@@ -11,14 +13,16 @@ export type MerkleTree = {
 };
 
 export type MerkleLeaf = {
+  pool: string; // campaign pool (leaf domain separation)
+  campaignId: bigint;
   index: number;
   account: string;
-  amount: bigint;
+  totalEarned: bigint; // CUMULATIVE lifetime earned, not per-epoch amount
 };
 
 /**
  * Build Merkle tree from leaves
- * Uses sorted pair hashing for canonical tree structure
+ * Sorted pair hashing (canonical); odd node paired with itself
  */
 export function buildMerkleTree(leaves: Hex[]): MerkleTree {
   if (leaves.length === 0) {
@@ -43,7 +47,7 @@ export function buildMerkleTree(leaves: Hex[]): MerkleTree {
 }
 
 /**
- * Hash two nodes together (sorted for canonical ordering)
+ * Hash two nodes together (sorted for canonical ordering — solady/OZ convention)
  */
 function hashPair(a: Hex, b: Hex): Hex {
   const [first, second] = a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a];
@@ -61,25 +65,35 @@ export function getMerkleProof(tree: MerkleTree, leafIndex: number): Hex[] {
   for (let level = 0; level < tree.layers.length - 1; level++) {
     const layer = tree.layers[level];
     const pairIndex = index ^ 1; // Toggle last bit to get sibling
-    if (pairIndex < layer.length) {
-      proof.push(layer[pairIndex]);
-    }
+    // Odd tail node is paired with itself in buildMerkleTree — its own hash is the sibling
+    proof.push(pairIndex < layer.length ? layer[pairIndex] : layer[index]);
     index = index >> 1; // Move to parent index
   }
 
   return proof;
 }
 
+function toAddressBytes(addr: string): Hex {
+  const a = addr.toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(a)) throw new Error(`invalid address: ${addr}`);
+  return a as Hex;
+}
+
 /**
- * Create leaf hash matching on-chain format:
- * keccak256(abi.encodePacked(uint256 index, address account, uint256 amount))
+ * Create leaf hash matching Distributor._verifyAndGetClaimable:
+ * keccak256(abi.encodePacked(address pool, uint256 campaignId, uint256 index, address account, uint256 totalEarned))
+ * = 20 + 32 + 32 + 20 + 32 bytes
  */
 export function makeLeaf(entry: MerkleLeaf): Hex {
-  // Manual encodePacked: uint256(32) + address(20) + uint256(32) = 84 bytes
-  const indexHex = pad(toHex(BigInt(entry.index)), 32);
-  const accountHex = entry.account.toLowerCase() as Hex;
-  const amountHex = pad(toHex(entry.amount), 32);
-  return keccak256(concat([indexHex, accountHex, amountHex]));
+  return keccak256(
+    concat([
+      toAddressBytes(entry.pool),
+      pad(toHex(entry.campaignId), 32),
+      pad(toHex(BigInt(entry.index)), 32),
+      toAddressBytes(entry.account),
+      pad(toHex(entry.totalEarned), 32),
+    ]),
+  );
 }
 
 /**
@@ -95,12 +109,13 @@ export function verifyProof(proof: Hex[], root: Hex, leaf: Hex): boolean {
 
 /**
  * Build complete distribution from user entries
- * Returns tree + proofs for each user
+ * Returns tree + proofs for each user; totalClaimable = Σ totalEarned
+ * (the exact `totalClaimable` arg for Distributor.proposeCampaignRoot)
  */
 export type DistributionData = {
   root: Hex;
   entries: (MerkleLeaf & { proof: Hex[] })[];
-  totalAmount: bigint;
+  totalClaimable: bigint;
 };
 
 export function buildDistribution(entries: MerkleLeaf[]): DistributionData {
@@ -119,12 +134,12 @@ export function buildDistribution(entries: MerkleLeaf[]): DistributionData {
     proof: getMerkleProof(tree, idx),
   }));
 
-  // Calculate total amount
-  const totalAmount = sorted.reduce((sum, e) => sum + e.amount, 0n);
+  // Cumulative liability = Σ totalEarned
+  const totalClaimable = sorted.reduce((sum, e) => sum + e.totalEarned, 0n);
 
   return {
     root: tree.root,
     entries: withProofs,
-    totalAmount,
+    totalClaimable,
   };
 }
