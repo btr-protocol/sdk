@@ -35,7 +35,6 @@ export const CONTRACTS = {
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -49,7 +48,6 @@ export const CONTRACTS = {
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -63,7 +61,6 @@ export const CONTRACTS = {
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -77,7 +74,6 @@ export const CONTRACTS = {
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -91,7 +87,6 @@ export const CONTRACTS = {
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -104,7 +99,6 @@ export const CONTRACTS = {
     BRIDGE: ZERO_ADDRESS,
     POOL_ZERO: ZERO_ADDRESS,
     POOL_STABLE: ZERO_ADDRESS,
-    ROUTER: ZERO_ADDRESS,
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
@@ -117,7 +111,7 @@ export type SupportedChainId = keyof typeof CONTRACTS;
 export type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
 
 /** DEX singleton keys in the per-chain registry (env-overridable on testnet). */
-export const CONTRACT_KEYS = ['ROUTER', 'POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL', 'ORACLE', 'FAUCET'] as const;
+export const CONTRACT_KEYS = ['POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL', 'ORACLE', 'FAUCET'] as const;
 export type DexContractKey = (typeof CONTRACT_KEYS)[number];
 
 /**
@@ -125,7 +119,6 @@ export type DexContractKey = (typeof CONTRACT_KEYS)[number];
  * Front: prefix with `VITE_` (e.g. `VITE_ADMIN_ADDRESS`). Back/keepers: bare names.
  */
 export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
-  ROUTER: 'BTR_ROUTER_ADDRESS',
   POOL_FACTORY: 'BTR_POOL_FACTORY_ADDRESS',
   ADMIN: 'BTR_ADMIN_ADDRESS',
   ACCESS_CONTROL: 'BTR_ACCESS_CONTROL_ADDRESS',
@@ -135,7 +128,6 @@ export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
 
 /** Front (Vite) env var names — `VITE_` + bare key suffix used by Safety Control Center. */
 export const CONTRACT_VITE_ENV_VARS: Record<DexContractKey, string> = {
-  ROUTER: 'VITE_ROUTER_ADDRESS',
   POOL_FACTORY: 'VITE_POOL_FACTORY_ADDRESS',
   ADMIN: 'VITE_ADMIN_ADDRESS',
   ACCESS_CONTROL: 'VITE_ACCESS_CONTROL_ADDRESS',
@@ -164,11 +156,6 @@ export const SUPPORTED_CONTRACT_CHAIN_IDS = Object.keys(CONTRACTS).map(Number) a
 // ─────────────────────────────────────────────────────────────
 // BTR DEX Accessors
 // ─────────────────────────────────────────────────────────────
-
-export function getBtrRouter(chainId: number): Address | undefined {
-  const chain = chainId as SupportedChainId;
-  return CONTRACTS[chain]?.ROUTER;
-}
 
 export function getBtrPoolFactory(chainId: number): Address | undefined {
   const chain = chainId as SupportedChainId;

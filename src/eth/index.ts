@@ -103,7 +103,6 @@ export {
   getContractAddress,
   isChainSupported,
   SUPPORTED_CONTRACT_CHAIN_IDS,
-  getBtrRouter,
   getBtrPoolFactory,
   getBtrAdmin,
   getBtrAccessControl,

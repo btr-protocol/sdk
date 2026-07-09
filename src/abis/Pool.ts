@@ -361,30 +361,6 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
-    name: 'getHookForFlag',
-    inputs: [
-      {
-        name: 'tk',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'flag',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    outputs: [
-      {
-        name: 'h',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'getLPBalance',
     inputs: [
       {
