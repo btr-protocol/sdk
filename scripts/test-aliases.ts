@@ -4,8 +4,8 @@
  * Test token alias search functionality
  */
 
-import { tokenMatchesSearch, resolveTokenAlias, TOKENS } from './tokens';
-import { logger } from '../utils/logger.js';
+import { tokenMatchesSearch, resolveTokenAlias, TOKENS } from '../src/eth/tokens';
+import { logger } from '../src/utils/logger.js';
 
 const log = logger.withContext('testAliases');
 
