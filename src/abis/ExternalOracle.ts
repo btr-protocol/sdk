@@ -659,6 +659,17 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'error',
+    name: 'CooldownActive',
+    inputs: [
+      {
+        name: 'remainingSeconds',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'FeedAlreadyExists',
     inputs: [
       {
