@@ -1,22 +1,20 @@
 /**
  * BTR DEX SDK
- * Modular SDK for interacting with BTR DEX - supports AMM flows and guardians
+ * Modular SDK for interacting with BTR DEX - pool data/swap helpers, router call builder, guardians
  *
  * @example Basic usage with EIP-1193 provider
  * ```ts
- * import { deposit, swap, withdraw } from '@btr-protocol/sdk/flows';
- * import { POOL_ABI } from '@btr-protocol/sdk/abis';
- * import { encodeFunctionData } from '@btr-protocol/sdk';
+ * import { getSwapQuote, swap } from '@btr-protocol/sdk/pool';
  *
  * const provider = window.ethereum; // EIP-1193 provider
  *
- * // Execute a swap
- * await swap(provider, POOL_ABI, {
- *   poolAddress: '0x...',
- *   tokenIn: '0x...',
- *   tokenOut: '0x...',
- *   amountIn: 1000000n,
- *   slippageBps: 50, // 0.5%
+ * const quote = await getSwapQuote(provider, poolAddress, tokenIn, tokenOut, amountIn);
+ * await swap(provider, poolAddress, {
+ *   tokenIn,
+ *   tokenOut,
+ *   amountIn,
+ *   minAmountOut: quote.amountOut, // apply your own slippage tolerance
+ *   recipient: yourAddress,
  * });
  * ```
  *
