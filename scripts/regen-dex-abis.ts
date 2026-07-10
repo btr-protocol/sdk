@@ -64,6 +64,23 @@ const CONTRACTS: Array<{
     blurb: 'Singleton flash loan / flash account module.',
   },
   {
+    contract: 'AccessControl',
+    root: 'shared',
+    file: 'AccessControl.ts',
+    constName: 'ACCESS_CONTROL_ABI',
+    title: 'AccessControl',
+    blurb:
+      'Singleton AccessControl — governance SSoT (owner / treasury / swapper / factory / keepers).',
+  },
+  {
+    contract: 'StakedAsset',
+    root: 'shared',
+    file: 'StakedAsset.ts',
+    constName: 'STAKED_ASSET_ABI',
+    title: 'StakedAsset',
+    blurb: 'ERC-20 staking receipt (sToken) minted/burned by the Staking singleton.',
+  },
+  {
     contract: 'Staking',
     root: 'shared',
     file: 'Staking.ts',

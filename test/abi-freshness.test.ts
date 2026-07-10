@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
+  ACCESS_CONTROL_ABI,
   ADMIN_ABI,
   BRIDGEABLE_ERC20_ABI,
   BRIDGE_ABI,
@@ -25,6 +26,7 @@ import {
   GOV_TOKEN_ABI,
   POOL_ABI,
   POOL_FACTORY_ABI,
+  STAKED_ASSET_ABI,
   STAKING_ABI,
   TREASURY_ABI,
 } from '../src/abis/index.js';
@@ -46,6 +48,7 @@ const ABI_MAP: Array<{
   root?: keyof typeof EVM_ROOTS;
   mergeEventsFrom?: string[];
 }> = [
+  { name: 'AccessControl', ts: ACCESS_CONTROL_ABI, contract: 'AccessControl', root: 'shared' },
   { name: 'Admin', ts: ADMIN_ABI, contract: 'Admin' },
   { name: 'Bridge', ts: BRIDGE_ABI, contract: 'Bridge', root: 'shared' },
   {
@@ -60,6 +63,7 @@ const ABI_MAP: Array<{
   { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken', root: 'shared' },
   { name: 'Pool', ts: POOL_ABI, contract: 'Pool', mergeEventsFrom: ['IPool'] },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
+  { name: 'StakedAsset', ts: STAKED_ASSET_ABI, contract: 'StakedAsset', root: 'shared' },
   { name: 'Staking', ts: STAKING_ABI, contract: 'Staking', root: 'shared' },
   { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury', root: 'shared' },
 ];
