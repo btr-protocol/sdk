@@ -21,10 +21,6 @@
       "types": "./src/eth/index.ts",
       "default": "./src/eth/index.ts"
     },
-    "./flows": {
-      "types": "./src/flows/index.ts",
-      "default": "./src/flows/index.ts"
-    },
     "./guardians": {
       "types": "./src/guardians/index.ts",
       "default": "./src/guardians/index.ts"
