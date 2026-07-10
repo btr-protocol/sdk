@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Cross-chain bridge endpoint.
- * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
+ * Source: shared/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const BRIDGE_ABI = [
