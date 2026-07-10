@@ -17,7 +17,7 @@ export const ZERO_ADDRESS: Address = zeroAddress;
 
 /**
  * Canonical LiFi Diamond address — same on all supported EVM chains (LiFi deployment doctrine).
- * Single source of truth for keeper calldata `to` allowlist + ALM/DEX settler placeholders.
+ * Single source of truth for the keeper calldata `to` allowlist.
  * @see https://docs.li.fi/smart-contracts/deployments
  */
 export const LIFI_DIAMOND: Address = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE';
@@ -29,89 +29,113 @@ export const LIFI_DIAMOND: Address = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE
 export const CONTRACTS = {
   // Localhost (Anvil) - Deterministic CREATE3 addresses
   31337: {
-    BTR: '0x0000000000000000000000000000000000000000000000' as Address,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: '0x0000000000000000000000000000000000000000000' as Address,
-    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
-    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
-    // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-  },
-
-  // Ethereum Mainnet - Deterministic CREATE3 addresses (to be deployed)
-  1: {
-    BTR: '0x0000000000000000000000000000000000000000000' as Address,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: '0x0000000000000000000000000000000000000000000' as Address,
-    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
-    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
-    // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-  },
-
-  // BNB Chain - Deterministic CREATE3 addresses (to be deployed)
-  56: {
-    BTR: '0x0000000000000000000000000000000000000000000' as Address,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: '0x0000000000000000000000000000000000000000000' as Address,
-    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
-    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
-    // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-  },
-
-  // Base - Deterministic CREATE3 addresses (to be deployed)
-  8453: {
-    BTR: '0x0000000000000000000000000000000000000000000' as Address,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: '0x0000000000000000000000000000000000000000000' as Address,
-    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
-    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
-    // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-  },
-
-  // Arbitrum - Deterministic CREATE3 addresses (to be deployed)
-  42161: {
-    BTR: '0x0000000000000000000000000000000000000000000' as Address,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: '0x0000000000000000000000000000000000000000000' as Address,
-    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
-    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
-    // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-  },
-
-  // BNB Chain Testnet (Chapel, id 97) — ZERO until CREATE3 deploy; override via env (see CONTRACT_ENV_VARS)
-  97: {
     BTR: ZERO_ADDRESS,
-    TREASURY: ZERO_ADDRESS,
+    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
     BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: ZERO_ADDRESS,
-    POOL_STABLE: ZERO_ADDRESS,
+    POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
+    POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
+    // TODO: real deployment addresses
     POOL_FACTORY: ZERO_ADDRESS,
     ADMIN: ZERO_ADDRESS,
     ACCESS_CONTROL: ZERO_ADDRESS,
     ORACLE: ZERO_ADDRESS,
     FAUCET: ZERO_ADDRESS,
   },
+
+  // Ethereum Mainnet - Deterministic CREATE3 addresses (to be deployed)
+  1: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: ZERO_ADDRESS,
+    POOL_STABLE: ZERO_ADDRESS,
+    // TODO: real deployment addresses
+    POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
+    ORACLE: ZERO_ADDRESS,
+    FAUCET: ZERO_ADDRESS,
+  },
+
+  // BNB Chain - Deterministic CREATE3 addresses (to be deployed)
+  56: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: ZERO_ADDRESS,
+    POOL_STABLE: ZERO_ADDRESS,
+    // TODO: real deployment addresses
+    POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
+    ORACLE: ZERO_ADDRESS,
+    FAUCET: ZERO_ADDRESS,
+  },
+
+  // Base - Deterministic CREATE3 addresses (to be deployed)
+  8453: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: ZERO_ADDRESS,
+    POOL_STABLE: ZERO_ADDRESS,
+    // TODO: real deployment addresses
+    POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
+    ORACLE: ZERO_ADDRESS,
+    FAUCET: ZERO_ADDRESS,
+  },
+
+  // Arbitrum - Deterministic CREATE3 addresses (to be deployed)
+  42161: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: ZERO_ADDRESS,
+    POOL_STABLE: ZERO_ADDRESS,
+    // TODO: real deployment addresses
+    POOL_FACTORY: ZERO_ADDRESS,
+    ADMIN: ZERO_ADDRESS,
+    ACCESS_CONTROL: ZERO_ADDRESS,
+    ORACLE: ZERO_ADDRESS,
+    FAUCET: ZERO_ADDRESS,
+  },
+
+  // BNB Chain Testnet (Chapel, id 97) — from dex/evm/deployments/97.deploy.json
+  97: {
+    BTR: ZERO_ADDRESS,
+    TREASURY: ZERO_ADDRESS,
+    BRIDGE: ZERO_ADDRESS,
+    POOL_ZERO: '0xEaB818235028bE378c92115099fF206EBb11B621' as Address, // volatilePool
+    POOL_STABLE: '0x029EdAb049776633A9A7B49F87C5c97De5164ccE' as Address,
+    POOL_FACTORY: '0x49C710167A4b486F20f9437485D865D653806310' as Address,
+    ADMIN: '0x35c625c07ed4a9123ab863f6e8722c9210c808A3' as Address,
+    ACCESS_CONTROL: '0x626eb915d4a4136F7c00352A54378d3A322488da' as Address,
+    ORACLE: '0xD91712c9F4037D0010041691Df191AB45994F2bF' as Address,
+    FAUCET: '0x6a901982CE6cD2561F677217e012A33b8a88EF27' as Address,
+  },
 } as const;
+
+// Init-time guard: literals hide behind `as Address`, so enforce 0x + 40 hex at module load.
+for (const [chain, registry] of Object.entries(CONTRACTS)) {
+  for (const [name, addr] of Object.entries(registry)) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(addr))
+      throw new Error(`CONTRACTS[${chain}].${name}: malformed address ${addr}`);
+  }
+}
 
 export type SupportedChainId = keyof typeof CONTRACTS;
 export type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
 
 /** DEX singleton keys in the per-chain registry (env-overridable on testnet). */
-export const CONTRACT_KEYS = ['POOL_FACTORY', 'ADMIN', 'ACCESS_CONTROL', 'ORACLE', 'FAUCET'] as const;
+export const CONTRACT_KEYS = [
+  'POOL_FACTORY',
+  'ADMIN',
+  'ACCESS_CONTROL',
+  'ORACLE',
+  'FAUCET',
+] as const;
 export type DexContractKey = (typeof CONTRACT_KEYS)[number];
 
 /**
@@ -141,7 +165,7 @@ export const CONTRACT_VITE_ENV_VARS: Record<DexContractKey, string> = {
 
 export function getContractAddress(
   chainId: number,
-  contractName: ContractName
+  contractName: ContractName,
 ): Address | undefined {
   const chain = chainId as SupportedChainId;
   return CONTRACTS[chain]?.[contractName];
@@ -151,7 +175,9 @@ export function isChainSupported(chainId: number): chainId is SupportedChainId {
   return chainId in CONTRACTS;
 }
 
-export const SUPPORTED_CONTRACT_CHAIN_IDS = Object.keys(CONTRACTS).map(Number) as SupportedChainId[];
+export const SUPPORTED_CONTRACT_CHAIN_IDS = Object.keys(CONTRACTS).map(
+  Number,
+) as SupportedChainId[];
 
 // ─────────────────────────────────────────────────────────────
 // BTR DEX Accessors

@@ -17,9 +17,17 @@
       "types": "./src/abis/index.ts",
       "default": "./src/abis/index.ts"
     },
+    "./amm": {
+      "types": "./src/amm/index.ts",
+      "default": "./src/amm/index.ts"
+    },
     "./eth": {
       "types": "./src/eth/index.ts",
       "default": "./src/eth/index.ts"
+    },
+    "./eth/wallets": {
+      "types": "./src/eth/wallets.ts",
+      "default": "./src/eth/wallets.ts"
     },
     "./guardians": {
       "types": "./src/guardians/index.ts",
@@ -41,6 +49,10 @@
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
     },
+    "./utils/format": {
+      "types": "./src/utils/format.ts",
+      "default": "./src/utils/format.ts"
+    },
     "./types": {
       "types": "./src/types/index.ts",
       "default": "./src/types/index.ts"
@@ -51,21 +63,8 @@
     }
   },
   "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
-  "files": [
-    "src",
-    "README.md",
-    "CHANGELOG.md"
-  ],
-  "keywords": [
-    "btr",
-    "evm",
-    "rpc",
-    "abi",
-    "dex",
-    "amm",
-    "oracle",
-    "circuit-breaker"
-  ],
+  "files": ["src", "README.md", "CHANGELOG.md"],
+  "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle", "circuit-breaker"],
   "scripts": {
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",

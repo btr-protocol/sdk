@@ -1,0 +1,1082 @@
+[
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19999799,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.99994975,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.4996859375,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.1999979900202003,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.9999497525249357,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.499685976949146,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.20003819304074352,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 1.000150826018588,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.500188912616176,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.1999578023491488,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.9997488991689952,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.4991842419059656,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19996784,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.999799,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.4993090625,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.20002814365671667,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 1.0001005025234126,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.5000627667237647,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19999750000000002,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.9999375,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.499609375,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19999750003124964,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.9999375039060058,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.499609436025621,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.2000475037820193,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 1.0001875945504828,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.500234965940517,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19994751818123913,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.9996877077048896,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.498985475295952,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.19996000000000003,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 0.99975,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.499140625,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 0.20003500565707003,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 1.000125003903075,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 2.5000780541809826,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 1.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 619.993769,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3099.844225,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7749.02640625,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.1999979900202003,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 0.9999497525249356,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.499685976949146,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 620.1183984263049,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3100.4675606576234,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7750.5856291101445,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.1999578023491488,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 0.9997488991689952,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.4991842419059656,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 619.900304,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3099.3769,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7747.85809375,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.20002814365671667,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 1.0001005025234126,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.500062766723765,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 619.99225,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3099.80625,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7748.7890625,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.1999975000312496,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 0.9999375039060059,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.499609436025621,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 620.1472617242599,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3100.581543106496,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7750.728394415602,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.1999475181812391,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 0.9996877077048896,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.498985475295952,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 619.8760000000001,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 3099.225,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 7747.3359375,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 620.0,
+    "grossOut": 0.20003500565707,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 3100.0,
+    "grossOut": 1.000125003903075,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 7750.0,
+    "grossOut": 2.5000780541809826,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 3100.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12399.875380000001,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 61996.8845,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 154980.528125,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.1999979900202003,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 0.9999497525249357,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.499685976949146,
+    "liab": 10.0,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12402.3679685261,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 62009.35121315247,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 155011.7125822029,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.1999578023491488,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 0.9997488991689953,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.4991842419059656,
+    "liab": 12.5,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12398.006080000001,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 61987.538,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 154957.161875,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.20002814365671667,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 1.0001005025234124,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.500062766723765,
+    "liab": 7.692307692307692,
+    "profile": "stable",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 5000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12399.845000000001,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 61996.125,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 154975.78125,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.1999975000312496,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 0.9999375039060059,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.499609436025621,
+    "liab": 10.0,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12402.945234485196,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 62011.63086212993,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 155014.56788831204,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.1999475181812391,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 0.9996877077048895,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.498985475295952,
+    "liab": 12.5,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 0.2,
+    "grossOut": 12397.52,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 1.0,
+    "grossOut": 61984.5,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 2.5,
+    "grossOut": 154946.71875,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": true,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 12400.0,
+    "grossOut": 0.20003500565707003,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 62000.0,
+    "grossOut": 1.0001250039030751,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  },
+  {
+    "amountIn": 155000.0,
+    "grossOut": 2.5000780541809826,
+    "liab": 7.692307692307692,
+    "profile": "volatile",
+    "res": 10.0,
+    "selling": false,
+    "sigma": 250000.0,
+    "twap": 62000.0
+  }
+]

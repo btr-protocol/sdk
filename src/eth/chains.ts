@@ -416,8 +416,11 @@ export const CHAINS: Record<number, ChainConfig> = {
     id: 97,
     name: 'BNB Chain Testnet',
     rpcUrls: [
+      'https://bsc-testnet.drpc.org',
+      'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
+      'https://data-seed-prebsc-1-s2.bnbchain.org:8545',
       'https://data-seed-prebsc-1-s1.binance.org:8545',
-      'https://rpc.ankr.com/bsc_testnet_chapel',
+      'https://bsc-testnet-rpc.publicnode.com',
     ],
     nativeCurrency: { name: 'Test BNB', symbol: 'tBNB', decimals: 18 },
     blockExplorerUrls: ['https://testnet.bscscan.com'],
