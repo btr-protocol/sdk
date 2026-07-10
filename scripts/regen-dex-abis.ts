@@ -1,11 +1,14 @@
 /**
- * One-shot: extract ABIs from dex/evm/out artifacts @ pinned commit → sdk/src/abis/*.ts
- * Usage: bun scratchpad/regen-dex-abis.ts
+ * One-shot: extract ABIs from dex/evm/out + shared/evm/out artifacts @ pinned commit → sdk/src/abis/*.ts
+ * Usage: bun scripts/regen-dex-abis.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const DEX_EVM = resolve(import.meta.dir, '../../dex/evm');
+const EVM_ROOTS = {
+  dex: resolve(import.meta.dir, '../../dex/evm'),
+  shared: resolve(import.meta.dir, '../../shared/evm'),
+} as const;
 const ABI_DIR = resolve(import.meta.dir, '../src/abis');
 
 const CONTRACTS: Array<{
@@ -14,6 +17,14 @@ const CONTRACTS: Array<{
   constName: string;
   title: string;
   blurb: string;
+  /** Which repo's evm/out holds the artifact (default 'dex'; periphery singletons moved to shared/evm). */
+  root?: keyof typeof EVM_ROOTS;
+  /** Extra interface artifact(s) whose EVENT entries get merged in (dedup by name). Needed when an
+   *  event is declared on an interface but only ever EMITTED from a library the contract calls into —
+   *  solc's ABI generator doesn't pick up library-emitted events unless the contract itself `is` the
+   *  declaring interface, so they're silently absent from the contract's own artifact (GATE-06: Pool's
+   *  Swapped/BatchSwapped/Deposited/Withdrawn/LiabilitySwapped/Donated all hit this). */
+  mergeEventsFrom?: string[];
 }> = [
   {
     contract: 'Admin',
@@ -28,6 +39,7 @@ const CONTRACTS: Array<{
     constName: 'POOL_ABI',
     title: 'Pool',
     blurb: 'Flat pool surface (swap/deposit/withdraw/view). Admin ops live on Admin singleton.',
+    mergeEventsFrom: ['IPool'],
   },
   {
     contract: 'PoolFactory',
@@ -53,6 +65,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'Staking',
+    root: 'shared',
     file: 'Staking.ts',
     constName: 'STAKING_ABI',
     title: 'Staking',
@@ -60,6 +73,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'Distributor',
+    root: 'shared',
     file: 'Distributor.ts',
     constName: 'DISTRIBUTOR_ABI',
     title: 'Distributor',
@@ -67,6 +81,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'GovToken',
+    root: 'shared',
     file: 'GovToken.ts',
     constName: 'GOV_TOKEN_ABI',
     title: 'GovToken',
@@ -74,6 +89,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'Bridge',
+    root: 'shared',
     file: 'Bridge.ts',
     constName: 'BRIDGE_ABI',
     title: 'Bridge',
@@ -81,6 +97,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'BridgeableERC20',
+    root: 'shared',
     file: 'BridgeableERC20.ts',
     constName: 'BRIDGEABLE_ERC20_ABI',
     title: 'BridgeableERC20',
@@ -88,6 +105,7 @@ const CONTRACTS: Array<{
   },
   {
     contract: 'Treasury',
+    root: 'shared',
     file: 'Treasury.ts',
     constName: 'TREASURY_ABI',
     title: 'Treasury',
@@ -119,19 +137,43 @@ function abiToTs(abi: unknown[], indent = 0): string {
   return String(abi);
 }
 
-for (const { contract, file, constName, title, blurb } of CONTRACTS) {
-  const artifactPath = resolve(DEX_EVM, `out/${contract}.sol/${contract}.json`);
-  const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as { abi: unknown[] };
+for (const {
+  contract,
+  file,
+  constName,
+  title,
+  blurb,
+  root = 'dex',
+  mergeEventsFrom,
+} of CONTRACTS) {
+  const evmRoot = EVM_ROOTS[root];
+  const artifactPath = resolve(evmRoot, `out/${contract}.sol/${contract}.json`);
+  const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    abi: Array<Record<string, unknown>>;
+  };
+  let abi = artifact.abi;
+  if (mergeEventsFrom?.length) {
+    const have = new Set(abi.filter((e) => e.type === 'event').map((e) => e.name as string));
+    for (const ifaceName of mergeEventsFrom) {
+      const ifacePath = resolve(evmRoot, `out/${ifaceName}.sol/${ifaceName}.json`);
+      const iface = JSON.parse(readFileSync(ifacePath, 'utf8')) as {
+        abi: Array<Record<string, unknown>>;
+      };
+      const missing = iface.abi.filter((e) => e.type === 'event' && !have.has(e.name as string));
+      for (const e of missing) have.add(e.name as string);
+      abi = [...abi, ...missing];
+    }
+  }
   const header = `/**
  * ${title} Contract ABI
  * @module @btr-protocol/sdk/abis
  *
  * ${blurb}
- * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
+ * Source: ${root}/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
-export const ${constName} = ${abiToTs(artifact.abi)};
+export const ${constName} = ${abiToTs(abi)};
 `;
   writeFileSync(resolve(ABI_DIR, file), header);
-  console.log(`wrote ${file} (${artifact.abi.length} entries)`);
+  console.log(`wrote ${file} (${abi.length} entries)`);
 }

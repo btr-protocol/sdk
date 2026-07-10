@@ -47,6 +47,32 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'MAX_POOL_TOKENS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_TOKEN_POOLS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'UPGRADE_TIMELOCK',
     inputs: [],
     outputs: [
@@ -144,6 +170,19 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'deregisterPool',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'executeReferenceUpgrade',
     inputs: [],
     outputs: [],
@@ -195,6 +234,25 @@ export const POOL_FACTORY_ABI = [
         name: '',
         type: 'uint256',
         internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getOfficialPoolsForToken',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address[]',
+        internalType: 'address[]',
       },
     ],
     stateMutability: 'view',
@@ -279,6 +337,30 @@ export const POOL_FACTORY_ABI = [
     type: 'function',
     name: 'officialPools',
     inputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'officialTokenToPools',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
       {
         name: '',
         type: 'uint256',
@@ -404,6 +486,19 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'setPoolBaseToken',
+    inputs: [
+      {
+        name: 'newBase',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'setProtocolDeployer',
     inputs: [
       {
@@ -478,6 +573,25 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'event',
+    name: 'PoolBaseTokenUpdated',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'newBase',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'PoolCreated',
     inputs: [
       {
@@ -503,6 +617,19 @@ export const POOL_FACTORY_ABI = [
         type: 'bool',
         indexed: false,
         internalType: 'bool',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'PoolDeregistered',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
     ],
     anonymous: false,
@@ -596,12 +723,33 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'error',
+    name: 'ExcessiveAmount',
+    inputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'InvalidInput',
     inputs: [],
   },
   {
     type: 'error',
     name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {

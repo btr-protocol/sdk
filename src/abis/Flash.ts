@@ -17,7 +17,7 @@ export const FLASH_ABI = [
         internalType: 'address',
       },
       {
-        name: '',
+        name: 'token',
         type: 'address',
         internalType: 'address',
       },

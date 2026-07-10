@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Rewards distributor singleton.
- * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
+ * Source: shared/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const DISTRIBUTOR_ABI = [

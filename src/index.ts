@@ -1,6 +1,6 @@
 /**
  * BTR DEX SDK
- * Modular SDK for interacting with BTR DEX - supports AMM flows, oracles, and guardians
+ * Modular SDK for interacting with BTR DEX - supports AMM flows and guardians
  *
  * @example Basic usage with EIP-1193 provider
  * ```ts
@@ -18,25 +18,6 @@
  *   amountIn: 1000000n,
  *   slippageBps: 50, // 0.5%
  * });
- * ```
- *
- * @example Oracle keeper (backend)
- * ```ts
- * import { BinanceOracle } from '@btr-protocol/sdk/oracles';
- * import { POOL_ABI } from '@btr-protocol/sdk/abis';
- *
- * const provider = createJsonRpcProvider('https://...');
- *
- * const oracle = new BinanceOracle(provider, {
- *   poolAddress: '0x...',
- *   assets: [
- *     { address: '0x...', symbol: 'ETH', decimals: 18 },
- *     { address: '0x...', symbol: 'USDC', decimals: 6 },
- *   ],
- *   divergenceThreshold: 50, // 0.5%
- * }, POOL_ABI);
- *
- * await oracle.start();
  * ```
  *
  * @example Circuit breaker guardian (backend)
@@ -92,8 +73,7 @@ export * from './utils/pair.js';
 // Shared types (TimeFrame enum + helpers)
 export * from './types/index.js';
 
-// Oracles and Guardians
-export * from './oracles/index.js';
+// Guardians
 export * from './guardians/index.js';
 
 // Pool data and transactions (canonical source for POOL_ABI, SwapQuote, PoolAsset)

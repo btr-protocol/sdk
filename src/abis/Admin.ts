@@ -205,6 +205,25 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'bootstrapSealed',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'cancelAddAsset',
     inputs: [
       {
@@ -881,6 +900,19 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'sealBootstrap',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'setAnchor',
     inputs: [
       {
@@ -1157,6 +1189,31 @@ export const ADMIN_ABI = [
   },
   {
     type: 'event',
+    name: 'BaseTokenOracleSet',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'oracle',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        indexed: false,
+        internalType: 'bytes32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'BatchLegSkipped',
     inputs: [
       {
@@ -1195,6 +1252,19 @@ export const ADMIN_ABI = [
         type: 'uint8',
         indexed: false,
         internalType: 'uint8',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'BootstrapSealed',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
       },
     ],
     anonymous: false,

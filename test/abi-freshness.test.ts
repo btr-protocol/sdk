@@ -1,9 +1,9 @@
 /**
  * ABI freshness test, Phase 42H.D · Round 4 · G16
  *
- * For each DEX ABI in src/abis/, load the compiled artifact from dex/evm/out
- * (forge build @ pinned commit) and assert ABI parity. Catches drift when
- * Solidity sources change without ABI regen.
+ * For each ABI in src/abis/, load the compiled artifact from dex/evm/out or
+ * shared/evm/out (forge build @ pinned commit) and assert ABI parity. Catches
+ * drift when Solidity sources change without ABI regen.
  *
  * Comparison is structural (function/event/error/constructor selectors + types).
  * Param `name` fields and `internalType` strings are stripped before compare -
@@ -12,13 +12,13 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
   ADMIN_ABI,
-  BRIDGE_ABI,
   BRIDGEABLE_ERC20_ABI,
+  BRIDGE_ABI,
   DISTRIBUTOR_ABI,
   EXTERNAL_ORACLE_ABI,
   FLASH_ABI,
@@ -29,21 +29,39 @@ import {
   TREASURY_ABI,
 } from '../src/abis/index.js';
 
-const DEX_EVM = resolve(import.meta.dir, '../../dex/evm');
+const EVM_ROOTS = {
+  dex: resolve(import.meta.dir, '../../dex/evm'),
+  shared: resolve(import.meta.dir, '../../shared/evm'),
+} as const;
 
-/** Map of (sdk ABI const) → (forge contract name). */
-const ABI_MAP: Array<{ name: string; ts: readonly unknown[]; contract: string }> = [
+/** Map of (sdk ABI const) → (forge contract name). `root` picks the sibling repo holding the
+ *  artifact (periphery singletons moved to shared/evm). `mergeEventsFrom` mirrors
+ *  scripts/regen-dex-abis.ts: events declared on an interface but only ever EMITTED from a
+ *  library aren't in the implementing contract's own artifact (solc doesn't attribute a
+ *  library-emitted event to the caller unless it `is` the declaring interface) — GATE-06. */
+const ABI_MAP: Array<{
+  name: string;
+  ts: readonly unknown[];
+  contract: string;
+  root?: keyof typeof EVM_ROOTS;
+  mergeEventsFrom?: string[];
+}> = [
   { name: 'Admin', ts: ADMIN_ABI, contract: 'Admin' },
-  { name: 'Bridge', ts: BRIDGE_ABI, contract: 'Bridge' },
-  { name: 'BridgeableERC20', ts: BRIDGEABLE_ERC20_ABI, contract: 'BridgeableERC20' },
-  { name: 'Distributor', ts: DISTRIBUTOR_ABI, contract: 'Distributor' },
+  { name: 'Bridge', ts: BRIDGE_ABI, contract: 'Bridge', root: 'shared' },
+  {
+    name: 'BridgeableERC20',
+    ts: BRIDGEABLE_ERC20_ABI,
+    contract: 'BridgeableERC20',
+    root: 'shared',
+  },
+  { name: 'Distributor', ts: DISTRIBUTOR_ABI, contract: 'Distributor', root: 'shared' },
   { name: 'ExternalOracle', ts: EXTERNAL_ORACLE_ABI, contract: 'ExternalOracle' },
   { name: 'Flash', ts: FLASH_ABI, contract: 'Flash' },
-  { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken' },
-  { name: 'Pool', ts: POOL_ABI, contract: 'Pool' },
+  { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken', root: 'shared' },
+  { name: 'Pool', ts: POOL_ABI, contract: 'Pool', mergeEventsFrom: ['IPool'] },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
-  { name: 'Staking', ts: STAKING_ABI, contract: 'Staking' },
-  { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury' },
+  { name: 'Staking', ts: STAKING_ABI, contract: 'Staking', root: 'shared' },
+  { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury', root: 'shared' },
 ];
 
 type AbiItem = Record<string, unknown> & {
@@ -53,10 +71,25 @@ type AbiItem = Record<string, unknown> & {
   components?: AbiItem[];
 };
 
-function loadForgeAbi(contract: string): AbiItem[] {
-  const artifactPath = resolve(DEX_EVM, `out/${contract}.sol/${contract}.json`);
+function loadForgeAbi(
+  contract: string,
+  root: keyof typeof EVM_ROOTS = 'dex',
+  mergeEventsFrom?: string[],
+): AbiItem[] {
+  const artifactPath = resolve(EVM_ROOTS[root], `out/${contract}.sol/${contract}.json`);
   const raw = readFileSync(artifactPath, 'utf8');
-  return (JSON.parse(raw) as { abi: AbiItem[] }).abi;
+  let abi = (JSON.parse(raw) as { abi: AbiItem[] }).abi;
+  if (mergeEventsFrom?.length) {
+    const have = new Set(abi.filter((e) => e.type === 'event').map((e) => e.name as string));
+    for (const ifaceName of mergeEventsFrom) {
+      const ifacePath = resolve(EVM_ROOTS[root], `out/${ifaceName}.sol/${ifaceName}.json`);
+      const iface = (JSON.parse(readFileSync(ifacePath, 'utf8')) as { abi: AbiItem[] }).abi;
+      const missing = iface.filter((e) => e.type === 'event' && !have.has(e.name as string));
+      for (const e of missing) have.add(e.name as string);
+      abi = [...abi, ...missing];
+    }
+  }
+  return abi;
 }
 
 /**
@@ -97,18 +130,18 @@ function canonical(v: unknown): string {
   return JSON.stringify(v);
 }
 
-describe('ABI freshness vs dex/evm sources', () => {
-  const dexExists = existsSync(DEX_EVM);
+describe('ABI freshness vs dex/evm + shared/evm sources', () => {
+  const rootsExist = existsSync(EVM_ROOTS.dex) && existsSync(EVM_ROOTS.shared);
 
-  test('dex/evm sibling repo is reachable', () => {
-    expect(dexExists).toBe(true);
+  test('dex/evm + shared/evm sibling repos are reachable', () => {
+    expect(rootsExist).toBe(true);
   });
 
-  if (!dexExists) return;
+  if (!rootsExist) return;
 
-  for (const { name, ts, contract } of ABI_MAP) {
-    test(`${name} ABI matches dex/evm compiled artifact`, () => {
-      const onChain = loadForgeAbi(contract);
+  for (const { name, ts, contract, root, mergeEventsFrom } of ABI_MAP) {
+    test(`${name} ABI matches ${root ?? 'dex'}/evm compiled artifact`, () => {
+      const onChain = loadForgeAbi(contract, root, mergeEventsFrom);
       const a = canonical(normalize(onChain));
       const b = canonical(normalize(ts));
       if (a !== b) {

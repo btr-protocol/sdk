@@ -29,10 +29,6 @@
       "types": "./src/guardians/index.ts",
       "default": "./src/guardians/index.ts"
     },
-    "./oracles": {
-      "types": "./src/oracles/index.ts",
-      "default": "./src/oracles/index.ts"
-    },
     "./pool": {
       "types": "./src/pool/index.ts",
       "default": "./src/pool/index.ts"
@@ -40,6 +36,10 @@
     "./rewards": {
       "types": "./src/rewards/index.ts",
       "default": "./src/rewards/index.ts"
+    },
+    "./router": {
+      "types": "./src/router/index.ts",
+      "default": "./src/router/index.ts"
     },
     "./utils": {
       "types": "./src/utils/index.ts",
