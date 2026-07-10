@@ -3,7 +3,7 @@
  * @module @btr-protocol/sdk/abis
  *
  * Protocol treasury singleton.
- * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
+ * Source: shared/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
 export const TREASURY_ABI = [
@@ -1040,6 +1040,11 @@ export const TREASURY_ABI = [
   {
     type: 'error',
     name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {
