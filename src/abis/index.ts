@@ -17,5 +17,6 @@ export * from './Flash.js';
 export * from './GovToken.js';
 export * from './Pool.js';
 export * from './PoolFactory.js';
+export * from './StakedAsset.js';
 export * from './Staking.js';
 export * from './Treasury.js';

@@ -3,9 +3,9 @@
  * Works in both frontend (with injected wallet) and backend (with private key)
  */
 
-import { encodeFn, decodeFn } from '../eth/abi';
-import type { Address, Hex, Eip1193Provider } from '../eth/types';
 import { POOL_ABI } from '../abis/Pool.js';
+import { decodeFn, encodeFn } from '../eth/abi';
+import type { Address, Eip1193Provider, Hex } from '../eth/types';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)
@@ -75,7 +75,7 @@ export interface PoolData {
 export async function getAsset(
   provider: Eip1193Provider,
   poolAddress: Address,
-  tokenAddress: Address
+  tokenAddress: Address,
 ): Promise<Asset> {
   const calldata = encodeFn({ abi: POOL_ABI, functionName: 'getAsset', args: [tokenAddress] });
 
@@ -93,9 +93,13 @@ export async function getAsset(
 export async function getCoverageRatio(
   provider: Eip1193Provider,
   poolAddress: Address,
-  tokenAddress: Address
+  tokenAddress: Address,
 ): Promise<bigint> {
-  const calldata = encodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', args: [tokenAddress] });
+  const calldata = encodeFn({
+    abi: POOL_ABI,
+    functionName: 'getCoverageRatio',
+    args: [tokenAddress],
+  });
 
   const result = (await provider.request({
     method: 'eth_call',
@@ -112,9 +116,13 @@ export async function getLPBalance(
   provider: Eip1193Provider,
   poolAddress: Address,
   userAddress: Address,
-  tokenAddress: Address
+  tokenAddress: Address,
 ): Promise<bigint> {
-  const calldata = encodeFn({ abi: POOL_ABI, functionName: 'getLPBalance', args: [userAddress, tokenAddress] });
+  const calldata = encodeFn({
+    abi: POOL_ABI,
+    functionName: 'getLPBalance',
+    args: [userAddress, tokenAddress],
+  });
 
   const result = (await provider.request({
     method: 'eth_call',
@@ -132,9 +140,13 @@ export async function getSwapQuote(
   poolAddress: Address,
   tokenIn: Address,
   tokenOut: Address,
-  amountIn: bigint
+  amountIn: bigint,
 ): Promise<SwapQuote> {
-  const calldata = encodeFn({ abi: POOL_ABI, functionName: 'getSwapQuote', args: [tokenIn, tokenOut, amountIn] });
+  const calldata = encodeFn({
+    abi: POOL_ABI,
+    functionName: 'getSwapQuote',
+    args: [tokenIn, tokenOut, amountIn],
+  });
 
   const result = (await provider.request({
     method: 'eth_call',
@@ -151,7 +163,7 @@ export async function getPoolData(
   provider: Eip1193Provider,
   poolAddress: Address,
   tokens: Array<{ address: Address; symbol: string; name: string }>,
-  poolName: string
+  poolName: string,
 ): Promise<PoolData> {
   const assets: PoolAsset[] = [];
 
@@ -183,61 +195,11 @@ export async function getPoolData(
 // Transaction Functions
 // ─────────────────────────────────────────────────────────────
 
-// Transaction ABIs
-const SWAP_ABI = [
-  {
-    type: 'function',
-    name: 'swap',
-    stateMutability: 'payable',
-    inputs: [
-      { name: 'tokenIn', type: 'address' },
-      { name: 'tokenOut', type: 'address' },
-      { name: 'amountIn', type: 'uint256' },
-      { name: 'minAmountOut', type: 'uint256' },
-      { name: 'recipient', type: 'address' },
-    ],
-    outputs: [{ name: 'amountOut', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'deposit',
-    stateMutability: 'payable',
-    inputs: [
-      { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [
-      {
-        name: 'result',
-        type: 'tuple',
-        components: [
-          { name: 'lpAmount', type: 'uint256' },
-          { name: 'actualDeposit', type: 'uint256' },
-        ],
-      },
-    ],
-  },
-  {
-    type: 'function',
-    name: 'withdraw',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'token', type: 'address' },
-      { name: 'lpAmount', type: 'uint256' },
-      { name: 'minAmountOut', type: 'uint256' },
-    ],
-    outputs: [
-      {
-        name: 'result',
-        type: 'tuple',
-        components: [
-          { name: 'amountOut', type: 'uint256' },
-          { name: 'lpBurned', type: 'uint256' },
-        ],
-      },
-    ],
-  },
-] as const;
+/** EIP-7528 native-asset sentinel (shared/evm `Constants.NATIVE`). Pool wraps to wnative on pull. */
+export const NATIVE_TOKEN: Address = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowerCase();
+const txValue = (token: Address, amount: bigint): Hex =>
+  isNative(token) ? `0x${amount.toString(16)}` : '0x0';
 
 export interface SwapParams {
   tokenIn: Address;
@@ -265,10 +227,10 @@ export interface WithdrawParams {
 export async function swap(
   provider: Eip1193Provider,
   poolAddress: Address,
-  params: SwapParams
+  params: SwapParams,
 ): Promise<Hex> {
   const calldata = encodeFn({
-    abi: SWAP_ABI,
+    abi: POOL_ABI,
     functionName: 'swap',
     args: [params.tokenIn, params.tokenOut, params.amountIn, params.minAmountOut, params.recipient],
   });
@@ -280,7 +242,7 @@ export async function swap(
       {
         to: poolAddress,
         data: calldata,
-        value: '0x0', // TODO: Handle native token swaps
+        value: txValue(params.tokenIn, params.amountIn),
       },
     ],
   })) as Hex;
@@ -293,10 +255,10 @@ export async function swap(
 export async function deposit(
   provider: Eip1193Provider,
   poolAddress: Address,
-  params: DepositParams
+  params: DepositParams,
 ): Promise<Hex> {
   const calldata = encodeFn({
-    abi: SWAP_ABI,
+    abi: POOL_ABI,
     functionName: 'deposit',
     args: [params.token, params.amount],
   });
@@ -307,7 +269,7 @@ export async function deposit(
       {
         to: poolAddress,
         data: calldata,
-        value: '0x0',
+        value: txValue(params.token, params.amount),
       },
     ],
   })) as Hex;
@@ -319,10 +281,10 @@ export async function deposit(
 export async function withdraw(
   provider: Eip1193Provider,
   poolAddress: Address,
-  params: WithdrawParams
+  params: WithdrawParams,
 ): Promise<Hex> {
   const calldata = encodeFn({
-    abi: SWAP_ABI,
+    abi: POOL_ABI,
     functionName: 'withdraw',
     args: [params.token, params.lpAmount, params.minAmountOut],
   });

@@ -78,6 +78,9 @@ export * from './guardians/index.js';
 export * from './pool/index.js';
 export * from './router/index.js';
 
+// Off-chain AIMM pricer + route-finding (quoteExactIn, rankSwap, poolStateFrom)
+export * from './amm/index.js';
+
 // Eth utilities and clients
 export * from './eth/index.js';
 export type { Client } from './eth/client.js';
