@@ -13,7 +13,8 @@
 // marginal) — exact-in-the-limit for the concave case and safe across toll/skew kinks — then keep the
 // split only if it beats the best single route by more than the gas it costs.
 
-import { type DepthLevel, type PoolState, type Quote, depthCurve, quoteExactIn } from './aimm';
+import { type PoolState, type Quote, quoteExactIn } from './aimm';
+import { type AggRow, aggregateDepthCurves, niceStep } from './depthAgg.js';
 
 export interface NamedPool {
   tag: string; // pool identity (e.g. 'stable' | 'volatile')
@@ -250,46 +251,7 @@ export function rankSwap(
   return { best, singles };
 }
 
-// ── Aggregated market depth across all pools (for the DepthPanel) ─────────────────
-
-interface Row {
-  price: number; // quote asset per token
-  size: number; // token traded at this step
-  cum: number; // cumulative token outward from the mid
-}
-export interface AggRow {
-  price: number;
-  size: number;
-  cum: number;
-}
-
-/**
- * Bucket rows to `step`: price→floor (bids) / ceil (asks) multiple of step, sum size + cum outward
- * from the mid. `denom='quote'` scales token→quote (size·price). Collapses rows sharing a bucket.
- */
-function aggregate(
-  rows: Row[],
-  step: number,
-  side: 'bid' | 'ask',
-  denom: 'base' | 'quote',
-): AggRow[] {
-  if (!rows.length) return [];
-  const snap = (p: number) =>
-    step > 0 ? (side === 'bid' ? Math.floor(p / step) : Math.ceil(p / step)) * step : p;
-  const buckets = new Map<number, number>();
-  for (const r of rows) {
-    const b = snap(r.price);
-    buckets.set(b, (buckets.get(b) ?? 0) + (denom === 'quote' ? r.size * r.price : r.size));
-  }
-  const entries = [...buckets.entries()].sort((a, b) =>
-    side === 'bid' ? b[0] - a[0] : a[0] - b[0],
-  );
-  let cum = 0;
-  return entries.map(([price, size]) => {
-    cum += size;
-    return { price, size, cum };
-  });
-}
+// ── Aggregated market depth across all pools (DepthPanel + chart bands) ───────────
 
 export interface AggDepth {
   mid: number; // size-weighted mid across pools
@@ -298,17 +260,10 @@ export interface AggDepth {
   step: number;
 }
 
-const levelsToRows = (levels: DepthLevel[]): Row[] =>
-  levels.map((l, i) => ({
-    price: l.price,
-    size: i === 0 ? l.cumTok : l.cumTok - levels[i - 1].cumTok,
-    cum: l.cumTok,
-  }));
-
 /**
- * Combined book for (base, quote) across every pool that holds the pair: concatenate each pool's
- * depthCurve rows and re-bucket to one price ladder. Differing per-pool mids reconcile via the price
- * bucketing, so the panel shows true aggregate liquidity, not a single pool's.
+ * Combined book for (from, to) across every pool that holds the pair.
+ * Densifies each pool Hermite curve onto `step`, then merges same-price buckets (N-pool).
+ * Prefer `aggregateDepthCurves` when you need mark/spread/ladder/display denom.
  */
 export function aggregateDepth(
   pools: NamedPool[],
@@ -316,41 +271,14 @@ export function aggregateDepth(
   to: string,
   opts?: { step?: number; unit?: 'token' | 'base' },
 ): AggDepth {
-  const curves = pools
-    .filter((p) => poolHas(p.state, from) && poolHas(p.state, to))
-    .map((p) => depthCurve(p.state, from, to, { unit: opts?.unit ?? 'base' }));
-  if (curves.length === 0) return { mid: 0, bids: [], asks: [], step: 0 };
-
-  // Size-weighted mid across pools (weight = each pool's total displayed depth).
-  let midNum = 0;
-  let midDen = 0;
-  const bidRows: Row[] = [];
-  const askRows: Row[] = [];
-  for (const c of curves) {
-    const w = c.maxTokBid + c.maxTokAsk || 1;
-    midNum += c.mid * w;
-    midDen += w;
-    bidRows.push(...levelsToRows(c.bids));
-    askRows.push(...levelsToRows(c.asks));
+  const book = aggregateDepthCurves(pools, from, to, {
+    step: opts?.step,
+    unit: opts?.unit ?? 'token',
+  });
+  if (!book) {
+    const mid = 0;
+    const step = opts?.step ?? (mid > 0 ? niceStep(mid * 5e-4) : 0);
+    return { mid: 0, bids: [], asks: [], step };
   }
-  const mid = midDen > 0 ? midNum / midDen : 0;
-  const step = opts?.step ?? niceDepthStep(mid);
-  return {
-    mid,
-    bids: aggregate(bidRows, step, 'bid', 'base'),
-    asks: aggregate(askRows, step, 'ask', 'base'),
-    step,
-  };
-}
-
-/** Default ladder step ≈ a few bps of mid, snapped to a 1/2/5 nice value. */
-function niceDepthStep(mid: number): number {
-  if (mid <= 0) return 0;
-  const target = mid * 5e-4; // ~5 bps
-  const mag = 10 ** Math.floor(Math.log10(target));
-  const rungs = [1, 2, 5, 10].map((r) => r * mag);
-  return rungs.reduce(
-    (best, s) => (Math.abs(s - target) < Math.abs(best - target) ? s : best),
-    rungs[0],
-  );
+  return { mid: book.mid, bids: book.bids, asks: book.asks, step: book.step };
 }
