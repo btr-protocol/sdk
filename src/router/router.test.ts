@@ -11,9 +11,13 @@ const POOL_V = '0x0000000000000000000000000000000000000020' as const;
 
 const SWAP_SEL = '0xd5bcb9b5'; // swap(address,address,uint256,uint256,address)
 const APPROVE_SEL = '0x095ea7b3'; // approve(address,uint256)
+const MAX_UINT256 = (1n << 256n) - 1n;
+
+/** Last word of approve(spender, amount) calldata → amount. */
+const approveAmount = (data: string): bigint => BigInt(`0x${data.slice(2 + 8 + 64)}`);
 
 describe('buildSwapCalls', () => {
-  test('single direct leg → [approve, swap]', () => {
+  test('single direct leg → [approve exact, swap]', () => {
     const legs: ExecLeg[] = [
       { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 1000n, minOut: 995n },
     ];
@@ -21,9 +25,18 @@ describe('buildSwapCalls', () => {
     expect(calls.length).toBe(2);
     expect(calls[0].to.toLowerCase()).toBe(USDC.toLowerCase()); // approve on the token
     expect(calls[0].data.startsWith(APPROVE_SEL)).toBe(true);
+    expect(approveAmount(calls[0].data)).toBe(1000n); // exact amount, not max
     expect(calls[1].to.toLowerCase()).toBe(POOL_S.toLowerCase()); // swap on the pool
     expect(calls[1].data.startsWith(SWAP_SEL)).toBe(true);
     expect(totalValue(calls)).toBe(0n);
+  });
+
+  test('approveMax=true → max uint256 allowance', () => {
+    const legs: ExecLeg[] = [
+      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 1000n, minOut: 995n },
+    ];
+    const calls = buildSwapCalls(legs, { recipient: USER, approveMax: true });
+    expect(approveAmount(calls[0].data)).toBe(MAX_UINT256);
   });
 
   test('split across two pools (same tokenIn) → 2 approvals (distinct spenders) + 2 swaps, approvals first', () => {
@@ -36,6 +49,7 @@ describe('buildSwapCalls', () => {
     expect(calls.slice(0, 2).every((c) => c.data.startsWith(APPROVE_SEL))).toBe(true);
     expect(calls.slice(2).every((c) => c.data.startsWith(SWAP_SEL))).toBe(true);
     expect(new Set(calls.slice(0, 2).map((c) => c.to.toLowerCase())).size).toBe(1); // same token
+    expect(calls.slice(0, 2).map((c) => approveAmount(c.data)).sort()).toEqual([300n, 700n]);
   });
 
   test('needsApproval=false skips approvals (cached allowance)', () => {
@@ -57,13 +71,15 @@ describe('buildSwapCalls', () => {
     expect(totalValue(calls)).toBe(5n);
   });
 
-  test('dedup approvals for the same (token,pool) across legs', () => {
+  test('dedup approvals for the same (token,pool) across legs — exact Σ amountIn', () => {
     const legs: ExecLeg[] = [
       { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 500n, minOut: 498n },
       { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 500n, minOut: 498n },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER });
-    expect(calls.filter((c) => c.data.startsWith(APPROVE_SEL)).length).toBe(1);
+    const approves = calls.filter((c) => c.data.startsWith(APPROVE_SEL));
+    expect(approves.length).toBe(1);
+    expect(approveAmount(approves[0].data)).toBe(1000n);
     expect(calls.filter((c) => c.data.startsWith(SWAP_SEL)).length).toBe(2);
   });
 });

@@ -75,15 +75,23 @@ export interface DepthLevel {
 }
 
 export interface DepthCurve {
-  mid: number; // skewed size-0 mid, base-per-token
+  /** Oracle mark (NX TWAP), base-per-token — inventory-independent. */
+  mark: number;
+  /** Skewed size-0 mid = mark + inventory premium, base-per-token. Book is centered here. */
+  mid: number;
   bidBest: number;
   askBest: number;
   spreadBps: number;
-  bids: DepthLevel[]; // price descending (sell token)
-  asks: DepthLevel[]; // price ascending (buy token)
+  bids: DepthLevel[]; // price descending (sell token), outward from mid
+  asks: DepthLevel[]; // price ascending (buy token), outward from mid
   maxTokBid: number;
   maxTokAsk: number;
   unit: 'token' | 'base';
+}
+
+/** Inventory premium in bps: (mid − mark) / mark. Positive ⇒ mid above oracle. */
+export function premiumBps(mid: number, mark: number): number {
+  return mark > 0 ? ((mid - mark) / mark) * 1e4 : 0;
 }
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
@@ -425,10 +433,29 @@ function capAskBase(k: LegKit, leg: PoolLeg): number {
 // ── depthCurve ──────────────────────────────────────────────────────────────────
 
 /**
+ * Depth-axis sample grid from `center` toward `edge`: always includes the skewed mid (`center`),
+ * spline knots, the band edge, plus uniform steps so the polyline follows the AIMM offset curve
+ * (piecewise-linear today; Hermite-ready when evalSpline ports Spline.sol). Never samples around
+ * the raw mark depth (5000) — the virtual book is centered on inventory-skewed mid.
+ */
+function depthBandSamples(center: number, edge: number, knotXs: number[], step = 250): number[] {
+  const lo = Math.min(center, edge);
+  const hi = Math.max(center, edge);
+  const xs = new Set<number>([center, edge]);
+  for (const x of knotXs) {
+    if (x > lo + 1e-9 && x < hi - 1e-9) xs.add(x);
+  }
+  for (let d = lo + step; d < hi - 1e-9; d += step) xs.add(d);
+  const sorted = [...xs].sort((a, b) => a - b);
+  // Ask side walks center→edge ascending; bid side center→edge descending.
+  return edge >= center ? sorted : sorted.reverse();
+}
+
+/**
  * The Binance-style book (x = price, y = cumulative size outward from mid). Direct pair = analytic
- * polyline through the spline knots; cross pair = numeric sweep of quoteExactIn (marginal = local
- * slope). Cumulative base under the curve at size S == quoteExactIn(S).grossOut by construction —
- * the acceptance invariant (spec §2).
+ * polyline through the spline (depth-axis traversal via priceAt / bandPrice); cross pair = numeric
+ * sweep of quoteExactIn (marginal = local slope). Cumulative base under the curve at size S ==
+ * quoteExactIn(S).grossOut by construction — the acceptance invariant (spec §2).
  */
 export function depthCurve(
   state: PoolState,
@@ -449,9 +476,13 @@ export function depthCurve(
   const half = spread / 2;
   const knotXs = k.pts.map((p) => p[0]);
 
-  // ASK (buy token): d from center→10000; the size traders receive at a buy sized to reach band d.
-  const askDs = [k.center, ...knotXs.filter((x) => x > k.center), BPS].sort((a, b) => a - b);
-  const asks: DepthLevel[] = dedup(askDs).map((d) => {
+  // Caps = remaining FILLABLE liquidity (spline band ∩ physical reserves).
+  // Ask drains spoke R; bid drains hub baseRes — both must clip the printed ladder.
+  const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res * 0.999);
+  const maxTokBid = capBidTok(k, leg);
+
+  // ASK (buy token): d from skewed center→10000; size = tokens received along the band.
+  const asksRaw: DepthLevel[] = dedup(depthBandSamples(k.center, BPS, knotXs)).map((d) => {
     const est = ((d - k.center) / BPS) * k.depth; // notional token = band size
     const baseIn = est * k.mid; // one-step fixed point uses mid to size the band (aimm.rs:346)
     const exec = bandPrice(k, k.center, d);
@@ -462,27 +493,68 @@ export function depthCurve(
     };
   });
 
-  // BID (sell token): d from center→0.
-  const bidDs = [k.center, ...knotXs.filter((x) => x < k.center), 0].sort((a, b) => b - a);
-  const bids: DepthLevel[] = dedup(bidDs).map((d) => {
+  // BID (sell token): d from skewed center→0.
+  const bidsRaw: DepthLevel[] = dedup(depthBandSamples(k.center, 0, knotXs)).map((d) => {
     const t = ((k.center - d) / BPS) * k.depth;
     const exec = bandPrice(k, k.center, d);
     return { price: priceAt(k.twap, k.pts, d), cumTok: t, cumBase: t * exec };
   });
 
-  const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res * 0.999);
-  const maxTokBid = capBidTok(k, leg);
   return {
+    mark: k.twap,
     mid: k.mid,
     bidBest: k.mid * (1 - half / PBPS),
     askBest: k.mid * (1 + half / PBPS),
     spreadBps: spread / 100,
-    bids,
-    asks,
+    bids: clipDepthLevels(bidsRaw, maxTokBid),
+    asks: clipDepthLevels(asksRaw, maxTokAsk),
     maxTokBid,
     maxTokAsk,
     unit,
   };
+}
+
+/**
+ * Virtual market depth for a hub-spoke pair — the UI-facing API over `depthCurve`.
+ *
+ * Reads remaining fillable liquidity on BOTH sides of the spoke's bonding curve:
+ * - **Bids** (sell `token` → hub): spline bid band ∩ hub `baseRes` (`capBidTok`)
+ * - **Asks** (buy `token` ← hub): spline ask band ∩ spoke `res`
+ *
+ * Prices are always hub-per-token. Every cumulative size S satisfies
+ * `quoteExactIn(…, S).grossOut` under the ladder (spec D3) — no fabricated depth.
+ */
+export function virtualMarketDepth(state: PoolState, token: string): DepthCurve {
+  if (token === state.base) return emptyCurve('base');
+  if (!state.legs[token]) return emptyCurve('base');
+  return depthCurve(state, state.base, token);
+}
+
+/** Keep levels with cumTok ≤ maxTok; append an interpolated terminal vertex at exactly maxTok. */
+function clipDepthLevels(levels: DepthLevel[], maxTok: number): DepthLevel[] {
+  if (!(maxTok > 0) || levels.length === 0) return [];
+  const out: DepthLevel[] = [];
+  for (const l of levels) {
+    if (l.cumTok <= maxTok + 1e-15) {
+      out.push(l); // keep the mid vertex (cumTok=0) — required for ladder integrals
+      continue;
+    }
+    const prev = out[out.length - 1];
+    if (prev && prev.cumTok < maxTok - 1e-15) {
+      const span = l.cumTok - prev.cumTok;
+      const t = span > 0 ? (maxTok - prev.cumTok) / span : 1;
+      out.push({
+        price: prev.price + t * (l.price - prev.price),
+        cumTok: maxTok,
+        cumBase: prev.cumBase + t * (l.cumBase - prev.cumBase),
+      });
+    } else if (!prev) {
+      const scale = l.cumTok > 0 ? maxTok / l.cumTok : 0;
+      out.push({ price: l.price, cumTok: maxTok, cumBase: l.cumBase * scale });
+    }
+    break;
+  }
+  return out;
 }
 
 function crossCurve(
@@ -511,7 +583,10 @@ function crossCurve(
     return { cumTok: s, cumBase: q.grossOut };
   });
   const midX = mid > 0 ? 1 / mid : 0; // from-per-to
+  // Oracle mark in the same orientation (from-per-to): twap_to / twap_from.
+  const markX = legIn.twap > 0 ? legOut.twap / legIn.twap : 0;
   return {
+    mark: markX,
     mid: midX,
     bidBest: midX * (1 - half / PBPS),
     askBest: midX * (1 + half / PBPS),
@@ -556,6 +631,7 @@ function dedup(xs: number[]): number[] {
 
 function emptyCurve(unit: 'token' | 'base'): DepthCurve {
   return {
+    mark: 0,
     mid: 0,
     bidBest: 0,
     askBest: 0,
