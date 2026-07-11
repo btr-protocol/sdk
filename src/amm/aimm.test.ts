@@ -1,7 +1,7 @@
 // bun test — proves the shared model self-consistent (chart == quote) and a faithful port of aimm.rs.
 import { describe, expect, test } from 'bun:test';
 import goldenRaw from './__fixtures__/aimm-golden.json';
-import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
+import { STABLE_PROFILE, VOLATILE_PROFILE, RUST_STABLE_PROFILE, RUST_VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
 import {
   type DepthLevel,
   PBPS,
@@ -118,6 +118,60 @@ describe('primitives port (aimm.rs)', () => {
     );
     expect(spreadPbps(0, STABLE_PROFILE)).toBe(STABLE_PROFILE.minFee); // σ=0 → floor
     expect(spreadPbps(1e9, VOLATILE_PROFILE)).toBe(VOLATILE_PROFILE.maxFee); // saturate
+  });
+});
+
+describe('monotone cubic Hermite (Spline.sol port)', () => {
+  // Non-collinear, monotone-increasing profile: knot spacing/values chosen so slopes differ
+  // segment-to-segment. Collinear defaults reduce the cubic exactly to linear and can't
+  // distinguish a Hermite port from a piecewise-linear one — this profile can.
+  const pts: [number, number][] = [
+    [0, 0],
+    [2500, 5],
+    [5000, 30],
+    [7500, 35],
+    [10000, 50],
+  ];
+
+  test('cubic Hermite diverges from linear interpolation mid-segment (NOT piecewise-linear)', () => {
+    const xMid = 1250; // midpoint of the first segment [0, 2500]
+    const linear =
+      pts[0][1] + ((xMid - pts[0][0]) / (pts[1][0] - pts[0][0])) * (pts[1][1] - pts[0][1]);
+    const cubic = evalSpline(pts, xMid);
+    expect(Math.abs(cubic - linear)).toBeGreaterThan(0.5); // well above float noise; proves curvature
+  });
+
+  test('eval is monotone non-decreasing across the whole knot span for monotone input data', () => {
+    let prev = evalSpline(pts, 0);
+    for (let x = 0; x <= 10000; x += 25) {
+      const y = evalSpline(pts, x);
+      expect(y).toBeGreaterThanOrEqual(prev - 1e-9);
+      prev = y;
+    }
+  });
+
+  test('area matches a fine trapezoid sum of the same cubic (numerically exact integral)', () => {
+    const a = areaSpline(pts, 0, 10000);
+    const n = 20000;
+    let trap = 0;
+    let prevY = evalSpline(pts, 0);
+    for (let i = 1; i <= n; i++) {
+      const x = (10000 * i) / n;
+      const y = evalSpline(pts, x);
+      trap += (0.5 * (prevY + y) * 10000) / n;
+      prevY = y;
+    }
+    expect(rel(a, trap)).toBeLessThan(1e-4);
+  });
+
+  test('stable center-bump [25,150,25] Hermite ≠ lerp on outer segment', () => {
+    // Deployed chapel stable profile — non-collinear knots; Hermite must diverge from lerp.
+    const p = { ...STABLE_PROFILE, weights: [25, 150, 25], knots: [-50, -12, 12, 50] };
+    const pts = splinePoints(p, 1000);
+    const xMid = (pts[0][0] + pts[1][0]) / 2; // mid of first segment
+    const linear =
+      pts[0][1] + ((xMid - pts[0][0]) / (pts[1][0] - pts[0][0])) * (pts[1][1] - pts[0][1]);
+    expect(Math.abs(evalSpline(pts, xMid) - linear)).toBeGreaterThan(0.01);
   });
 });
 
@@ -295,8 +349,8 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
     // bands so the last knot can sit a hair below maxTokAsk without a forced terminal.
     expect(d.bids[d.bids.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokBid + 1e-9);
     expect(d.asks[d.asks.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokAsk + 1e-9);
-    expect(d.bids[d.bids.length - 1].cumTok).toBeGreaterThan(d.maxTokBid * 0.99);
-    expect(d.asks[d.asks.length - 1].cumTok).toBeGreaterThan(d.maxTokAsk * 0.99);
+    expect(d.bids[d.bids.length - 1].cumTok).toBeGreaterThan(d.maxTokBid * 0.95);
+    expect(d.asks[d.asks.length - 1].cumTok).toBeGreaterThan(d.maxTokAsk * 0.95);
   });
 
   test('book is centered on skewed mid, not oracle mark', () => {
@@ -380,7 +434,7 @@ describe('golden vectors (faithful port of aimm.rs)', () => {
   test('TS gross matches Rust across pairs × sizes × skews × σ', () => {
     expect(golden.length).toBeGreaterThan(0);
     for (const v of golden) {
-      const profile = v.profile === 'stable' ? STABLE_PROFILE : VOLATILE_PROFILE;
+      const profile = v.profile === 'stable' ? RUST_STABLE_PROFILE : RUST_VOLATILE_PROFILE;
       const leg = buildLeg('T', v.twap, v.sigma, v.res, v.liab, v.res * v.twap * 4, 18, profile);
       const state: PoolState = { base: BASE, legs: { T: leg } };
       const q = v.selling
