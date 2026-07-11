@@ -180,6 +180,16 @@ export { Contract, getContract, readContract, writeContract } from './contract';
 export type { Call } from './multicall';
 export { MC3_ADDR, multicall, multicallStrict } from './multicall';
 
+// Signing clients (bots / keepers)
+export type { Client } from './client';
+export {
+  createHttpProvider,
+  createPrivateKeyClient,
+  createPublicClient,
+  createWalletClient,
+  privateKeyToAddress,
+} from './client';
+
 // Wallets
 export type { WalletInfo, Eip6963Detail } from './wallets';
 export {
