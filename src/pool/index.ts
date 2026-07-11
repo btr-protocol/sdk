@@ -114,6 +114,7 @@ export type { LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
   mappingBase,
+  resolveTokenStorageKey,
   readLiquidityProfile,
   readOracleConfig,
   readRiskConfig,
