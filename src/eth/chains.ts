@@ -534,6 +534,16 @@ export function getExplorerUrl(chainId: number): string | undefined {
 }
 
 /**
+ * Get block explorer URL for a transaction hash on the given chain.
+ * Chapel (97) → https://testnet.bscscan.com/tx/0x…
+ */
+export function getExplorerTxUrl(chainId: number, hash: string): string | undefined {
+  const base = getExplorerUrl(chainId);
+  if (!base || !hash) return undefined;
+  return `${base.replace(/\/$/, '')}/tx/${hash}`;
+}
+
+/**
  * Get wrapped native token address
  */
 export function getWrappedNative(chainId: number): Address | undefined {
