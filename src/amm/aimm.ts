@@ -46,6 +46,10 @@ export interface PoolLeg {
   // BASE numeraire can never carry this (protocol invariant, enforced at addAsset), so it only ever
   // matters on a spoke leg's OUTPUT side (buying the spoke, or a cross trade's second leg).
   kappaCovBps: number;
+  /** Feed 1σ CI in BPS (ExternalOracle.confidence). Widens path spread. */
+  confidence?: number;
+  /** Seconds past ttl/2 (Pricing staleExcess). Widens path spread. */
+  staleExcess?: number;
 }
 
 /** Depth-1 star: `base` is the hub numeraire (no leg); spokes keyed by symbol. */
@@ -109,41 +113,136 @@ export function splinePoints(p: AimmProfile, disp: number): [number, number][] {
   return pts;
 }
 
-// ponytail: piecewise-LINEAR eval — the default knots are collinear so this is EXACT vs the
-// Rust ref; a deployed non-collinear profile would need Spline.sol's monotone-cubic port here.
-/** Linear interpolation of the spline at x, flat outside the knot span. (aimm.rs:529) */
-export function evalSpline(pts: [number, number][], x: number): number {
-  if (pts.length === 0) return 0;
-  if (x <= pts[0][0]) return pts[0][1];
-  const last = pts.length - 1;
-  if (x >= pts[last][0]) return pts[last][1];
-  for (let i = 0; i < last; i++) {
-    const [x0, y0] = pts[i];
-    const [x1, y1] = pts[i + 1];
-    if (x <= x1) return y0 + ((x - x0) / (x1 - x0)) * (y1 - y0);
+// Float 1:1 port of Spline.sol's monotone (Fritsch-Carlson) cubic Hermite — same `eval`/`area`/
+// `_tangents`/`_primitive`/`_search` algorithm, just dropping the 1e18 fixed-point scale for
+// ordinary doubles. Keeps every sign/clamp quirk of the on-chain version (see _tangents below)
+// so a deployed non-collinear profile matches on-chain exactly, not just approximately.
+
+/** Binary search for the segment index i s.t. pts[i].x < x <= pts[i+1].x (Spline.sol:_search). */
+function searchSpline(pts: [number, number][], x: number, n: number): number {
+  if (x <= pts[0][0]) return 0;
+  let low = 0;
+  let high = n - 2;
+  while (low < high) {
+    const mid = (low + high + 1) >> 1;
+    if (x < pts[mid][0]) high = mid - 1;
+    else low = mid;
   }
-  return pts[last][1];
+  return low;
 }
 
-/** Integral of the piecewise-linear spline over [lo, hi]. (aimm.rs:552) */
-export function areaSpline(pts: [number, number][], lo: number, hi: number): number {
-  if (hi <= lo || pts.length === 0) return 0;
-  let acc = 0;
-  let x = lo;
-  while (x < hi) {
-    // advance to whichever knot boundary bounds the segment containing x (linear ⇒ trapezoid exact)
-    let nextKnot = hi;
-    for (const [xk] of pts) {
-      if (xk > x) {
-        nextKnot = Math.min(xk, hi);
-        break;
-      }
-    }
-    acc += 0.5 * (evalSpline(pts, x) + evalSpline(pts, nextKnot)) * (nextKnot - x);
-    if (nextKnot === x) break;
-    x = nextKnot;
+/**
+ * Endpoint tangents for segment i (Spline.sol:_tangents). Secant s of the segment; interior
+ * tangents = sign-preserving average of the two adjacent secants (0 if they disagree in sign —
+ * note a zero secant's sign bit reads as non-negative, matching the on-chain int256 XOR trick, so
+ * a flat secant next to a rising one still yields a nonzero endpoint tangent, never the reverse).
+ * Then the Fritsch-Carlson α²+β²≤9 clamp: if m0²+m1²>9s², scale both by 3|s|/√(m0²+m1²).
+ */
+function splineTangents(pts: [number, number][], i: number, n: number): [number, number] {
+  const p0 = pts[i];
+  const p1 = pts[i + 1];
+  const s = (p1[1] - p0[1]) / (p1[0] - p0[0]);
+  let m0: number;
+  if (i === 0) {
+    m0 = s;
+  } else {
+    const pm = pts[i - 1];
+    const sp = (p0[1] - pm[1]) / (p0[0] - pm[0]);
+    m0 = (sp < 0) !== (s < 0) ? 0 : (sp + s) / 2;
   }
-  return acc;
+  let m1: number;
+  if (i === n - 2) {
+    m1 = s;
+  } else {
+    const p2 = pts[i + 2];
+    const sn = (p2[1] - p1[1]) / (p2[0] - p1[0]);
+    m1 = (s < 0) !== (sn < 0) ? 0 : (s + sn) / 2;
+  }
+  const sumSq = m0 * m0 + m1 * m1;
+  const nineSSq = 9 * s * s;
+  if (sumSq > nineSSq) {
+    const root = Math.sqrt(sumSq);
+    if (root > 0) {
+      const scale = (3 * Math.abs(s)) / root;
+      m0 *= scale;
+      m1 *= scale;
+    }
+  }
+  return [m0, m1];
+}
+
+/** Monotone cubic Hermite interpolation at x, flat outside the knot span. (Spline.sol:eval) */
+export function evalSpline(pts: [number, number][], x: number): number {
+  const n = pts.length;
+  if (n === 0) return 0;
+  if (n === 1 || x <= pts[0][0]) return pts[0][1];
+  if (x >= pts[n - 1][0]) return pts[n - 1][1];
+  const i = searchSpline(pts, x, n);
+  const p0 = pts[i];
+  const p1 = pts[i + 1];
+  const h = p1[0] - p0[0];
+  const [m0, m1] = splineTangents(pts, i, n);
+  const dy = p1[1] - p0[1];
+  const k0 = m0 * h;
+  const k1 = m1 * h;
+  const c2 = 3 * dy - 2 * k0 - k1;
+  const c3 = -2 * dy + k0 + k1;
+  const t = (x - p0[0]) / h;
+  return p0[1] + k0 * t + c2 * t * t + c3 * t * t * t;
+}
+
+/** Primitive F(t) of the Hermite cubic at dx into a segment of width h. (Spline.sol:_primitive) */
+function splinePrimitive(dx: number, h: number, y0: number, k0: number, a: number, b: number): number {
+  const t = dx / h;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const t4 = t3 * t;
+  return y0 * t + (k0 * t2) / 2 + (b * t3) / 3 + (a * t4) / 4;
+}
+
+/** Exact integral of the monotone cubic Hermite spline over [x1, x2]. (Spline.sol:area) */
+export function areaSpline(pts: [number, number][], x1: number, x2: number): number {
+  const n = pts.length;
+  if (x1 === x2 || n === 0) return 0;
+  const inv = x1 > x2;
+  if (inv) [x1, x2] = [x2, x1];
+  if (n === 1) {
+    const res = pts[0][1] * (x2 - x1);
+    return inv ? -res : res;
+  }
+  if (x2 <= pts[0][0]) {
+    const res = pts[0][1] * (x2 - x1);
+    return inv ? -res : res;
+  }
+  if (x1 >= pts[n - 1][0]) {
+    const res = pts[n - 1][1] * (x2 - x1);
+    return inv ? -res : res;
+  }
+  let i = searchSpline(pts, x1, n);
+  let res = 0;
+  while (i < n - 1 && x1 < x2) {
+    const p0 = pts[i];
+    const p1 = pts[i + 1];
+    const segEnd = p1[0];
+    const start = Math.max(x1, p0[0]);
+    const end = Math.min(x2, segEnd);
+    if (end > start) {
+      const h = p1[0] - p0[0];
+      const [m0, m1] = splineTangents(pts, i, n);
+      const k0 = m0 * h;
+      const k1 = m1 * h;
+      const dy = p1[1] - p0[1];
+      const a = k0 + k1 - 2 * dy;
+      const b = 3 * dy - 2 * k0 - k1;
+      const f2 = splinePrimitive(end - p0[0], h, p0[1], k0, a, b);
+      const f1 = splinePrimitive(start - p0[0], h, p0[1], k0, a, b);
+      res += (f2 - f1) * h;
+    }
+    if (segEnd >= x2) break;
+    x1 = segEnd;
+    i++;
+  }
+  return inv ? -res : res;
 }
 
 /** Linear inventory skew ∈ [-100, 100] from a leg's coverage. (aimm.rs:191) */
@@ -180,9 +279,18 @@ export function dispersion(sigma: number, p: AimmProfile): number {
   return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
 }
 
-/** Path/leg spread (fee) in PBPS with U = U_stale = 0 (declared seams). (aimm.rs:282) */
-export function spreadPbps(sigma: number, p: AimmProfile): number {
-  return clamp(p.minFee + (sigma * p.vega) / (100 * BPS), p.minFee, p.maxFee);
+/** Path/leg spread (fee) in PBPS: S_vol + U_stale + U_conf (Pricing.sol `_pathSpread`). */
+export function spreadPbps(
+  sigma: number,
+  p: AimmProfile,
+  opts?: { confidence?: number; staleExcess?: number },
+): number {
+  const STALE_Z = 100; // Pricing.sol
+  const sVol = p.minFee + (sigma * p.vega) / (100 * BPS);
+  const excess = opts?.staleExcess ?? 0;
+  const uStale = excess > 0 ? (STALE_Z * sigma * Math.sqrt(excess)) / BPS : 0;
+  const uConf = (opts?.confidence ?? 0) * (PBPS / BPS); // bps → PBPS
+  return clamp(sVol + uStale + uConf, p.minFee, p.maxFee);
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
@@ -223,8 +331,21 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps = 0,
+  feed?: { confidence?: number; staleExcess?: number },
 ): PoolLeg {
-  return { token, twap, sigma, res, liab, baseRes, decimals, profile, kappaCovBps };
+  return {
+    token,
+    twap,
+    sigma,
+    res,
+    liab,
+    baseRes,
+    decimals,
+    profile,
+    kappaCovBps,
+    confidence: feed?.confidence,
+    staleExcess: feed?.staleExcess,
+  };
 }
 
 // ── Per-leg derived kit + band traversal ────────────────────────────────────────
@@ -236,21 +357,62 @@ interface LegKit {
   center: number; // skewed book center in depth coords, 5000 + skew·50
   depth: number;
   mid: number; // priceAt(center), base-per-token
+  dispersion: number; // current κ in PBPS
+  skew: number; // inventory skew ∈ [-100, +100]
 }
 
-function legKit(leg: PoolLeg): LegKit {
+/** Public kit for UI bonding-curve charts (same math as quoteExactIn / depthCurve). */
+export function legKit(leg: PoolLeg): LegKit {
   const p = leg.profile;
   const disp = dispersion(leg.sigma, p);
-  const center = 5000 + computeSkew(leg.res, leg.liab, p) * 50;
+  const skew = computeSkew(leg.res, leg.liab, p);
+  const center = 5000 + skew * 50;
   const pts = splinePoints(p, disp);
   const depth = calcDepth(leg.res, leg.liab, p);
   const mid = priceAt(leg.twap, pts, center);
-  return { leg, twap: leg.twap, pts, center, depth, mid };
+  return { leg, twap: leg.twap, pts, center, depth, mid, dispersion: disp, skew };
 }
 
 /** Marginal base-per-token at depth-coord d (floored at 5% of TWAP, matching the Rust ref). */
-function priceAt(twap: number, pts: [number, number][], d: number): number {
+export function priceAt(twap: number, pts: [number, number][], d: number): number {
   return Math.max((twap * (PBPS + evalSpline(pts, d))) / PBPS, twap * 0.05);
+}
+
+/** Sample the Hermite bonding curve for charting: depth ∈ [0,10000] → price. */
+export function bondingCurveSamples(
+  leg: PoolLeg,
+  n = 65,
+): {
+  samples: { depth: number; price: number }[];
+  mark: number;
+  mid: number;
+  rangeLo: number;
+  rangeHi: number;
+  center: number;
+  skew: number;
+  dispersion: number;
+  spreadPbps: number;
+} {
+  const k = legKit(leg);
+  const samples: { depth: number; price: number }[] = [];
+  for (let i = 0; i <= n; i++) {
+    const depth = (BPS * i) / n;
+    samples.push({ depth, price: priceAt(k.twap, k.pts, depth) });
+  }
+  return {
+    samples,
+    mark: k.twap,
+    mid: k.mid,
+    rangeLo: priceAt(k.twap, k.pts, 0),
+    rangeHi: priceAt(k.twap, k.pts, BPS),
+    center: k.center,
+    skew: k.skew,
+    dispersion: k.dispersion,
+    spreadPbps: spreadPbps(leg.sigma, leg.profile, {
+      confidence: leg.confidence,
+      staleExcess: leg.staleExcess,
+    }),
+  };
 }
 
 /** Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at. */
@@ -373,7 +535,9 @@ export function quoteExactIn(
 
   const wp = worstProfile(involved.map((l) => l.profile));
   const sigmaPath = Math.max(...involved.map((l) => l.sigma));
-  const spread = spreadPbps(sigmaPath, wp); // PBPS — full bid-ask spread (drives the visible mid gap)
+  const confPath = Math.max(0, ...involved.map((l) => l.confidence ?? 0));
+  const stalePath = Math.max(0, ...involved.map((l) => l.staleExcess ?? 0));
+  const spread = spreadPbps(sigmaPath, wp, { confidence: confPath, staleExcess: stalePath });
   const spreadBps = spread / 100;
   // Only a HALF-spread is actually deducted from amountOut (getAnchorPathQuote: feeOut = amount·halfSpread),
   // so the LP/proto split must sum to spreadBps/2 — not the full spread — or the fee reads 2× reality.
@@ -435,8 +599,8 @@ function capAskBase(k: LegKit, leg: PoolLeg): number {
 /**
  * Depth-axis sample grid from `center` toward `edge`: always includes the skewed mid (`center`),
  * spline knots, the band edge, plus uniform steps so the polyline follows the AIMM offset curve
- * (piecewise-linear today; Hermite-ready when evalSpline ports Spline.sol). Never samples around
- * the raw mark depth (5000) — the virtual book is centered on inventory-skewed mid.
+ * (monotone cubic Hermite via evalSpline/Spline.sol). Never samples around the raw mark depth
+ * (5000) — the virtual book is centered on inventory-skewed mid.
  */
 function depthBandSamples(center: number, edge: number, knotXs: number[], step = 250): number[] {
   const lo = Math.min(center, edge);
@@ -472,7 +636,10 @@ export function depthCurve(
   const leg = state.legs[from === base ? to : from]; // exactly one side is base here
   if (!leg) return emptyCurve(unit);
   const k = legKit(leg);
-  const spread = spreadPbps(leg.sigma, leg.profile);
+  const spread = spreadPbps(leg.sigma, leg.profile, {
+    confidence: leg.confidence,
+    staleExcess: leg.staleExcess,
+  });
   const half = spread / 2;
   const knotXs = k.pts.map((p) => p[0]);
 
