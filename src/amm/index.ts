@@ -2,6 +2,7 @@
 // brain (router.ts) + the on-chain seam below (bigint pool reads → PoolState floats).
 
 export * from './aimm.js';
+export * from './depthAgg.js';
 export * from './router.js';
 
 import type { PoolAsset } from '../pool/index.js';
