@@ -175,9 +175,9 @@ export function calcDepth(res: number, liab: number, p: AimmProfile): number {
   return clamp(res + (p.depthAmp * (liab - res) * cp) / PBPS, 1, liab);
 }
 
-/** Dispersion κ in PBPS. (aimm.rs:218) */
+/** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing.sol `_calculateDispersion`) */
 export function dispersion(sigma: number, p: AimmProfile): number {
-  return clamp(1000 + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
+  return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
 }
 
 /** Path/leg spread (fee) in PBPS with U = U_stale = 0 (declared seams). (aimm.rs:282) */
