@@ -32,9 +32,10 @@ export interface Asset {
   decimals: number;
   gamma: number;
   vega: number;
-  lambda: number;
   haircutSuppressor: number;
   reservationPrice: bigint;
+  reservationPriceMax: bigint;
+  pegB64: bigint;
 }
 
 export interface SwapQuote {
@@ -108,6 +109,16 @@ export async function getCoverageRatio(
 
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
+
+export type { LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
+export {
+  POOL_STORAGE,
+  mappingBase,
+  readLiquidityProfile,
+  readOracleConfig,
+  readRiskConfig,
+  getStorageAt,
+} from './storage.js';
 
 /**
  * Fetch LP balance for a user
