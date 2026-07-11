@@ -81,6 +81,9 @@ export * from './router/index.js';
 // Off-chain AIMM pricer + route-finding (quoteExactIn, rankSwap, poolStateFrom)
 export * from './amm/index.js';
 
+// Chapel multi-venue registry + exact-in router
+export * from './venues/index.js';
+
 // Eth utilities and clients
 export * from './eth/index.js';
 export type { Client } from './eth/client.js';

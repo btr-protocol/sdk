@@ -45,6 +45,10 @@
       "types": "./src/router/index.ts",
       "default": "./src/router/index.ts"
     },
+    "./venues": {
+      "types": "./src/venues/index.ts",
+      "default": "./src/venues/index.ts"
+    },
     "./utils": {
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
