@@ -54,11 +54,15 @@ export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Numbe
  */
 export const BRAND = Object.freeze({
   name: 'BTR',
+  /** Public display name for social accounts (X, Telegram, etc.). */
+  socialName: 'BTR Protocol',
   github: 'https://github.com/btr-supply',
   githubOrg: 'btr-supply',
   domain: 'btr.supply',
-  twitter: 'btr_supply',
-  telegram: 'btrsupply',
+  /** X/Twitter handle — PascalCase, no underscore (`@BTRProtocol`). */
+  twitter: 'BTRProtocol',
+  /** Telegram handle — same branding as X (`t.me/BTRProtocol`). */
+  telegram: 'BTRProtocol',
   supportEmail: 'tech@btr.supply',
 });
 

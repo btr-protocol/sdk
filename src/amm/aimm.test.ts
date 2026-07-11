@@ -18,6 +18,7 @@ import {
   quoteExactIn,
   splinePoints,
   spreadPbps,
+  virtualMarketDepth,
 } from './aimm';
 
 const BASE = 'USDC';
@@ -277,6 +278,60 @@ describe('orientation', () => {
     expect(sell.route).toEqual(['BTCB', BASE]);
     expect(buy.route).toEqual([BASE, 'BTCB']);
     expect(sell.midPrice).toBeCloseTo(1 / buy.midPrice, 6); // reciprocal mids, same book
+  });
+});
+
+describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
+  test('USD-balanced seed ⇒ both sides have comparable tok depth', () => {
+    // volState sets baseRes = res × twap ⇒ notionals match at mark.
+    const d = virtualMarketDepth(volState(10), 'BTCB');
+    expect(d.maxTokBid).toBeGreaterThan(0);
+    expect(d.maxTokAsk).toBeGreaterThan(0);
+    expect(d.maxTokAsk / d.maxTokBid).toBeGreaterThan(0.4);
+    expect(d.maxTokAsk / d.maxTokBid).toBeLessThan(2.5);
+    expect(d.bids.length).toBeGreaterThan(0);
+    expect(d.asks.length).toBeGreaterThan(0);
+    // Ladder ends at (or just under) the fillable caps — ask vertices use mid-sized
+    // bands so the last knot can sit a hair below maxTokAsk without a forced terminal.
+    expect(d.bids[d.bids.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokBid + 1e-9);
+    expect(d.asks[d.asks.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokAsk + 1e-9);
+    expect(d.bids[d.bids.length - 1].cumTok).toBeGreaterThan(d.maxTokBid * 0.99);
+    expect(d.asks[d.asks.length - 1].cumTok).toBeGreaterThan(d.maxTokAsk * 0.99);
+  });
+
+  test('book is centered on skewed mid, not oracle mark', () => {
+    // Mild under-coverage ⇒ positive inventory skew ⇒ mid ≠ mark; touch = mid.
+    const twap = 64_000;
+    const leg = buildLeg('BTCB', twap, sigmaSeed('volatile'), 8_000, 10_000, 8_000 * twap, 18, VOLATILE_PROFILE);
+    const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
+    expect(d.mark).toBe(twap);
+    expect(Math.abs(d.mid - d.mark) / d.mark).toBeGreaterThan(1e-6);
+    // Both sides still have fillable depth at moderate skew.
+    expect(d.asks.length).toBeGreaterThan(0);
+    expect(d.bids.length).toBeGreaterThan(0);
+    // First printed levels sit at the mid vertex (cumTok=0), not at mark.
+    expect(d.asks[0].cumTok).toBe(0);
+    expect(d.bids[0].cumTok).toBe(0);
+    expect(d.asks[0].price).toBeCloseTo(d.mid, 6);
+    expect(d.bids[0].price).toBeCloseTo(d.mid, 6);
+    // Asks above mid, bids below — book fans from mid, not mark.
+    if (d.asks.length > 1) expect(d.asks[1].price).toBeGreaterThanOrEqual(d.mid - 1e-9);
+    if (d.bids.length > 1) expect(d.bids[1].price).toBeLessThanOrEqual(d.mid + 1e-9);
+  });
+
+  test('10k BTCB + 10k USDC (token seed) clips bid to ~USDC/mark, ask to ~½ BTCB', () => {
+    const twap = 64_000;
+    const leg = buildLeg('BTCB', twap, sigmaSeed('volatile'), 10_000, 10_000, 10_000, 18, VOLATILE_PROFILE);
+    const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
+    // Bid limited by hub USDC ≈ 10k/64000 ≈ 0.156
+    expect(d.maxTokBid).toBeLessThan(0.2);
+    expect(d.maxTokBid).toBeGreaterThan(0.1);
+    // Ask limited by half of spoke depth at center=5000
+    expect(d.maxTokAsk).toBeGreaterThan(4_000);
+    expect(d.maxTokAsk).toBeLessThan(10_000);
+    // Printed ladder never exceeds the fillable caps
+    expect(d.bids.every((l) => l.cumTok <= d.maxTokBid + 1e-9)).toBe(true);
+    expect(d.asks.every((l) => l.cumTok <= d.maxTokAsk + 1e-9)).toBe(true);
   });
 });
 

@@ -38,8 +38,11 @@ export interface ExecCall {
 export interface BuildOpts {
   recipient: Address; // where tokenOut lands (usually the user)
   /** Return false to SKIP a token→pool approval (e.g. cached allowance already covers it). Called once
-   *  per unique (tokenIn, pool). Default: emit a max approval for every non-native leg. */
+   *  per unique (tokenIn, pool). Default: emit an approval for every non-native leg that needs one. */
   needsApproval?: (tokenIn: Address, pool: Address, amountIn: bigint) => boolean;
+  /** When true, approve max uint256 (reuse forever). When false/omitted (default), approve only the
+   *  exact Σ amountIn for that (token, pool) — standard exact-amount approve + swap. */
+  approveMax?: boolean;
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;
@@ -108,18 +111,29 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   return legs;
 }
 
-/** Ordered [approvals…, swaps…] calls for a routed/split swap. Approvals are deduped per (token,pool)
- *  and max-sized (approve once, reuse forever). Native-in legs carry `value` instead of an approval. */
+/** Ordered [approvals…, swaps…] calls for a routed/split swap. Approvals are deduped per (token,pool);
+ *  amount is exact Σ amountIn by default, or max uint256 when `approveMax`. Native-in legs carry
+ *  `value` instead of an approval. No EIP-2612 / Permit2 — plain ERC-20 `approve` only. */
 export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const approvals: ExecCall[] = [];
   const swaps: ExecCall[] = [];
   const seen = new Set<string>();
+  // Σ amountIn per (token,pool) so a split into the same pool gets one exact approve covering both legs.
+  const exactByKey = new Map<string, bigint>();
+  for (const leg of legs) {
+    if (leg.native) continue;
+    const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
+    exactByKey.set(key, (exactByKey.get(key) ?? 0n) + leg.amountIn);
+  }
+  const approveAmt = (key: string): bigint =>
+    opts.approveMax ? MAX_UINT256 : (exactByKey.get(key) ?? 0n);
 
   for (const leg of legs) {
     if (!leg.native) {
       const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
+      const amount = approveAmt(key);
       const need = opts.needsApproval
-        ? opts.needsApproval(leg.tokenIn, leg.pool, leg.amountIn)
+        ? opts.needsApproval(leg.tokenIn, leg.pool, amount)
         : true;
       if (need && !seen.has(key)) {
         seen.add(key);
@@ -128,7 +142,7 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
           data: encodeFn({
             abi: ERC20_ABI,
             functionName: 'approve',
-            args: [leg.pool, MAX_UINT256],
+            args: [leg.pool, amount],
           }),
           value: 0n,
         });
