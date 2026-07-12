@@ -40,14 +40,22 @@ export const CHAPEL_VOLATILES: Address[] = [
 ];
 
 export const CHAPEL_BTR = {
-  poolFactory:  '0x5B2ca84cE575B5024e71598605685234cd9758ec' as Address,
-  stablePool:   '0xC954A27E69ae7C9d10a136c4f7F3910b38F09324' as Address,
-  volatilePool: '0x88d5EC4C0c83391a9C84Bc196911084D7179AA40' as Address,
+  poolFactory:  '0xEf72eE3274F03557EDcDf843A1444ae7f8f7bb05' as Address,
+  stablePool:   '0xfF83da2711888dCb8B50dc6c1EF0b8F91424d23f' as Address,
+  volatilePool: '0x68fDAA0be33D4d78AbeEF63aB8A32A6751d2F4C8' as Address,
   oracle:       '0xD91712c9F4037D0010041691Df191AB45994F2bF' as Address, // ExternalOracle (stables)
-  ac:           '0x626eb915d4a4136F7c00352A54378d3A322488da' as Address,
-  admin:        '0x71ad34866B2bB0E99478297DA735E9b94922B7Fb' as Address,
+  /** Steward-lite AC (pools / Admin). Oracle keeps incumbent AC below. */
+  ac:           '0xeBd35b5FC97090Ba1fCC31fBBccde29077A2854C' as Address,
+  acOracle:     '0x626eb915d4a4136F7c00352A54378d3A322488da' as Address,
+  admin:        '0x1a6bB558e7C2E8537D7e38491D1DE318B027F8B9' as Address,
   faucet:       '0x6a901982CE6cD2561F677217e012A33b8a88EF27' as Address,
-  poolImpl:     '0x6281c177fC5Aaf293be6a759E44535E1F2E76629' as Address,
+  poolImpl:     '0x449e2234E04eEd1BE40721A99D509E2d44677bF6' as Address,
+  poolAux:      '0xd90D8fA74C5Dd2290e967010Ef16f1Ce9E9Eb5e5' as Address,
+  flash:        '0x91399ab82Db9F05d470618e89d0090AB4eF8Ff09' as Address,
+  mockVenusUsdc: '0xe4DAce78d31804a876555121beCfCA565b086327' as Address,
+  mockVenusUsdt: '0x9f22e75eAb85829E47a9aBaD214f35BD5eddf7C1' as Address,
+  venusHookUsdc: '0x59E57b508Eb14941Dd6D0544E3Fb98d2a34CE777' as Address,
+  venusHookUsdt: '0x7Ec0564B49888437fF9f8B720a6ec8005CB21C56' as Address,
 } as const;
 
 /** Curve StableSwap pools — stables + tricrypto-style volatiles (NG math). */
