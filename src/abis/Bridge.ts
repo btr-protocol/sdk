@@ -298,6 +298,13 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'pause',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'pauseToken',
     inputs: [
       {
@@ -306,13 +313,26 @@ export const BRIDGE_ABI = [
         internalType: 'address',
       },
       {
-        name: 'paused',
+        name: 'paused_',
         type: 'bool',
         internalType: 'bool',
       },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'paused',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -663,6 +683,13 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'unpause',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'upgradeToAndCall',
     inputs: [
       {
@@ -792,6 +819,19 @@ export const BRIDGE_ABI = [
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'Paused',
+    inputs: [
+      {
+        name: 'paused',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
       },
     ],
     anonymous: false,

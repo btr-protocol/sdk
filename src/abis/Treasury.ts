@@ -81,6 +81,13 @@ export const TREASURY_ABI = [
   },
   {
     type: 'function',
+    name: 'cancelBridgeChange',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'cancelEmissionsCapChange',
     inputs: [],
     outputs: [],
@@ -199,6 +206,13 @@ export const TREASURY_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'executeBridgeChange',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -449,6 +463,52 @@ export const TREASURY_ABI = [
   },
   {
     type: 'function',
+    name: 'pause',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'paused',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingBridge',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingBridgeChangeOp',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'pendingEmissionsCap',
     inputs: [],
     outputs: [
@@ -546,6 +606,19 @@ export const TREASURY_ABI = [
   },
   {
     type: 'function',
+    name: 'requestBridgeChange',
+    inputs: [
+      {
+        name: 'newBridge',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'requestEmissionsCapChange',
     inputs: [
       {
@@ -634,6 +707,13 @@ export const TREASURY_ABI = [
   },
   {
     type: 'function',
+    name: 'unpause',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'upgradeToAndCall',
     inputs: [
       {
@@ -693,6 +773,38 @@ export const TREASURY_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'BridgeChangeCancelled',
+    inputs: [
+      {
+        name: 'cancelledBridge',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'BridgeChangeRequested',
+    inputs: [
+      {
+        name: 'newBridge',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'executableAt',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
+    ],
+    anonymous: false,
   },
   {
     type: 'event',
@@ -843,6 +955,19 @@ export const TREASURY_ABI = [
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'Paused',
+    inputs: [
+      {
+        name: 'paused',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
       },
     ],
     anonymous: false,
@@ -1019,6 +1144,22 @@ export const TREASURY_ABI = [
   },
   {
     type: 'error',
+    name: 'AlreadyConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'ExceedsMaxSupply',
     inputs: [],
   },
@@ -1026,6 +1167,17 @@ export const TREASURY_ABI = [
     type: 'error',
     name: 'Expired',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
   },
   {
     type: 'error',
