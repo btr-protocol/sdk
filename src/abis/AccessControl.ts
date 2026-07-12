@@ -231,7 +231,45 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'isGuardian',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'isKeeper',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isRiskSteward',
     inputs: [
       {
         name: '',
@@ -491,6 +529,24 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'setGuardian',
+    inputs: [
+      {
+        name: 'g',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 's',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'setKeeper',
     inputs: [
       {
@@ -500,6 +556,24 @@ export const ACCESS_CONTROL_ABI = [
       },
       {
         name: 's',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setRiskSteward',
+    inputs: [
+      {
+        name: 's',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'ok',
         type: 'bool',
         internalType: 'bool',
       },
@@ -632,6 +706,25 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
+    name: 'GuardianSet',
+    inputs: [
+      {
+        name: 'who',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'ok',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'KeeperSet',
     inputs: [
       {
@@ -690,6 +783,25 @@ export const ACCESS_CONTROL_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'RiskStewardSet',
+    inputs: [
+      {
+        name: 'who',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'ok',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
       },
     ],
     anonymous: false,

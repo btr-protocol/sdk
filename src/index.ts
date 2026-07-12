@@ -1,6 +1,6 @@
 /**
  * BTR DEX SDK
- * Modular SDK for interacting with BTR DEX - pool data/swap helpers, router call builder, guardians
+ * Modular SDK for interacting with BTR DEX - pool data/swap helpers, router call builder
  *
  * @example Basic usage with EIP-1193 provider
  * ```ts
@@ -16,20 +16,6 @@
  *   minAmountOut: quote.amountOut, // apply your own slippage tolerance
  *   recipient: yourAddress,
  * });
- * ```
- *
- * @example Circuit breaker guardian (backend)
- * ```ts
- * import { CircuitBreakerGuardian } from '@btr-protocol/sdk/guardians';
- * import { POOL_ABI } from '@btr-protocol/sdk/abis';
- *
- * const guardian = new CircuitBreakerGuardian(provider, {
- *   poolAddress: '0x...',
- *   assets: [...],
- *   maxDivergence: 100, // 1%
- * }, POOL_ABI);
- *
- * await guardian.start();
  * ```
  *
  * @module @btr-protocol/sdk
@@ -50,14 +36,10 @@ export {
   ONE_DAY,
   DEFAULT_ORACLE_STALENESS,
   DEFAULT_PRICE_DIVERGENCE_BPS,
-  DEFAULT_CB_CHECK_INTERVAL,
-  DEFAULT_CB_COOLDOWN,
   SUPPORTED_CHAINS,
   type TokenAddress,
   type PoolAddress,
   type OraclePrice,
-  type CircuitBreakerConfig,
-  type GuardianConfig,
 } from './utils/constants.js';
 export * from './utils/typing.js';
 export * from './utils/safe.js';
@@ -70,9 +52,6 @@ export * from './utils/pair.js';
 
 // Shared types (TimeFrame enum + helpers)
 export * from './types/index.js';
-
-// Guardians
-export * from './guardians/index.js';
 
 // Pool data and transactions (canonical source for POOL_ABI, SwapQuote, PoolAsset)
 export * from './pool/index.js';
