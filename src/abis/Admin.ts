@@ -260,6 +260,24 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'cancelSetAssetHook',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'cancelTimelock',
     inputs: [
       {
@@ -297,6 +315,24 @@ export const ADMIN_ABI = [
   {
     type: 'function',
     name: 'cancelUpdateRiskConfig',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'clearAssetHook',
     inputs: [
       {
         name: 'pool',
@@ -382,6 +418,24 @@ export const ADMIN_ABI = [
   {
     type: 'function',
     name: 'executeOracleUpdate',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeSetAssetHook',
     inputs: [
       {
         name: 'pool',
@@ -737,6 +791,34 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'requestSetAssetHook',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'hook',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'flags',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'requestTreasuryUpdate',
     inputs: [
       {
@@ -900,6 +982,70 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'riskFences',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'minFeeHardMin',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'minFeeHardMax',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'maxFeeHardMax',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'gammaHardMin',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'gammaHardMax',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'vegaHardMin',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'vegaHardMax',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'haircutHardMax',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'maxDeltaBps',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'sealBootstrap',
     inputs: [
       {
@@ -994,6 +1140,64 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'setAssetParamsBounded',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'minLiquidity',
+        type: 'uint128',
+        internalType: 'uint128',
+      },
+      {
+        name: 'minFeeBps',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'maxFeeBps',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'gamma',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'vega',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'haircutSuppressor',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'reservationPrice',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+      {
+        name: 'reservationPriceMax',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'setBaseTokenOracle',
     inputs: [
       {
@@ -1028,6 +1232,76 @@ export const ADMIN_ABI = [
         name: 'cooldownSeconds',
         type: 'uint16',
         internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setRiskFences',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'f',
+        type: 'tuple',
+        internalType: 'struct IAdmin.RiskFences',
+        components: [
+          {
+            name: 'minFeeHardMin',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'minFeeHardMax',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'maxFeeHardMax',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'gammaHardMin',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'gammaHardMax',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'vegaHardMin',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'vegaHardMax',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'haircutHardMax',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'maxDeltaBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+        ],
       },
     ],
     outputs: [],
@@ -1127,6 +1401,74 @@ export const ADMIN_ABI = [
         type: 'uint128',
         indexed: false,
         internalType: 'uint128',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'AssetHookUpdated',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'hook',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'flags',
+        type: 'uint32',
+        indexed: false,
+        internalType: 'uint32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'AssetParamsBoundedSet',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'minFeeBps',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
+      {
+        name: 'gamma',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
+      {
+        name: 'tighten',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
       },
     ],
     anonymous: false,
@@ -1513,6 +1855,31 @@ export const ADMIN_ABI = [
       },
       {
         name: 'flags',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'RiskFencesSet',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'maxDeltaBps',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',

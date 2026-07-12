@@ -29,10 +29,6 @@
       "types": "./src/eth/wallets.ts",
       "default": "./src/eth/wallets.ts"
     },
-    "./guardians": {
-      "types": "./src/guardians/index.ts",
-      "default": "./src/guardians/index.ts"
-    },
     "./pool": {
       "types": "./src/pool/index.ts",
       "default": "./src/pool/index.ts"
@@ -68,7 +64,7 @@
   },
   "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
   "files": ["src", "README.md", "CHANGELOG.md"],
-  "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle", "circuit-breaker"],
+  "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle"],
   "scripts": {
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",

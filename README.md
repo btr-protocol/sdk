@@ -11,7 +11,7 @@ Version pinned in `package.json` (`version` field). See `CHANGELOG.md`.
 - Pool helpers: data fetch + swap quoting, single-pool, caller supplies the pool address (`./pool`).
 - Off-chain AIMM pricer + route-finding: `quoteExactIn`, `enumerateRoutes`, `quoteRoute`, `rankSwap` (best plan incl. order splitting), `aggregateDepth`, plus the `poolStateFrom` on-chain seam (`./amm`).
 - Off-chain swap-execution call builder: `planToLegs` maps a `rankSwap` plan to executable legs; `buildSwapCalls` turns legs into a deduplicated, ordered `approve`+`swap` calldata sequence (`./router`).
-- Guardians + rewards: `./guardians`, `./rewards`.
+- Rewards: `./rewards`.
 - Shared utils: encoding, validation, math, formatting, logger, constants, chains, tokens (`./utils`).
 
 ## Install (workspace `file:` example)
@@ -36,11 +36,10 @@ bun install
 
 | Subpath | Purpose |
 |---|---|
-| `@btr-protocol/sdk` | Curated root re-export (utils, guardians, pool incl. `POOL_ABI`, router, amm, eth) — the other 12 ABIs are `@btr-protocol/sdk/abis`-only, not re-exported at root |
+| `@btr-protocol/sdk` | Curated root re-export (utils, pool incl. `POOL_ABI`, router, amm, eth) — the other 12 ABIs are `@btr-protocol/sdk/abis`-only, not re-exported at root |
 | `@btr-protocol/sdk/abis` | Raw ABIs: `ACCESS_CONTROL_ABI`, `ADMIN_ABI`, `BRIDGE_ABI`, `BRIDGEABLE_ERC20_ABI`, `DISTRIBUTOR_ABI`, `EXTERNAL_ORACLE_ABI`, `FLASH_ABI`, `GOV_TOKEN_ABI`, `POOL_ABI`, `POOL_FACTORY_ABI`, `STAKED_ASSET_ABI`, `STAKING_ABI`, `TREASURY_ABI` |
 | `@btr-protocol/sdk/amm` | Off-chain AIMM pricer (`buildLeg`, `quoteExactIn`, `depthCurve`) + route-finding (`enumerateRoutes`, `quoteRoute`, `rankSwap`, `aggregateDepth`) + `poolStateFrom` seam (see below) |
-| `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626/7540/777, OFT, signatures, RLP |
-| `@btr-protocol/sdk/guardians` | Circuit-breaker + base guardian |
+| `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
 | `@btr-protocol/sdk/pool` | Single-pool data + tx: `getAsset`, `getCoverageRatio`, `getLPBalance`, `getSwapQuote`, `getPoolData`, `swap`, `deposit`, `withdraw`, `NATIVE_TOKEN` (canonical `POOL_ABI`, `SwapQuote`, `PoolAsset`) |
 | `@btr-protocol/sdk/router` | `planToLegs(plan, opts)` + `buildSwapCalls(legs, opts)` + `totalValue(calls)` — route plan → ordered approve+swap calldata. No on-chain router (see below) |
 | `@btr-protocol/sdk/rewards` | Merkle proofs, earning/voting damping, distributor helpers |

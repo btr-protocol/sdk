@@ -38,10 +38,6 @@ export const nowSec = (): number => Math.floor(Date.now() / 1000);
 export const DEFAULT_ORACLE_STALENESS = ONE_DAY; // 24 hours
 export const DEFAULT_PRICE_DIVERGENCE_BPS = 500; // 5%
 
-// Circuit breaker constants
-export const DEFAULT_CB_CHECK_INTERVAL = FIVE_MINUTES * 1000; // 5 minutes in ms
-export const DEFAULT_CB_COOLDOWN = ONE_HOUR; // 1 hour
-
 // Supported chains — derived from the canonical CHAINS registry in eth/chains.ts.
 // Kept as a numeric array (single source of truth = CHAINS).
 // For named accessors (ETHEREUM, ARBITRUM, ...) import from `@btr-protocol/sdk/eth` directly.
@@ -115,18 +111,6 @@ export interface OraclePrice {
   price: bigint;
   timestamp: number;
   symbol: string;
-}
-
-export interface CircuitBreakerConfig {
-  maxDivergence: number; // in basis points
-  checkInterval: number; // in milliseconds
-  cooldownPeriod: number; // in seconds
-}
-
-export interface GuardianConfig extends CircuitBreakerConfig {
-  poolAddress: PoolAddress;
-  assets: TokenAddress[];
-  referenceOracle: string; // e.g., 'binance', 'chainlink'
 }
 
 /**
