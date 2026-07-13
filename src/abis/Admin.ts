@@ -1041,6 +1041,16 @@ export const ADMIN_ABI = [
         type: 'uint16',
         internalType: 'uint16',
       },
+      {
+        name: 'reservationHardLoMin',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+      {
+        name: 'reservationHardHiMax',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
     ],
     stateMutability: 'view',
   },
@@ -1300,6 +1310,16 @@ export const ADMIN_ABI = [
             name: 'maxDeltaBps',
             type: 'uint16',
             internalType: 'uint16',
+          },
+          {
+            name: 'reservationHardLoMin',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
+            name: 'reservationHardHiMax',
+            type: 'uint64',
+            internalType: 'uint64',
           },
         ],
       },
