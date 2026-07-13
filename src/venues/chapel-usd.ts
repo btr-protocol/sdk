@@ -23,6 +23,10 @@ export const CHAPEL_USD_TARGETS = {
   yieldApr: 0.05,
   /** Cap yield dt so a late CronJob cannot jump weeks of APR in one tick. */
   yieldDtCapSec: 6 * 3600,
+  /** Yield-program genesis (unix s). MockVenus rate is a pure fn of block ts
+   *  anchored here → wall-clock accrual, idempotent across cron miss/restart/
+   *  double-run. Mocks deployed ~2026-07-11 at rate≈1e18, so no catch-up jump. */
+  yieldEpochTs: 1_752_192_000,
   gasTbnb: { flow: 0.05, arb: 0.05, oracle: 0.1 },
 } as const;
 
@@ -142,12 +146,25 @@ export async function fetchChapelMarksUsd(
   return out;
 }
 
-export function tickMockVenusRate(
+/**
+ * MockVenus exchange-rate target for a block timestamp: 1e18·(1 + apr·(ts−epoch)/YEAR).
+ * Wall-clock (not runs×dt) — a missed or duplicated cron tick cannot drift or
+ * double-count accrual, so strategyApr stays a true annualised yield. Monotonic
+ * (never cuts rate) and single-tick jump capped to yieldDtCapSec of APR, which
+ * bounds any one-off catch-up from a mis-set epoch.
+ */
+export function mockVenusRateForBlock(
   prev: bigint,
-  dtSec: number,
+  blockTs: number,
+  epochTs = CHAPEL_USD_TARGETS.yieldEpochTs,
   apr = CHAPEL_USD_TARGETS.yieldApr,
 ): bigint {
-  const dt = Math.min(Math.max(1, dtSec), CHAPEL_USD_TARGETS.yieldDtCapSec);
-  const mul = BigInt(Math.floor(1e18 * (1 + (apr * dt) / YEAR)));
-  return (prev * mul) / 10n ** 18n;
+  const elapsed = Math.max(0, blockTs - epochTs);
+  const target = BigInt(Math.floor(1e18 * (1 + (apr * elapsed) / YEAR)));
+  if (target <= prev) return prev;
+  const capMul = BigInt(
+    Math.floor(1e18 * (1 + (apr * CHAPEL_USD_TARGETS.yieldDtCapSec) / YEAR)),
+  );
+  const capped = (prev * capMul) / 10n ** 18n;
+  return target > capped ? capped : target;
 }
