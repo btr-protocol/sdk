@@ -38,19 +38,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'DEFAULT_TTL',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'MAX_DEV_THRESHOLD',
     inputs: [],
     outputs: [
@@ -177,25 +164,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'getEma',
-    inputs: [
-      {
-        name: 'feedId',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'getFeed',
     inputs: [
       {
@@ -212,11 +180,6 @@ export const EXTERNAL_ORACLE_ABI = [
         components: [
           {
             name: 'lastPriceB64',
-            type: 'uint64',
-            internalType: 'uint64',
-          },
-          {
-            name: 'emaPriceB64',
             type: 'uint64',
             internalType: 'uint64',
           },
@@ -247,6 +210,11 @@ export const EXTERNAL_ORACLE_ABI = [
           },
           {
             name: 'tauSigma',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'maxDeviation',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -352,44 +320,6 @@ export const EXTERNAL_ORACLE_ABI = [
         name: '',
         type: 'bool',
         internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isOracle',
-    inputs: [
-      {
-        name: 'account',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'maxDeviations',
-    inputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint16',
-        internalType: 'uint16',
       },
     ],
     stateMutability: 'view',
@@ -625,12 +555,6 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint64',
       },
       {
-        name: 'ema',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-      {
         name: 'sigmaSample',
         type: 'uint32',
         indexed: false,
@@ -689,11 +613,6 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'bytes32',
       },
     ],
-  },
-  {
-    type: 'error',
-    name: 'InvalidDecimals',
-    inputs: [],
   },
   {
     type: 'error',
