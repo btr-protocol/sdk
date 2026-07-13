@@ -112,4 +112,13 @@ describe('aggregateDepthCurves', () => {
       coarse!.asks.length + coarse!.bids.length,
     );
   });
+
+  test('one-sided pool still returns a book (skewed reserves)', () => {
+    const twap = 64_000;
+    const leg = buildLeg('BTCB', twap, sigmaSeed('volatile'), 10_000, 10_000, 10_000, 18, VOLATILE_PROFILE);
+    const pool: NamedPool = { tag: 'volatile', state: { base: 'USDC', legs: { BTCB: leg } } };
+    const book = aggregateDepthCurves([pool], 'USDC', 'BTCB', { step: 50 });
+    expect(book).not.toBeNull();
+    expect(book!.asks.length + book!.bids.length).toBeGreaterThan(0);
+  });
 });
