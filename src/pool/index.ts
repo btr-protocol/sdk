@@ -113,6 +113,9 @@ export async function getCoverageRatio(
 export type { LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
+  HOOK_PRE_OUTFLOW,
+  HOOK_POST_INFLOW,
+  HOOK_FLAGS_MASK,
   mappingBase,
   resolveTokenStorageKey,
   readLiquidityProfile,
