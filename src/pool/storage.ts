@@ -56,6 +56,28 @@ export const HOOK_POST_INFLOW = 1 << 1;
 /** Known-bits mask; dex rejects unknown bits at adminSetAssetHook. */
 export const HOOK_FLAGS_MASK = HOOK_PRE_OUTFLOW | HOOK_POST_INFLOW;
 
+/** Decoded `IPool.HookSlot { address target; uint32 flags }` (single packed storage word). */
+export interface HookSlot {
+  target: Address;
+  flags: number;
+}
+
+/** Decode a packed HookSlot word: target @ byte offset 0 (low 20B), uint32 flags @ offset 20. */
+export function decodeHookSlot(word: Hex): HookSlot {
+  return { target: addressAt(word, 0), flags: u32At(word, 20) };
+}
+
+/** Read the per-asset HookSlot (assetHooks mapping, slot 18). `target == address(0)` ⇒ no hook. */
+export async function readAssetHook(
+  provider: Eip1193Provider,
+  pool: Address,
+  token: Address,
+): Promise<HookSlot> {
+  const key = await resolveTokenStorageKey(provider, pool, token);
+  const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assetHooks));
+  return decodeHookSlot(word);
+}
+
 export interface LiquidityProfile {
   weights: number[];
   knots: number[];

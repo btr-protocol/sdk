@@ -110,7 +110,7 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
-export type { LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
+export type { HookSlot, LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
   HOOK_PRE_OUTFLOW,
@@ -121,6 +121,8 @@ export {
   readLiquidityProfile,
   readOracleConfig,
   readRiskConfig,
+  readAssetHook,
+  decodeHookSlot,
   getStorageAt,
 } from './storage.js';
 
