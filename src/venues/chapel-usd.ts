@@ -26,8 +26,13 @@ export const CHAPEL_USD_TARGETS = {
   gasTbnb: { flow: 0.05, arb: 0.05, oracle: 0.1 },
 } as const;
 
-/** NXR symbols (oracle.chapel.toml). Stables omitted: priced as $1. */
+/** NXR symbols — same paths as keepers/oracle.chapel.toml (USDC-per-token). */
 export const CHAPEL_NXR_FEED: Record<string, string | { primary: string; via: string }> = {
+  USDC: { primary: 'USDC-USDT', via: 'USDT-USDC' },
+  USDT: 'USDT-USDC',
+  USD1: 'USD1-USDC',
+  USDE: 'USDE-USDC',
+  FDUSD: 'FDUSD-USDC',
   BTCB: 'BTC-USDC',
   ETH: 'ETH-USDC',
   WBNB: 'BNB-USDC',
@@ -50,8 +55,11 @@ export const CHAPEL_REF_MARKS_USD: Record<string, number> = {
 
 const DEC = 18;
 const YEAR = 365.25 * 24 * 3600;
-/** Refuse marks outside [ref/20, ref×20] (broken OHLC / unit error). */
-const MARK_BAND = 20;
+/** Volatile: reject unit garbage (e.g. BTC mark → $1). */
+const VOL_MARK_BAND = 20;
+/** Stable: allow real depeg (FDUSD ~0.92) but reject broken OHLC. */
+const STABLE_MARK_MIN = 0.5;
+const STABLE_MARK_MAX = 1.5;
 
 export function isChapelStable(sym: string): boolean {
   return (CHAPEL_STABLE_SYMS as readonly string[]).includes(sym.toUpperCase());
@@ -64,15 +72,18 @@ export function refMarksUsd(): Record<string, number> {
 function saneMark(sym: string, raw: number): number {
   const ref = CHAPEL_REF_MARKS_USD[sym] ?? 1;
   if (!(raw > 0) || !Number.isFinite(raw)) return ref;
-  if (raw < ref / MARK_BAND || raw > ref * MARK_BAND) return ref;
+  if (isChapelStable(sym)) {
+    if (raw < STABLE_MARK_MIN || raw > STABLE_MARK_MAX) return ref;
+    return raw;
+  }
+  if (raw < ref / VOL_MARK_BAND || raw > ref * VOL_MARK_BAND) return ref;
   return raw;
 }
 
-/** USD → token wei (18-dec mocks). Stables always $1. */
+/** USD → token wei (18-dec mocks). Uses live mark for every asset (incl. stables). */
 export function tokenWeiFromUsd(usd: number, sym: string, marks?: Record<string, number>): bigint {
   if (!(usd > 0)) return 0n;
   const key = sym.toUpperCase();
-  if (isChapelStable(key)) return parseUnits(usd.toFixed(8), DEC);
   const mark = saneMark(key, marks?.[key] ?? CHAPEL_REF_MARKS_USD[key] ?? 1);
   if (!(mark > 0)) return 0n;
   return parseUnits((usd / mark).toFixed(8), DEC);
@@ -113,7 +124,7 @@ async function resolveMark(
   return a != null && b != null ? a * b : null;
 }
 
-/** Live USDC marks; stables stay $1; volatiles fall back to ref if OHLC missing/insane. */
+/** Live USDC marks from data.btr.markets (same NXR paths as oracle keeper). */
 export async function fetchChapelMarksUsd(
   mdBase = process.env.CHAPEL_MD_BASE ?? 'https://data.btr.markets/md',
 ): Promise<Record<string, number>> {
