@@ -1,11 +1,12 @@
 /**
- * Chapel testnet USD targets + live mark fetch (data.btr.markets → NXR OHLC).
- * SSoT for pool seed, bot floors, and hourly top-up sizing.
+ * Chapel testnet USD targets + live marks (data.btr.markets → NXR OHLC).
+ * SSoT for pool seed, bot floors, hourly top-up sizing.
  */
 import { parseUnits } from '../utils/format.js';
 
 export const CHAPEL_STABLE_SYMS = ['USDC', 'USDT', 'USD1', 'USDE', 'FDUSD'] as const;
 export const CHAPEL_VOL_POOL_SYMS = ['USDC', 'USDT', 'BTCB', 'ETH', 'WBNB', 'CAKE', 'XAUT'] as const;
+/** Stables ∪ volatiles (bot inventory + mark universe). */
 export const CHAPEL_BOT_SYMS = [
   ...CHAPEL_STABLE_SYMS,
   'BTCB',
@@ -15,36 +16,18 @@ export const CHAPEL_BOT_SYMS = [
   'XAUT',
 ] as const;
 
-export type ChapelStableSym = (typeof CHAPEL_STABLE_SYMS)[number];
-export type ChapelBotSym = (typeof CHAPEL_BOT_SYMS)[number];
-
-/** USD notion targets (human). Stables: same $/asset everywhere. */
 export const CHAPEL_USD_TARGETS = {
-  /** Per-asset pool reserve target ($). */
   poolPerAssetUsd: 50_000,
-  /** Bot operating floor per asset ($) — identical for every stable. */
   botFloorUsd: 25_000,
-  /** One-shot bot seed per asset ($). */
   botSeedUsd: 50_000,
-  /** Mock Venus yield APR (keeper setRate). */
   yieldApr: 0.05,
-  gasTbnb: {
-    flow: 0.05,
-    arb: 0.05,
-    oracle: 0.1,
-  },
+  /** Cap yield dt so a late CronJob cannot jump weeks of APR in one tick. */
+  yieldDtCapSec: 6 * 3600,
+  gasTbnb: { flow: 0.05, arb: 0.05, oracle: 0.1 },
 } as const;
 
-/** NXR symbols aligned with keepers/oracle.chapel.toml. */
-export const CHAPEL_NXR_FEED: Record<
-  string,
-  string | { primary: string; via?: string }
-> = {
-  USDC: { primary: 'USDC-USDT', via: 'USDT-USDC' },
-  USDT: 'USDT-USDC',
-  USD1: 'USD1-USDC',
-  USDE: 'USDE-USDC',
-  FDUSD: 'FDUSD-USDC',
+/** NXR symbols (oracle.chapel.toml). Stables omitted: priced as $1. */
+export const CHAPEL_NXR_FEED: Record<string, string | { primary: string; via: string }> = {
   BTCB: 'BTC-USDC',
   ETH: 'ETH-USDC',
   WBNB: 'BNB-USDC',
@@ -52,7 +35,6 @@ export const CHAPEL_NXR_FEED: Record<
   XAUT: 'XAUT-USDC',
 };
 
-/** Offline marks (USDC per token) when data edge unreachable. */
 export const CHAPEL_REF_MARKS_USD: Record<string, number> = {
   USDC: 1,
   USDT: 1,
@@ -66,8 +48,10 @@ export const CHAPEL_REF_MARKS_USD: Record<string, number> = {
   XAUT: 4_100,
 };
 
-const DECIMALS = 18;
-const YEAR_SEC = 365.25 * 24 * 3600;
+const DEC = 18;
+const YEAR = 365.25 * 24 * 3600;
+/** Refuse marks outside [ref/20, ref×20] (broken OHLC / unit error). */
+const MARK_BAND = 20;
 
 export function isChapelStable(sym: string): boolean {
   return (CHAPEL_STABLE_SYMS as readonly string[]).includes(sym.toUpperCase());
@@ -77,81 +61,68 @@ export function refMarksUsd(): Record<string, number> {
   return { ...CHAPEL_REF_MARKS_USD };
 }
 
-/** Convert USD notional → token wei (18 dec mocks). Stables use $1. */
+function saneMark(sym: string, raw: number): number {
+  const ref = CHAPEL_REF_MARKS_USD[sym] ?? 1;
+  if (!(raw > 0) || !Number.isFinite(raw)) return ref;
+  if (raw < ref / MARK_BAND || raw > ref * MARK_BAND) return ref;
+  return raw;
+}
+
+/** USD → token wei (18-dec mocks). Stables always $1. */
 export function tokenWeiFromUsd(usd: number, sym: string, marks?: Record<string, number>): bigint {
   if (!(usd > 0)) return 0n;
   const key = sym.toUpperCase();
-  const m = marks ?? CHAPEL_REF_MARKS_USD;
-  const mark = isChapelStable(key) ? 1 : (m[key] ?? CHAPEL_REF_MARKS_USD[key] ?? 1);
+  if (isChapelStable(key)) return parseUnits(usd.toFixed(8), DEC);
+  const mark = saneMark(key, marks?.[key] ?? CHAPEL_REF_MARKS_USD[key] ?? 1);
   if (!(mark > 0)) return 0n;
-  const tokens = usd / mark;
-  return parseUnits(tokens.toFixed(8), DECIMALS);
+  return parseUnits((usd / mark).toFixed(8), DEC);
 }
 
-export function targetWeiForPool(sym: string, marks: Record<string, number>): bigint {
-  return tokenWeiFromUsd(CHAPEL_USD_TARGETS.poolPerAssetUsd, sym, marks);
-}
-
-export function targetWeiForBotFloor(sym: string, marks: Record<string, number>): bigint {
-  return tokenWeiFromUsd(CHAPEL_USD_TARGETS.botFloorUsd, sym, marks);
-}
-
-export function targetWeiForBotSeed(sym: string, marks: Record<string, number>): bigint {
-  return tokenWeiFromUsd(CHAPEL_USD_TARGETS.botSeedUsd, sym, marks);
-}
+export const targetWeiForPool = (s: string, m: Record<string, number>) =>
+  tokenWeiFromUsd(CHAPEL_USD_TARGETS.poolPerAssetUsd, s, m);
+export const targetWeiForBotFloor = (s: string, m: Record<string, number>) =>
+  tokenWeiFromUsd(CHAPEL_USD_TARGETS.botFloorUsd, s, m);
+export const targetWeiForBotSeed = (s: string, m: Record<string, number>) =>
+  tokenWeiFromUsd(CHAPEL_USD_TARGETS.botSeedUsd, s, m);
 
 interface OhlcBar {
-  ts: number;
   close: number;
   tick_count?: number;
 }
 
-async function fetchOhlcClose(
-  mdBase: string,
-  nxrSym: string,
-  tfSec = 30,
-): Promise<number | null> {
+async function ohlcClose(mdBase: string, nxrSym: string): Promise<number | null> {
   const now = Date.now();
-  const from = now - 3_600_000;
-  const url = `${mdBase.replace(/\/$/, '')}/ohlc/${nxrSym}?tf=${tfSec}&from=${from}&to=${now}`;
+  const url = `${mdBase.replace(/\/$/, '')}/ohlc/${nxrSym}?tf=30&from=${now - 3_600_000}&to=${now}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) return null;
   const bars = (await res.json()) as OhlcBar[];
-  if (!Array.isArray(bars) || !bars.length) return null;
+  if (!Array.isArray(bars)) return null;
   for (let i = bars.length - 1; i >= 0; i--) {
     const b = bars[i]!;
     if ((b.tick_count ?? 1) > 0 && Number.isFinite(b.close) && b.close > 0) return b.close;
   }
-  const last = bars[bars.length - 1]!;
-  return Number.isFinite(last.close) && last.close > 0 ? last.close : null;
+  return null;
 }
 
-async function resolveNxrMark(mdBase: string, spec: string | { primary: string; via?: string }): Promise<number | null> {
-  if (typeof spec === 'string') return fetchOhlcClose(mdBase, spec);
-  const primary = await fetchOhlcClose(mdBase, spec.primary);
-  if (!spec.via) return primary;
-  const via = await fetchOhlcClose(mdBase, spec.via);
-  if (primary == null || via == null) return null;
-  return primary * via;
+async function resolveMark(
+  mdBase: string,
+  spec: string | { primary: string; via: string },
+): Promise<number | null> {
+  if (typeof spec === 'string') return ohlcClose(mdBase, spec);
+  const [a, b] = await Promise.all([ohlcClose(mdBase, spec.primary), ohlcClose(mdBase, spec.via)]);
+  return a != null && b != null ? a * b : null;
 }
 
-/**
- * Live USDC-denominated marks from data.btr.markets (fallback → CHAPEL_REF_MARKS_USD).
- */
+/** Live USDC marks; stables stay $1; volatiles fall back to ref if OHLC missing/insane. */
 export async function fetchChapelMarksUsd(
-  mdBase = process.env.CHAPEL_MD_BASE ?? process.env.VITE_NXR_API ?? 'https://data.btr.markets/md',
+  mdBase = process.env.CHAPEL_MD_BASE ?? 'https://data.btr.markets/md',
 ): Promise<Record<string, number>> {
   const out = refMarksUsd();
-  const syms = [...new Set([...CHAPEL_BOT_SYMS, ...CHAPEL_VOL_POOL_SYMS])];
   await Promise.all(
-    syms.map(async (sym) => {
-      const spec = CHAPEL_NXR_FEED[sym];
-      if (!spec) return;
+    Object.entries(CHAPEL_NXR_FEED).map(async ([sym, spec]) => {
       try {
-        const px = await resolveNxrMark(mdBase, spec);
-        if (px != null && Number.isFinite(px) && px > 0) {
-          out[sym] = isChapelStable(sym) ? 1 : px;
-        }
+        const px = await resolveMark(mdBase, spec);
+        if (px != null) out[sym] = saneMark(sym, px);
       } catch {
         /* keep ref */
       }
@@ -160,8 +131,12 @@ export async function fetchChapelMarksUsd(
   return out;
 }
 
-/** MockVenus compound rate tick (~APR) for elapsed seconds. */
-export function tickMockVenusRate(prev: bigint, dtSec: number, apr = CHAPEL_USD_TARGETS.yieldApr): bigint {
-  const mul = BigInt(Math.floor(1e18 * (1 + (apr * dtSec) / YEAR_SEC)));
+export function tickMockVenusRate(
+  prev: bigint,
+  dtSec: number,
+  apr = CHAPEL_USD_TARGETS.yieldApr,
+): bigint {
+  const dt = Math.min(Math.max(1, dtSec), CHAPEL_USD_TARGETS.yieldDtCapSec);
+  const mul = BigInt(Math.floor(1e18 * (1 + (apr * dt) / YEAR)));
   return (prev * mul) / 10n ** 18n;
 }
