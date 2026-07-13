@@ -46,6 +46,16 @@ export const POOL_STORAGE = {
   invested: 19n,
 } as const;
 
+/**
+ * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/Constants.sol`
+ * (verified exact: HOOK_PRE_OUTFLOW=1<<0, HOOK_POST_INFLOW=1<<1). SSoT for back/front.
+ * Pool dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
+ */
+export const HOOK_PRE_OUTFLOW = 1 << 0;
+export const HOOK_POST_INFLOW = 1 << 1;
+/** Known-bits mask; dex rejects unknown bits at adminSetAssetHook. */
+export const HOOK_FLAGS_MASK = HOOK_PRE_OUTFLOW | HOOK_POST_INFLOW;
+
 export interface LiquidityProfile {
   weights: number[];
   knots: number[];
