@@ -42,6 +42,22 @@ const CONTRACTS: Array<{
     mergeEventsFrom: ['IPool'],
   },
   {
+    contract: 'PoolAux',
+    file: 'PoolAux.ts',
+    constName: 'POOL_AUX_ABI',
+    title: 'PoolAux',
+    blurb:
+      'Cold-path dispatcher (Pool fallback → DELEGATECALL). Hook surface (getAssetHook/hookDeploy/hookRecall) + pool-scoped admin. Call against the POOL address, not PoolAux.',
+  },
+  {
+    contract: 'IPoolHooks',
+    file: 'IPoolHooks.ts',
+    constName: 'POOL_HOOKS_ABI',
+    title: 'IPoolHooks',
+    blurb:
+      'Per-asset yield-hook callback surface (preOutflow recall + postInflow deploy). Pool→hook direction. Flags: HOOK_PRE_OUTFLOW / HOOK_POST_INFLOW.',
+  },
+  {
     contract: 'PoolFactory',
     file: 'PoolFactory.ts',
     constName: 'POOL_FACTORY_ABI',
