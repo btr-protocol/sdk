@@ -110,6 +110,8 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
+export type { YieldHookKind } from './hooks.js';
+export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
 export type { HookSlot, LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
