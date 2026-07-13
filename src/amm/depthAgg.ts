@@ -271,9 +271,11 @@ export function aggregateDepthCurves(
     parts.push({ mark: curve.mark, mid: curve.mid, spreadBps: curve.spreadBps, asks, bids, w });
   }
   if (!parts.length) return null;
-  if (!parts.some((p) => p.asks.some((r) => r.cum > 0)) || !parts.some((p) => p.bids.some((r) => r.cum > 0))) {
-    return null;
-  }
+  // Allow one-sided books (skewed reserves clip the thin side — e.g. BTCB hub drain).
+  // Reject only when BOTH sides are empty across all contributing pools.
+  const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
+  const hasBids = parts.some((p) => p.bids.some((r) => r.cum > 0));
+  if (!hasAsks && !hasBids) return null;
 
   let markNum = 0;
   let midNum = 0;
