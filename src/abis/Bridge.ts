@@ -222,6 +222,19 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'guardianPauseToken',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'initialize',
     inputs: [],
     outputs: [],
