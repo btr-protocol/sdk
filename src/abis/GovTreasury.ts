@@ -1,12 +1,12 @@
 /**
- * Treasury Contract ABI
+ * GovTreasury Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Protocol treasury singleton.
+ * Home-chain governance treasury (UUPS). Emissions/vesting/bridge/gov-token custody + salvage. Ops fee-collection carved out to OpsTreasury. UpgradeGate: request/execute/cancel + paused.
  * Source: shared/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
-export const TREASURY_ABI = [
+export const GOV_TREASURY_ABI = [
   {
     type: 'constructor',
     inputs: [
@@ -17,10 +17,6 @@ export const TREASURY_ABI = [
       },
     ],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'receive',
-    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -34,24 +30,6 @@ export const TREASURY_ABI = [
       },
     ],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'accrue',
-    inputs: [
-      {
-        name: 'vault',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'perfShares',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -104,29 +82,6 @@ export const TREASURY_ABI = [
     type: 'function',
     name: 'claimVested',
     inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'collectProtocolFees',
-    inputs: [
-      {
-        name: 'admin',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -326,7 +281,7 @@ export const TREASURY_ABI = [
       {
         name: '',
         type: 'tuple',
-        internalType: 'struct ITreasury.VestingSchedule',
+        internalType: 'struct IGovTreasury.VestingSchedule',
         components: [
           {
             name: 'totalAllocation',
@@ -568,25 +523,6 @@ export const TREASURY_ABI = [
         name: '',
         type: 'uint96',
         internalType: 'uint96',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'perfShareBalance',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -974,50 +910,6 @@ export const TREASURY_ABI = [
   },
   {
     type: 'event',
-    name: 'PerfAccrued',
-    inputs: [
-      {
-        name: 'vault',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'perfShares',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'ProtocolFeesCollected',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
     name: 'Salvaged',
     inputs: [
       {
@@ -1191,22 +1083,12 @@ export const TREASURY_ABI = [
   },
   {
     type: 'error',
-    name: 'NotAuth',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'NotCode',
     inputs: [],
   },
   {
     type: 'error',
     name: 'NotReady',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'NotVault',
     inputs: [],
   },
   {

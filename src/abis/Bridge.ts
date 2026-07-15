@@ -419,6 +419,19 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'pendingUpgradeOp',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'proxiableUUID',
     inputs: [],
     outputs: [
