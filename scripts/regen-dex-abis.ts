@@ -70,7 +70,7 @@ const CONTRACTS: Array<{
     constName: 'EXTERNAL_ORACLE_ABI',
     title: 'ExternalOracle',
     blurb:
-      'Push-based external oracle. pushFeed/batchPush carry (price, sigma, confidence); getEma = rate-clamped reference.',
+      'Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation.',
   },
   {
     contract: 'Flash',
