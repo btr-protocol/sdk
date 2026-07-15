@@ -277,6 +277,30 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'isGuardianOrAuth',
+    inputs: [
+      {
+        name: 'sender',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'auth',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'isKeeper',
     inputs: [
       {
