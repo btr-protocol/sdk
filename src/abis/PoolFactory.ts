@@ -105,6 +105,19 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'beacon',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'cancelReferenceUpgrade',
     inputs: [],
     outputs: [],
@@ -294,6 +307,13 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'guardianCancelUpgrade',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -718,7 +738,7 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'error',
-    name: 'DeploymentFailed',
+    name: 'BadConfig',
     inputs: [],
   },
   {
@@ -739,12 +759,22 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'error',
+    name: 'Expired',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'InvalidInput',
     inputs: [],
   },
   {
     type: 'error',
     name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotAuth',
     inputs: [],
   },
   {
