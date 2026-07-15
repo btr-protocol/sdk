@@ -103,6 +103,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'bootstrapTreasuryOwner',
+    inputs: [
+      {
+        name: 't',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'cancelFactory',
     inputs: [],
     outputs: [],
@@ -132,6 +145,13 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'function',
     name: 'cancelTreasury',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'cancelTreasuryOwner',
     inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -193,6 +213,13 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'function',
     name: 'executeTreasury',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeTreasuryOwner',
     inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -270,25 +297,6 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'function',
     name: 'isRiskSteward',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isVault',
     inputs: [
       {
         name: '',
@@ -437,6 +445,24 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'pendingTreasuryOwner',
+    inputs: [],
+    outputs: [
+      {
+        name: 'addr',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'eta',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'queueFactory',
     inputs: [
       {
@@ -489,10 +515,10 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'registerAdapter',
+    name: 'queueTreasuryOwner',
     inputs: [
       {
-        name: 'a',
+        name: 't',
         type: 'address',
         internalType: 'address',
       },
@@ -502,10 +528,10 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'registerVault',
+    name: 'registerAdapter',
     inputs: [
       {
-        name: 'v',
+        name: 'a',
         type: 'address',
         internalType: 'address',
       },
@@ -623,6 +649,19 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'function',
     name: 'treasury',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'treasuryOwner',
     inputs: [],
     outputs: [
       {
@@ -911,6 +950,51 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
+    name: 'TreasuryOwnerCancelled',
+    inputs: [
+      {
+        name: 't',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'TreasuryOwnerQueued',
+    inputs: [
+      {
+        name: 't',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'eta',
+        type: 'uint64',
+        indexed: false,
+        internalType: 'uint64',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'TreasuryOwnerSet',
+    inputs: [
+      {
+        name: 't',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'TreasuryQueued',
     inputs: [
       {
@@ -934,19 +1018,6 @@ export const ACCESS_CONTROL_ABI = [
     inputs: [
       {
         name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'VaultRegistered',
-    inputs: [
-      {
-        name: 'v',
         type: 'address',
         indexed: true,
         internalType: 'address',

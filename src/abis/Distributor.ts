@@ -402,6 +402,30 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'function',
+    name: 'rescueSurplus',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'to',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'surplus',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'reservedLiability',
     inputs: [
       {
@@ -710,6 +734,31 @@ export const DISTRIBUTOR_ABI = [
         type: 'uint8',
         indexed: false,
         internalType: 'enum IDistributor.CampaignStatus',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SurplusRescued',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'to',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'surplus',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
     ],
     anonymous: false,

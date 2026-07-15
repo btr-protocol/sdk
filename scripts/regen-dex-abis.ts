@@ -137,12 +137,22 @@ const CONTRACTS: Array<{
     blurb: 'Bridge-wrapped ERC20 with permit.',
   },
   {
-    contract: 'Treasury',
+    contract: 'GovTreasury',
     root: 'shared',
-    file: 'Treasury.ts',
-    constName: 'TREASURY_ABI',
-    title: 'Treasury',
-    blurb: 'Protocol treasury singleton.',
+    file: 'GovTreasury.ts',
+    constName: 'GOV_TREASURY_ABI',
+    title: 'GovTreasury',
+    blurb:
+      'Home-chain governance treasury (UUPS). Emissions/vesting/bridge/gov-token custody + salvage. Ops fee-collection carved out to OpsTreasury. UpgradeGate: request/execute/cancel + paused.',
+  },
+  {
+    contract: 'OpsTreasury',
+    root: 'shared',
+    file: 'OpsTreasury.ts',
+    constName: 'OPS_TREASURY_ABI',
+    title: 'OpsTreasury',
+    blurb:
+      'Per-chain operations treasury (UUPS, IOpsTreasury). collectProtocolFees/fundDistributor/setDistributor/salvage + receive. UpgradeGate: request/execute/cancel + paused.',
   },
 ];
 

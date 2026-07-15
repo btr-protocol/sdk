@@ -145,6 +145,67 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'batchPushSigned',
+    inputs: [
+      {
+        name: 'blob',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
+      {
+        name: 'sig',
+        type: 'bytes',
+        internalType: 'bytes',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'eip712Domain',
+    inputs: [],
+    outputs: [
+      {
+        name: 'fields',
+        type: 'bytes1',
+        internalType: 'bytes1',
+      },
+      {
+        name: 'name',
+        type: 'string',
+        internalType: 'string',
+      },
+      {
+        name: 'version',
+        type: 'string',
+        internalType: 'string',
+      },
+      {
+        name: 'chainId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'verifyingContract',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'salt',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+      {
+        name: 'extensions',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'feedIds',
     inputs: [
       {
@@ -218,6 +279,11 @@ export const EXTERNAL_ORACLE_ABI = [
             type: 'uint16',
             internalType: 'uint16',
           },
+          {
+            name: 'sourceTs',
+            type: 'uint48',
+            internalType: 'uint48',
+          },
         ],
       },
     ],
@@ -255,6 +321,19 @@ export const EXTERNAL_ORACLE_ABI = [
     inputs: [
       {
         name: 'oracle',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'grantSigner',
+    inputs: [
+      {
+        name: 'signer',
         type: 'address',
         internalType: 'address',
       },
@@ -326,6 +405,19 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'maxRelayLagSecs',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'oracles',
     inputs: [
       {
@@ -383,6 +475,51 @@ export const EXTERNAL_ORACLE_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'revokeSigner',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setMaxRelayLag',
+    inputs: [
+      {
+        name: 'secs',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'signers',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -514,6 +651,19 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'event',
+    name: 'MaxRelayLagSet',
+    inputs: [
+      {
+        name: 'secs',
+        type: 'uint32',
+        indexed: false,
+        internalType: 'uint32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'OracleGranted',
     inputs: [
       {
@@ -582,6 +732,32 @@ export const EXTERNAL_ORACLE_ABI = [
     anonymous: false,
   },
   {
+    type: 'event',
+    name: 'SignerGranted',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SignerRevoked',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
     type: 'error',
     name: 'CooldownActive',
     inputs: [
@@ -613,6 +789,11 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'bytes32',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'FeedStale',
+    inputs: [],
   },
   {
     type: 'error',
