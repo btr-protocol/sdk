@@ -64,6 +64,19 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'SOURCE_TS_FUTURE_SKEW_S',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'addFeed',
     inputs: [
       {
