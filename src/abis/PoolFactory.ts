@@ -675,6 +675,25 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'event',
+    name: 'ReferencePoolUpgradeCancelled',
+    inputs: [
+      {
+        name: 'canceller',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'cancelledImplementation',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'ReferencePoolUpgradeRequested',
     inputs: [
       {
