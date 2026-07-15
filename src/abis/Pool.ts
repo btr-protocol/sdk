@@ -848,6 +848,11 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
+    name: 'FeedPaused',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'InvalidDecimals',
     inputs: [],
   },

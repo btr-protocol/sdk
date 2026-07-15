@@ -15,11 +15,6 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'address',
         internalType: 'address',
       },
-      {
-        name: 'oracle_',
-        type: 'address',
-        internalType: 'address',
-      },
     ],
     stateMutability: 'nonpayable',
   },
@@ -123,34 +118,6 @@ export const EXTERNAL_ORACLE_ABI = [
         name: 'ttl',
         type: 'uint16',
         internalType: 'uint16',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'batchPush',
-    inputs: [
-      {
-        name: '_feedIds',
-        type: 'bytes32[]',
-        internalType: 'bytes32[]',
-      },
-      {
-        name: 'prices',
-        type: 'uint64[]',
-        internalType: 'uint64[]',
-      },
-      {
-        name: 'sigmas',
-        type: 'uint32[]',
-        internalType: 'uint32[]',
-      },
-      {
-        name: 'confidences',
-        type: 'uint16[]',
-        internalType: 'uint16[]',
       },
     ],
     outputs: [],
@@ -278,7 +245,7 @@ export const EXTERNAL_ORACLE_ABI = [
             internalType: 'uint16',
           },
           {
-            name: 'tau',
+            name: 'flags',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -327,19 +294,6 @@ export const EXTERNAL_ORACLE_ABI = [
       },
     ],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'grantOracle',
-    inputs: [
-      {
-        name: 'oracle',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -431,26 +385,7 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'oracles',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'pushFeed',
+    name: 'narrowMaxDeviation',
     inputs: [
       {
         name: 'feedId',
@@ -458,17 +393,7 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'bytes32',
       },
       {
-        name: 'newPriceB64',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-      {
-        name: 'sigmaSample',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'newConfidence',
+        name: 'newMaxDeviation',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -478,12 +403,12 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'revokeOracle',
+    name: 'pauseFeed',
     inputs: [
       {
-        name: 'oracle',
-        type: 'address',
-        internalType: 'address',
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
       },
     ],
     outputs: [],
@@ -536,6 +461,19 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'unpauseFeed',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'updateFeed',
     inputs: [
       {
@@ -556,25 +494,6 @@ export const EXTERNAL_ORACLE_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'event',
-    name: 'BatchPushed',
-    inputs: [
-      {
-        name: 'count',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-      {
-        name: 'pusher',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
   },
   {
     type: 'event',
@@ -639,6 +558,32 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'event',
+    name: 'FeedPaused',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'FeedUnpaused',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'FeedUpdated',
     inputs: [
       {
@@ -664,46 +609,7 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'event',
-    name: 'MaxRelayLagSet',
-    inputs: [
-      {
-        name: 'secs',
-        type: 'uint32',
-        indexed: false,
-        internalType: 'uint32',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'OracleGranted',
-    inputs: [
-      {
-        name: 'oracle',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'OracleRevoked',
-    inputs: [
-      {
-        name: 'oracle',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'Pushed',
+    name: 'MaxDeviationNarrowed',
     inputs: [
       {
         name: 'feedId',
@@ -712,34 +618,23 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'bytes32',
       },
       {
-        name: 'price',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-      {
-        name: 'sigmaSample',
-        type: 'uint32',
-        indexed: false,
-        internalType: 'uint32',
-      },
-      {
-        name: 'sigmaEma',
-        type: 'uint32',
-        indexed: false,
-        internalType: 'uint32',
-      },
-      {
-        name: 'confidence',
+        name: 'newMaxDeviation',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',
       },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'MaxRelayLagSet',
+    inputs: [
       {
-        name: 'pusher',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
+        name: 'secs',
+        type: 'uint32',
+        indexed: false,
+        internalType: 'uint32',
       },
     ],
     anonymous: false,
