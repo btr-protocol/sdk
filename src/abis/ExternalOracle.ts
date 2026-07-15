@@ -2,7 +2,7 @@
  * ExternalOracle Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Push-based external oracle. pushFeed/batchPush carry (price, sigma, confidence); getEma = rate-clamped reference.
+ * Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation.
  * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
