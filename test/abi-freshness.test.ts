@@ -24,13 +24,14 @@ import {
   EXTERNAL_ORACLE_ABI,
   FLASH_ABI,
   GOV_TOKEN_ABI,
+  GOV_TREASURY_ABI,
+  OPS_TREASURY_ABI,
   POOL_ABI,
   POOL_AUX_ABI,
   POOL_FACTORY_ABI,
   POOL_HOOKS_ABI,
   STAKED_ASSET_ABI,
   STAKING_ABI,
-  TREASURY_ABI,
 } from '../src/abis/index.js';
 
 const EVM_ROOTS = {
@@ -63,13 +64,14 @@ const ABI_MAP: Array<{
   { name: 'ExternalOracle', ts: EXTERNAL_ORACLE_ABI, contract: 'ExternalOracle' },
   { name: 'Flash', ts: FLASH_ABI, contract: 'Flash' },
   { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken', root: 'shared' },
+  { name: 'GovTreasury', ts: GOV_TREASURY_ABI, contract: 'GovTreasury', root: 'shared' },
+  { name: 'OpsTreasury', ts: OPS_TREASURY_ABI, contract: 'OpsTreasury', root: 'shared' },
   { name: 'Pool', ts: POOL_ABI, contract: 'Pool', mergeEventsFrom: ['IPool'] },
   { name: 'PoolAux', ts: POOL_AUX_ABI, contract: 'PoolAux' },
   { name: 'IPoolHooks', ts: POOL_HOOKS_ABI, contract: 'IPoolHooks' },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
   { name: 'StakedAsset', ts: STAKED_ASSET_ABI, contract: 'StakedAsset', root: 'shared' },
   { name: 'Staking', ts: STAKING_ABI, contract: 'Staking', root: 'shared' },
-  { name: 'Treasury', ts: TREASURY_ABI, contract: 'Treasury', root: 'shared' },
 ];
 
 type AbiItem = Record<string, unknown> & {

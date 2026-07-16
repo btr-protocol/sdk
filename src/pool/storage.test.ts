@@ -3,7 +3,29 @@
  * LSB-aligned fields within a 32-byte word.
  */
 import { describe, expect, test } from 'bun:test';
-import { i8At, mappingBase, u16At, u32At, u8At, addressAt } from './storage';
+import { POOL_STORAGE, addressAt, i8At, mappingBase, u16At, u32At, u8At } from './storage';
+
+test('PoolStorage absolute slots match the compact predeploy layout', () => {
+  expect(POOL_STORAGE).toEqual({
+    baseToken: 0n,
+    wnative: 1n,
+    bridge: 2n,
+    treasuryInitialized: 3n,
+    assets: 4n,
+    oracleConfigs: 5n,
+    riskConfigs: 6n,
+    profiles: 7n,
+    lpBalances: 8n,
+    protocolFees: 9n,
+    feeParams: 10n,
+    flowCooldownSeconds: 11n,
+    lastDepositTime: 12n,
+    lastLPStakeTime: 13n,
+    factory: 14n,
+    assetHooks: 15n,
+    invested: 16n,
+  });
+});
 
 describe('storage word packing (LSB-aligned)', () => {
   // Word with uint16=0x1234 at offset 0, uint16=0xABCD at offset 2, uint32=0xDEADBEEF at offset 6

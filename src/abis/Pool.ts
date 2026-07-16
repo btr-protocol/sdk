@@ -253,11 +253,6 @@ export const POOL_ABI = [
             internalType: 'uint8',
           },
           {
-            name: '_pad1',
-            type: 'uint8[2]',
-            internalType: 'uint8[2]',
-          },
-          {
             name: 'gamma',
             type: 'uint16',
             internalType: 'uint16',
@@ -286,11 +281,6 @@ export const POOL_ABI = [
             name: 'pegB64',
             type: 'uint64',
             internalType: 'uint64',
-          },
-          {
-            name: '_pad2',
-            type: 'uint8[2]',
-            internalType: 'uint8[2]',
           },
         ],
       },
@@ -348,11 +338,6 @@ export const POOL_ABI = [
             name: 'flashFeeBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[29]',
-            internalType: 'uint8[29]',
           },
         ],
       },
@@ -530,11 +515,6 @@ export const POOL_ABI = [
             name: 'flashFeeBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[29]',
-            internalType: 'uint8[29]',
           },
         ],
       },
@@ -821,6 +801,11 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
+    name: 'BadConfig',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'BaseDepegged',
     inputs: [
       {
@@ -869,6 +854,11 @@ export const POOL_ABI = [
   {
     type: 'error',
     name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {
