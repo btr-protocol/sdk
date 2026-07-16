@@ -143,11 +143,6 @@ export const POOL_AUX_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
-          {
-            name: '_pad',
-            type: 'uint8[9]',
-            internalType: 'uint8[9]',
-          },
         ],
       },
       {
@@ -189,11 +184,6 @@ export const POOL_AUX_ABI = [
             name: 'kappaCovBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[14]',
-            internalType: 'uint8[14]',
           },
         ],
       },
@@ -370,24 +360,6 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
-    name: 'adminSetBaseTokenOracle',
-    inputs: [
-      {
-        name: 'oracle',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'feedId',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'adminSetBridge',
     inputs: [
       {
@@ -417,11 +389,6 @@ export const POOL_AUX_ABI = [
             name: 'flashFeeBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[29]',
-            internalType: 'uint8[29]',
           },
         ],
       },
@@ -480,11 +447,6 @@ export const POOL_AUX_ABI = [
             name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[9]',
-            internalType: 'uint8[9]',
           },
         ],
       },
@@ -580,11 +542,6 @@ export const POOL_AUX_ABI = [
             name: 'kappaCovBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[14]',
-            internalType: 'uint8[14]',
           },
         ],
       },
@@ -885,6 +842,11 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'error',
+    name: 'BadConfig',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'ExcessiveAmount',
     inputs: [
       {
@@ -929,6 +891,11 @@ export const POOL_AUX_ABI = [
   {
     type: 'error',
     name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {
