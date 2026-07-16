@@ -75,11 +75,6 @@ export const ADMIN_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
-          {
-            name: '_pad',
-            type: 'uint8[9]',
-            internalType: 'uint8[9]',
-          },
         ],
       },
       {
@@ -121,11 +116,6 @@ export const ADMIN_ABI = [
             name: 'kappaCovBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[14]',
-            internalType: 'uint8[14]',
           },
         ],
       },
@@ -593,11 +583,6 @@ export const ADMIN_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
-          {
-            name: '_pad',
-            type: 'uint8[9]',
-            internalType: 'uint8[9]',
-          },
         ],
       },
       {
@@ -639,11 +624,6 @@ export const ADMIN_ABI = [
             name: 'kappaCovBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[14]',
-            internalType: 'uint8[14]',
           },
         ],
       },
@@ -778,11 +758,6 @@ export const ADMIN_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
-          {
-            name: '_pad',
-            type: 'uint8[9]',
-            internalType: 'uint8[9]',
-          },
         ],
       },
     ],
@@ -858,11 +833,6 @@ export const ADMIN_ABI = [
             name: 'flashFeeBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[29]',
-            internalType: 'uint8[29]',
           },
         ],
       },
@@ -968,11 +938,6 @@ export const ADMIN_ABI = [
             name: 'kappaCovBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: '_pad',
-            type: 'uint8[14]',
-            internalType: 'uint8[14]',
           },
         ],
       },
@@ -1201,29 +1166,6 @@ export const ADMIN_ABI = [
         name: 'reservationPriceMax',
         type: 'uint64',
         internalType: 'uint64',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'setBaseTokenOracle',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'oracle',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'feedId',
-        type: 'bytes32',
-        internalType: 'bytes32',
       },
     ],
     outputs: [],
@@ -1545,31 +1487,6 @@ export const ADMIN_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'BaseTokenOracleSet',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'oracle',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'feedId',
-        type: 'bytes32',
-        indexed: false,
-        internalType: 'bytes32',
       },
     ],
     anonymous: false,
@@ -2001,6 +1918,11 @@ export const ADMIN_ABI = [
   {
     type: 'error',
     name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {

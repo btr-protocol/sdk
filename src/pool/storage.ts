@@ -35,15 +35,12 @@ export const POOL_STORAGE = {
   lpBalances: 8n,
   protocolFees: 9n,
   feeParams: 10n,
-  // 11 reserved by FeeParams packing (64 B → 2 slots)
-  flowCooldownSeconds: 12n,
-  lastDepositTime: 13n,
-  lastLPStakeTime: 14n,
-  baseTokenOracle: 15n,
-  baseTokenFeedId: 16n,
-  factory: 17n,
-  assetHooks: 18n,
-  invested: 19n,
+  flowCooldownSeconds: 11n,
+  lastDepositTime: 12n,
+  lastLPStakeTime: 13n,
+  factory: 14n,
+  assetHooks: 15n,
+  invested: 16n,
 } as const;
 
 /**
@@ -67,7 +64,7 @@ export function decodeHookSlot(word: Hex): HookSlot {
   return { target: addressAt(word, 0), flags: u32At(word, 20) };
 }
 
-/** Read the per-asset HookSlot (assetHooks mapping, slot 18). `target == address(0)` ⇒ no hook. */
+/** Read the per-asset HookSlot (assetHooks mapping, slot 15). `target == address(0)` ⇒ no hook. */
 export async function readAssetHook(
   provider: Eip1193Provider,
   pool: Address,

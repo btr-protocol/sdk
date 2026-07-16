@@ -15,6 +15,11 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'maxRelayLagSecs_',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
     ],
     stateMutability: 'nonpayable',
   },
@@ -40,6 +45,19 @@ export const EXTERNAL_ORACLE_ABI = [
         name: '',
         type: 'uint16',
         internalType: 'uint16',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_RELAY_LAG_SECS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint32',
+        internalType: 'uint32',
       },
     ],
     stateMutability: 'view',
@@ -429,19 +447,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'setMaxRelayLag',
-    inputs: [
-      {
-        name: 'secs',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'signers',
     inputs: [
       {
@@ -628,19 +633,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'event',
-    name: 'MaxRelayLagSet',
-    inputs: [
-      {
-        name: 'secs',
-        type: 'uint32',
-        indexed: false,
-        internalType: 'uint32',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
     name: 'SignerGranted',
     inputs: [
       {
@@ -711,6 +703,11 @@ export const EXTERNAL_ORACLE_ABI = [
   {
     type: 'error',
     name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotCode',
     inputs: [],
   },
   {
