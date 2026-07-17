@@ -25,6 +25,10 @@
       "types": "./src/eth/index.ts",
       "default": "./src/eth/index.ts"
     },
+    "./oracle": {
+      "types": "./src/oracle/index.ts",
+      "default": "./src/oracle/index.ts"
+    },
     "./eth/wallets": {
       "types": "./src/eth/wallets.ts",
       "default": "./src/eth/wallets.ts"
