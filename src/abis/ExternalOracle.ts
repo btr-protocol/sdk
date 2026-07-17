@@ -151,7 +151,7 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'bytes',
       },
       {
-        name: 'sig',
+        name: 'sigs',
         type: 'bytes',
         internalType: 'bytes',
       },
@@ -447,6 +447,45 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'setSignerThreshold',
+    inputs: [
+      {
+        name: 't',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'signerCount',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'signerThreshold',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'signers',
     inputs: [
       {
@@ -653,6 +692,19 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SignerThresholdSet',
+    inputs: [
+      {
+        name: 'threshold',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
       },
     ],
     anonymous: false,

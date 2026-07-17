@@ -75,6 +75,11 @@ export const ADMIN_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
         ],
       },
       {
@@ -583,6 +588,11 @@ export const ADMIN_ABI = [
             type: 'uint8',
             internalType: 'uint8',
           },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
         ],
       },
       {
@@ -757,6 +767,11 @@ export const ADMIN_ABI = [
             name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
           },
         ],
       },
