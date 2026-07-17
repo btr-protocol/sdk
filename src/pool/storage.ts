@@ -96,6 +96,8 @@ export interface OracleConfig {
   primary: Address;
   refBandBps: number;
   mode: number;
+  /** Ref-band oracle instance (independent signer set); zero address = legacy fallback to primary. */
+  refPrimary: Address;
 }
 
 /** Mapping entry base slot: keccak256(abi.encode(key, mappingSlot)). */
@@ -210,10 +212,12 @@ export async function readOracleConfig(
 ): Promise<OracleConfig> {
   const key = await resolveTokenStorageKey(provider, pool, token);
   const base = mappingBase(key, POOL_STORAGE.oracleConfigs);
-  const [feedId, refFeedId, packed] = await Promise.all([
+  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode (packed), 3=refPrimary (appended last).
+  const [feedId, refFeedId, packed, refWord] = await Promise.all([
     getStorageAt(provider, pool, base),
     getStorageAt(provider, pool, base + 1n),
     getStorageAt(provider, pool, base + 2n),
+    getStorageAt(provider, pool, base + 3n),
   ]);
   return {
     feedId,
@@ -221,5 +225,6 @@ export async function readOracleConfig(
     primary: addressAt(packed, 0),
     refBandBps: u16At(packed, 20),
     mode: u8At(packed, 22),
+    refPrimary: addressAt(refWord, 0),
   };
 }
