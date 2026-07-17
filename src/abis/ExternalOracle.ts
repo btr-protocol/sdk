@@ -20,6 +20,16 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'uint32',
         internalType: 'uint32',
       },
+      {
+        name: 'initialSigners_',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
+      {
+        name: 'signerThreshold_',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
     ],
     stateMutability: 'nonpayable',
   },
@@ -51,13 +61,13 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'MAX_RELAY_LAG_SECS',
+    name: 'MAX_SIGNERS',
     inputs: [],
     outputs: [
       {
         name: '',
-        type: 'uint32',
-        internalType: 'uint32',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
@@ -71,6 +81,32 @@ export const EXTERNAL_ORACLE_ABI = [
         name: '',
         type: 'uint32',
         internalType: 'uint32',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'SIGNER_GOV_GRACE',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'SIGNER_GOV_TIMELOCK',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint48',
+        internalType: 'uint48',
       },
     ],
     stateMutability: 'view',
@@ -161,6 +197,20 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'cancelSignerGrant',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'cancelSignerThresholdDecrease',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'eip712Domain',
     inputs: [],
     outputs: [
@@ -201,6 +251,20 @@ export const EXTERNAL_ORACLE_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'executeSignerGrant',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeSignerThresholdDecrease',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -315,19 +379,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'grantSigner',
-    inputs: [
-      {
-        name: 'signer',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'hasFeed',
     inputs: [
       {
@@ -434,6 +485,84 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'pendingSigner',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingSignerGrantOp',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingSignerThreshold',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'pendingSignerThresholdOp',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'requestSignerGrant',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'requestSignerThresholdDecrease',
+    inputs: [
+      {
+        name: 't',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'revokeSigner',
     inputs: [
       {
@@ -465,8 +594,8 @@ export const EXTERNAL_ORACLE_ABI = [
     outputs: [
       {
         name: '',
-        type: 'uint256',
-        internalType: 'uint256',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
@@ -672,6 +801,38 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'event',
+    name: 'SignerGrantCancelled',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SignerGrantRequested',
+    inputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'eta',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'SignerGranted',
     inputs: [
       {
@@ -692,6 +853,38 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SignerThresholdDecreaseCancelled',
+    inputs: [
+      {
+        name: 'threshold',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'SignerThresholdDecreaseRequested',
+    inputs: [
+      {
+        name: 'threshold',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
+      },
+      {
+        name: 'eta',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
       },
     ],
     anonymous: false,
@@ -719,6 +912,11 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint32',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'Expired',
+    inputs: [],
   },
   {
     type: 'error',
@@ -754,6 +952,11 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'error',
+    name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotAuth',
     inputs: [],
   },
@@ -764,8 +967,24 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'error',
+    name: 'NotReady',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'Overflow',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [
+      {
+        name: 'executeAt',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
+    ],
   },
   {
     type: 'error',
