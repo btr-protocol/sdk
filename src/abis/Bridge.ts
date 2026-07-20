@@ -235,13 +235,6 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
-    name: 'initialize',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'isBridgeable',
     inputs: [
       {
@@ -1106,6 +1099,11 @@ export const BRIDGE_ABI = [
         internalType: 'address',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
+    inputs: [],
   },
   {
     type: 'error',

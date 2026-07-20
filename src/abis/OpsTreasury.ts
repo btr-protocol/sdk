@@ -450,6 +450,11 @@ export const OPS_TREASURY_ABI = [
   },
   {
     type: 'error',
+    name: 'NotOwner',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotReady',
     inputs: [],
   },

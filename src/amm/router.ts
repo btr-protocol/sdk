@@ -262,7 +262,7 @@ export interface AggDepth {
 
 /**
  * Combined book for (from, to) across every pool that holds the pair.
- * Densifies each pool Hermite curve onto `step`, then merges same-price buckets (N-pool).
+ * Densifies each pool quartic curve onto `step`, then merges same-price buckets (N-pool).
  * Prefer `aggregateDepthCurves` when you need mark/spread/ladder/display denom.
  */
 export function aggregateDepth(

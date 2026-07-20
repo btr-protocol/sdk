@@ -1,20 +1,230 @@
 // Pure BTR AIMM pricer — the ONE model shared by useSwapQuote (the form) and the
 // depth chart, so a quote and its rendered book can never disagree (spec D3).
 //
-// Ported 1:1 from dex/sim/src/amm/aimm.rs (the readable f64 reference that
-// itself mirrors the on-chain dex/evm/src/libraries/Pricing.sol). Cited line numbers
-// point at the Rust source each fn tracks. All internal prices are base(USDC)-per-token;
-// quoteExactIn outputs are trader-oriented tokenOut-per-tokenIn.
+// Mirrors the on-chain dex/evm/src/libraries/{Pricing,NUQuartic}.sol. The pricing shape is a
+// clamped quartic I-spline on non-uniform knots (NUQuartic.Curve, shared preset table keyed by
+// Asset.presetId). evalQ/areaQ/buildCurve below are EXACT BigInt mirrors of the Solidity integer
+// math (truncating division included) so front depth charts match on-chain quotes bit-for-bit at
+// the curve level. Amount/price plumbing around them stays f64 (UI floats).
 //
-// SEAMS (the only deferrals): σ (sigmaSeed → live feed.sigmaEma on deploy), reserves/L
+// SEAMS (the only deferrals): σ (sigmaSeed → live feed.sigma on deploy), reserves/L
 // (usePoolData stub → on-chain), and each leg's kappaCovBps (defaults 0 = off, matching the
 // current testnet risk config — dex/evm/deploy/testnet-asset-params.json sharedRiskConfig; wire
 // per-asset RiskConfig.kappaCovBps via Pool once a risk-config view fn exists on-chain). Everything
-// else is built fully, including the convex coverage-wall toll (GATE-07; Pricing.sol:355,659 `_covToll`).
+// else is built fully, including the convex coverage-wall toll (GATE-07; Pricing.sol `_covToll`).
 
 export const BPS = 1e4; // 0.01%
 export const PBPS = 1e6; // 0.0001% (fee/offset/dispersion unit)
-export const WEIGHT_SUM = 200; // profile weights sum (1 unit = 0.5% depth)
+
+// ── NUQuartic mirror (dex/evm/src/libraries/NUQuartic.sol) ──────────────────────
+// Curve y(x): x ∈ [0, BPS] cumulative-depth bps, y in pbps·Q fixed point (Q = 1e9).
+// Quotes scale y by dispersion/dispRef (Pricing._scaleY), then drop the Q fixed point.
+
+const P = 10n ** 18n; // NUQuartic.P
+const QI = 1_000_000_000n; // NUQuartic.Q (pbps fixed point)
+const DI = 1_000_000n; // NUQuartic.D (derivative-pyramid scale)
+/** Hard segment cap — 14×uint16 boundaries is all the on-chain header holds. */
+export const MAX_SEGS = 14;
+/** flags bit0: preset only valid on coverage-walled assets (NUQuartic.FLAG_REQUIRES_WALL). */
+export const CURVE_FLAG_REQUIRES_WALL = 1;
+
+/** One packed power-basis segment: y(u) = c0 + u(c1 + u(c2 + u(c3 + u·c4))), u ∈ [0,1]·1e18.
+ *  `S` = exact prefix integral ∫y dx from 0 to the segment's left edge (pbps·Q·x units). */
+export interface QuarticSeg {
+  c0: bigint;
+  c1: bigint;
+  c2: bigint;
+  c3: bigint;
+  c4: bigint;
+  S: bigint;
+}
+
+/** Decoded NUQuartic.Curve (header + segs). Same directory semantics as the packed header. */
+export interface QuarticCurve {
+  /** Segment count m ≤ MAX_SEGS. */
+  m: number;
+  /** Right edges b_1..b_m (b_m = BPS); segment i covers [b_i, b_{i+1}) with b_0 = 0. */
+  boundaries: number[];
+  /** Reference dispersion (pbps) the fit was built at; quotes scale y by disp/dispRef. */
+  dispRef: number;
+  /** Curve flag bits (CURVE_FLAG_REQUIRES_WALL). */
+  flags: number;
+  /** Length m. */
+  segs: QuarticSeg[];
+}
+
+/** Clamp + round a depth coordinate onto the on-chain integer x-domain [0, BPS]. */
+const xInt = (x: number): number => (x <= 0 ? 0 : x >= BPS ? BPS : Math.round(x));
+
+/** Segment index + local frame (NUQuartic._frame): linear directory scan, m ≤ 14. */
+function frame(c: QuarticCurve, x: number): [i: number, x0: number, h: number] {
+  let i = 0;
+  let b = 0;
+  let next = c.boundaries[0];
+  while (i < c.m - 1 && x >= next) {
+    i++;
+    b = next;
+    next = c.boundaries[i];
+  }
+  return [i, b, next - b];
+}
+
+/** y(x) in pbps·Q — exact integer mirror of NUQuartic.evalQ (BigInt `/` truncates like Solidity). */
+export function evalQ(c: QuarticCurve, x: number): bigint {
+  const xi = xInt(x);
+  const [i, x0, h] = frame(c, xi);
+  let dx = xi > x0 ? xi - x0 : 0;
+  if (dx > h) dx = h;
+  const u = (BigInt(dx) * P) / BigInt(h);
+  const s = c.segs[i];
+  let v = (s.c4 * u) / P;
+  v = ((s.c3 + v) * u) / P;
+  v = ((s.c2 + v) * u) / P;
+  v = ((s.c1 + v) * u) / P;
+  return s.c0 + v;
+}
+
+/** Cumulative ∫y dx from 0 to x (NUQuartic._at): prefix S + local quintic primitive. */
+function atQ(c: QuarticCurve, x: number): bigint {
+  const [i, x0, h] = frame(c, x);
+  let dx = x > x0 ? x - x0 : 0;
+  if (dx > h) dx = h;
+  const u = (BigInt(dx) * P) / BigInt(h);
+  const u2 = (u * u) / P;
+  const u3 = (u2 * u) / P;
+  const u4 = (u3 * u) / P;
+  const u5 = (u4 * u) / P;
+  const s = c.segs[i];
+  const sum = s.c0 * u + (s.c1 * u2) / 2n + (s.c2 * u3) / 3n + (s.c3 * u4) / 4n + (s.c4 * u5) / 5n;
+  return s.S + (BigInt(h) * sum) / P;
+}
+
+/** O(1) exact integral over [x1,x2] in pbps·Q·x units (NUQuartic.areaQ). 0 when x1 ≥ x2. */
+export function areaQ(c: QuarticCurve, x1: number, x2: number): bigint {
+  const a = xInt(x1);
+  const b = xInt(x2);
+  if (a >= b) return 0n;
+  return atQ(c, b) - atQ(c, a);
+}
+
+/** Pricing._scaleY: y-scale by dispersion/dispRef, drop the Q fixed point → integer pbps. */
+export function scaleY(yQ: bigint, curve: QuarticCurve, dispersionPbps: number): number {
+  return Number((yQ * BigInt(Math.round(dispersionPbps))) / (BigInt(curve.dispRef) * QI));
+}
+
+// ── Curve builder (admin/fixture path) — exact mirror of NUQuartic.set ──────────
+
+/** de Boor degree 4 at x in span s (NUQuartic._deBoor4). wQ already pbps·Q. */
+function deBoor4(t: number[], wQ: bigint[], s: number, x: number): bigint {
+  const d = [wQ[s - 4], wQ[s - 3], wQ[s - 2], wQ[s - 1], wQ[s]];
+  for (let r = 1; r <= 4; r++) {
+    for (let j = 4; j >= r; j--) {
+      const den = BigInt(t[j + 1 + s - r] - t[j + s - 4]);
+      const num = BigInt(x - t[j + s - 4]);
+      d[j] = (d[j - 1] * (den - num) + d[j] * num) / den;
+    }
+  }
+  return d[4];
+}
+
+/** q_i = 4·(w[i+1]−w[i])·D/(t[i+5]−t[i+1]) — first-derivative ctrl (NUQuartic._q). */
+const qCtrl = (t: number[], wQ: bigint[], i: number): bigint =>
+  (4n * (wQ[i + 1] - wQ[i]) * DI) / BigInt(t[i + 5] - t[i + 1]);
+
+/** First derivative: degree-3 de Boor over q (NUQuartic._deBoorD1). */
+function deBoorD1(t: number[], wQ: bigint[], s: number, x: number): bigint {
+  const d = [qCtrl(t, wQ, s - 4), qCtrl(t, wQ, s - 3), qCtrl(t, wQ, s - 2), qCtrl(t, wQ, s - 1)];
+  for (let r = 1; r <= 3; r++) {
+    for (let j = 3; j >= r; j--) {
+      const den = BigInt(t[j + s - r + 1] - t[j + s - 3]);
+      const num = BigInt(x - t[j + s - 3]);
+      d[j] = (d[j - 1] * (den - num) + d[j] * num) / den;
+    }
+  }
+  return d[3];
+}
+
+/** Second derivative: r_i = 3·(q[i+1]−q[i])/(t[i+5]−t[i+2]), degree-2 de Boor (NUQuartic._deBoorD2). */
+function deBoorD2(t: number[], wQ: bigint[], s: number, x: number): bigint {
+  const d: bigint[] = [];
+  for (let k = 0; k < 3; k++) {
+    const i = s - 4 + k;
+    d.push((3n * (qCtrl(t, wQ, i + 1) - qCtrl(t, wQ, i))) / BigInt(t[i + 5] - t[i + 2]));
+  }
+  for (let r = 1; r <= 2; r++) {
+    for (let j = 2; j >= r; j--) {
+      const den = BigInt(t[j + s - r + 1] - t[j + s - 2]);
+      const num = BigInt(x - t[j + s - 2]);
+      d[j] = (d[j - 1] * (den - num) + d[j] * num) / den;
+    }
+  }
+  return d[2];
+}
+
+/** Power basis on local u∈[0,1] for span s (NUQuartic._segCoeffs). */
+function segCoeffs(t: number[], wQ: bigint[], s: number): bigint[] {
+  const ih = BigInt(t[s + 1] - t[s]);
+  const c0 = deBoor4(t, wQ, s, t[s]);
+  const c1 = (deBoorD1(t, wQ, s, t[s]) * ih) / DI;
+  const c2 = (deBoorD2(t, wQ, s, t[s]) * ih * ih) / (2n * DI);
+  const A = deBoor4(t, wQ, s, t[s + 1]) - c0 - c1 - c2;
+  const B = (deBoorD1(t, wQ, s, t[s + 1]) * ih) / DI - c1 - 2n * c2;
+  return [c0, c1, c2, 4n * A - B, B - 3n * A];
+}
+
+/**
+ * Validate + convert a clamped quartic B-spline to the packed power basis — exact TS mirror of
+ * NUQuartic.set (same integer truncation), producing the decoded curve `readCurve` would return
+ * after an on-chain `setCurve(interior, wQ, dispRef, flags)`.
+ * @param interior strictly-increasing integer interior knots in (0, BPS)
+ * @param wQ control weights (pbps·Q), length interior.length+5, NONDECREASING
+ * @param dispRef reference dispersion (pbps) the fit was built at
+ */
+export function buildCurve(
+  interior: number[],
+  wQ: bigint[],
+  dispRef: number,
+  flags = 0,
+): QuarticCurve {
+  const n = wQ.length;
+  if (n < 5 || n - 4 > MAX_SEGS || interior.length !== n - 5)
+    throw new Error('invalid curve input');
+  if (wQ[n - 1] === wQ[0]) throw new Error('flat curve = no price discovery');
+  for (let i = 1; i < n; i++) {
+    if (wQ[i] < wQ[i - 1]) throw new Error('Δw<0 ⇒ non-monotone curve');
+  }
+  const t = new Array<number>(n + 5).fill(0);
+  let prev = 0;
+  for (let j = 0; j < interior.length; j++) {
+    const kx = interior[j];
+    if (!Number.isInteger(kx) || kx <= prev || kx >= BPS) throw new Error('invalid interior knot');
+    t[5 + j] = kx;
+    prev = kx;
+  }
+  for (let i = n; i < n + 5; i++) t[i] = BPS;
+
+  const m = n - 4;
+  const boundaries: number[] = [];
+  for (let j = 1; j <= m; j++) boundaries.push(t[j + 4]);
+  const LIM = (2n ** 64n - 1n) / 2n;
+  const I128_MAX = 2n ** 127n - 1n;
+  const segs: QuarticSeg[] = [];
+  let S = 0n;
+  for (let j = 0; j < m; j++) {
+    const k = segCoeffs(t, wQ, j + 4);
+    for (const v of k) if (v > LIM || v < -LIM) throw new Error('coefficient overflow');
+    if (S > I128_MAX || S < -I128_MAX - 1n) throw new Error('prefix-integral overflow');
+    segs.push({ c0: k[0], c1: k[1], c2: k[2], c3: k[3], c4: k[4], S });
+    // exact full-segment integral: h·(60c0+30c1+20c2+15c3+12c4)/60
+    S +=
+      (BigInt(t[j + 5] - t[j + 4]) *
+        (60n * k[0] + 30n * k[1] + 20n * k[2] + 15n * k[3] + 12n * k[4])) /
+      60n;
+  }
+  return { m, boundaries, dispRef, flags, segs };
+}
+
+// ── Profile / pool-state types ──────────────────────────────────────────────────
 
 export interface AimmProfile {
   gamma: number; // inventory sensitivity, BPS
@@ -28,21 +238,22 @@ export interface AimmProfile {
   covMax: number; // 0.01% units (20000 = 200%)
   depthAmp: number;
   protoShare: number; // % of spread routed to protocol (fee split)
-  weights: number[]; // len n
-  knots: number[]; // len n+1, each in [-100, 100]
+  /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). null = presetId 0 / unset
+   *  ⇒ the skew-anchored linear-impact fallback quote (Pricing._traverseCurveByVolume). */
+  curve: QuarticCurve | null;
 }
 
 /** One spoke edge vs the base numeraire. */
 export interface PoolLeg {
   token: string;
   twap: number; // NX mark, base-per-token
-  sigma: number; // sigmaEma from feed, PBPS-scaled (1e4 = 1%)
+  sigma: number; // sigma from feed, PBPS-scaled (1e4 = 1%)
   res: number; // R — token reserves
   liab: number; // L — token liabilities (c = R/L)
   baseRes: number; // base (USDC) backing available to pay a sell
   decimals: number;
   profile: AimmProfile;
-  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol:268) — the
+  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol) — the
   // BASE numeraire can never carry this (protocol invariant, enforced at addAsset), so it only ever
   // matters on a spoke leg's OUTPUT side (buying the spoke, or a cross trade's second leg).
   kappaCovBps: number;
@@ -60,7 +271,7 @@ export interface PoolState {
 
 export interface Quote {
   amountOut: number; // net of the path spread AND the coverage-wall toll
-  grossOut: number; // pre-toll, pre-fee (spline area)
+  grossOut: number; // pre-toll, pre-fee (curve area)
   avgPrice: number; // trader-effective tokenOut-per-tokenIn
   midPrice: number; // skewed size-0 tokenOut-per-tokenIn
   priceImpactBps: number; // pure-curve movement vs skewed mid
@@ -100,152 +311,25 @@ export function premiumBps(mid: number, mark: number): number {
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
 
-// ── Primitives (exported for tests) — each ports the cited aimm.rs fn ───────────
+// ── Primitives (exported for tests) — each mirrors the cited Pricing.sol fn ─────
 
-/** Spline control points: x = cumulative depth [0,10000], y = offset in PBPS. (aimm.rs:247) */
-export function splinePoints(p: AimmProfile, disp: number): [number, number][] {
-  const pts: [number, number][] = [[0, (p.knots[0] * disp) / 100]];
-  let cum = 0;
-  for (let i = 0; i < p.weights.length; i++) {
-    cum += p.weights[i];
-    pts.push([(cum * BPS) / WEIGHT_SUM, (p.knots[i + 1] * disp) / 100]);
-  }
-  return pts;
+// Pricing.sol constants mirrored by the float quote path.
+const SPLINE_MIN_OFFSET_PBPS = -0.9 * PBPS;
+const MIN_EXEC_PRICE_FRAC = 0.05; // MIN_EXEC_PRICE_BPS = 500
+const MAX_IMPACT = 2; // 200% (WAD-scaled on-chain)
+const MIN_ADJ = 0.001; // WAD/1000
+
+/** Clamp + scale a PBPS price offset onto the mark (Pricing._offsetToPrice). */
+function offsetToPrice(mark: number, offsetPbps: number): number {
+  return (mark * Math.max(PBPS + offsetPbps, 0)) / PBPS;
 }
 
-// Float 1:1 port of Spline.sol's monotone (Fritsch-Carlson) cubic Hermite — same `eval`/`area`/
-// `_tangents`/`_primitive`/`_search` algorithm, just dropping the 1e18 fixed-point scale for
-// ordinary doubles. Keeps every sign/clamp quirk of the on-chain version (see _tangents below)
-// so a deployed non-collinear profile matches on-chain exactly, not just approximately.
-
-/** Binary search for the segment index i s.t. pts[i].x < x <= pts[i+1].x (Spline.sol:_search). */
-function searchSpline(pts: [number, number][], x: number, n: number): number {
-  if (x <= pts[0][0]) return 0;
-  let low = 0;
-  let high = n - 2;
-  while (low < high) {
-    const mid = (low + high + 1) >> 1;
-    if (x < pts[mid][0]) high = mid - 1;
-    else low = mid;
-  }
-  return low;
+/** skew → absolute price (no-profile fallback; Pricing._skewToPrice): offset = skew·disp/100. */
+function skewToPrice(mark: number, skew: number, disp: number): number {
+  return offsetToPrice(mark, (skew * disp) / 100);
 }
 
-/**
- * Endpoint tangents for segment i (Spline.sol:_tangents). Secant s of the segment; interior
- * tangents = sign-preserving average of the two adjacent secants (0 if they disagree in sign —
- * note a zero secant's sign bit reads as non-negative, matching the on-chain int256 XOR trick, so
- * a flat secant next to a rising one still yields a nonzero endpoint tangent, never the reverse).
- * Then the Fritsch-Carlson α²+β²≤9 clamp: if m0²+m1²>9s², scale both by 3|s|/√(m0²+m1²).
- */
-function splineTangents(pts: [number, number][], i: number, n: number): [number, number] {
-  const p0 = pts[i];
-  const p1 = pts[i + 1];
-  const s = (p1[1] - p0[1]) / (p1[0] - p0[0]);
-  let m0: number;
-  if (i === 0) {
-    m0 = s;
-  } else {
-    const pm = pts[i - 1];
-    const sp = (p0[1] - pm[1]) / (p0[0] - pm[0]);
-    m0 = (sp < 0) !== (s < 0) ? 0 : (sp + s) / 2;
-  }
-  let m1: number;
-  if (i === n - 2) {
-    m1 = s;
-  } else {
-    const p2 = pts[i + 2];
-    const sn = (p2[1] - p1[1]) / (p2[0] - p1[0]);
-    m1 = (s < 0) !== (sn < 0) ? 0 : (s + sn) / 2;
-  }
-  const sumSq = m0 * m0 + m1 * m1;
-  const nineSSq = 9 * s * s;
-  if (sumSq > nineSSq) {
-    const root = Math.sqrt(sumSq);
-    if (root > 0) {
-      const scale = (3 * Math.abs(s)) / root;
-      m0 *= scale;
-      m1 *= scale;
-    }
-  }
-  return [m0, m1];
-}
-
-/** Monotone cubic Hermite interpolation at x, flat outside the knot span. (Spline.sol:eval) */
-export function evalSpline(pts: [number, number][], x: number): number {
-  const n = pts.length;
-  if (n === 0) return 0;
-  if (n === 1 || x <= pts[0][0]) return pts[0][1];
-  if (x >= pts[n - 1][0]) return pts[n - 1][1];
-  const i = searchSpline(pts, x, n);
-  const p0 = pts[i];
-  const p1 = pts[i + 1];
-  const h = p1[0] - p0[0];
-  const [m0, m1] = splineTangents(pts, i, n);
-  const dy = p1[1] - p0[1];
-  const k0 = m0 * h;
-  const k1 = m1 * h;
-  const c2 = 3 * dy - 2 * k0 - k1;
-  const c3 = -2 * dy + k0 + k1;
-  const t = (x - p0[0]) / h;
-  return p0[1] + k0 * t + c2 * t * t + c3 * t * t * t;
-}
-
-/** Primitive F(t) of the Hermite cubic at dx into a segment of width h. (Spline.sol:_primitive) */
-function splinePrimitive(dx: number, h: number, y0: number, k0: number, a: number, b: number): number {
-  const t = dx / h;
-  const t2 = t * t;
-  const t3 = t2 * t;
-  const t4 = t3 * t;
-  return y0 * t + (k0 * t2) / 2 + (b * t3) / 3 + (a * t4) / 4;
-}
-
-/** Exact integral of the monotone cubic Hermite spline over [x1, x2]. (Spline.sol:area) */
-export function areaSpline(pts: [number, number][], x1: number, x2: number): number {
-  const n = pts.length;
-  if (x1 === x2 || n === 0) return 0;
-  const inv = x1 > x2;
-  if (inv) [x1, x2] = [x2, x1];
-  if (n === 1) {
-    const res = pts[0][1] * (x2 - x1);
-    return inv ? -res : res;
-  }
-  if (x2 <= pts[0][0]) {
-    const res = pts[0][1] * (x2 - x1);
-    return inv ? -res : res;
-  }
-  if (x1 >= pts[n - 1][0]) {
-    const res = pts[n - 1][1] * (x2 - x1);
-    return inv ? -res : res;
-  }
-  let i = searchSpline(pts, x1, n);
-  let res = 0;
-  while (i < n - 1 && x1 < x2) {
-    const p0 = pts[i];
-    const p1 = pts[i + 1];
-    const segEnd = p1[0];
-    const start = Math.max(x1, p0[0]);
-    const end = Math.min(x2, segEnd);
-    if (end > start) {
-      const h = p1[0] - p0[0];
-      const [m0, m1] = splineTangents(pts, i, n);
-      const k0 = m0 * h;
-      const k1 = m1 * h;
-      const dy = p1[1] - p0[1];
-      const a = k0 + k1 - 2 * dy;
-      const b = 3 * dy - 2 * k0 - k1;
-      const f2 = splinePrimitive(end - p0[0], h, p0[1], k0, a, b);
-      const f1 = splinePrimitive(start - p0[0], h, p0[1], k0, a, b);
-      res += (f2 - f1) * h;
-    }
-    if (segEnd >= x2) break;
-    x1 = segEnd;
-    i++;
-  }
-  return inv ? -res : res;
-}
-
-/** Linear inventory skew ∈ [-100, 100] from a leg's coverage. (aimm.rs:191) */
+/** Linear inventory skew ∈ [-100, 100] from a leg's coverage (Pricing.computeInventorySkew). */
 export function computeSkew(res: number, liab: number, p: AimmProfile): number {
   if (liab <= 0) return -100;
   const c = res / liab;
@@ -260,7 +344,7 @@ export function computeSkew(res: number, liab: number, p: AimmProfile): number {
   return under ? s : -s;
 }
 
-/** Coverage-amplified effective pricing depth (NOT raw reserves). (aimm.rs:224) */
+/** Coverage-amplified effective pricing depth (NOT raw reserves). */
 export function calcDepth(res: number, liab: number, p: AimmProfile): number {
   if (res <= 0) return 1;
   if (liab <= 0) return res;
@@ -274,7 +358,7 @@ export function calcDepth(res: number, liab: number, p: AimmProfile): number {
   return clamp(res + (p.depthAmp * (liab - res) * cp) / PBPS, 1, liab);
 }
 
-/** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing.sol `_calculateDispersion`) */
+/** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing `_calculateDispersion`) */
 export function dispersion(sigma: number, p: AimmProfile): number {
   return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
 }
@@ -294,7 +378,7 @@ export function spreadPbps(
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
- *  (Pricing.sol:682 `_covQ`; floored defensively — the real fail-closed lnWad(0) revert only fires
+ *  (Pricing.sol `_covQ`; floored defensively — the real fail-closed lnWad(0) revert only fires
  *  on an on-chain integer-precision edge that `grossOut >= res` already short-circuits below.) */
 export function covQ(c: number): number {
   const cc = Math.max(c, 1e-9);
@@ -302,7 +386,7 @@ export function covQ(c: number): number {
 }
 
 /**
- * Convex coverage-wall toll (GATE-07) on the drained OUTPUT leg — 1:1 port of Pricing.sol:659
+ * Convex coverage-wall toll (GATE-07) on the drained OUTPUT leg — 1:1 port of Pricing.sol
  * `_covToll` (charge-only, peg-clamped; NOT the older rebate-ledger variant in aimm-sim, which the
  * shipped contract never carried). Charges κ·L·(Q(c0)−Q(c1)) in output-token units: 0 when κ=0 or the
  * leg has no liabilities; `grossOut` when the drain would fully exhaust reserves (wall blocks the
@@ -353,7 +437,7 @@ export function buildLeg(
 interface LegKit {
   leg: PoolLeg;
   twap: number;
-  pts: [number, number][];
+  curve: QuarticCurve | null;
   center: number; // skewed book center in depth coords, 5000 + skew·50
   depth: number;
   mid: number; // priceAt(center), base-per-token
@@ -366,19 +450,35 @@ export function legKit(leg: PoolLeg): LegKit {
   const p = leg.profile;
   const disp = dispersion(leg.sigma, p);
   const skew = computeSkew(leg.res, leg.liab, p);
-  const center = 5000 + skew * 50;
-  const pts = splinePoints(p, disp);
+  const center = 5000 + skew * 50; // Pricing._skewToDepth
   const depth = calcDepth(leg.res, leg.liab, p);
-  const mid = priceAt(leg.twap, pts, center);
-  return { leg, twap: leg.twap, pts, center, depth, mid, dispersion: disp, skew };
+  const k: LegKit = {
+    leg,
+    twap: leg.twap,
+    curve: p.curve,
+    center,
+    depth,
+    mid: 0,
+    dispersion: disp,
+    skew,
+  };
+  k.mid = priceAt(k, center);
+  return k;
 }
 
-/** Marginal base-per-token at depth-coord d (floored at 5% of TWAP, matching the Rust ref). */
-export function priceAt(twap: number, pts: [number, number][], d: number): number {
-  return Math.max((twap * (PBPS + evalSpline(pts, d))) / PBPS, twap * 0.05);
+/**
+ * Marginal base-per-token at depth-coord d. Curve: offsetToPrice(scaleY(evalQ(d))) — the exact
+ * width-0 branch of Pricing._traverseCurve. Fallback (no preset): marginal of the skew-anchored
+ * linear-impact model, mid·(1 ± |d−center|/BPS).
+ */
+export function priceAt(k: LegKit, d: number): number {
+  if (k.curve) return offsetToPrice(k.twap, scaleY(evalQ(k.curve, d), k.curve, k.dispersion));
+  const mid = skewToPrice(k.twap, k.skew, k.dispersion);
+  const vf = Math.min(Math.abs(d - k.center) / BPS, MAX_IMPACT);
+  return d <= k.center ? Math.max(mid * (1 - vf), mid * MIN_ADJ) : mid * (1 + vf);
 }
 
-/** Sample the Hermite bonding curve for charting: depth ∈ [0,10000] → price. */
+/** Sample the quartic bonding curve for charting: depth ∈ [0,10000] → marginal price. */
 export function bondingCurveSamples(
   leg: PoolLeg,
   n = 65,
@@ -397,14 +497,14 @@ export function bondingCurveSamples(
   const samples: { depth: number; price: number }[] = [];
   for (let i = 0; i <= n; i++) {
     const depth = (BPS * i) / n;
-    samples.push({ depth, price: priceAt(k.twap, k.pts, depth) });
+    samples.push({ depth, price: priceAt(k, depth) });
   }
   return {
     samples,
     mark: k.twap,
     mid: k.mid,
-    rangeLo: priceAt(k.twap, k.pts, 0),
-    rangeHi: priceAt(k.twap, k.pts, BPS),
+    rangeLo: priceAt(k, 0),
+    rangeHi: priceAt(k, BPS),
     center: k.center,
     skew: k.skew,
     dispersion: k.dispersion,
@@ -415,18 +515,36 @@ export function bondingCurveSamples(
   };
 }
 
-/** Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at. */
+/**
+ * Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at.
+ * Mirrors Pricing._traverseCurve: areaQ(lo,hi)/width → scaleY → floor SPLINE_MIN_OFFSET_PBPS
+ * → mark scale → MIN_EXEC_PRICE floor. Fallback: linear-impact average mid·(1 ± vf/2).
+ */
 function bandPrice(k: LegKit, a: number, b: number): number {
-  const lo = Math.min(a, b);
-  const hi = Math.max(a, b);
+  if (!k.curve) {
+    const mid = skewToPrice(k.twap, k.skew, k.dispersion);
+    const impact = Math.min(Math.abs(b - a) / BPS, MAX_IMPACT);
+    const half = impact / 2;
+    return b <= a ? Math.max(mid * (1 - half), mid * MIN_ADJ) : mid * (1 + half);
+  }
+  const lo = xInt(Math.min(a, b));
+  const hi = xInt(Math.max(a, b));
   const w = hi - lo;
-  let off = w === 0 ? evalSpline(k.pts, a) : areaSpline(k.pts, lo, hi) / w;
-  off = Math.max(off, -0.9 * PBPS);
-  return Math.max((k.twap * (PBPS + off)) / PBPS, k.twap * 0.05);
+  if (w === 0) return offsetToPrice(k.twap, scaleY(evalQ(k.curve, a), k.curve, k.dispersion));
+  // On-chain order: areaQ / width (integer), THEN scaleY — mirrored exactly.
+  let off = scaleY(areaQ(k.curve, lo, hi) / BigInt(w), k.curve, k.dispersion);
+  off = Math.max(off, SPLINE_MIN_OFFSET_PBPS);
+  return Math.max((k.twap * (PBPS + off)) / PBPS, k.twap * MIN_EXEC_PRICE_FRAC);
 }
 
-/** Average fill price over a traded volume by walking the spline. (aimm.rs:262) */
+/** Average fill price over a traded volume by walking the curve (Pricing._traverseCurveByVolume). */
 function traverse(k: LegKit, amountInTok: number, selling: boolean): number {
+  if (!k.curve) {
+    const impact = Math.min(amountInTok / k.depth, MAX_IMPACT);
+    const mid = skewToPrice(k.twap, k.skew, k.dispersion);
+    const half = impact / 2;
+    return selling ? Math.max(mid * (1 - half), mid * MIN_ADJ) : mid * (1 + half);
+  }
   const vf = Math.min((amountInTok * BPS) / k.depth, BPS);
   const end = selling ? Math.max(k.center - vf, 0) : Math.min(k.center + vf, BPS);
   return bandPrice(k, k.center, end);
@@ -463,7 +581,7 @@ const zeroQuote = (route: string[]): Quote => ({
 
 /**
  * Sell `amountIn` of `tokenIn` for `tokenOut` through the depth-1 star. Direct (one side is
- * the base) = one spline walk; cross = spoke→base→spoke composed. Path-fee model (spec D4):
+ * the base) = one curve walk; cross = spoke→base→spoke composed. Path-fee model (spec D4):
  * half-spread haircut on the output, path spread computed once (Pricing.getAnchorPathQuote).
  */
 export function quoteExactIn(
@@ -499,7 +617,7 @@ export function quoteExactIn(
     if (amountIn > 0)
       grossOut = Math.min(amountIn * traverse(k, amountIn, true), leg.baseRes * 0.999);
   } else if (inBase && !outBase) {
-    // DIRECT BUY: base → token (one-step fixed point — replicate, don't solve; aimm.rs:346).
+    // DIRECT BUY: base → token (one-step fixed point — replicate, don't solve).
     const leg = state.legs[tokenOut];
     if (!leg) return zeroQuote([tokenIn, tokenOut]);
     const k = legKit(leg);
@@ -549,7 +667,7 @@ export function quoteExactIn(
     return { ...zeroQuote(route), midPrice, spreadBps, lpFeeBps, protoFeeBps, maxIn };
   }
   // GATE-07: coverage-wall toll charged on the drained output leg, BEFORE the spread/fee haircut —
-  // mirrors Pricing.sol:355 (`acc.currentAmount -= _covToll(...)` precedes the fee-out computation).
+  // mirrors Pricing.sol (`acc.currentAmount -= _covToll(...)` precedes the fee-out computation).
   const toll = outLeg ? covToll(outLeg.res, outLeg.liab, outLeg.kappaCovBps, grossOut) : 0;
   const netGross = grossOut - toll;
   const amountOut = netGross * (1 - spread / 2 / PBPS); // half-spread on output (path model)
@@ -598,9 +716,9 @@ function capAskBase(k: LegKit, leg: PoolLeg): number {
 
 /**
  * Depth-axis sample grid from `center` toward `edge`: always includes the skewed mid (`center`),
- * spline knots, the band edge, plus uniform steps so the polyline follows the AIMM offset curve
- * (monotone cubic Hermite via evalSpline/Spline.sol). Never samples around the raw mark depth
- * (5000) — the virtual book is centered on inventory-skewed mid.
+ * curve segment boundaries, the band edge, plus uniform steps so the polyline follows the AIMM
+ * offset curve (quartic I-spline via evalQ). Never samples around the raw mark depth (5000) —
+ * the virtual book is centered on inventory-skewed mid.
  */
 function depthBandSamples(center: number, edge: number, knotXs: number[], step = 250): number[] {
   const lo = Math.min(center, edge);
@@ -617,9 +735,9 @@ function depthBandSamples(center: number, edge: number, knotXs: number[], step =
 
 /**
  * The Binance-style book (x = price, y = cumulative size outward from mid). Direct pair = analytic
- * polyline through the spline (depth-axis traversal via priceAt / bandPrice); cross pair = numeric
- * sweep of quoteExactIn (marginal = local slope). Cumulative base under the curve at size S ==
- * quoteExactIn(S).grossOut by construction — the acceptance invariant (spec §2).
+ * polyline through the quartic curve (depth-axis traversal via priceAt / bandPrice); cross pair =
+ * numeric sweep of quoteExactIn (marginal = local slope). Cumulative base under the curve at size S
+ * == quoteExactIn(S).grossOut by construction — the acceptance invariant (spec §2).
  */
 export function depthCurve(
   state: PoolState,
@@ -641,9 +759,10 @@ export function depthCurve(
     staleExcess: leg.staleExcess,
   });
   const half = spread / 2;
-  const knotXs = k.pts.map((p) => p[0]);
+  // Segment boundaries anchor the sample grid (the C2 density bends there, smoothly).
+  const knotXs = k.curve ? [0, ...k.curve.boundaries] : [];
 
-  // Caps = remaining FILLABLE liquidity (spline band ∩ physical reserves).
+  // Caps = remaining FILLABLE liquidity (curve band ∩ physical reserves).
   // Ask drains spoke R; bid drains hub baseRes — both must clip the printed ladder.
   const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res * 0.999);
   const maxTokBid = capBidTok(k, leg);
@@ -651,10 +770,10 @@ export function depthCurve(
   // ASK (buy token): d from skewed center→10000; size = tokens received along the band.
   const asksRaw: DepthLevel[] = dedup(depthBandSamples(k.center, BPS, knotXs)).map((d) => {
     const est = ((d - k.center) / BPS) * k.depth; // notional token = band size
-    const baseIn = est * k.mid; // one-step fixed point uses mid to size the band (aimm.rs:346)
+    const baseIn = est * k.mid; // one-step fixed point uses mid to size the band
     const exec = bandPrice(k, k.center, d);
     return {
-      price: priceAt(k.twap, k.pts, d),
+      price: priceAt(k, d),
       cumTok: exec > 0 ? baseIn / exec : 0,
       cumBase: baseIn,
     };
@@ -664,7 +783,7 @@ export function depthCurve(
   const bidsRaw: DepthLevel[] = dedup(depthBandSamples(k.center, 0, knotXs)).map((d) => {
     const t = ((k.center - d) / BPS) * k.depth;
     const exec = bandPrice(k, k.center, d);
-    return { price: priceAt(k.twap, k.pts, d), cumTok: t, cumBase: t * exec };
+    return { price: priceAt(k, d), cumTok: t, cumBase: t * exec };
   });
 
   return {
@@ -685,8 +804,8 @@ export function depthCurve(
  * Virtual market depth for a hub-spoke pair — the UI-facing API over `depthCurve`.
  *
  * Reads remaining fillable liquidity on BOTH sides of the spoke's bonding curve:
- * - **Bids** (sell `token` → hub): spline bid band ∩ hub `baseRes` (`capBidTok`)
- * - **Asks** (buy `token` ← hub): spline ask band ∩ spoke `res`
+ * - **Bids** (sell `token` → hub): curve bid band ∩ hub `baseRes` (`capBidTok`)
+ * - **Asks** (buy `token` ← hub): curve ask band ∩ spoke `res`
  *
  * Prices are always hub-per-token. Every cumulative size S satisfies
  * `quoteExactIn(…, S).grossOut` under the ladder (spec D3) — no fabricated depth.

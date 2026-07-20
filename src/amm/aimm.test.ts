@@ -1,12 +1,21 @@
-// bun test — proves the shared model self-consistent (chart == quote) and a faithful port of aimm.rs.
 import { describe, expect, test } from 'bun:test';
-import goldenRaw from './__fixtures__/aimm-golden.json';
-import { STABLE_PROFILE, VOLATILE_PROFILE, RUST_STABLE_PROFILE, RUST_VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
+// bun test — proves the shared model self-consistent (chart == quote) and the quartic curve
+// primitives (evalQ/areaQ/buildCurve) bit-faithful to NUQuartic.sol via the on-chain parity vectors.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  CURVE_PRESETS,
+  STABLE_PROFILE,
+  VOLATILE_PROFILE,
+  presetCurve,
+  sigmaSeed,
+} from './__fixtures__/profiles';
 import {
   type DepthLevel,
   PBPS,
   type PoolState,
-  areaSpline,
+  areaQ,
+  buildCurve,
   buildLeg,
   calcDepth,
   computeSkew,
@@ -14,9 +23,8 @@ import {
   covToll,
   depthCurve,
   dispersion,
-  evalSpline,
+  evalQ,
   quoteExactIn,
-  splinePoints,
   spreadPbps,
   virtualMarketDepth,
 } from './aimm';
@@ -63,9 +71,9 @@ function crossState(): PoolState {
 
 const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
 
-// Integrate the RENDERED marginal ladder (trapezoid; marginal is linear in cumTok within a knot
-// segment ⇒ exact) up to cumulative token size S → the base filled. This is literally "integrate the
-// rendered depth" and must equal the quote's gross output.
+// Integrate the RENDERED marginal ladder (trapezoid) up to cumulative token size S → the base
+// filled. Must track the quote's gross output (chart == quote). The quartic marginal is degree-4
+// in the depth coord, so the polyline trapezoid is an approximation — tolerance reflects that.
 function integrateLadder(levels: DepthLevel[], S: number): number {
   const asc = [...levels].sort((a, b) => a.cumTok - b.cumTok);
   let acc = 0;
@@ -84,23 +92,7 @@ function integrateLadder(levels: DepthLevel[], S: number): number {
   return acc;
 }
 
-describe('primitives port (aimm.rs)', () => {
-  test('splinePoints places knots on the [0,10000] depth axis', () => {
-    const pts = splinePoints(VOLATILE_PROFILE, 1000);
-    expect(pts.map((p) => p[0])).toEqual([0, 2500, 5000, 7500, 10000]);
-    expect(pts[2][1]).toBe(0); // center knot = 0 offset
-  });
-  test('evalSpline is flat outside the knot span, linear within', () => {
-    const pts = splinePoints(VOLATILE_PROFILE, 1000);
-    expect(evalSpline(pts, -5)).toBe(pts[0][1]);
-    expect(evalSpline(pts, 99999)).toBe(pts[4][1]);
-    expect(evalSpline(pts, 3750)).toBeCloseTo(0.5 * (pts[1][1] + pts[2][1]), 9);
-  });
-  test('areaSpline == analytic trapezoid of the collinear default knots', () => {
-    const pts = splinePoints(VOLATILE_PROFILE, 1000);
-    const a = areaSpline(pts, 2500, 7500);
-    expect(a).toBeCloseTo(0.5 * (evalSpline(pts, 2500) + evalSpline(pts, 7500)) * 5000, 6);
-  });
+describe('model primitives (Pricing.sol mirrors)', () => {
   test('computeSkew symmetric around c=1; clamps at coverage bounds', () => {
     expect(computeSkew(1, 1, VOLATILE_PROFILE)).toBeCloseTo(0, 9);
     expect(computeSkew(0.4, 1, VOLATILE_PROFILE)).toBe(100); // c ≤ covMin
@@ -121,67 +113,124 @@ describe('primitives port (aimm.rs)', () => {
   });
 });
 
-describe('monotone cubic Hermite (Spline.sol port)', () => {
-  // Non-collinear, monotone-increasing profile: knot spacing/values chosen so slopes differ
-  // segment-to-segment. Collinear defaults reduce the cubic exactly to linear and can't
-  // distinguish a Hermite port from a piecewise-linear one — this profile can.
-  const pts: [number, number][] = [
-    [0, 0],
-    [2500, 5],
-    [5000, 30],
-    [7500, 35],
-    [10000, 50],
-  ];
+// ── NUQuartic mirror: exact-integer parity vs the on-chain vectors ──────────────
+// Same fixture the Solidity suite (dex/evm/test/unit/NUQuartic.t.sol) certifies against; the
+// vectors' yQ/aQ were emitted by the float fitter, so parity carries the SAME tolerances as the
+// Sol test (eval ≤ 200 pbps·1e-9 units; area ≤ 1e-6 rel + 0.1 pbps·x abs). BigInt evalQ/areaQ
+// reproduce Solidity truncation exactly, so agreeing within those bands ⇒ on-chain agreement.
+const VECTORS_PATH = resolve(
+  new URL('.', import.meta.url).pathname,
+  '../../..',
+  'dex/evm/test/proto/quartic_vectors.json',
+);
+interface ParityVec {
+  interior: number[];
+  wQ: number[];
+  xs: number[];
+  yQ: number[];
+  areas: { x1: number; x2: number; aQ: number }[];
+}
+const vectors = JSON.parse(readFileSync(VECTORS_PATH, 'utf8')) as Record<string, ParityVec>;
 
-  test('cubic Hermite diverges from linear interpolation mid-segment (NOT piecewise-linear)', () => {
-    const xMid = 1250; // midpoint of the first segment [0, 2500]
-    const linear =
-      pts[0][1] + ((xMid - pts[0][0]) / (pts[1][0] - pts[0][0])) * (pts[1][1] - pts[0][1]);
-    const cubic = evalSpline(pts, xMid);
-    expect(Math.abs(cubic - linear)).toBeGreaterThan(0.5); // well above float noise; proves curvature
+describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/areaQ on-chain)', () => {
+  test('evalQ matches every shape family within the on-chain parity band', () => {
+    let worst = 0n;
+    let worstAt = '';
+    for (const [name, v] of Object.entries(vectors)) {
+      const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+      for (let i = 0; i < v.xs.length; i++) {
+        let d = evalQ(c, v.xs[i]) - BigInt(v.yQ[i]);
+        if (d < 0n) d = -d;
+        if (d > worst) {
+          worst = d;
+          worstAt = `${name} @ x=${v.xs[i]}`;
+        }
+      }
+    }
+    // Report the worst |Δ| (pbps·1e-9 units) — mirrors NUQuartic.t.sol's assertLe(worst, 200).
+    console.log(`evalQ parity worst |Δ| = ${worst} (pbps·1e-9) at ${worstAt}`);
+    expect(worst).toBeLessThanOrEqual(200n);
   });
 
-  test('eval is monotone non-decreasing across the whole knot span for monotone input data', () => {
-    let prev = evalSpline(pts, 0);
-    for (let x = 0; x <= 10000; x += 25) {
-      const y = evalSpline(pts, x);
-      expect(y).toBeGreaterThanOrEqual(prev - 1e-9);
-      prev = y;
+  test('areaQ matches every shape family within the on-chain parity band', () => {
+    for (const [name, v] of Object.entries(vectors)) {
+      const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+      for (const a of v.areas) {
+        let d = areaQ(c, a.x1, a.x2) - BigInt(a.aQ);
+        if (d < 0n) d = -d;
+        const mag = a.aQ < 0 ? -a.aQ : a.aQ;
+        expect(Number(d)).toBeLessThanOrEqual(mag / 1_000_000 + 100_000_000);
+        if (Number(d) > mag / 1_000_000 + 100_000_000) console.log(`area ${name}`, a, d);
+      }
     }
   });
 
-  test('area matches a fine trapezoid sum of the same cubic (numerically exact integral)', () => {
-    const a = areaSpline(pts, 0, 10000);
-    const n = 20000;
-    let trap = 0;
-    let prevY = evalSpline(pts, 0);
-    for (let i = 1; i <= n; i++) {
-      const x = (10000 * i) / n;
-      const y = evalSpline(pts, x);
-      trap += (0.5 * (prevY + y) * 10000) / n;
-      prevY = y;
+  test('monotone: Δw≥0 ⇒ nondecreasing evalQ on every shape', () => {
+    for (const v of Object.values(vectors)) {
+      const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+      let prev = evalQ(c, 0);
+      for (let x = 10; x <= 10_000; x += 10) {
+        const y = evalQ(c, x);
+        expect(y).toBeGreaterThanOrEqual(prev - 10n); // 1e-8 pbps slack (NUQuartic.t.sol)
+        prev = y;
+      }
     }
-    expect(rel(a, trap)).toBeLessThan(1e-4);
   });
 
-  test('stable center-bump [25,150,25] Hermite ≠ lerp on outer segment', () => {
-    // Deployed chapel stable profile — non-collinear knots; Hermite must diverge from lerp.
-    const p = { ...STABLE_PROFILE, weights: [25, 150, 25], knots: [-50, -12, 12, 50] };
-    const pts = splinePoints(p, 1000);
-    const xMid = (pts[0][0] + pts[1][0]) / 2; // mid of first segment
-    const linear =
-      pts[0][1] + ((xMid - pts[0][0]) / (pts[1][0] - pts[0][0])) * (pts[1][1] - pts[0][1]);
-    expect(Math.abs(evalSpline(pts, xMid) - linear)).toBeGreaterThan(0.01);
+  test('areaQ == Riemann sum of evalQ (internal consistency)', () => {
+    const v = vectors.hyper;
+    const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+    const [lo, hi] = [200, 9800];
+    let riemann = 0;
+    const n = 9600;
+    for (let i = 0; i < n; i++) {
+      const x0 = lo + ((hi - lo) * i) / n;
+      const x1 = lo + ((hi - lo) * (i + 1)) / n;
+      riemann += 0.5 * (Number(evalQ(c, x0)) + Number(evalQ(c, x1))) * (x1 - x0);
+    }
+    const exact = Number(areaQ(c, lo, hi));
+    expect(rel(exact, riemann)).toBeLessThan(1e-4);
+  });
+
+  test('buildCurve validation mirrors NUQuartic.set reverts', () => {
+    const v = vectors.hyper;
+    const wQ = v.wQ.map(BigInt);
+    const dec = [...wQ];
+    dec[dec.length - 1] = dec[0] - 1n;
+    expect(() => buildCurve(v.interior, dec, 500)).toThrow(); // Δw<0
+    expect(() =>
+      buildCurve(
+        v.interior,
+        wQ.map(() => wQ[0]),
+        500,
+      ),
+    ).toThrow(); // flat
+    const badKnot = [...v.interior];
+    badKnot[badKnot.length - 1] = 10_000;
+    expect(() => buildCurve(badKnot, wQ, 500)).toThrow(); // knot ≥ BPS
+  });
+
+  test('fixture preset table: portable-only, wQ quantization identical to the exported vectors', () => {
+    expect(CURVE_PRESETS.length).toBeGreaterThan(0);
+    // W5 presets are the unprefixed vector families — same quantized wQ by construction.
+    for (const p of CURVE_PRESETS.filter((x) => x.W === 5)) {
+      const v = vectors[p.regime];
+      if (!v) continue; // pin variants have no exported vector family
+      expect(p.interior).toEqual(v.interior);
+      expect(p.wQ.map(Number)).toEqual(v.wQ);
+      expect(() => presetCurve(p)).not.toThrow();
+    }
   });
 });
 
-describe('invariant: integrating the rendered depth == quote.grossOut', () => {
+describe('invariant: integrating the rendered depth tracks quote.grossOut', () => {
   test('SELL ladder integral reproduces grossOut (direct)', () => {
     const state = volState();
     const curve = depthCurve(state, 'BTCB', BASE);
     for (const S of [0.05, 0.5, 1.5, 3.2, 4.6]) {
       const q = quoteExactIn(state, 'BTCB', BASE, S);
-      expect(rel(integrateLadder(curve.bids, S), q.grossOut)).toBeLessThan(1e-9);
+      // Quartic marginal is degree-4 between vertices ⇒ trapezoid ladder ≈ exact area.
+      expect(rel(integrateLadder(curve.bids, S), q.grossOut)).toBeLessThan(2e-3);
     }
   });
   test('BUY book vertices are quote-consistent (direct)', () => {
@@ -315,7 +364,7 @@ describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
     const qFree = quoteExactIn(stateFree, BASE, 'BTCB', 1_000_000);
     expect(qTolled.covTollBps).toBeGreaterThan(0);
     expect(qTolled.amountOut).toBeLessThan(qFree.amountOut);
-    expect(qTolled.grossOut).toBeCloseTo(qFree.grossOut, 9); // toll doesn't touch the pure spline curve
+    expect(qTolled.grossOut).toBeCloseTo(qFree.grossOut, 9); // toll doesn't touch the pure curve
   });
 });
 
@@ -356,7 +405,16 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
   test('book is centered on skewed mid, not oracle mark', () => {
     // Mild under-coverage ⇒ positive inventory skew ⇒ mid ≠ mark; touch = mid.
     const twap = 64_000;
-    const leg = buildLeg('BTCB', twap, sigmaSeed('volatile'), 8_000, 10_000, 8_000 * twap, 18, VOLATILE_PROFILE);
+    const leg = buildLeg(
+      'BTCB',
+      twap,
+      sigmaSeed('volatile'),
+      8_000,
+      10_000,
+      8_000 * twap,
+      18,
+      VOLATILE_PROFILE,
+    );
     const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
     expect(d.mark).toBe(twap);
     expect(Math.abs(d.mid - d.mark) / d.mark).toBeGreaterThan(1e-6);
@@ -375,7 +433,16 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
 
   test('10k BTCB + 10k USDC (token seed) clips bid to ~USDC/mark, ask to ~½ BTCB', () => {
     const twap = 64_000;
-    const leg = buildLeg('BTCB', twap, sigmaSeed('volatile'), 10_000, 10_000, 10_000, 18, VOLATILE_PROFILE);
+    const leg = buildLeg(
+      'BTCB',
+      twap,
+      sigmaSeed('volatile'),
+      10_000,
+      10_000,
+      10_000,
+      18,
+      VOLATILE_PROFILE,
+    );
     const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
     // Bid limited by hub USDC ≈ 10k/64000 ≈ 0.156
     expect(d.maxTokBid).toBeLessThan(0.2);
@@ -418,29 +485,42 @@ describe('compose + degenerate', () => {
   });
 });
 
-// Golden vectors emitted by aimm.rs quote() — proves faithfulness to the Rust reference, not just
-// self-consistency. Each vector: a leg (twap/sigma/res) + amountIn/selling → gross exec price.
-describe('golden vectors (faithful port of aimm.rs)', () => {
-  const golden = goldenRaw as {
-    profile: 'stable' | 'volatile';
-    twap: number;
-    sigma: number;
-    res: number;
-    liab: number;
-    amountIn: number;
-    selling: boolean;
-    grossOut: number;
-  }[];
-  test('TS gross matches Rust across pairs × sizes × skews × σ', () => {
-    expect(golden.length).toBeGreaterThan(0);
-    for (const v of golden) {
-      const profile = v.profile === 'stable' ? RUST_STABLE_PROFILE : RUST_VOLATILE_PROFILE;
-      const leg = buildLeg('T', v.twap, v.sigma, v.res, v.liab, v.res * v.twap * 4, 18, profile);
-      const state: PoolState = { base: BASE, legs: { T: leg } };
-      const q = v.selling
-        ? quoteExactIn(state, 'T', BASE, v.amountIn)
-        : quoteExactIn(state, BASE, 'T', v.amountIn);
-      expect(rel(q.grossOut, v.grossOut)).toBeLessThan(1e-6);
-    }
+describe('fallback quote (presetId 0 — skew-anchored linear impact)', () => {
+  const noCurve = { ...VOLATILE_PROFILE, curve: null };
+  test('quotes stay live without a preset; impact grows with size', () => {
+    const leg = buildLeg(
+      'BTCB',
+      62_000,
+      sigmaSeed('volatile'),
+      9.4,
+      9.4,
+      9.4 * 62_000,
+      18,
+      noCurve,
+    );
+    const state: PoolState = { base: BASE, legs: { BTCB: leg } };
+    const small = quoteExactIn(state, 'BTCB', BASE, 0.1);
+    const large = quoteExactIn(state, 'BTCB', BASE, 3);
+    expect(small.amountOut).toBeGreaterThan(0);
+    expect(large.amountOut).toBeGreaterThan(0);
+    // avg fill degrades with size (selling: mid·(1 − impact/2))
+    expect(large.grossOut / 3).toBeLessThan(small.grossOut / 0.1);
+    // size-0 mid = skewToPrice(mark, skew=0) = mark at c=1
+    expect(small.midPrice).toBeCloseTo(62_000, 6);
+  });
+  test('depth chart still renders off the fallback marginal', () => {
+    const leg = buildLeg(
+      'BTCB',
+      62_000,
+      sigmaSeed('volatile'),
+      9.4,
+      9.4,
+      9.4 * 62_000,
+      18,
+      noCurve,
+    );
+    const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
+    expect(d.asks.length).toBeGreaterThan(0);
+    expect(d.bids.length).toBeGreaterThan(0);
   });
 });

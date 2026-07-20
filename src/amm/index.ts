@@ -1,5 +1,6 @@
-// Off-chain AIMM model: pure f64 pricer (aimm.ts, mirrors dex/sim/src/amm/aimm.rs) + routing
-// brain (router.ts) + the on-chain seam below (bigint pool reads → PoolState floats).
+// Off-chain AIMM model: pricer (aimm.ts — exact-integer NUQuartic curve mirror + f64 plumbing,
+// mirrors dex/evm Pricing.sol/NUQuartic.sol) + routing brain (router.ts) + the on-chain seam
+// below (bigint pool reads → PoolState floats).
 
 export * from './aimm.js';
 export * from './depthAgg.js';
@@ -12,7 +13,7 @@ import { type AimmProfile, type PoolState, buildLeg } from './aimm.js';
 /** Per-spoke market inputs the chain doesn't serve: NX mark, feed σ (PBPS-scaled), profile, κ. */
 export interface LegFeed {
   twap: number; // base-per-token
-  sigma: number; // sigmaEma, PBPS-scaled (1e4 = 1%)
+  sigma: number; // sigma, PBPS-scaled (1e4 = 1%)
   profile: AimmProfile;
   kappaCovBps?: number; // default 0 = wall off
 }
