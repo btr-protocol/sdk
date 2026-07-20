@@ -74,19 +74,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'MAX_VOLATILITY',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'SIGNER_GOV_GRACE',
     inputs: [],
     outputs: [
@@ -150,16 +137,6 @@ export const EXTERNAL_ORACLE_ABI = [
       },
       {
         name: 'confidence',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'tau',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'tauSigma',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -307,7 +284,7 @@ export const EXTERNAL_ORACLE_ABI = [
             internalType: 'uint64',
           },
           {
-            name: 'sigmaEma',
+            name: 'sigma',
             type: 'uint32',
             internalType: 'uint32',
           },
@@ -332,11 +309,6 @@ export const EXTERNAL_ORACLE_ABI = [
             internalType: 'uint16',
           },
           {
-            name: 'tauSigma',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'maxDeviation',
             type: 'uint16',
             internalType: 'uint16',
@@ -353,19 +325,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'getFeedCount',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'getFeedIds',
     inputs: [],
     outputs: [
@@ -373,25 +332,6 @@ export const EXTERNAL_ORACLE_ABI = [
         name: '',
         type: 'bytes32[]',
         internalType: 'bytes32[]',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'hasFeed',
-    inputs: [
-      {
-        name: 'feedId',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
@@ -709,18 +649,6 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'tau',
-        type: 'uint16',
-        indexed: false,
-        internalType: 'uint16',
-      },
-      {
-        name: 'tauSigma',
-        type: 'uint16',
-        indexed: false,
-        internalType: 'uint16',
-      },
-      {
         name: 'maxDeviation',
         type: 'uint16',
         indexed: false,
@@ -963,6 +891,11 @@ export const EXTERNAL_ORACLE_ABI = [
   {
     type: 'error',
     name: 'NotCode',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
     inputs: [],
   },
   {

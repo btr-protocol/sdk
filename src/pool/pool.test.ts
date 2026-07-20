@@ -34,13 +34,13 @@ describe('Pool Data Retrieval', () => {
     expect(asset).toHaveProperty('reserves');
     expect(asset).toHaveProperty('liabilities');
     expect(asset).toHaveProperty('decimals');
-    expect(asset).toHaveProperty('minFeeBps');
-    expect(asset).toHaveProperty('maxFeeBps');
+    expect(asset).toHaveProperty('minFeePbps');
+    expect(asset).toHaveProperty('maxFeePbps');
 
     expect(typeof asset.reserves).toBe('bigint');
     expect(typeof asset.liabilities).toBe('bigint');
     expect(typeof asset.decimals).toBe('bigint');
-    expect(typeof asset.minFeeBps).toBe('bigint');
+    expect(typeof asset.minFeePbps).toBe('bigint');
 
     // Decimals should be 18 for USDC on BSC
     expect(Number(asset.decimals)).toBe(18);
@@ -121,7 +121,7 @@ describe('Swap Simulation', () => {
       // Verify quote structure
       expect(quote).toHaveProperty('amountIn');
       expect(quote).toHaveProperty('amountOut');
-      expect(quote).toHaveProperty('spreadBps');
+      expect(quote).toHaveProperty('spreadPbps');
       expect(quote).toHaveProperty('protoFee');
       expect(quote).toHaveProperty('lpFee');
       expect(quote).toHaveProperty('skewIn');
@@ -132,7 +132,7 @@ describe('Swap Simulation', () => {
       // Verify types
       expect(typeof quote.amountIn).toBe('bigint');
       expect(typeof quote.amountOut).toBe('bigint');
-      expect(typeof quote.spreadBps).toBe('number');
+      expect(typeof quote.spreadPbps).toBe('number');
       expect(typeof quote.protoFee).toBe('bigint');
       expect(typeof quote.lpFee).toBe('bigint');
       expect(typeof quote.skewIn).toBe('number');

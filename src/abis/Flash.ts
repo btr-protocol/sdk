@@ -155,38 +155,6 @@ export const FLASH_ABI = [
   },
   {
     type: 'error',
-    name: 'InsufficientAmount',
-    inputs: [
-      {
-        name: 'available',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'required',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'NotFound',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-      {
-        name: 'target',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-  },
-  {
-    type: 'error',
     name: 'OperationFailed',
     inputs: [],
   },

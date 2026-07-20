@@ -23,16 +23,17 @@ export interface Asset {
   minLiquidity: bigint;
   liquidityIndex: bigint;
   lastUpdate: number;
-  minDispersion: number;
+  /** Pricing-shape pointer into PoolStorage.curves (shared preset table). 0 = fallback quote. */
+  presetId: number;
   anchor: Address;
-  minFeeBps: number;
-  maxFeeBps: number;
+  minFeePbps: number;
+  maxFeePbps: number;
   maxDispersion: number;
-  anchorDepth: number;
   decimals: number;
   gamma: number;
   vega: number;
   haircutSuppressor: number;
+  minDispersion: number;
   reservationPrice: bigint;
   reservationPriceMax: bigint;
   pegB64: bigint;
@@ -41,7 +42,7 @@ export interface Asset {
 export interface SwapQuote {
   amountOut: bigint;
   amountIn: bigint;
-  spreadBps: number;
+  spreadPbps: number;
   protoFee: bigint;
   lpFee: bigint;
   skewIn: number;
@@ -112,15 +113,17 @@ export async function getCoverageRatio(
 
 export type { YieldHookKind } from './hooks.js';
 export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
-export type { HookSlot, LiquidityProfile, OracleConfig, RiskConfig } from './storage.js';
+export type { HookSlot, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
   HOOK_PRE_OUTFLOW,
   HOOK_POST_INFLOW,
   HOOK_FLAGS_MASK,
   mappingBase,
+  mappingBaseU16,
   resolveTokenStorageKey,
-  readLiquidityProfile,
+  readAssetPresetId,
+  readCurve,
   readOracleConfig,
   readRiskConfig,
   readAssetHook,

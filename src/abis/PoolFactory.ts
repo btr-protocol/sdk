@@ -29,10 +29,6 @@ export const POOL_FACTORY_ABI = [
     stateMutability: 'nonpayable',
   },
   {
-    type: 'receive',
-    stateMutability: 'payable',
-  },
-  {
     type: 'function',
     name: 'AC',
     inputs: [],
@@ -307,13 +303,6 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'guardianCancelUpgrade',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -803,6 +792,11 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'error',
+    name: 'NotOwner',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'OperationFailed',
     inputs: [],
   },
@@ -816,11 +810,6 @@ export const POOL_FACTORY_ABI = [
         internalType: 'uint48',
       },
     ],
-  },
-  {
-    type: 'error',
-    name: 'Unauthorized',
-    inputs: [],
   },
   {
     type: 'error',

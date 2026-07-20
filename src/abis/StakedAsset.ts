@@ -737,6 +737,11 @@ export const STAKED_ASSET_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'Permit2AllowanceIsFixedAtInfinity',
     inputs: [],
   },
@@ -748,11 +753,6 @@ export const STAKED_ASSET_ABI = [
   {
     type: 'error',
     name: 'TotalSupplyOverflow',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'Unauthorized',
     inputs: [],
   },
   {

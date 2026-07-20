@@ -1,5 +1,5 @@
 // Order-book aggregation + multi-pool depth curves.
-// Densifies Hermite depth polylines onto a 1/2/5 price ladder, then merges N pools.
+// Densifies quartic-curve depth polylines onto a 1/2/5 price ladder, then merges N pools.
 // Front DepthPanel + chart liquidity bands share this math (no parallel model).
 
 import {

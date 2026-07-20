@@ -125,24 +125,12 @@ export const ADMIN_ABI = [
         ],
       },
       {
-        name: 'profile',
-        type: 'tuple',
-        internalType: 'struct IPool.LiquidityProfile',
-        components: [
-          {
-            name: 'weights',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
-          },
-          {
-            name: 'knots',
-            type: 'int8[17]',
-            internalType: 'int8[17]',
-          },
-        ],
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -266,6 +254,24 @@ export const ADMIN_ABI = [
         name: 'token',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'cancelSetCurve',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],
@@ -399,19 +405,6 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
-    name: 'executeBridgeUpdate',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'executeOracleUpdate',
     inputs: [
       {
@@ -441,6 +434,24 @@ export const ADMIN_ABI = [
         name: 'token',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeSetCurve',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],
@@ -638,24 +649,12 @@ export const ADMIN_ABI = [
         ],
       },
       {
-        name: 'profile',
-        type: 'tuple',
-        internalType: 'struct IPool.LiquidityProfile',
-        components: [
-          {
-            name: 'weights',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
-          },
-          {
-            name: 'knots',
-            type: 'int8[17]',
-            internalType: 'int8[17]',
-          },
-        ],
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -699,24 +698,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'newBase',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestBridgeUpdate',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'newBridge',
         type: 'address',
         internalType: 'address',
       },
@@ -809,6 +790,44 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'requestSetCurve',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'interior',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'wQ',
+        type: 'int256[]',
+        internalType: 'int256[]',
+      },
+      {
+        name: 'dispRef',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'flags',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'requestTreasuryUpdate',
     inputs: [
       {
@@ -845,7 +864,7 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'flashFeeBps',
+            name: 'flashFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -870,21 +889,9 @@ export const ADMIN_ABI = [
         internalType: 'address',
       },
       {
-        name: 'newProfile',
-        type: 'tuple',
-        internalType: 'struct IPool.LiquidityProfile',
-        components: [
-          {
-            name: 'weights',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
-          },
-          {
-            name: 'knots',
-            type: 'int8[17]',
-            internalType: 'int8[17]',
-          },
-        ],
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
         name: 'minDispersion',
@@ -1090,12 +1097,12 @@ export const ADMIN_ABI = [
         internalType: 'uint128',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
       {
-        name: 'maxFeeBps',
+        name: 'maxFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -1148,12 +1155,12 @@ export const ADMIN_ABI = [
         internalType: 'uint128',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
       {
-        name: 'maxFeeBps',
+        name: 'maxFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -1181,6 +1188,44 @@ export const ADMIN_ABI = [
         name: 'reservationPriceMax',
         type: 'uint64',
         internalType: 'uint64',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setCurve',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'interior',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'wQ',
+        type: 'int256[]',
+        internalType: 'int256[]',
+      },
+      {
+        name: 'dispRef',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'flags',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     outputs: [],
@@ -1342,12 +1387,6 @@ export const ADMIN_ABI = [
         indexed: true,
         internalType: 'address',
       },
-      {
-        name: 'depth',
-        type: 'uint8',
-        indexed: false,
-        internalType: 'uint8',
-      },
     ],
     anonymous: false,
   },
@@ -1430,7 +1469,7 @@ export const ADMIN_ABI = [
         internalType: 'address',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',
@@ -1565,7 +1604,7 @@ export const ADMIN_ABI = [
   },
   {
     type: 'event',
-    name: 'BridgeUpdated',
+    name: 'CurveUpdated',
     inputs: [
       {
         name: 'pool',
@@ -1574,16 +1613,10 @@ export const ADMIN_ABI = [
         internalType: 'address',
       },
       {
-        name: 'oldBridge',
-        type: 'address',
+        name: 'presetId',
+        type: 'uint16',
         indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'newBridge',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
+        internalType: 'uint16',
       },
     ],
     anonymous: false,
@@ -1638,12 +1671,12 @@ export const ADMIN_ABI = [
       },
       {
         name: 'protoShare',
-        type: 'uint16',
+        type: 'uint8',
         indexed: false,
-        internalType: 'uint16',
+        internalType: 'uint8',
       },
       {
-        name: 'flashFeeBps',
+        name: 'flashFeePbps',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',
@@ -1660,12 +1693,6 @@ export const ADMIN_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
-      },
-      {
-        name: 'oldCooldown',
-        type: 'uint16',
-        indexed: false,
-        internalType: 'uint16',
       },
       {
         name: 'newCooldown',

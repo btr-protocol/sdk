@@ -802,6 +802,11 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotConfigured',
     inputs: [
       {
@@ -818,12 +823,12 @@ export const DISTRIBUTOR_ABI = [
   },
   {
     type: 'error',
-    name: 'Reentrancy',
+    name: 'NotOwner',
     inputs: [],
   },
   {
     type: 'error',
-    name: 'Unauthorized',
+    name: 'Reentrancy',
     inputs: [],
   },
   {

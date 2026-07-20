@@ -154,11 +154,6 @@ export const GOV_TREASURY_ABI = [
         type: 'uint128',
         internalType: 'uint128',
       },
-      {
-        name: 'suppressor',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
     ],
     stateMutability: 'view',
   },
@@ -307,11 +302,6 @@ export const GOV_TREASURY_ABI = [
             name: 'cliffAmount',
             type: 'uint128',
             internalType: 'uint128',
-          },
-          {
-            name: 'suppressor',
-            type: 'uint16',
-            internalType: 'uint16',
           },
         ],
       },
@@ -702,11 +692,6 @@ export const GOV_TREASURY_ABI = [
         type: 'uint128',
         internalType: 'uint128',
       },
-      {
-        name: 'suppressor',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
     ],
     stateMutability: 'view',
   },
@@ -1083,7 +1068,17 @@ export const GOV_TREASURY_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotCode',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
     inputs: [],
   },
   {
