@@ -193,24 +193,12 @@ export const POOL_AUX_ABI = [
         ],
       },
       {
-        name: 'profile',
-        type: 'tuple',
-        internalType: 'struct IPool.LiquidityProfile',
-        components: [
-          {
-            name: 'weights',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
-          },
-          {
-            name: 'knots',
-            type: 'int8[17]',
-            internalType: 'int8[17]',
-          },
-        ],
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -312,12 +300,12 @@ export const POOL_AUX_ABI = [
         internalType: 'uint128',
       },
       {
-        name: 'minFeeBps',
+        name: 'minFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
       {
-        name: 'maxFeeBps',
+        name: 'maxFeePbps',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -365,12 +353,32 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
-    name: 'adminSetBridge',
+    name: 'adminSetCurve',
     inputs: [
       {
-        name: 'newBridge',
-        type: 'address',
-        internalType: 'address',
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'interior',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'wQ',
+        type: 'int256[]',
+        internalType: 'int256[]',
+      },
+      {
+        name: 'dispRef',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'flags',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     outputs: [],
@@ -391,7 +399,7 @@ export const POOL_AUX_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'flashFeeBps',
+            name: 'flashFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -474,21 +482,9 @@ export const POOL_AUX_ABI = [
         internalType: 'address',
       },
       {
-        name: 'profile',
-        type: 'tuple',
-        internalType: 'struct IPool.LiquidityProfile',
-        components: [
-          {
-            name: 'weights',
-            type: 'uint8[16]',
-            internalType: 'uint8[16]',
-          },
-          {
-            name: 'knots',
-            type: 'int8[17]',
-            internalType: 'int8[17]',
-          },
-        ],
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
       },
       {
         name: 'minDispersion',

@@ -34,7 +34,7 @@ export interface QuoteRecord {
   priceB64: bigint;
   /** mark scaled to 1e18 (== on-chain `b64To1e18(price)`). 0 is invalid on-chain. */
   mark1e18: bigint;
-  /** NXR-signed volatility, PBPS (stored directly as `sigmaEma`). */
+  /** NXR-signed volatility, PBPS (stored directly as `sigma`). */
   sigma: number;
   /** mark confidence interval, bps. */
   confidence: number;

@@ -218,9 +218,9 @@ export const POOL_ABI = [
             internalType: 'uint32',
           },
           {
-            name: 'minDispersion',
-            type: 'uint32',
-            internalType: 'uint32',
+            name: 'presetId',
+            type: 'uint16',
+            internalType: 'uint16',
           },
           {
             name: 'anchor',
@@ -228,12 +228,12 @@ export const POOL_ABI = [
             internalType: 'address',
           },
           {
-            name: 'minFeeBps',
+            name: 'minFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
-            name: 'maxFeeBps',
+            name: 'maxFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -241,11 +241,6 @@ export const POOL_ABI = [
             name: 'maxDispersion',
             type: 'uint32',
             internalType: 'uint32',
-          },
-          {
-            name: 'anchorDepth',
-            type: 'uint8',
-            internalType: 'uint8',
           },
           {
             name: 'decimals',
@@ -268,6 +263,11 @@ export const POOL_ABI = [
             internalType: 'uint16',
           },
           {
+            name: 'minDispersion',
+            type: 'uint32',
+            internalType: 'uint32',
+          },
+          {
             name: 'reservationPrice',
             type: 'uint64',
             internalType: 'uint64',
@@ -283,19 +283,6 @@ export const POOL_ABI = [
             internalType: 'uint64',
           },
         ],
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getAuthorizedBridge',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
       },
     ],
     stateMutability: 'view',
@@ -335,7 +322,7 @@ export const POOL_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'flashFeeBps',
+            name: 'flashFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -443,7 +430,7 @@ export const POOL_ABI = [
             internalType: 'uint256',
           },
           {
-            name: 'spreadBps',
+            name: 'spreadPbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -512,7 +499,7 @@ export const POOL_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'flashFeeBps',
+            name: 'flashFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -1106,7 +1093,7 @@ export const POOL_ABI = [
         internalType: 'uint256',
       },
       {
-        name: 'spreadBps',
+        name: 'spreadPbps',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',

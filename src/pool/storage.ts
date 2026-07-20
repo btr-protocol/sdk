@@ -1,14 +1,18 @@
 /**
  * PoolStorage slot readers — Solana-style deterministic layout, no Solidity getters.
  *
- * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). Mapping bases:
- *   assets=4, oracleConfigs=5, riskConfigs=6, profiles=7, …
- * Key = keccak256(abi.encode(token, mappingSlot)) — same as Solidity 0.8.
+ * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`), pinned by dex PoolStorageLayout.t.sol:
+ *   slot0 = baseToken|initialized, 1 = wnative, 2 = treasury; mappings assets=3,
+ *   oracleConfigs=4, riskConfigs=5, curves=6, lpBalances=7, protocolFees=8;
+ *   feeParams=9, flowCooldownSeconds=10, lastDepositTime=11, lastLPStakeTime=12,
+ *   factory=13, assetHooks=14, invested=15.
+ * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
  * Policy: dex/evm/README.md § "Off-chain reads (no storage getters)".
  */
 
+import type { QuarticCurve, QuarticSeg } from '../amm/aimm.js';
 import { encodeAbiParameters } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
@@ -24,23 +28,23 @@ function isNativeKey(token: Address): boolean {
 
 /** Absolute slots of `IPool.PoolStorage` fields (pinned by PoolStorageLayout.t.sol). */
 export const POOL_STORAGE = {
+  /** Packed: baseToken (address, bytes 0..19) + initialized (bool @ byte 20). */
   baseToken: 0n,
   wnative: 1n,
-  bridge: 2n,
-  treasuryInitialized: 3n,
-  assets: 4n,
-  oracleConfigs: 5n,
-  riskConfigs: 6n,
-  profiles: 7n,
-  lpBalances: 8n,
-  protocolFees: 9n,
-  feeParams: 10n,
-  flowCooldownSeconds: 11n,
-  lastDepositTime: 12n,
-  lastLPStakeTime: 13n,
-  factory: 14n,
-  assetHooks: 15n,
-  invested: 16n,
+  treasury: 2n,
+  assets: 3n,
+  oracleConfigs: 4n,
+  riskConfigs: 5n,
+  curves: 6n,
+  lpBalances: 7n,
+  protocolFees: 8n,
+  feeParams: 9n,
+  flowCooldownSeconds: 10n,
+  lastDepositTime: 11n,
+  lastLPStakeTime: 12n,
+  factory: 13n,
+  assetHooks: 14n,
+  invested: 15n,
 } as const;
 
 /**
@@ -73,11 +77,6 @@ export async function readAssetHook(
   const key = await resolveTokenStorageKey(provider, pool, token);
   const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assetHooks));
   return decodeHookSlot(word);
-}
-
-export interface LiquidityProfile {
-  weights: number[];
-  knots: number[];
 }
 
 export interface RiskConfig {
@@ -161,30 +160,78 @@ export function i8At(word: Hex, offset: number): number {
 export function addressAt(word: Hex, offset: number): Address {
   const b = hexToBytes(word.slice(2));
   const i = 32 - offset - 20;
-  return (`0x${bytesToHex(b.slice(i, i + 20))}`) as Address;
+  return `0x${bytesToHex(b.slice(i, i + 20))}` as Address;
 }
 
-export async function readLiquidityProfile(
+/** Mapping entry base slot for a uint16 key (curves preset table). */
+export function mappingBaseU16(key: number, mappingSlot: bigint): bigint {
+  const encoded = encodeAbiParameters(
+    [{ type: 'uint256' }, { type: 'uint256' }],
+    [BigInt(key), mappingSlot],
+  );
+  return BigInt(keccak256(encoded));
+}
+
+/** Signed int64 packed at bit offset `shift` in a storage word. */
+function i64AtBits(word: bigint, shift: number): bigint {
+  const u = (word >> BigInt(shift)) & 0xffffffffffffffffn;
+  return u >= 1n << 63n ? u - (1n << 64n) : u;
+}
+
+/**
+ * Read the asset's pricing-shape pointer (Asset slot 1, bits [240:256)) — presetId into
+ * `PoolStorage.curves`. 0 = no preset (fallback quote).
+ */
+export async function readAssetPresetId(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
-): Promise<LiquidityProfile> {
+): Promise<number> {
   const key = await resolveTokenStorageKey(provider, pool, token);
-  const base = mappingBase(key, POOL_STORAGE.profiles);
-  const [wWord, kWord] = await Promise.all([
-    getStorageAt(provider, pool, base),
-    getStorageAt(provider, pool, base + 1n),
-  ]);
-  const rawW = Array.from({ length: 16 }, (_, i) => u8At(wWord, i));
-  let n = 16;
-  while (n > 0 && rawW[n - 1] === 0) n--;
-  const weights = rawW.slice(0, n);
-  const knots: number[] = [];
-  const nKnots = Math.max(weights.length + 1, 0);
-  for (let i = 0; i < nKnots && i < 17; i++) {
-    knots.push(i8At(kWord, i));
+  const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assets) + 1n);
+  // Asset slot 1: minLiquidity[0:16) liquidityIndex[16:24) lastUpdate[24:28) presetId[28:30).
+  return u16At(word, 28);
+}
+
+/**
+ * Read + decode a shared preset curve (`NUQuartic.Curve` @ curves[presetId], slot 6):
+ * header slot + the 2m live segment slots (of the fixed uint256[28] block). Returns null when
+ * the preset is unset (header 0 — Pricing falls back to the linear-impact quote).
+ * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
+ */
+export async function readCurve(
+  provider: Eip1193Provider,
+  pool: Address,
+  presetId: number,
+): Promise<QuarticCurve | null> {
+  const base = mappingBaseU16(presetId, POOL_STORAGE.curves);
+  const header = BigInt(await getStorageAt(provider, pool, base));
+  if (header === 0n) return null;
+  const m = Number(header & 0xffn);
+  const boundaries: number[] = [];
+  for (let j = 1; j <= m; j++) {
+    boundaries.push(Number((header >> BigInt(8 + 16 * (j - 1))) & 0xffffn));
   }
-  return { weights, knots };
+  const dispRef = Number((header >> 232n) & 0xffffn);
+  const flags = Number((header >> 248n) & 0xffn);
+  const words = await Promise.all(
+    Array.from({ length: 2 * m }, (_, i) => getStorageAt(provider, pool, base + 1n + BigInt(i))),
+  );
+  const segs: QuarticSeg[] = [];
+  for (let i = 0; i < m; i++) {
+    const a = BigInt(words[2 * i]);
+    const b = BigInt(words[2 * i + 1]);
+    const sRaw = (b >> 64n) & ((1n << 128n) - 1n);
+    segs.push({
+      c0: i64AtBits(a, 0),
+      c1: i64AtBits(a, 64),
+      c2: i64AtBits(a, 128),
+      c3: i64AtBits(a, 192),
+      c4: i64AtBits(b, 0),
+      S: sRaw >= 1n << 127n ? sRaw - (1n << 128n) : sRaw,
+    });
+  }
+  return { m, boundaries, dispRef, flags, segs };
 }
 
 export async function readRiskConfig(
