@@ -324,6 +324,12 @@ function offsetToPrice(mark: number, offsetPbps: number): number {
   return (mark * Math.max(PBPS + offsetPbps, 0)) / PBPS;
 }
 
+/** Floored offset → price on ALL curve paths (Pricing._flooredOffsetPrice): SPLINE_MIN_OFFSET_PBPS then MIN_EXEC_PRICE_FRAC. */
+function flooredOffsetPrice(mark: number, offsetPbps: number): number {
+  const off = Math.max(offsetPbps, SPLINE_MIN_OFFSET_PBPS);
+  return Math.max((mark * (PBPS + off)) / PBPS, mark * MIN_EXEC_PRICE_FRAC);
+}
+
 /** skew → absolute price (no-profile fallback; Pricing._skewToPrice): offset = skew·disp/100. */
 function skewToPrice(mark: number, skew: number, disp: number): number {
   return offsetToPrice(mark, (skew * disp) / 100);
@@ -472,7 +478,7 @@ export function legKit(leg: PoolLeg): LegKit {
  * linear-impact model, mid·(1 ± |d−center|/BPS).
  */
 export function priceAt(k: LegKit, d: number): number {
-  if (k.curve) return offsetToPrice(k.twap, scaleY(evalQ(k.curve, d), k.curve, k.dispersion));
+  if (k.curve) return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, d), k.curve, k.dispersion));
   const mid = skewToPrice(k.twap, k.skew, k.dispersion);
   const vf = Math.min(Math.abs(d - k.center) / BPS, MAX_IMPACT);
   return d <= k.center ? Math.max(mid * (1 - vf), mid * MIN_ADJ) : mid * (1 + vf);
@@ -530,7 +536,7 @@ function bandPrice(k: LegKit, a: number, b: number): number {
   const lo = xInt(Math.min(a, b));
   const hi = xInt(Math.max(a, b));
   const w = hi - lo;
-  if (w === 0) return offsetToPrice(k.twap, scaleY(evalQ(k.curve, a), k.curve, k.dispersion));
+  if (w === 0) return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, a), k.curve, k.dispersion));
   // On-chain order: areaQ / width (integer), THEN scaleY — mirrored exactly.
   let off = scaleY(areaQ(k.curve, lo, hi) / BigInt(w), k.curve, k.dispersion);
   off = Math.max(off, SPLINE_MIN_OFFSET_PBPS);
