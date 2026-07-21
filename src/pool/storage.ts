@@ -179,7 +179,7 @@ function i64AtBits(word: bigint, shift: number): bigint {
 }
 
 /**
- * Read the asset's pricing-shape pointer (Asset slot 1, bits [240:256)) — presetId into
+ * Read the asset's pricing-shape pointer (Asset slot 1, bits [224:240), byte 28): presetId into
  * `PoolStorage.curves`. 0 = no preset (fallback quote).
  */
 export async function readAssetPresetId(
