@@ -12,14 +12,15 @@ import {
   type Eip1193Provider,
   type Hex,
 } from '../eth/index.js';
-import { getSwapQuote } from '../pool/index.js';
-import { CHAPEL_UNIV2, CHAPEL_TOKENS } from './chapel.js';
+import { getSwapQuote, defaultDeadline } from '../pool/index.js';
+import { CHAPEL_UNIV2 } from './chapel.js';
 import {
   CURVE_ABI,
   FLUID_ABI,
   UNIV2_PAIR_ABI,
   UNIV2_FACTORY_ABI,
   WOMBAT_ABI,
+  activeUsdc,
   eqAddr,
   hasToken,
   uniV2PairCandidates,
@@ -71,8 +72,6 @@ export interface QuoteBestOpts {
   minOut?: bigint;
 }
 
-const USDC = CHAPEL_TOKENS.usdc;
-
 async function safeRead<T>(fn: () => Promise<T>): Promise<T | null> {
   try {
     return await fn();
@@ -121,11 +120,12 @@ async function quoteBtr(
           { name: 'amountIn', type: 'uint256' },
           { name: 'minAmountOut', type: 'uint256' },
           { name: 'recipient', type: 'address' },
+          { name: 'deadline', type: 'uint256' },
         ],
         outputs: [],
       }],
       functionName: 'swap',
-      args: [tokenIn, tokenOut, amountIn, minOut, recipient],
+      args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
     }),
   };
 }
@@ -400,6 +400,7 @@ export async function quoteAllExactIn(
 export async function quoteBestExactIn(opts: QuoteBestOpts): Promise<BestVenueQuote | null> {
   const { tokenIn, tokenOut, amountIn } = opts;
   if (eqAddr(tokenIn, tokenOut) || amountIn <= 0n) return null;
+  const USDC = activeUsdc();
 
   const singles = await quoteAllExactIn(opts);
   const best = pickBest(singles);

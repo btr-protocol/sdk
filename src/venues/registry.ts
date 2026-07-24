@@ -13,7 +13,18 @@ import {
   CHAPEL_WOMBAT,
   CHAPEL_WOMBAT_TOKENS,
 } from './chapel.js';
-import { isZeroAddress, ZERO_ADDRESS } from '../eth/index.js';
+import {
+  SEPOLIA_BTR,
+  SEPOLIA_CHAIN_ID,
+  SEPOLIA_REF_MARKS_USD,
+  SEPOLIA_STABLE_SYMBOLS,
+  SEPOLIA_TOKENS,
+  SEPOLIA_VOLATILE_SYMBOLS,
+} from './sepolia.js';
+import { CHAPEL_CHAIN_ID } from './chapel.js';
+import { refMarksUsd as chapelRefMarksUsd } from './chapel-usd.js';
+import { isZeroAddress, ZERO_ADDRESS, keccak256, type Hex } from '../eth/index.js';
+import { sepoliaFeedId } from './sepolia.js';
 
 export type VenueKind = 'btr' | 'curve' | 'uniV2' | 'rangeCl' | 'wombat' | 'fluid';
 
@@ -164,8 +175,63 @@ export const eqAddr = (a: string, b: string): boolean => a.toLowerCase() === b.t
 export const hasToken = (tokens: readonly Address[] | undefined, t: Address): boolean =>
   !!tokens?.some((x) => eqAddr(x, t));
 
-/** Static venue pools (BTR + Curve + Wombat + Fluid). LiteCL discovered at quote time. */
+// ── Active chain selection ────────────────────────────────────────────────────
+// The venue router is single-chain per process. A daemon calls setVenueChain()
+// once at boot; every quote/exec selector below reads the active context. Default
+// is Chapel so existing Chapel callers are unchanged.
+
+let ACTIVE_CHAIN = CHAPEL_CHAIN_ID;
+
+/** Select the venue chain (11155111 = Sepolia, 97 = Chapel). Call once at boot. */
+export function setVenueChain(chainId: number): void {
+  ACTIVE_CHAIN = chainId;
+}
+
+export function activeChainId(): number {
+  return ACTIVE_CHAIN;
+}
+
+const symAddrs = (syms: readonly string[]): Address[] =>
+  syms.map((s) => SEPOLIA_TOKENS[s]!).filter(Boolean);
+
+/** Sepolia has NO incumbents: venue set = the two BTR cores. Token lists gate
+ *  which pool quotes a pair, so dual-listed USDC/USDT quote BOTH pools and the
+ *  router picks the better price (best-route across pools). */
+function sepoliaVenuePools(): VenuePool[] {
+  return [
+    { venue: 'btr', tag: 'btr-stable', address: SEPOLIA_BTR.stablePool, tokens: symAddrs(SEPOLIA_STABLE_SYMBOLS) },
+    { venue: 'btr', tag: 'btr-volatile', address: SEPOLIA_BTR.volatilePool, tokens: symAddrs(SEPOLIA_VOLATILE_SYMBOLS) },
+  ];
+}
+
+/** USDC base of the active chain (USDC-hub numeraire). */
+export function activeUsdc(): Address {
+  return ACTIVE_CHAIN === SEPOLIA_CHAIN_ID ? SEPOLIA_TOKENS['USDC']! : CHAPEL_TOKENS.usdc;
+}
+
+/** ExternalOracle address of the active chain. */
+export function activeOracle(): Address {
+  return ACTIVE_CHAIN === SEPOLIA_CHAIN_ID ? SEPOLIA_BTR.oracle : CHAPEL_BTR.oracle;
+}
+
+/** Static USD ref marks (fallback while live oracle is down / stale). */
+export function activeRefMarksUsd(): Record<string, number> {
+  return ACTIVE_CHAIN === SEPOLIA_CHAIN_ID ? { ...SEPOLIA_REF_MARKS_USD } : chapelRefMarksUsd();
+}
+
+/** ExternalOracle getFeed key for a symbol. Chapel derives keccak(asset‖base);
+ *  Sepolia uses the registered Pyth-style feedId. null when unknown. */
+export function activeFeedId(symbol: string, token: Address): Hex | null {
+  if (ACTIVE_CHAIN === SEPOLIA_CHAIN_ID) return sepoliaFeedId(symbol);
+  const base = CHAPEL_TOKENS.usdc;
+  const packed = `0x${token.slice(2).toLowerCase()}${base.slice(2).toLowerCase()}` as Hex;
+  return keccak256(packed);
+}
+
+/** Static venue pools for the active chain. Chapel = BTR + Curve + Wombat + Fluid
+ *  (+ UniV2 discovered at quote time); Sepolia = BTR cores only. */
 export function staticVenuePools(): VenuePool[] {
+  if (ACTIVE_CHAIN === SEPOLIA_CHAIN_ID) return sepoliaVenuePools();
   const out: VenuePool[] = [
     {
       venue: 'btr',
@@ -227,8 +293,9 @@ export function staticVenuePools(): VenuePool[] {
   return out;
 }
 
-/** Stable + volatile pairs for UniV2 factory lookup. */
+/** Stable + volatile pairs for UniV2 factory lookup. Sepolia has no incumbents. */
 export function uniV2PairCandidates(): { a: Address; b: Address }[] {
+  if (ACTIVE_CHAIN === SEPOLIA_CHAIN_ID) return [];
   const toks = [...new Set([...CHAPEL_STABLES, ...CHAPEL_VOLATILES])];
   const pairs: { a: Address; b: Address }[] = [];
   for (let i = 0; i < toks.length; i++) {
