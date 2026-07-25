@@ -522,6 +522,38 @@ export function bondingCurveSamples(
 }
 
 /**
+ * On-chain pricing shape as a LIQUIDITY DENSITY over price-offset space: mass of book depth per
+ * bp of offset from mark = inverse slope Δx/Δy of the monotone I-spline offset curve y(x),
+ * unit-area normalized. Offsets are computed in float straight from the pbps·Q fixed point — NOT
+ * via scaleY: its integer-pbps truncation zeroes Δy on near-flat segments → density = Inf.
+ * Near-flat steps (Δy ≤ ε·span) are merged into the next advancing step; each emitted point sits
+ * at the merged step's offset midpoint. Returns [offsetBp, densityPerBp] pairs, offsets ascending.
+ */
+export function curveDensity(
+  curve: QuarticCurve,
+  dispersionPbps: number,
+  n = 120,
+): [number, number][] {
+  const k = dispersionPbps / (curve.dispRef * 1e9 * 100); // pbps·Q → bp
+  const yAt = (x: number): number => Number(evalQ(curve, x)) * k;
+  const eps = Math.max(Math.abs(yAt(BPS) - yAt(0)), 1e-12) * 1e-9;
+  const pts: [number, number][] = [];
+  let x0 = 0;
+  let y0 = yAt(0);
+  for (let i = 1; i <= n; i++) {
+    const x1 = (BPS * i) / n;
+    const y1 = yAt(x1);
+    if (y1 - y0 <= eps) continue; // flat step: merge forward instead of emitting a density spike
+    pts.push([(y0 + y1) / 2, (x1 - x0) / (y1 - y0)]);
+    x0 = x1;
+    y0 = y1;
+  }
+  // ∫density dy = Σ emitted Δx = x0 (covered span) → divide out for unit area.
+  if (x0 > 0) for (const p of pts) p[1] /= x0;
+  return pts;
+}
+
+/**
  * Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at.
  * Mirrors Pricing._traverseCurve: areaQ(lo,hi)/width → scaleY → floor SPLINE_MIN_OFFSET_PBPS
  * → mark scale → MIN_EXEC_PRICE floor. Fallback: linear-impact average mid·(1 ± vf/2).
