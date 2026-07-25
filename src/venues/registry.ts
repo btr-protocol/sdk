@@ -177,10 +177,12 @@ export const hasToken = (tokens: readonly Address[] | undefined, t: Address): bo
 
 // ── Active chain selection ────────────────────────────────────────────────────
 // The venue router is single-chain per process. A daemon calls setVenueChain()
-// once at boot; every quote/exec selector below reads the active context. Default
-// is Chapel so existing Chapel callers are unchanged.
+// once at boot; every quote/exec selector below reads the active context.
+// Default is Sepolia: it is the only deployed venue (Chapel retired 2026-07-25), and
+// a caller that forgets setVenueChain() must not silently transact against Chapel
+// addresses. Chapel branches below are kept only until the last 97 caller is gone.
 
-let ACTIVE_CHAIN = CHAPEL_CHAIN_ID;
+let ACTIVE_CHAIN = SEPOLIA_CHAIN_ID;
 
 /** Select the venue chain (11155111 = Sepolia, 97 = Chapel). Call once at boot. */
 export function setVenueChain(chainId: number): void {
