@@ -429,6 +429,11 @@ export const OPS_TREASURY_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotCode',
     inputs: [],
   },

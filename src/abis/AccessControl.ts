@@ -2,7 +2,7 @@
  * AccessControl Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Singleton AccessControl — governance SSoT (owner / treasury / swapper / factory / keepers).
+ * Singleton AccessControl: governance SSoT (owner / treasuryOwner / treasury / swapper / factory / staking / keepers / guardians / risk stewards). Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians; quorumStatus is the drift monitor.
  * Source: shared/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
@@ -61,6 +61,13 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'armQuorumPolicy',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -233,6 +240,32 @@ export const ACCESS_CONTROL_ABI = [
         name: '',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'guardianCount',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'guardianQuorumMax',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
@@ -552,6 +585,47 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'quorumPolicyArmed',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'quorumStatus',
+    inputs: [],
+    outputs: [
+      {
+        name: 'armed',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'ownerOk',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'treasuryOwnerOk',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'guardians',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'registerAdapter',
     inputs: [
       {
@@ -590,6 +664,19 @@ export const ACCESS_CONTROL_ABI = [
         name: 's',
         type: 'bool',
         internalType: 'bool',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setGuardianQuorumMax',
+    inputs: [
+      {
+        name: 'max',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     outputs: [],
@@ -769,6 +856,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
+    name: 'GuardianQuorumMaxSet',
+    inputs: [
+      {
+        name: 'max',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'GuardianSet',
     inputs: [
       {
@@ -848,6 +948,12 @@ export const ACCESS_CONTROL_ABI = [
         internalType: 'address',
       },
     ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'QuorumPolicyArmed',
+    inputs: [],
     anonymous: false,
   },
   {
@@ -1056,6 +1162,21 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'error',
+    name: 'BadConfig',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidState',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'KillCapExhausted',
     inputs: [],
   },
@@ -1098,6 +1219,22 @@ export const ACCESS_CONTROL_ABI = [
     type: 'error',
     name: 'NotFactory',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ThresholdViolation',
+    inputs: [
+      {
+        name: 'value',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'threshold',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
   {
     type: 'error',

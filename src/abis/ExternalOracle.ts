@@ -2,7 +2,7 @@
  * ExternalOracle Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation.
+ * Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> BASE_TIMELOCK -> executeFeedWiden (guardian-vetoable).
  * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
@@ -174,6 +174,19 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'cancelFeedWiden',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'cancelSignerGrant',
     inputs: [],
     outputs: [],
@@ -228,6 +241,19 @@ export const EXTERNAL_ORACLE_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'executeFeedWiden',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -477,6 +503,48 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
+    name: 'pendingWiden',
+    inputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'requestFeedWiden',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+      {
+        name: 'maxDeviation',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'ttl',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'requestSignerGrant',
     inputs: [
       {
@@ -704,6 +772,50 @@ export const EXTERNAL_ORACLE_ABI = [
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'FeedWidenCancelled',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'FeedWidenRequested',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        indexed: true,
+        internalType: 'bytes32',
+      },
+      {
+        name: 'maxDeviation',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
+      {
+        name: 'ttl',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
+      {
+        name: 'eta',
+        type: 'uint48',
+        indexed: false,
+        internalType: 'uint48',
       },
     ],
     anonymous: false,
