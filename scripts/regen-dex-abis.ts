@@ -70,7 +70,7 @@ const CONTRACTS: Array<{
     constName: 'EXTERNAL_ORACLE_ABI',
     title: 'ExternalOracle',
     blurb:
-      'Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation.',
+      'Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> BASE_TIMELOCK -> executeFeedWiden (guardian-vetoable).',
   },
   {
     contract: 'Flash',
@@ -86,7 +86,7 @@ const CONTRACTS: Array<{
     constName: 'ACCESS_CONTROL_ABI',
     title: 'AccessControl',
     blurb:
-      'Singleton AccessControl — governance SSoT (owner / treasury / swapper / factory / keepers).',
+      'Singleton AccessControl: governance SSoT (owner / treasuryOwner / treasury / swapper / factory / staking / keepers / guardians / risk stewards). Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians; quorumStatus is the drift monitor.',
   },
   {
     contract: 'StakedAsset',

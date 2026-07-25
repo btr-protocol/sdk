@@ -1963,7 +1963,17 @@ export const ADMIN_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotCode',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
     inputs: [],
   },
   {
@@ -1997,11 +2007,6 @@ export const ADMIN_ABI = [
         internalType: 'uint256',
       },
     ],
-  },
-  {
-    type: 'error',
-    name: 'Unauthorized',
-    inputs: [],
   },
   {
     type: 'error',

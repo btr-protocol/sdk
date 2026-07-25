@@ -906,6 +906,11 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotCode',
     inputs: [],
   },
