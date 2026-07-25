@@ -399,6 +399,11 @@ export const ADMIN_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'spokes',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1827,12 +1832,6 @@ export const ADMIN_ABI = [
         internalType: 'address',
       },
       {
-        name: 'minLiquidity',
-        type: 'uint128',
-        indexed: false,
-        internalType: 'uint128',
-      },
-      {
         name: 'flags',
         type: 'uint16',
         indexed: false,
@@ -1971,6 +1970,33 @@ export const ADMIN_ABI = [
     type: 'error',
     name: 'NotReady',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [
+      {
+        name: 'executeAt',
+        type: 'uint48',
+        internalType: 'uint48',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ThresholdViolation',
+    inputs: [
+      {
+        name: 'value',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'threshold',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
   {
     type: 'error',

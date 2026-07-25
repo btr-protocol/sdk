@@ -223,12 +223,21 @@ const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowe
 const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
 
+/** Opt-out sentinel for the trailing `deadline` param (type(uint256).max = no expiry). */
+export const NO_DEADLINE: bigint = 2n ** 256n - 1n;
+/** Default tx validity window (seconds) when no deadline is supplied. */
+export const DEFAULT_DEADLINE_S = 600;
+/** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now. */
+export const defaultDeadline = (): bigint => BigInt(Math.floor(Date.now() / 1000) + DEFAULT_DEADLINE_S);
+
 export interface SwapParams {
   tokenIn: Address;
   tokenOut: Address;
   amountIn: bigint;
   minAmountOut: bigint;
   recipient: Address;
+  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
+  deadline?: bigint;
 }
 
 export interface DepositParams {
@@ -240,6 +249,8 @@ export interface WithdrawParams {
   token: Address;
   lpAmount: bigint;
   minAmountOut: bigint;
+  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
+  deadline?: bigint;
 }
 
 /**
@@ -254,7 +265,14 @@ export async function swap(
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'swap',
-    args: [params.tokenIn, params.tokenOut, params.amountIn, params.minAmountOut, params.recipient],
+    args: [
+      params.tokenIn,
+      params.tokenOut,
+      params.amountIn,
+      params.minAmountOut,
+      params.recipient,
+      params.deadline ?? defaultDeadline(),
+    ],
   });
 
   // Send transaction (provider must support eth_sendTransaction)
@@ -308,7 +326,7 @@ export async function withdraw(
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'withdraw',
-    args: [params.token, params.lpAmount, params.minAmountOut],
+    args: [params.token, params.lpAmount, params.minAmountOut, params.deadline ?? defaultDeadline()],
   });
 
   return (await provider.request({
