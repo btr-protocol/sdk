@@ -4,9 +4,11 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  CHAPEL_VOLATILE_CURVE,
   CURVE_PRESETS,
   STABLE_PROFILE,
   VOLATILE_PROFILE,
+  findPreset,
   presetCurve,
   sigmaSeed,
 } from './__fixtures__/profiles';
@@ -21,6 +23,7 @@ import {
   computeSkew,
   covQ,
   covToll,
+  curveDensity,
   depthCurve,
   dispersion,
   evalQ,
@@ -522,5 +525,81 @@ describe('fallback quote (presetId 0 — skew-anchored linear impact)', () => {
     const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
     expect(d.asks.length).toBeGreaterThan(0);
     expect(d.bids.length).toBeGreaterThan(0);
+  });
+});
+
+describe('curveDensity (offset-space liquidity density)', () => {
+  const trapz = (pts: [number, number][]): number => {
+    let a = 0;
+    for (let i = 1; i < pts.length; i++) {
+      a += 0.5 * (pts[i][1] + pts[i - 1][1]) * (pts[i][0] - pts[i - 1][0]);
+    }
+    return a;
+  };
+
+  test('unit area, ascending offsets, all-finite on the chapel ramp', () => {
+    const pts = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
+    expect(pts.length).toBeGreaterThan(100);
+    for (let i = 1; i < pts.length; i++) expect(pts[i][0]).toBeGreaterThan(pts[i - 1][0]);
+    for (const [o, d] of pts) {
+      expect(Number.isFinite(o)).toBe(true);
+      expect(Number.isFinite(d)).toBe(true);
+      expect(d).toBeGreaterThan(0);
+    }
+    expect(Math.abs(trapz(pts) - 1)).toBeLessThan(0.02);
+  });
+
+  test('symmetric ramp → symmetric density', () => {
+    const pts = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
+    const n = pts.length;
+    const span = pts[n - 1][0] - pts[0][0];
+    for (let i = 0; i < n; i++) {
+      expect(Math.abs(pts[i][0] + pts[n - 1 - i][0])).toBeLessThan(span * 1e-9 + 1e-9);
+      expect(Math.abs(pts[i][1] - pts[n - 1 - i][1]) / pts[i][1]).toBeLessThan(1e-6);
+    }
+  });
+
+  test('dispersion scales offsets ∝ s and density ∝ 1/s', () => {
+    const a = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
+    const b = curveDensity(CHAPEL_VOLATILE_CURVE, 2000);
+    expect(b.length).toBe(a.length);
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i][0]).toBeCloseTo(2 * a[i][0], 8);
+      expect(b[i][1]).toBeCloseTo(a[i][1] / 2, 8);
+    }
+  });
+
+  test('lepto W5 preset: finite density, ascending offsets', () => {
+    const p = findPreset('lepto', 5);
+    expect(p).toBeDefined();
+    if (!p) return;
+    const pts = curveDensity(presetCurve(p), p.dispRef);
+    expect(pts.length).toBeGreaterThan(50);
+    for (let i = 1; i < pts.length; i++) expect(pts[i][0]).toBeGreaterThan(pts[i - 1][0]);
+    for (const [, d] of pts) {
+      expect(Number.isFinite(d)).toBe(true);
+      expect(d).toBeGreaterThan(0);
+    }
+    expect(Math.abs(trapz(pts) - 1)).toBeLessThan(0.05);
+  });
+
+  test('hard plateau segments merge — no Inf/NaN (scaleY-truncation guard)', () => {
+    // Flat edges (Δw=0 on the first/last spans) would make scaleY-based Δy = 0 → density Inf.
+    const step = 125_000_000_000n;
+    const flat = buildCurve(
+      [2000, 4000, 6000, 8000],
+      [-4n, -4n, -4n, -4n, 0n, 4n, 4n, 4n, 4n].map((v) => v * step),
+      1000,
+    );
+    const pts = curveDensity(flat, 1000);
+    expect(pts.length).toBeGreaterThan(0);
+    for (let i = 1; i < pts.length; i++) expect(pts[i][0]).toBeGreaterThan(pts[i - 1][0]);
+    for (const [, d] of pts) {
+      expect(Number.isFinite(d)).toBe(true);
+      expect(d).toBeGreaterThan(0);
+    }
+    const area = trapz(pts);
+    expect(area).toBeGreaterThan(0.7);
+    expect(area).toBeLessThan(1.3);
   });
 });
