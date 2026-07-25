@@ -99,6 +99,11 @@ export const POOL_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     outputs: [
       {
@@ -593,6 +598,11 @@ export const POOL_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     outputs: [
       {
@@ -624,6 +634,11 @@ export const POOL_ABI = [
       },
       {
         name: 'minLpAmountOut',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deadline',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -666,6 +681,11 @@ export const POOL_ABI = [
       },
       {
         name: 'minAmountOut',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deadline',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -712,6 +732,11 @@ export const POOL_ABI = [
       },
       {
         name: 'minAmountOut',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deadline',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -806,6 +831,11 @@ export const POOL_ABI = [
         internalType: 'uint256',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'Expired',
+    inputs: [],
   },
   {
     type: 'error',

@@ -9,7 +9,7 @@ const USDT = '0x0000000000000000000000000000000000000002' as const;
 const POOL_S = '0x0000000000000000000000000000000000000010' as const;
 const POOL_V = '0x0000000000000000000000000000000000000020' as const;
 
-const SWAP_SEL = '0xd5bcb9b5'; // swap(address,address,uint256,uint256,address)
+const SWAP_SEL = '0x9908fc8b'; // swap(address,address,uint256,uint256,address,uint256)
 const APPROVE_SEL = '0x095ea7b3'; // approve(address,uint256)
 const MAX_UINT256 = (1n << 256n) - 1n;
 

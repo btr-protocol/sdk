@@ -12,7 +12,7 @@ import type { SwapPlan } from '../amm/router.js';
 import { encodeFn } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
-import { NATIVE_TOKEN } from '../pool/index.js';
+import { NATIVE_TOKEN, defaultDeadline } from '../pool/index.js';
 import { parseUnits } from '../utils/format.js';
 
 /** One executable swap leg. For a split, pass several (parallel, each funded from the user's tokenIn).
@@ -43,6 +43,8 @@ export interface BuildOpts {
   /** When true, approve max uint256 (reuse forever). When false/omitted (default), approve only the
    *  exact Σ amountIn for that (token, pool) — standard exact-amount approve + swap. */
   approveMax?: boolean;
+  /** Unix-seconds swap expiry; defaults to now + 600s. Pass NO_DEADLINE to opt out. */
+  deadline?: bigint;
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;
@@ -127,6 +129,7 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   }
   const approveAmt = (key: string): bigint =>
     opts.approveMax ? MAX_UINT256 : (exactByKey.get(key) ?? 0n);
+  const deadline = opts.deadline ?? defaultDeadline();
 
   for (const leg of legs) {
     if (!leg.native) {
@@ -153,7 +156,7 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
       data: encodeFn({
         abi: POOL_ABI,
         functionName: 'swap',
-        args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient],
+        args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
       }),
       value: leg.native ? leg.amountIn : 0n,
     });

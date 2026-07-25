@@ -347,6 +347,11 @@ export const POOL_AUX_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'spokes',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
