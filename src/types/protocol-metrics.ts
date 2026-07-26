@@ -135,3 +135,30 @@ export interface ProtocolMetricsTimeseries {
   source: MetricsSource;
   points: TimeseriesPoint[];
 }
+
+/** One minute-bucketed deposit/withdraw aggregate (from dex_liquidity_1m). */
+export interface LiquidityFlowBucket {
+  t: number;
+  pool: string;
+  poolTag: string;
+  side: 'deposit' | 'withdraw';
+  symbol: string | null;
+  eventCount: number;
+  amount: number | null;
+  lpAmount: number | null;
+  amountUsd: number | null;
+}
+
+/** GET /api/protocol/liquidity/history — LP deposit/withdraw flow, newest first.
+ *  Aggregate (per-minute) not per-wallet: `dex_liquidity` keeps `sender` for tx-level
+ *  drill-down, but a per-address feed is an unbuilt product decision, not a shape gap. */
+export interface ProtocolLiquidityHistory {
+  chainId: number;
+  pool: string | null;
+  asset: string | null;
+  side: 'deposit' | 'withdraw' | null;
+  from: number;
+  to: number;
+  source: MetricsSource;
+  buckets: LiquidityFlowBucket[];
+}
