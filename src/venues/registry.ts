@@ -176,7 +176,7 @@ export const hasToken = (tokens: readonly Address[] | undefined, t: Address): bo
   !!tokens?.some((x) => eqAddr(x, t));
 
 // ── Active chain selection ────────────────────────────────────────────────────
-// The venue router is single-chain per process. A daemon calls setVenueChain()
+// The venue router is single-chain per process. A keeper calls setVenueChain()
 // once at boot; every quote/exec selector below reads the active context.
 // Default is Sepolia: it is the only deployed venue (Chapel retired 2026-07-25), and
 // a caller that forgets setVenueChain() must not silently transact against Chapel

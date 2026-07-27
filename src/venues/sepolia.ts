@@ -95,7 +95,7 @@ export function sepoliaFeedId(symbol: string): `0x${string}` | null {
 
 /** Static USD fallbacks, used until the oracle-push cohort brings live marks up.
  *  Stables=1 (numeraire class); volatiles ~ current-ish testnet refs. Sizing only:
- *  the AIMM reverts StaleData while prices are down and the flow daemon retries. */
+ *  the AIMM reverts StaleData while prices are down and the flow keeper retries. */
 export const SEPOLIA_REF_MARKS_USD: Record<string, number> = {
   USDC: 1, USDT: 1, USDE: 1, USDS: 1, DAI: 1, USD1: 1, USDG: 1, PYUSD: 1, RLUSD: 1,
   syrupUSDC: 1, USDF: 1, U: 1, GHO: 1, TUSD: 1, USDTB: 1, FDUSD: 1, AUSD: 1,
