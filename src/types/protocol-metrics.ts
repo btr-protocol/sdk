@@ -45,6 +45,23 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'mm.spread.avg',
 ] as const satisfies readonly ProtocolTimeseriesMetric[];
 
+/** LP flow taxonomy (dex_liquidity_1m). Deliberately NOT in
+ *  ProtocolTimeseriesMetric: /metrics/timeseries has no SQL case for these, so
+ *  listing them there would make the collector accept an id it cannot serve.
+ *  Flow is served by GET /api/protocol/liquidity/history; these ids label it. */
+export type ProtocolLiquidityMetric =
+  | 'liq.dep.usd'
+  | 'liq.wd.usd'
+  | 'liq.net.usd'
+  | 'liq.events';
+
+export const PROTOCOL_LIQUIDITY_METRICS = [
+  'liq.dep.usd',
+  'liq.wd.usd',
+  'liq.net.usd',
+  'liq.events',
+] as const satisfies readonly ProtocolLiquidityMetric[];
+
 /** Minimum shape required to display APR legs without fabricating totals. */
 export interface AprLegs {
   feeApr: number | null;
