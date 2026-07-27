@@ -66,6 +66,7 @@ export {
   getAllRpcs,
   getExplorerUrl,
   getExplorerTxUrl,
+  getExplorerAddressUrl,
   getWrappedNative,
   getMulticall3,
   testRpc,
