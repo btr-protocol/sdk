@@ -5,7 +5,10 @@
 import type { Address } from '../eth/types.js';
 
 export const SEPOLIA_CHAIN_ID = 11155111;
-export const SEPOLIA_DEPLOY_BLOCK = 11343575;
+/** Ingest start block. MUST be at or below the first pool log, not the last deploy tx:
+ *  the pools were created and seeded from 11340141, so 11343575 (the previous value)
+ *  put all 26 `Deposited` events out of scope and they were never indexed. */
+export const SEPOLIA_DEPLOY_BLOCK = 11340000;
 
 /** Pool asset ERC20s (24 unique: 17 stable + 9 volatile, USDC/USDT shared). Keyed by canonical symbol. */
 export const SEPOLIA_TOKENS: Record<string, Address> = {
