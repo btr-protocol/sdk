@@ -397,6 +397,15 @@ export const CHAINS: Record<number, ChainConfig> = {
     testnet: true,
   },
 
+  5042002: {
+    id: 5042002,
+    name: 'Arc Testnet',
+    rpcUrls: ['https://rpc.testnet.arc.network'],
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+    blockExplorerUrls: ['https://testnet.arcscan.app'],
+    testnet: true,
+  },
+
   11155111: {
     id: 11155111,
     name: 'Ethereum Sepolia Testnet',
@@ -541,6 +550,19 @@ export function getExplorerTxUrl(chainId: number, hash: string): string | undefi
   const base = getExplorerUrl(chainId);
   if (!base || !hash) return undefined;
   return `${base.replace(/\/$/, '')}/tx/${hash}`;
+}
+
+/**
+ * Get block explorer URL for an account or token contract address.
+ */
+export function getExplorerAddressUrl(
+  chainId: number,
+  address: string,
+  kind: 'address' | 'token' = 'address',
+): string | undefined {
+  const base = getExplorerUrl(chainId);
+  if (!base || !address) return undefined;
+  return `${base.replace(/\/$/, '')}/${kind}/${address}`;
 }
 
 /**
