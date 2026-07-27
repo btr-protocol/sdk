@@ -32,6 +32,19 @@ const PEG = [0.98, 1.02] as const;
 const BANDS: Record<string, readonly [number, number]> = {
   syrupUSDC: [1.0, 1.5], WETH: [500, 20_000], WBTC: [20_000, 500_000], cbBTC: [20_000, 500_000],
   BNB: [100, 5_000], XAUT: [1_500, 10_000], PAXG: [1_500, 10_000], EURC: [0.9, 1.3],
+  // FX core (fiat-backed stables). These legs are NOT ~1.0 against the USDC base — their mark is
+  // the real fiat rate — so the PEG band below would reject every one of them. Each window is a
+  // SCALE guard (catches a 1e3 fat-finger or an inverted pair) around the measured 2026-07-27
+  // rate, deliberately wide enough for any plausible FX move: a tight window on a live rate would
+  // strand the ceremony, and an absent one silently applies PEG and fails at 0.98.
+  // ⚠ INVERSION IS THE DANGEROUS ERROR, not magnitude: NXR serves CAD/BRL/JPY/KRW natively as
+  // USD/X (1.41, 5.10, 163.5, 1469.9). The nxrSymbol for these legs is the X-USD cross, so a
+  // mis-set symbol yields the reciprocal — and only these bands catch it.
+  QCAD: [0.5, 1.0],        // CAD/USD 0.7099
+  AUDF: [0.4, 1.0],        // AUD/USD 0.7002
+  BRLA: [0.1, 0.4],        // BRL/USD 0.1963
+  JPYC: [0.003, 0.012],    // JPY/USD 0.0061197
+  KRW1: [0.0003, 0.0015],  // KRW/USD 0.00068070
 };
 /** The ceremony runbook's freshness bound: seeds must come from live NXR shortly pre-broadcast. */
 const MAX_AGE_MS = 5 * 60_000;
