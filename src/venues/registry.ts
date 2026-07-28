@@ -16,6 +16,7 @@ import {
 import {
   SEPOLIA_BTR,
   SEPOLIA_CHAIN_ID,
+  SEPOLIA_FX_SYMBOLS,
   SEPOLIA_REF_MARKS_USD,
   SEPOLIA_STABLE_SYMBOLS,
   SEPOLIA_TOKENS,
@@ -196,13 +197,14 @@ export function activeChainId(): number {
 const symAddrs = (syms: readonly string[]): Address[] =>
   syms.map((s) => SEPOLIA_TOKENS[s]!).filter(Boolean);
 
-/** Sepolia has NO incumbents: venue set = the two BTR cores. Token lists gate
- *  which pool quotes a pair, so dual-listed USDC/USDT quote BOTH pools and the
- *  router picks the better price (best-route across pools). */
+/** Sepolia has NO incumbents: venue set = the three BTR cores. Token lists gate
+ *  which pool quotes a pair, so a dual-listed asset quotes every pool that lists
+ *  it and the router picks the better price (best-route across pools). */
 function sepoliaVenuePools(): VenuePool[] {
   return [
     { venue: 'btr', tag: 'btr-stable', address: SEPOLIA_BTR.stablePool, tokens: symAddrs(SEPOLIA_STABLE_SYMBOLS) },
     { venue: 'btr', tag: 'btr-volatile', address: SEPOLIA_BTR.volatilePool, tokens: symAddrs(SEPOLIA_VOLATILE_SYMBOLS) },
+    { venue: 'btr', tag: 'btr-fx', address: SEPOLIA_BTR.fxPool, tokens: symAddrs(SEPOLIA_FX_SYMBOLS) },
   ];
 }
 
