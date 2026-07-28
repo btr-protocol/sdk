@@ -13,8 +13,8 @@
  * strands the feed (Sepolia, 2026-07-24: WBTC seeded 65,020 and never recoverable by ladder,
  * because NXR signs market marks, not rungs).
  *
- * Symbol mapping is NOT restated here — it is `nxrSymbol` on SEPOLIA_ORACLE_FEEDS (WETH→ETH-USDC,
- * WBTC/cbBTC→BTC-USDC), the only place that binding exists.
+ * Symbol mapping is NOT restated here — it is `nxrSymbol` on SEPOLIA_ORACLE_FEEDS
+ * (stables → Pyth `X-USD` USDC≈1 proxy; WETH→ETH-USDC; FX→`X-USD` for /v1/price).
  */
 
 import { join } from 'node:path';
