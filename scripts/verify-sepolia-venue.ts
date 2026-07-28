@@ -12,14 +12,15 @@
  * and that the stable/volatile symbol sets are feed-complete.
  *
  * NOT checked, because it is not in the deployment: `nxrSymbol`. That is the NX Rates
- * pair name (WETH→ETH-USDC, WBTC/cbBTC→BTC-USDC), owned here on purpose — the deploy
- * JSON has no idea what NXR calls a pair. Edit it by hand; verify against NXR REST.
+ * pair name (stables→`X-USD` proxy, WETH→ETH-USDC, FX→`X-USD`), owned here on purpose —
+ * the deploy JSON has no idea what NXR calls a pair. Edit it by hand; verify against NXR REST.
  */
 
 import { join } from 'node:path';
 import {
   SEPOLIA_BTR,
   SEPOLIA_CHAIN_ID,
+  SEPOLIA_FX_SYMBOLS,
   SEPOLIA_ORACLE_FEEDS,
   SEPOLIA_STABLE_SYMBOLS,
   SEPOLIA_TOKENS,
@@ -64,7 +65,7 @@ for (const f of SEPOLIA_ORACLE_FEEDS) {
 }
 
 // 4. Every pool asset must have a feed, or the AIMM cannot mark it.
-for (const sym of new Set([...SEPOLIA_STABLE_SYMBOLS, ...SEPOLIA_VOLATILE_SYMBOLS])) {
+for (const sym of new Set([...SEPOLIA_STABLE_SYMBOLS, ...SEPOLIA_VOLATILE_SYMBOLS, ...SEPOLIA_FX_SYMBOLS])) {
   if (!seen.has(sym)) fail(`pool asset ${sym}: no entry in SEPOLIA_ORACLE_FEEDS`);
   if (!SEPOLIA_TOKENS[sym]) fail(`pool asset ${sym}: no entry in SEPOLIA_TOKENS`);
 }
