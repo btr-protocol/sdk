@@ -37,11 +37,13 @@ export function recoverAddress(signature: Hex, message: string): Address {
   const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${msgBytes.length}`);
   const msgHash = keccak256(new Uint8Array([...prefix, ...msgBytes]));
 
-  // Recover public key using compact signature (r + s) and recovery id
-  // Note: recoverPublicKey is on the secp256k1 instance
-  const compactSig = new Uint8Array([...r, ...s]);
-  // @ts-ignore - Noble curves types may be outdated, but this function exists at runtime
-  const publicKey = (secp256k1 as any).secp256k1.recoverPublicKey(compactSig, hexToBytes(msgHash.slice(2)), recoveryId);
+  // Noble @noble/curves: Signature.fromCompact → addRecoveryBit → recoverPublicKey
+  // (same path as sdk/oracle/verify.recoverDigestSigner). Nested `.secp256k1.recoverPublicKey`
+  // is undefined on current noble and broke referrals SIWE verify.
+  const publicKey = secp256k1.Signature.fromCompact(new Uint8Array([...r, ...s]))
+    .addRecoveryBit(recoveryId)
+    .recoverPublicKey(hexToBytes(msgHash.slice(2)))
+    .toRawBytes(false); // uncompressed 65 bytes (0x04 || X || Y)
 
   // Derive address from public key (skip 0x04 prefix, hash, take last 20 bytes)
   const pubKeyHash = keccak256(`0x${bytesToHex(publicKey.slice(1))}`);
