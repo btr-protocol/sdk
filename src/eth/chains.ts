@@ -409,11 +409,10 @@ export const CHAINS: Record<number, ChainConfig> = {
   11155111: {
     id: 11155111,
     name: 'Ethereum Sepolia Testnet',
-    rpcUrls: [
-      'https://sepolia.gateway.tenderly.co',
-      'https://rpc.ankr.com/eth_sepolia',
-      'https://ethereum-sepolia.publicnode.com',
-    ],
+    // publicnode first: tenderly 429s under any real load, and ankr answers
+    // every request with "Unauthorized: you must authenticate with an API key",
+    // so it was a guaranteed-dead second hop that starved every on-chain read.
+    rpcUrls: ['https://ethereum-sepolia.publicnode.com', 'https://sepolia.gateway.tenderly.co'],
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://sepolia.etherscan.io'],
     wrappedNative: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
