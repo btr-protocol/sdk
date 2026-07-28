@@ -409,6 +409,10 @@ export const CHAINS: Record<number, ChainConfig> = {
   11155111: {
     id: 11155111,
     name: 'Ethereum Sepolia Testnet',
+    // Without this the slug is `ethereum-sepolia-testnet`, and there is no such
+    // asset — the network icon 404s wherever Sepolia is shown. Testnets reuse
+    // their mainnet mark.
+    icon: '/networks/ethereum.svg',
     // publicnode first: tenderly 429s under any real load, and ankr answers
     // every request with "Unauthorized: you must authenticate with an API key",
     // so it was a guaranteed-dead second hop that starved every on-chain read.
