@@ -63,6 +63,7 @@ export const SEPOLIA_BTR = {
   treasuryProxy: '0x0A2082dD7Aa8cf17E2F9d32Ec316Ea24fFB82f79' as Address,
   stablePool: '0xA9207BE6f1D33828b98508C6c77f51cdeC4951eE' as Address,
   volatilePool: '0x1f997b7dCcE0A956e431A24D58622e32656C8537' as Address,
+  fxPool: '0x18c7376A4F9B3C3fb8A0A33fAf3c55aD225CB229' as Address,
 } as const;
 
 export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; quoteVia?: string; token: Address; symbol: string; }
@@ -96,7 +97,7 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'cbBTC-USDC', feedId: '0x2dbe04920b7268184af8cd9e8352e4627de70402f84a8991fceefdc390b0031e', nxrSymbol: 'BTC-USDC', token: SEPOLIA_TOKENS['cbBTC']!, symbol: 'cbBTC' },
   { name: 'BNB-USDC', feedId: '0x585aa682889549d88e9a5b1c103b66937f0c2b3db7347e2ad1677f4017060a9e', nxrSymbol: 'BNB-USDC', token: SEPOLIA_TOKENS['BNB']!, symbol: 'BNB' },
   { name: 'XAUT-USDC', feedId: '0x8afa125f9bb7cb165f10d443fc5b426d2bdd2a001e36fa52e0eb732644e2cb1d', nxrSymbol: 'XAUT-USDC', token: SEPOLIA_TOKENS['XAUT']!, symbol: 'XAUT' },
-  { name: 'PAXG-USDC', feedId: '0x22562b1961d06a602fc9149b222c5cc50548fd80202b752ec666bbcf6a47c34a', nxrSymbol: 'PAXG-USDC', token: SEPOLIA_TOKENS['PAXG']!, symbol: 'PAXG' },
+  { name: 'PAXG-USDC', feedId: '0x22562b1961d06a602fc9149b222c5cc50548fd80202b752ec666bbcf6a47c34a', nxrSymbol: 'PAXG-USD', token: SEPOLIA_TOKENS['PAXG']!, symbol: 'PAXG' },
   { name: 'EURC-USDC', feedId: '0x7b48a1509b4849707b3c406b7c1866cabb0938d87b5e0b0842df4b098c693575', nxrSymbol: 'EURC-USD', token: SEPOLIA_TOKENS['EURC']!, symbol: 'EURC' },
   { name: 'QCAD-USDC', feedId: '0xe1cfd349e9e3e4d6891c8e33a7b1533e191ee3318ff034c049618caa57d74bad', nxrSymbol: 'CAD-USD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
   { name: 'AUDF-USDC', feedId: '0x020409a061f1ccc6a3d0511f2bb1f18c175b4614e4c5c5e02ed715d6254a5dfa', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF' },
