@@ -397,6 +397,17 @@ export const CHAINS: Record<number, ChainConfig> = {
     testnet: true,
   },
 
+  5042: {
+    id: 5042,
+    name: 'Arc',
+    icon: '/networks/arc.svg',
+    // ⚠ NOT LIVE YET (2026-07-28). Registered so the network list can show Arc
+    // as a roadmap entry; the deployment stays `pending`, so it is never
+    // selectable and nothing routes here.
+    rpcUrls: ['https://rpc.arc.network'],
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+  },
+
   5042002: {
     id: 5042002,
     name: 'Arc Testnet',
