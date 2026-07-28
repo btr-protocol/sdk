@@ -400,7 +400,9 @@ export const CHAINS: Record<number, ChainConfig> = {
   5042002: {
     id: 5042002,
     name: 'Arc Testnet',
-    rpcUrls: ['https://rpc.testnet.arc.network'],
+    // One asset covers both Arc networks; the slug would be `arc-testnet.svg`.
+    icon: '/networks/arc.svg',
+    rpcUrls: ['https://rpc.testnet.arc.network', 'https://arc-testnet.drpc.org'],
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
     testnet: true,
