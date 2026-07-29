@@ -76,6 +76,11 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
+            name: 'usdQuoted',
+            type: 'bool',
+            internalType: 'bool',
+          },
+          {
             name: 'refPrimary',
             type: 'address',
             internalType: 'address',
@@ -605,6 +610,11 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
+            name: 'usdQuoted',
+            type: 'bool',
+            internalType: 'bool',
+          },
+          {
             name: 'refPrimary',
             type: 'address',
             internalType: 'address',
@@ -753,6 +763,11 @@ export const ADMIN_ABI = [
             name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
+          },
+          {
+            name: 'usdQuoted',
+            type: 'bool',
+            internalType: 'bool',
           },
           {
             name: 'refPrimary',

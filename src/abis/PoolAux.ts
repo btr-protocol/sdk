@@ -144,6 +144,11 @@ export const POOL_AUX_ABI = [
             internalType: 'uint8',
           },
           {
+            name: 'usdQuoted',
+            type: 'bool',
+            internalType: 'bool',
+          },
+          {
             name: 'refPrimary',
             type: 'address',
             internalType: 'address',
@@ -465,6 +470,11 @@ export const POOL_AUX_ABI = [
             name: 'mode',
             type: 'uint8',
             internalType: 'uint8',
+          },
+          {
+            name: 'usdQuoted',
+            type: 'bool',
+            internalType: 'bool',
           },
           {
             name: 'refPrimary',
