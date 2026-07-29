@@ -116,7 +116,11 @@ export function sepoliaFeedId(symbol: string): `0x${string}` | null {
  *  the AIMM reverts StaleData while prices are down and the flow keeper retries. */
 export const SEPOLIA_REF_MARKS_USD: Record<string, number> = {
   USDC: 1, USDT: 1, USDE: 1, USDS: 1, DAI: 1, USD1: 1, USDG: 1, PYUSD: 1, RLUSD: 1,
-  syrupUSDC: 1, USDF: 1, U: 1, GHO: 1, TUSD: 1, USDTB: 1, FDUSD: 1, AUSD: 1,
+  USDF: 1, U: 1, GHO: 1, TUSD: 1, USDTB: 1, FDUSD: 1, AUSD: 1,
+  // syrupUSDC is NOT a $1 peg — it is an accruing Maple NAV wrapper (~1.1757 on
+  // 2026-07-29), which is also why it is deliberately absent from
+  // cexs.stablecoins in NX Rates. Carrying it at 1 understated it by 17.6%.
+  syrupUSDC: 1.1757,
   // Refreshed 2026-07-28 against the live on-chain marks (and Binance spot).
   // The prior values (WETH 3800, WBTC 118k, BNB 1100) were ~2x the real market
   // and had gone unnoticed because they only surface when a feed read fails —
