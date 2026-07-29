@@ -121,4 +121,19 @@ describe('aggregateDepthCurves', () => {
     expect(book).not.toBeNull();
     expect(book!.asks.length + book!.bids.length).toBeGreaterThan(0);
   });
+
+  // Regression: crossCurve used to return bids reversed (cum descending), which
+  // aggregate() collapsed to zero rows — WETH/WBTC printed asks only.
+  test('cross pair (neither leg is the hub base) prints BOTH sides', () => {
+    const weth = buildLeg('WETH', 1_880, sigmaSeed('volatile'), 500, 500, 940_000, 18, VOLATILE_PROFILE);
+    const wbtc = buildLeg('WBTC', 63_500, sigmaSeed('volatile'), 15, 15, 952_500, 18, VOLATILE_PROFILE);
+    const pool: NamedPool = { tag: 'volatile', state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } } };
+    const book = aggregateDepthCurves([pool], 'WETH', 'WBTC');
+    expect(book).not.toBeNull();
+    expect(book!.asks.length).toBeGreaterThan(0);
+    expect(book!.bids.length).toBeGreaterThan(0);
+    // Bids sit below the mid, asks above.
+    expect(book!.bids[0].price).toBeLessThanOrEqual(book!.mid);
+    expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
+  });
 });

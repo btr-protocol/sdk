@@ -915,8 +915,8 @@ function crossCurve(
     bidBest: midX * (1 - half / PBPS),
     askBest: midX * (1 + half / PBPS),
     spreadBps: spread / 100,
-    bids: withMarginal(bids, midX, false),
-    asks: withMarginal(asks, midX, true),
+    bids: withMarginal(bids, midX),
+    asks: withMarginal(asks, midX),
     maxTokBid: bidMax,
     maxTokAsk: askMax,
     unit,
@@ -938,15 +938,16 @@ function sweep(
   return out;
 }
 
-// Marginal (local slope of base-per-token) between successive swept nodes; ascending asks / descending bids.
-function withMarginal(levels: DepthLevel[], mid: number, ascending: boolean): DepthLevel[] {
-  const out = levels.map((l, i) => {
+// Marginal (local slope of base-per-token) between successive swept nodes.
+// Order stays mid-outward (cumTok ascending) for BOTH sides, matching the
+// hub-spoke path — depthLevelsToRows/aggregate read cum as monotonically rising.
+function withMarginal(levels: DepthLevel[], mid: number): DepthLevel[] {
+  return levels.map((l, i) => {
     const prev = i === 0 ? { cumTok: 0, cumBase: 0 } : levels[i - 1];
     const dT = l.cumTok - prev.cumTok;
     const dB = l.cumBase - prev.cumBase;
     return { ...l, price: dT > 0 ? dB / dT : mid };
   });
-  return ascending ? out : out.slice().reverse();
 }
 
 function dedup(xs: number[]): number[] {
