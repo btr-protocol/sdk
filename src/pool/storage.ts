@@ -95,6 +95,12 @@ export interface OracleConfig {
   primary: Address;
   refBandBps: number;
   mode: number;
+  /**
+   * DEN-01: the attested mark is quoted in USD (`<TOKEN>-USD`) rather than in the pool's base token,
+   * so the pool divides it by the base's own USD mark at consumption. True for the stable/FX feeds
+   * NXR signs as `X-USD` under an `X-USDC` on-chain name; false for genuine base crosses.
+   */
+  usdQuoted: boolean;
   /** Ref-band oracle instance (independent signer set); zero address = legacy fallback to primary. */
   refPrimary: Address;
 }
@@ -259,7 +265,7 @@ export async function readOracleConfig(
 ): Promise<OracleConfig> {
   const key = await resolveTokenStorageKey(provider, pool, token);
   const base = mappingBase(key, POOL_STORAGE.oracleConfigs);
-  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode (packed), 3=refPrimary (appended last).
+  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode|usdQuoted (packed), 3=refPrimary.
   const [feedId, refFeedId, packed, refWord] = await Promise.all([
     getStorageAt(provider, pool, base),
     getStorageAt(provider, pool, base + 1n),
@@ -272,6 +278,7 @@ export async function readOracleConfig(
     primary: addressAt(packed, 0),
     refBandBps: u16At(packed, 20),
     mode: u8At(packed, 22),
+    usdQuoted: u8At(packed, 23) !== 0,
     refPrimary: addressAt(refWord, 0),
   };
 }
