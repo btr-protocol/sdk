@@ -111,22 +111,6 @@ export const CONTRACTS = {
     DISTRIBUTOR: ZERO_ADDRESS,
     FAUCET: ZERO_ADDRESS,
   },
-
-  // BNB Chain Testnet (Chapel, id 97) — from dex/evm/deployments/97.deploy.json (2026-07-12 reseed)
-  97: {
-    BTR: ZERO_ADDRESS,
-    TREASURY: ZERO_ADDRESS,
-    BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: '0x68fDAA0be33D4d78AbeEF63aB8A32A6751d2F4C8' as Address, // volatilePool
-    POOL_STABLE: '0xfF83da2711888dCb8B50dc6c1EF0b8F91424d23f' as Address,
-    POOL_FACTORY: '0xEf72eE3274F03557EDcDf843A1444ae7f8f7bb05' as Address,
-    ADMIN: '0x1a6bB558e7C2E8537D7e38491D1DE318B027F8B9' as Address,
-    ACCESS_CONTROL: '0xeBd35b5FC97090Ba1fCC31fBBccde29077A2854C' as Address,
-    ORACLE: '0xD91712c9F4037D0010041691Df191AB45994F2bF' as Address,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: '0x6a901982CE6cD2561F677217e012A33b8a88EF27' as Address,
-  },
 } as const;
 
 // Init-time guard: literals hide behind `as Address`, so enforce 0x + 40 hex at module load.
@@ -153,7 +137,7 @@ export const CONTRACT_KEYS = [
 export type DexContractKey = (typeof CONTRACT_KEYS)[number];
 
 /**
- * Env var names for overriding ZERO placeholders until chapel/mainnet CREATE3 deploy.
+ * Env var names for overriding ZERO placeholders until the mainnet CREATE3 deploy.
  * Front: prefix with `VITE_` (e.g. `VITE_ADMIN_ADDRESS`). Back/keepers: bare names.
  */
 export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {

@@ -48,7 +48,6 @@ export * from './utils/business.js';
 export * from './utils/maths.js';
 export * from './utils/format.js';
 export * from './utils/encoding.js';
-export * from './utils/pair.js';
 
 // Shared types (TimeFrame enum + helpers)
 export * from './types/index.js';
@@ -60,7 +59,7 @@ export * from './router/index.js';
 // Off-chain AIMM pricer + route-finding (quoteExactIn, rankSwap, poolStateFrom)
 export * from './amm/index.js';
 
-// Chapel multi-venue registry + exact-in router
+// Deployed-venue registry + on-chain exact-in router
 export * from './venues/index.js';
 
 // Signed-quote oracle verification (decode/digest/recover/quorum for batchPushSigned)
