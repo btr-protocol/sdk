@@ -101,14 +101,33 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'EURC-USDC', feedId: '0x7b48a1509b4849707b3c406b7c1866cabb0938d87b5e0b0842df4b098c693575', nxrSymbol: 'EURC-USD', token: SEPOLIA_TOKENS['EURC']!, symbol: 'EURC' },
   { name: 'QCAD-USDC', feedId: '0xe1cfd349e9e3e4d6891c8e33a7b1533e191ee3318ff034c049618caa57d74bad', nxrSymbol: 'CAD-USD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
   { name: 'AUDF-USDC', feedId: '0x020409a061f1ccc6a3d0511f2bb1f18c175b4614e4c5c5e02ed715d6254a5dfa', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF' },
+  // idx 24: the BASE-DEPEG REFERENCE, keccak(USDC, USD) — NOT keccak(USDC, USDC).
+  // Omitting it left this array at 29 entries against the chain's 30, so every
+  // position from here on was off-by-one versus `feedIds[]` despite the header
+  // claiming on-chain order. Nothing indexes positionally today, so it was latent
+  // — but `Pricing._denominate` now divides every `usdQuoted` asset by THIS feed,
+  // so a consumer resolving it by position would divide by the wrong asset.
+  // `symbol` stays 'USDC' and this row sits AFTER idx 0, so token-level
+  // `sepoliaFeedId('USDC')` still resolves to USDC-USDC. Feed-level callers must
+  // use `sepoliaFeedByName` — see test/sepolia-feeds.test.ts.
+  { name: 'USDC-USD', feedId: '0xd1d7f3873fb17b9dbd7bdf1c2c9e6b85b483f61c4f4ce08c48b2b7b668d1485d', nxrSymbol: 'USDC-USD', token: SEPOLIA_TOKENS['USDC']!, symbol: 'USDC' },
   { name: 'BRLA-USDC', feedId: '0x515ee3abad05481e194281cf3698615c4dae80161051c75b5e5b8be9c14fda32', nxrSymbol: 'BRL-USD', token: SEPOLIA_TOKENS['BRLA']!, symbol: 'BRLA' },
   { name: 'JPYC-USDC', feedId: '0x965b70a15f56a602d15397b5fff1893d2786ebb06ea0f5199d0bed022eb85453', nxrSymbol: 'JPY-USD', token: SEPOLIA_TOKENS['JPYC']!, symbol: 'JPYC' },
   { name: 'KRW1-USDC', feedId: '0xc0322e276c809f19550dae0de4178c06042ea6b8802b1d813c9957c2fe84d1a0', nxrSymbol: 'KRW-USD', token: SEPOLIA_TOKENS['KRW1']!, symbol: 'KRW1' },
 ];
 
-/** symbol -> ExternalOracle feedId (getFeed key). null when no feed is registered. */
+/** symbol -> ExternalOracle feedId (getFeed key). null when no feed is registered.
+ *  ⚠ `symbol` is the TOKEN symbol and is NOT unique: USDC carries both its own
+ *  USDC-USDC feed and the USDC-USD depeg reference. Returns the first match
+ *  (USDC-USDC) by design. To address a specific feed, use `sepoliaFeedByName`. */
 export function sepoliaFeedId(symbol: string): `0x${string}` | null {
   return SEPOLIA_ORACLE_FEEDS.find((f) => f.symbol === symbol)?.feedId ?? null;
+}
+
+/** on-chain feed name -> feed. `name` IS unique; prefer this whenever the caller
+ *  means a particular feed rather than "whatever feed this token has". */
+export function sepoliaFeedByName(name: string): SepoliaFeed | null {
+  return SEPOLIA_ORACLE_FEEDS.find((f) => f.name === name) ?? null;
 }
 
 /** Static USD fallbacks, used until the oracle-push cohort brings live marks up.
