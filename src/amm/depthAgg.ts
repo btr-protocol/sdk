@@ -7,6 +7,7 @@ import {
   type DepthLevel,
   type PoolState,
   depthCurve,
+  invertDepthCurve,
   virtualMarketDepth,
 } from './aimm.js';
 
@@ -228,6 +229,9 @@ export interface AggregateDepthOpts {
   ladder?: { targetFrac?: number; count?: number };
   /** Override ladder default index (UI step picker). */
   stepIdx?: number;
+  /** Quote the book in `to`-per-`from` instead: reciprocal prices, bids↔asks, sizes re-denominated.
+   *  Applied per pool BEFORE bucketing so the ladder is nice in the displayed unit. */
+  invert?: boolean;
 }
 
 export interface AggregatedDepthBook {
@@ -262,7 +266,8 @@ export function aggregateDepthCurves(
   type Part = { mark: number; mid: number; spreadBps: number; asks: Row[]; bids: Row[]; w: number };
   const parts: Part[] = [];
   for (const p of eligible) {
-    const curve = curveForPool(p.state, from, to);
+    const raw = curveForPool(p.state, from, to);
+    const curve = opts?.invert ? invertDepthCurve(raw) : raw;
     if (!(curve.mid > 0) || (!curve.asks.length && !curve.bids.length)) continue;
     const asks = depthLevelsToRows(curve.asks);
     const bids = depthLevelsToRows(curve.bids);

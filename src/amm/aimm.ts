@@ -854,6 +854,31 @@ export function virtualMarketDepth(state: PoolState, token: string): DepthCurve 
   return depthCurve(state, state.base, token);
 }
 
+/**
+ * Reciprocal orientation of a depth curve (token↔base roles swap): price→1/price, bids↔asks,
+ * and cumTok↔cumBase (a bid's base notional IS the inverted ask's token size — exact, not scaled).
+ * Mid-outward ordering survives: ask price ascending → 1/price descending = a valid bid ladder.
+ */
+export function invertDepthCurve(c: DepthCurve): DepthCurve {
+  const inv = (x: number) => (x > 0 ? 1 / x : 0);
+  const swap = (ls: DepthLevel[]): DepthLevel[] =>
+    ls.map((l) => ({ price: inv(l.price), cumTok: l.cumBase, cumBase: l.cumTok }));
+  const bids = swap(c.asks);
+  const asks = swap(c.bids);
+  return {
+    mark: inv(c.mark),
+    mid: inv(c.mid),
+    bidBest: inv(c.askBest),
+    askBest: inv(c.bidBest),
+    spreadBps: c.spreadBps,
+    bids,
+    asks,
+    maxTokBid: bids[bids.length - 1]?.cumTok ?? 0,
+    maxTokAsk: asks[asks.length - 1]?.cumTok ?? 0,
+    unit: c.unit,
+  };
+}
+
 /** Keep levels with cumTok ≤ maxTok; append an interpolated terminal vertex at exactly maxTok. */
 function clipDepthLevels(levels: DepthLevel[], maxTok: number): DepthLevel[] {
   if (!(maxTok > 0) || levels.length === 0) return [];

@@ -136,4 +136,27 @@ describe('aggregateDepthCurves', () => {
     expect(book!.bids[0].price).toBeLessThanOrEqual(book!.mid);
     expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
   });
+
+  test('invert mirrors the book: reciprocal mid, sides swap, sizes change unit', () => {
+    const weth = buildLeg('WETH', 1_880, sigmaSeed('volatile'), 500, 500, 940_000, 18, VOLATILE_PROFILE);
+    const wbtc = buildLeg('WBTC', 63_500, sigmaSeed('volatile'), 15, 15, 952_500, 18, VOLATILE_PROFILE);
+    const pool: NamedPool = { tag: 'volatile', state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } } };
+    const fwd = aggregateDepthCurves([pool], 'WETH', 'WBTC')!;
+    const inv = aggregateDepthCurves([pool], 'WETH', 'WBTC', { invert: true })!;
+    expect(inv.mid).toBeCloseTo(1 / fwd.mid, 9);
+    expect(inv.mark).toBeCloseTo(1 / fwd.mark, 9);
+    // Best inverted bid ≈ reciprocal of the best forward ask (and vice versa), within a bucket.
+    expect(1 / inv.bids[0].price).toBeGreaterThan(fwd.asks[0].price - fwd.step);
+    expect(1 / inv.asks[0].price).toBeLessThan(fwd.bids[0].price + fwd.step);
+    // Sizes are re-denominated (~×mid), not copied over — a relabelled book would be identical.
+    const fwdTop = fwd.asks[fwd.asks.length - 1].cum;
+    const invTop = inv.bids[inv.bids.length - 1].cum;
+    expect(invTop / fwdTop).toBeGreaterThan(1 / fwd.mid * 0.5);
+    // Ordering contract for aggregate(): cum ascending mid-outward on both sides.
+    for (const side of [inv.bids, inv.asks]) {
+      for (let i = 1; i < side.length; i++) expect(side[i].cum).toBeGreaterThan(side[i - 1].cum);
+    }
+    expect(inv.bids[0].price).toBeLessThanOrEqual(inv.mid);
+    expect(inv.asks[0].price).toBeGreaterThanOrEqual(inv.mid);
+  });
 });
