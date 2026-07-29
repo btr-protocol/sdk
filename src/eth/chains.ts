@@ -18,14 +18,12 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
 /**
  * Canonical chain allowlist for BTR swap (atomic + intent).
  * SVM intentionally excluded — UI shows it greyed w/ "Coming soon".
- * Single source of truth: keep front (`ChainSelector`, `TokenSelector`)
- * and back (`services/swap/lib/config.ts ALLOWED_CHAIN_IDS`) in sync via this export.
+ * Consumed by front (`TokenSelector`); mainnets only.
  */
 export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
   1,     // Ethereum mainnet
   8453,  // Base
   56,    // BNB Chain
-  97,    // BNB Smart Chain testnet (chapel)
   42161, // Arbitrum
   999,   // HyperEVM
   43114, // Avalanche
@@ -560,7 +558,7 @@ export function getExplorerUrl(chainId: number): string | undefined {
 
 /**
  * Get block explorer URL for a transaction hash on the given chain.
- * Chapel (97) → https://testnet.bscscan.com/tx/0x…
+ * Sepolia (11155111) → https://sepolia.etherscan.io/tx/0x…
  */
 export function getExplorerTxUrl(chainId: number, hash: string): string | undefined {
   const base = getExplorerUrl(chainId);

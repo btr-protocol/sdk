@@ -9,8 +9,8 @@
 //   presetId = 100·tier + regimeOrdinal, tier ∈ {1: W0.5, 2: W1, 3: W2, 4: W5},
 //   regimeOrdinal = 1-based index in [hyper, flat, plateau, meso, lepto, platy, skew_L, skew_R,
 //   pin_M, pin_M_tight, pin_M_med, pin_M_wide]. 0 stays reserved (= no curve / fallback quote).
-// dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps) — same ratio the chapel
-// bootstrap curves use (ChapelEnableSwaps._curve: edge 500 → dispRef 1000, edge 50 → dispRef 100).
+// dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps) — same ratio the
+// bootstrap curves below use (edge 500 → dispRef 1000, edge 50 → dispRef 100).
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -84,20 +84,20 @@ export const presetCurve = (p: CurvePreset): QuarticCurve =>
 export const findPreset = (regime: string, W: number): CurvePreset | undefined =>
   CURVE_PRESETS.find((p) => p.regime === regime && p.W === W);
 
-// ── Chapel bootstrap curves (value-identical to ChapelEnableSwaps._curve) ───────
+// ── Bootstrap curves (deploy-script seed presets) ──────────────────────────────
 // Preset 1 = generic default (±500 pbps ramp, dispRef 1000); preset 2 = tight stable
 // (±50 pbps ramp, dispRef 100). Live front reads override via storage slots (readCurve).
 
-const CHAPEL_INTERIOR = [2000, 4000, 6000, 8000];
+const BOOTSTRAP_INTERIOR = [2000, 4000, 6000, 8000];
 const rampWQ = (step: bigint): bigint[] =>
   Array.from({ length: 9 }, (_, i) => BigInt(i - 4) * step);
-export const CHAPEL_VOLATILE_CURVE: QuarticCurve = buildCurve(
-  CHAPEL_INTERIOR,
+export const BOOTSTRAP_VOLATILE_CURVE: QuarticCurve = buildCurve(
+  BOOTSTRAP_INTERIOR,
   rampWQ(125_000_000_000n),
   1000,
 );
-export const CHAPEL_STABLE_CURVE: QuarticCurve = buildCurve(
-  CHAPEL_INTERIOR,
+export const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
+  BOOTSTRAP_INTERIOR,
   rampWQ(12_500_000_000n),
   100,
 );
@@ -119,7 +119,7 @@ export const STABLE_PROFILE: AimmProfile = {
   maxFee: 2_000,
   minDisp: 500,
   maxDisp: 5_000,
-  curve: CHAPEL_STABLE_CURVE,
+  curve: BOOTSTRAP_STABLE_CURVE,
 };
 
 /** Volatile: generic preset-1 curve + wider band (minDisp 50_000 → ±2.5% effective edge). */
@@ -129,7 +129,7 @@ export const VOLATILE_PROFILE: AimmProfile = {
   maxFee: 10_000,
   minDisp: 50_000,
   maxDisp: 500_000,
-  curve: CHAPEL_VOLATILE_CURVE,
+  curve: BOOTSTRAP_VOLATILE_CURVE,
 };
 
 const SIGMA_SEED = { stable: 5_000, volatile: 50_000 } as const;

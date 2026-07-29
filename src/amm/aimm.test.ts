@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  CHAPEL_VOLATILE_CURVE,
+  BOOTSTRAP_VOLATILE_CURVE,
   CURVE_PRESETS,
   STABLE_PROFILE,
   VOLATILE_PROFILE,
@@ -537,8 +537,8 @@ describe('curveDensity (offset-space liquidity density)', () => {
     return a;
   };
 
-  test('unit area, ascending offsets, all-finite on the chapel ramp', () => {
-    const pts = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
+  test('unit area, ascending offsets, all-finite on the bootstrap ramp', () => {
+    const pts = curveDensity(BOOTSTRAP_VOLATILE_CURVE, 1000);
     expect(pts.length).toBeGreaterThan(100);
     for (let i = 1; i < pts.length; i++) expect(pts[i][0]).toBeGreaterThan(pts[i - 1][0]);
     for (const [o, d] of pts) {
@@ -550,7 +550,7 @@ describe('curveDensity (offset-space liquidity density)', () => {
   });
 
   test('symmetric ramp → symmetric density', () => {
-    const pts = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
+    const pts = curveDensity(BOOTSTRAP_VOLATILE_CURVE, 1000);
     const n = pts.length;
     const span = pts[n - 1][0] - pts[0][0];
     for (let i = 0; i < n; i++) {
@@ -560,8 +560,8 @@ describe('curveDensity (offset-space liquidity density)', () => {
   });
 
   test('dispersion scales offsets ∝ s and density ∝ 1/s', () => {
-    const a = curveDensity(CHAPEL_VOLATILE_CURVE, 1000);
-    const b = curveDensity(CHAPEL_VOLATILE_CURVE, 2000);
+    const a = curveDensity(BOOTSTRAP_VOLATILE_CURVE, 1000);
+    const b = curveDensity(BOOTSTRAP_VOLATILE_CURVE, 2000);
     expect(b.length).toBe(a.length);
     for (let i = 0; i < a.length; i++) {
       expect(b[i][0]).toBeCloseTo(2 * a[i][0], 8);
