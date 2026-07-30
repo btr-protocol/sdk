@@ -104,7 +104,16 @@ export function formatNumber(n: number | null | undefined, maxDecimals?: number)
     });
   }
 
-  return rounded.toFixed(decimals).replace(/\.?0+$/, '') || '0';
+  return trimZeros(rounded, decimals) || '0';
+}
+
+/**
+ * Drop trailing fractional zeros. Guarded on `decimals > 0`: toFixed(0) yields no
+ * decimal point, so a bare strip would eat integer zeros and render 20 as "2".
+ */
+function trimZeros(n: number, decimals: number): string {
+  const s = n.toFixed(decimals);
+  return decimals > 0 ? s.replace(/\.?0+$/, '') : s;
 }
 
 /** Format with compact notation (1K, 1M, 1B) */
@@ -189,7 +198,7 @@ export function formatPercentSig(n: number | null | undefined, sig = 2): string 
   if (n == null || !isFinite(n) || n === 0) return '0%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
-  const s = abs.toFixed(decimals).replace(/\.?0+$/, '');
+  const s = trimZeros(abs, decimals);
   return `${n < 0 ? '-' : ''}${s}%`;
 }
 
