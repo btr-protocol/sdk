@@ -48,7 +48,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
 /** LP flow taxonomy (dex_liquidity_1m). Deliberately NOT in
  *  ProtocolTimeseriesMetric: /metrics/timeseries has no SQL case for these, so
  *  listing them there would make the collector accept an id it cannot serve.
- *  Flow is served by GET /api/protocol/liquidity/history; these ids label it. */
+ *  Flow is served by GET /protocol/liquidity/history; these ids label it. */
 export type ProtocolLiquidityMetric =
   | 'liq.dep.usd'
   | 'liq.wd.usd'
@@ -166,7 +166,7 @@ export interface LiquidityFlowBucket {
   amountUsd: number | null;
 }
 
-/** GET /api/protocol/liquidity/history — LP deposit/withdraw flow, newest first.
+/** GET /protocol/liquidity/history — LP deposit/withdraw flow, newest first.
  *  Aggregate (per-minute) not per-wallet: `dex_liquidity` keeps `sender` for tx-level
  *  drill-down, but a per-address feed is an unbuilt product decision, not a shape gap. */
 export interface ProtocolLiquidityHistory {

@@ -54,12 +54,12 @@ export const BRAND = Object.freeze({
   socialName: 'BTR Protocol',
   github: 'https://github.com/btr-supply',
   githubOrg: 'btr-supply',
-  domain: 'btr.supply',
+  domain: 'btr.markets',
   /** X/Twitter handle — PascalCase, no underscore (`@BTRProtocol`). */
   twitter: 'BTRProtocol',
   /** Telegram handle — same branding as X (`t.me/BTRProtocol`). */
   telegram: 'BTRProtocol',
-  supportEmail: 'tech@btr.supply',
+  supportEmail: 'tech@btr.markets',
 });
 
 /**
