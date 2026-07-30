@@ -194,12 +194,12 @@ export function formatPercent(n: number | null | undefined, decimals = 2, signed
  * Percent with `sig` significant figures — small values keep precision (0.024%, 0.06%) instead of
  * collapsing to "0%". Input is already in percent units (2.4 → "2.4%"). Use for spreads / tiny rates.
  */
-export function formatPercentSig(n: number | null | undefined, sig = 2): string {
+export function formatPercentSig(n: number | null | undefined, sig = 2, signed = false): string {
   if (n == null || !isFinite(n) || n === 0) return '0%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
   const s = trimZeros(abs, decimals);
-  return `${n < 0 ? '-' : ''}${s}%`;
+  return `${n < 0 ? '-' : signed ? '+' : ''}${s}%`;
 }
 
 // ─────────────────────────────────────────────────────────────
