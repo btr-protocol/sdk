@@ -4,7 +4,15 @@
  * This is the canonical source for all deployed contract addresses.
  * Frontend and other consumers should import from here.
  *
- * Addresses are deterministic via CREATE3 across all chains (Anvil, testnet, mainnet).
+ * PLACEHOLDER REGISTRY. This is not the source of truth for deployed addresses and nothing
+ * should be wired to it: there is no 11155111 key, so CONTRACTS[11155111] is undefined on the
+ * only chain BTR is deployed to, and every DEX address on the chains listed below is
+ * ZERO_ADDRESS. The real SoT is dex/evm/deployments/<chainId>.{deploy,pools}.json, which the
+ * front end consumes via the btr-deployment vite plugin (front/src/config/deployment.ts).
+ *
+ * There is no CREATE3 anywhere in the stack. Pool proxies use a salted deterministic beacon-proxy
+ * deploy whose salt includes block.chainid (PoolFactory.sol:111-114), so addresses are NOT
+ * identical across chains. Mock tokens are plain nonce-ordered CREATE.
  */
 
 import type { Address } from './types';
@@ -27,7 +35,7 @@ export const LIFI_DIAMOND: Address = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE
 // ─────────────────────────────────────────────────────────────
 
 export const CONTRACTS = {
-  // Localhost (Anvil) - Deterministic CREATE3 addresses
+  // Localhost (Anvil) - placeholder addresses, not deployed
   31337: {
     BTR: ZERO_ADDRESS,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
@@ -44,7 +52,7 @@ export const CONTRACTS = {
     FAUCET: ZERO_ADDRESS,
   },
 
-  // Ethereum Mainnet - Deterministic CREATE3 addresses (to be deployed)
+  // Ethereum Mainnet - placeholder addresses, not deployed (to be deployed)
   1: {
     BTR: ZERO_ADDRESS,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
@@ -61,7 +69,7 @@ export const CONTRACTS = {
     FAUCET: ZERO_ADDRESS,
   },
 
-  // BNB Chain - Deterministic CREATE3 addresses (to be deployed)
+  // BNB Chain - placeholder addresses, not deployed (to be deployed)
   56: {
     BTR: ZERO_ADDRESS,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
@@ -78,7 +86,7 @@ export const CONTRACTS = {
     FAUCET: ZERO_ADDRESS,
   },
 
-  // Base - Deterministic CREATE3 addresses (to be deployed)
+  // Base - placeholder addresses, not deployed (to be deployed)
   8453: {
     BTR: ZERO_ADDRESS,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
@@ -95,7 +103,7 @@ export const CONTRACTS = {
     FAUCET: ZERO_ADDRESS,
   },
 
-  // Arbitrum - Deterministic CREATE3 addresses (to be deployed)
+  // Arbitrum - placeholder addresses, not deployed (to be deployed)
   42161: {
     BTR: ZERO_ADDRESS,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
@@ -137,7 +145,7 @@ export const CONTRACT_KEYS = [
 export type DexContractKey = (typeof CONTRACT_KEYS)[number];
 
 /**
- * Env var names for overriding ZERO placeholders until the mainnet CREATE3 deploy.
+ * Env var names for overriding ZERO placeholders until the mainnet deploy.
  * Front: prefix with `VITE_` (e.g. `VITE_ADMIN_ADDRESS`). Back/keepers: bare names.
  */
 export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
@@ -204,7 +212,7 @@ export function getBtrAccessControl(chainId: number): Address | undefined {
 // Mock Token Addresses (Anvil Only)
 // ─────────────────────────────────────────────────────────────
 
-// These are deterministic CREATE3 addresses from salts/bbbb_bb.txt
+// Vanity addresses from salts/bbbb_bb.txt (Anvil only; no CREATE3 in the shipped stack)
 export const MOCK_TOKENS: Record<string, Address> = {
   // From salts/bbbb_bb.txt
   mUSDC: '0xbbbb4a42775f9d01fb2870e702c7ed47ed5b04bb' as Address,
