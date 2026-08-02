@@ -16,12 +16,9 @@ export type MetricsGrain = '1m' | '5m' | '15m' | '1h' | '1d';
 export type MetricsSource = 'stub' | 'live' | 'empty';
 
 /**
- * Grain per window, so the collector and the front never disagree on what a bucket is.
- * Every table underneath is minute-floored, so 1m is the floor and anything coarser is a
- * server-side SAMPLE BY, never a client-side decimation of a fixed series.
- * Chosen to land every window in 60..720 points: a 1152px column cannot resolve more, and
- * the widest query measured on live QuestDB (30d over 236k pool_state_asset rows at 1m)
- * costs 1436ms against 536ms at 1h, so the point budget is also the latency budget.
+ * Grain per window, shared by the collector and the front so a bucket means one thing.
+ * Every table underneath is minute-floored ⇒ 1m is the floor. Sized to 60..720 points: the
+ * widest live query costs 1436ms at 1m against 536ms at 1h, so points are also latency.
  */
 export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>> = {
   '1h': '1m', // 60 pts
@@ -33,7 +30,7 @@ export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>>
   '30d': '1h', // 720
 };
 
-/** Coarsest grain whose bucket count fits the budget, for a free-form from..to span. */
+/** Grain for a free-form from..to span. Requires METRICS_WINDOWS to stay ascending. */
 export function grainForSpan(spanMs: number): MetricsGrain {
   for (const w of METRICS_WINDOWS) if (spanMs <= METRICS_WINDOW_MS[w]) return METRICS_WINDOW_GRAIN[w];
   return '1d';
@@ -95,8 +92,8 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'liq.events',
 ] as const satisfies readonly ProtocolTimeseriesMetric[];
 
-/** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the tx-level
- *  drill-down stays on GET /protocol/liquidity/history. */
+/** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the paged bucket
+ *  listing stays on GET /protocol/liquidity/history. */
 export type ProtocolLiquidityMetric =
   | 'liq.dep.usd'
   | 'liq.wd.usd'
