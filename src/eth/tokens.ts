@@ -231,6 +231,16 @@ export const TOKENS: Record<string, TokenMetadata> = {
       '56': '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3',
     },
   },
+  EURC: {
+    symbol: 'EURC',
+    name: 'Circle Euro Coin',
+    decimals: 6,
+    addresses: {
+      '1': '0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c',
+      '8453': '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42',
+      '11155111': '0x05705Ac3915A094b345629B02D5aa8d52Bb99DDB',
+    },
+  },
   // Fiat reference for pyth-fed X/USD oracle pairs (NXR); no on-chain token.
   USD: {
     symbol: 'USD',
