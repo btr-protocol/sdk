@@ -1,24 +1,58 @@
 /** Shared collector ↔ SDK ↔ front protocol-metrics contract. */
 
-export const METRICS_WINDOWS = ['24h', '7d', '30d'] as const;
+export const METRICS_WINDOWS = ['1h', '6h', '12h', '24h', '48h', '7d', '30d'] as const;
 export type MetricsWindow = (typeof METRICS_WINDOWS)[number];
 export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
+  '1h': 3600_000,
+  '6h': 6 * 3600_000,
+  '12h': 12 * 3600_000,
   '24h': 24 * 3600_000,
+  '48h': 48 * 3600_000,
   '7d': 7 * 24 * 3600_000,
   '30d': 30 * 24 * 3600_000,
 };
-export type MetricsGrain = '1m' | '5m' | '1h' | '1d';
+export const DEFAULT_METRICS_WINDOW: MetricsWindow = '48h';
+export type MetricsGrain = '1m' | '5m' | '15m' | '1h' | '1d';
 export type MetricsSource = 'stub' | 'live' | 'empty';
+
+/**
+ * Grain per window, so the collector and the front never disagree on what a bucket is.
+ * Every table underneath is minute-floored, so 1m is the floor and anything coarser is a
+ * server-side SAMPLE BY, never a client-side decimation of a fixed series.
+ * Chosen to land every window in 60..720 points: a 1152px column cannot resolve more, and
+ * the widest query measured on live QuestDB (30d over 236k pool_state_asset rows at 1m)
+ * costs 1436ms against 536ms at 1h, so the point budget is also the latency budget.
+ */
+export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>> = {
+  '1h': '1m', // 60 pts
+  '6h': '1m', // 360
+  '12h': '5m', // 144
+  '24h': '5m', // 288
+  '48h': '5m', // 576
+  '7d': '15m', // 672
+  '30d': '1h', // 720
+};
+
+/** Coarsest grain whose bucket count fits the budget, for a free-form from..to span. */
+export function grainForSpan(spanMs: number): MetricsGrain {
+  for (const w of METRICS_WINDOWS) if (spanMs <= METRICS_WINDOW_MS[w]) return METRICS_WINDOW_GRAIN[w];
+  return '1d';
+}
 
 export type ProtocolTimeseriesMetric =
   | 'vol.usd'
   | 'vol.usd.asset'
   | 'swap.count'
+  | 'swap.traders'
   | 'fee.lp.usd'
   | 'fee.proto.usd'
+  | 'fee.total.usd'
   | 'apr.fee'
   | 'apr.strategy'
   | 'tvl.usd'
+  | 'depth.usd'
+  | 'reserves.usd'
+  | 'debt.usd'
   | 'cov.c'
   | 'skew.psi'
   | 'util.liq'
@@ -26,17 +60,25 @@ export type ProtocolTimeseriesMetric =
   | 'oracle.age'
   | 'mm.fee.paid'
   | 'mm.spread.avg'
-  | 'mm.spread.quoted';
+  | 'mm.spread.quoted'
+  | 'holders.active'
+  | 'holders.lp.usd'
+  | ProtocolLiquidityMetric;
 
 export const PROTOCOL_TIMESERIES_METRICS = [
   'vol.usd',
   'vol.usd.asset',
   'swap.count',
+  'swap.traders',
   'fee.lp.usd',
   'fee.proto.usd',
+  'fee.total.usd',
   'apr.fee',
   'apr.strategy',
   'tvl.usd',
+  'depth.usd',
+  'reserves.usd',
+  'debt.usd',
   'cov.c',
   'skew.psi',
   'util.liq',
@@ -45,12 +87,16 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'mm.fee.paid',
   'mm.spread.avg',
   'mm.spread.quoted',
+  'holders.active',
+  'holders.lp.usd',
+  'liq.dep.usd',
+  'liq.wd.usd',
+  'liq.net.usd',
+  'liq.events',
 ] as const satisfies readonly ProtocolTimeseriesMetric[];
 
-/** LP flow taxonomy (dex_liquidity_1m). Deliberately NOT in
- *  ProtocolTimeseriesMetric: /metrics/timeseries has no SQL case for these, so
- *  listing them there would make the collector accept an id it cannot serve.
- *  Flow is served by GET /protocol/liquidity/history; these ids label it. */
+/** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the tx-level
+ *  drill-down stays on GET /protocol/liquidity/history. */
 export type ProtocolLiquidityMetric =
   | 'liq.dep.usd'
   | 'liq.wd.usd'
