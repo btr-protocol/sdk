@@ -75,24 +75,27 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
   // Single fetch attempt: timeout + typed transport errors.
   async function fetchRpc(url: string, body: unknown): Promise<any> {
     const ctrl = new AbortController();
+    // The abort must stay armed across the body read: headers can arrive and the body
+    // then stall forever (backgrounded tab, throttling proxy). A settled `post` is what
+    // clears the `inflight` dedupe entry, so a hung read wedges every later same-key call.
     const t = setTimeout(() => ctrl.abort(), timeout);
-    let res: Response;
     try {
-      res = await fetch(url, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
+      if (res.status === 429) throw new RpcRateLimitError('rate limited', 429);
+      if (!res.ok) throw new RpcNetworkError(`HTTP ${res.status}: ${res.statusText}`, res.status);
+      return await res.json();
     } catch (e: any) {
+      if (e instanceof RpcError) throw e;
       if (e?.name === 'AbortError') throw new RpcTimeoutError(`RPC timeout after ${timeout}ms`);
       throw new RpcNetworkError(e?.message ?? 'network error');
     } finally {
       clearTimeout(t);
     }
-    if (res.status === 429) throw new RpcRateLimitError('rate limited', 429);
-    if (!res.ok) throw new RpcNetworkError(`HTTP ${res.status}: ${res.statusText}`, res.status);
-    return res.json();
   }
 
   // Failover across endpoints + capped exponential backoff.
