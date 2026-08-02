@@ -83,6 +83,10 @@ export interface PlanLegOpts {
   nativeOut?: boolean;
 }
 
+/** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
+const SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+const isSentinel = (a: Address): boolean => a.toLowerCase() === SENTINEL;
+
 const toUnits = (v: number, decimals: number): bigint =>
   v > 0 ? parseUnits(v.toFixed(Math.min(decimals, 18)), decimals) : 0n;
 
@@ -152,8 +156,13 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   let wrapValue = 0n;
   let unwrapAmount = 0n;
   for (const leg of legs) {
-    // Trust boundary: a wrap/unwrap flag that does not match the chain's wrapped-native would send
-    // value to, or withdraw from, an unrelated contract. Refuse to encode it.
+    // Trust boundary: the EIP-7528 sentinel is not a contract. Approving or swapping it would
+    // encode an approve to an address with no code, so a leg must carry the wrapped address.
+    if (isSentinel(leg.tokenIn) || isSentinel(leg.tokenOut)) {
+      throw new Error('leg carries the native sentinel: pass the wrapped-native address');
+    }
+    // A wrap/unwrap flag that does not match the chain's wrapped-native would send value to, or
+    // withdraw from, an unrelated contract. Refuse to encode it.
     if (leg.wrapIn) {
       if (!wnative || leg.tokenIn.toLowerCase() !== wnative) {
         throw new Error('wrapIn leg: tokenIn is not the chain wrapped native');
