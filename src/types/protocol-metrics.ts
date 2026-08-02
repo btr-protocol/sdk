@@ -25,7 +25,8 @@ export type ProtocolTimeseriesMetric =
   | 'inv.ratio'
   | 'oracle.age'
   | 'mm.fee.paid'
-  | 'mm.spread.avg';
+  | 'mm.spread.avg'
+  | 'mm.spread.quoted';
 
 export const PROTOCOL_TIMESERIES_METRICS = [
   'vol.usd',
@@ -43,6 +44,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'oracle.age',
   'mm.fee.paid',
   'mm.spread.avg',
+  'mm.spread.quoted',
 ] as const satisfies readonly ProtocolTimeseriesMetric[];
 
 /** LP flow taxonomy (dex_liquidity_1m). Deliberately NOT in
