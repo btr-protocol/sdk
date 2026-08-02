@@ -11,9 +11,23 @@ import { POOL_ABI } from '../abis/Pool.js';
 import type { SwapPlan } from '../amm/router.js';
 import { encodeFn } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
+import type { Abi } from '../eth/abi.js';
 import type { Address, Hex } from '../eth/types.js';
-import { NATIVE_TOKEN, defaultDeadline } from '../pool/index.js';
+import { defaultDeadline } from '../pool/index.js';
 import { parseUnits } from '../utils/format.js';
+
+/** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
+ *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
+const WNATIVE_ABI: Abi = [
+  { name: 'deposit', type: 'function', stateMutability: 'payable', inputs: [], outputs: [] },
+  {
+    name: 'withdraw',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'wad', type: 'uint256' }],
+    outputs: [],
+  },
+];
 
 /** One executable swap leg. For a split, pass several (parallel, each funded from the user's tokenIn).
  *  For a cross-pool 2-hop the caller passes two legs where leg2.amountIn is set conservatively to
@@ -25,7 +39,10 @@ export interface ExecLeg {
   tokenOut: Address;
   amountIn: bigint;
   minOut: bigint; // per-leg slippage floor
-  native?: boolean; // tokenIn is the native asset (no approve; carried as msg.value)
+  /** tokenIn is the chain's wrapped native and the user pays the gas token: prepend a wrap. */
+  wrapIn?: boolean;
+  /** tokenOut is the chain's wrapped native and the user wants the gas token: append an unwrap. */
+  unwrapOut?: boolean;
 }
 
 /** An encoded call ready for eth_sendTransaction / wallet_sendCalls. */
@@ -45,6 +62,8 @@ export interface BuildOpts {
   approveMax?: boolean;
   /** Unix-seconds swap expiry; defaults to now + 600s. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
+  /** Chain's wrapped-native (WETH9) address. Required as soon as any leg sets wrapIn/unwrapOut. */
+  wrappedNative?: Address;
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;
@@ -57,16 +76,20 @@ export interface TokenMeta {
 export interface PlanLegOpts {
   slippageFrac: number; // per-leg slippage floor (0.005 = 0.5%)
   tokenOf: (symbol: string) => TokenMeta | undefined; // route symbols → on-chain meta
+  /** User pays the gas token: the first leg of every part wraps before it swaps. The plan itself is
+   *  always expressed in the WRAPPED symbol, so routing and pricing stay wrap-agnostic (1:1). */
+  nativeIn?: boolean;
+  /** User wants the gas token back: the last leg of every part unwraps after it swaps. */
+  nativeOut?: boolean;
 }
 
 const toUnits = (v: number, decimals: number): bigint =>
   v > 0 ? parseUnits(v.toFixed(Math.min(decimals, 18)), decimals) : 0n;
-const isNative = (a: Address): boolean => a.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 
 /** Map a router plan (amm/router rankSwap `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs
  *  where leg2.amountIn = leg1.minOut (the exact bridged amount isn't known until leg1 executes).
- *  Native-sentinel tokenIn (EIP-7528) flags the leg for msg.value instead of an approval.
+ *  `nativeIn`/`nativeOut` flag the outer legs so the batch wraps/unwraps around them.
  *  Null when any pool address or token meta is missing. */
 export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null {
   const slip = opts.slippageFrac;
@@ -84,7 +107,8 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: tout.address,
         amountIn: toUnits(partIn, tin.decimals),
         minOut: toUnits(part.quote.amountOut * (1 - slip), tout.decimals),
-        native: isNative(tin.address),
+        wrapIn: opts.nativeIn,
+        unwrapOut: opts.nativeOut,
       });
     } else {
       const t1in = opts.tokenOf(rl[0].tokenIn);
@@ -98,7 +122,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: tmid.address,
         amountIn: toUnits(partIn, t1in.decimals),
         minOut: leg1MinOut,
-        native: isNative(t1in.address),
+        wrapIn: opts.nativeIn,
       });
       legs.push({
         pool: rl[1].poolAddr as Address,
@@ -106,24 +130,46 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         minOut: toUnits(part.quote.amountOut * (1 - slip), t2out.decimals),
-        native: isNative(tmid.address),
+        unwrapOut: opts.nativeOut,
       });
     }
   }
   return legs;
 }
 
-/** Ordered [approvals…, swaps…] calls for a routed/split swap. Approvals are deduped per (token,pool);
- *  amount is exact Σ amountIn by default, or max uint256 when `approveMax`. Native-in legs carry
- *  `value` instead of an approval. No EIP-2612 / Permit2 — plain ERC-20 `approve` only. */
+/** Ordered [wrap?, approvals…, swaps…, unwrap?] calls for a routed/split swap. Approvals are deduped
+ *  per (token,pool); amount is exact Σ amountIn by default, or max uint256 when `approveMax`. Gas-token
+ *  legs are composed, never delegated to the pool: a `wrapIn` leg is funded by a preceding
+ *  `WNATIVE.deposit{value}` and then behaves as a plain ERC-20 leg; an `unwrapOut` leg is followed by
+ *  `WNATIVE.withdraw(Σ minOut)`. Withdrawing minOut (not the quote) is the only amount guaranteed to
+ *  exist: any positive slippage stays with the user as wrapped-native rather than reverting the batch.
+ *  No EIP-2612 / Permit2 — plain ERC-20 `approve` only. */
 export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const approvals: ExecCall[] = [];
   const swaps: ExecCall[] = [];
   const seen = new Set<string>();
+  const wnative = opts.wrappedNative?.toLowerCase();
+  let wrapValue = 0n;
+  let unwrapAmount = 0n;
+  for (const leg of legs) {
+    // Trust boundary: a wrap/unwrap flag that does not match the chain's wrapped-native would send
+    // value to, or withdraw from, an unrelated contract. Refuse to encode it.
+    if (leg.wrapIn) {
+      if (!wnative || leg.tokenIn.toLowerCase() !== wnative) {
+        throw new Error('wrapIn leg: tokenIn is not the chain wrapped native');
+      }
+      wrapValue += leg.amountIn;
+    }
+    if (leg.unwrapOut) {
+      if (!wnative || leg.tokenOut.toLowerCase() !== wnative) {
+        throw new Error('unwrapOut leg: tokenOut is not the chain wrapped native');
+      }
+      unwrapAmount += leg.minOut;
+    }
+  }
   // Σ amountIn per (token,pool) so a split into the same pool gets one exact approve covering both legs.
   const exactByKey = new Map<string, bigint>();
   for (const leg of legs) {
-    if (leg.native) continue;
     const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
     exactByKey.set(key, (exactByKey.get(key) ?? 0n) + leg.amountIn);
   }
@@ -132,24 +178,20 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const deadline = opts.deadline ?? defaultDeadline();
 
   for (const leg of legs) {
-    if (!leg.native) {
-      const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
-      const amount = approveAmt(key);
-      const need = opts.needsApproval
-        ? opts.needsApproval(leg.tokenIn, leg.pool, amount)
-        : true;
-      if (need && !seen.has(key)) {
-        seen.add(key);
-        approvals.push({
-          to: leg.tokenIn,
-          data: encodeFn({
-            abi: ERC20_ABI,
-            functionName: 'approve',
-            args: [leg.pool, amount],
-          }),
-          value: 0n,
-        });
-      }
+    const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
+    const amount = approveAmt(key);
+    // A wrapped-native leg holds no allowance before the batch wraps, so it always needs one:
+    // the caller's cached-allowance probe reads a pre-batch state that cannot cover it.
+    const need = leg.wrapIn || !opts.needsApproval
+      ? true
+      : opts.needsApproval(leg.tokenIn, leg.pool, amount);
+    if (need && !seen.has(key)) {
+      seen.add(key);
+      approvals.push({
+        to: leg.tokenIn,
+        data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [leg.pool, amount] }),
+        value: 0n,
+      });
     }
     swaps.push({
       to: leg.pool,
@@ -158,11 +200,25 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
         functionName: 'swap',
         args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
       }),
-      value: leg.native ? leg.amountIn : 0n,
+      value: 0n,
     });
   }
-  // Approvals first so a same-batch swap sees the allowance.
-  return [...approvals, ...swaps];
+  const wrap: ExecCall[] = wrapValue > 0n
+    ? [{
+        to: opts.wrappedNative as Address,
+        data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
+        value: wrapValue,
+      }]
+    : [];
+  const unwrap: ExecCall[] = unwrapAmount > 0n
+    ? [{
+        to: opts.wrappedNative as Address,
+        data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [unwrapAmount] }),
+        value: 0n,
+      }]
+    : [];
+  // Wrap first (funds the approvals), approvals before the swaps that spend them, unwrap last.
+  return [...wrap, ...approvals, ...swaps, ...unwrap];
 }
 
 /** Σ msg.value across the calls (native-in legs) — the total to attach to a batched send. */
