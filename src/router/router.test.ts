@@ -1,16 +1,18 @@
 import { describe, expect, test } from 'bun:test';
 import type { SwapPlan } from '../amm/router.js';
-import { NATIVE_TOKEN } from '../pool/index.js';
 import { type ExecLeg, type TokenMeta, buildSwapCalls, planToLegs, totalValue } from './index.js';
 
 const USER = '0x00000000000000000000000000000000000000AA' as const;
 const USDC = '0x0000000000000000000000000000000000000001' as const;
 const USDT = '0x0000000000000000000000000000000000000002' as const;
+const WNATIVE = '0x0000000000000000000000000000000000000003' as const;
 const POOL_S = '0x0000000000000000000000000000000000000010' as const;
 const POOL_V = '0x0000000000000000000000000000000000000020' as const;
 
 const SWAP_SEL = '0x9908fc8b'; // swap(address,address,uint256,uint256,address,uint256)
 const APPROVE_SEL = '0x095ea7b3'; // approve(address,uint256)
+const DEPOSIT_SEL = '0xd0e30db0'; // deposit()
+const WITHDRAW_SEL = '0x2e1a7d4d'; // withdraw(uint256)
 const MAX_UINT256 = (1n << 256n) - 1n;
 
 /** Last word of approve(spender, amount) calldata → amount. */
@@ -61,14 +63,55 @@ describe('buildSwapCalls', () => {
     expect(calls[0].data.startsWith(SWAP_SEL)).toBe(true);
   });
 
-  test('native-in leg → no approval, value = amountIn', () => {
+  test('wrapIn leg → leading deposit carries the value, swap itself is valueless', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: USDC, tokenOut: USDT, amountIn: 5n, minOut: 4n, native: true },
+      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
     ];
-    const calls = buildSwapCalls(legs, { recipient: USER });
-    expect(calls.length).toBe(1);
+    const calls = buildSwapCalls(legs, { recipient: USER, wrappedNative: WNATIVE });
+    expect(calls.length).toBe(3); // deposit, approve, swap
+    expect(calls[0].to).toBe(WNATIVE);
+    expect(calls[0].data).toBe(DEPOSIT_SEL);
     expect(calls[0].value).toBe(5n);
+    expect(calls[1].data.startsWith(APPROVE_SEL)).toBe(true);
+    expect(calls[2].value).toBe(0n);
     expect(totalValue(calls)).toBe(5n);
+  });
+
+  test('wrapIn always approves, even when the allowance probe says otherwise', () => {
+    const legs: ExecLeg[] = [
+      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+    ];
+    const calls = buildSwapCalls(legs, {
+      recipient: USER,
+      wrappedNative: WNATIVE,
+      needsApproval: () => false,
+    });
+    expect(calls.filter((c) => c.data.startsWith(APPROVE_SEL)).length).toBe(1);
+  });
+
+  test('unwrapOut leg → trailing withdraw of Σ minOut, not of the quote', () => {
+    const legs: ExecLeg[] = [
+      { pool: POOL_V, tokenIn: USDC, tokenOut: WNATIVE, amountIn: 9n, minOut: 4n, unwrapOut: true },
+      { pool: POOL_S, tokenIn: USDC, tokenOut: WNATIVE, amountIn: 9n, minOut: 3n, unwrapOut: true },
+    ];
+    const calls = buildSwapCalls(legs, { recipient: USER, wrappedNative: WNATIVE });
+    const last = calls[calls.length - 1];
+    expect(last.to).toBe(WNATIVE);
+    expect(last.data.startsWith(WITHDRAW_SEL)).toBe(true);
+    expect(BigInt(`0x${last.data.slice(10)}`)).toBe(7n);
+    expect(totalValue(calls)).toBe(0n);
+  });
+
+  test('wrap/unwrap flag that does not match the chain wrapped native is refused', () => {
+    const wrong: ExecLeg[] = [
+      { pool: POOL_V, tokenIn: USDC, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+    ];
+    expect(() => buildSwapCalls(wrong, { recipient: USER, wrappedNative: WNATIVE })).toThrow();
+    // Missing wrappedNative is equally refused: it would encode a call to `undefined`.
+    const right: ExecLeg[] = [
+      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+    ];
+    expect(() => buildSwapCalls(right, { recipient: USER })).toThrow();
   });
 
   test('dedup approvals for the same (token,pool) across legs — exact Σ amountIn', () => {
@@ -88,7 +131,7 @@ describe('planToLegs', () => {
   const META: Record<string, TokenMeta> = {
     USDC: { address: USDC, decimals: 6 },
     USDT: { address: USDT, decimals: 18 },
-    BNB: { address: NATIVE_TOKEN, decimals: 18 },
+    BNB: { address: WNATIVE, decimals: 18 },
   };
   const tokenOf = (s: string) => META[s];
   const direct = (poolAddr: string | undefined, tokenIn: string, tokenOut: string) => ({
@@ -119,10 +162,10 @@ describe('planToLegs', () => {
     expect(legs.length).toBe(1);
     expect(legs[0].amountIn).toBe(100_000_000n); // 100 USDC @ 6 decimals
     expect(legs[0].minOut).toBe(74_250_000_000_000_000_000n); // 99·0.75 @ 18 decimals
-    expect(legs[0].native).toBe(false);
+    expect(legs[0].wrapIn).toBeUndefined();
   });
 
-  test('cross-pool part → 2 legs; leg2.amountIn = leg1.minOut; native sentinel flags leg1', () => {
+  test('cross-pool part → 2 legs; leg2.amountIn = leg1.minOut; wrap flags leg1 only', () => {
     const route = {
       legs: [
         { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
@@ -152,12 +195,12 @@ describe('planToLegs', () => {
         },
       ],
     };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }));
+    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, nativeIn: true }));
     expect(legs.length).toBe(2);
-    expect(legs[0].native).toBe(true);
+    expect(legs[0].wrapIn).toBe(true);
     expect(legs[0].minOut).toBe(600_000_000n); // bridged USDC @ 6 decimals
     expect(legs[1].amountIn).toBe(legs[0].minOut);
-    expect(legs[1].native).toBe(false);
+    expect(legs[1].wrapIn).toBeUndefined();
   });
 
   test('split parts emit largest first', () => {
