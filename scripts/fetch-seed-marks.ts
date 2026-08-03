@@ -27,10 +27,10 @@ const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$
 
 /** Plausibility bands, mirroring the deploy scripts' own requires so a bad snapshot fails HERE —
  *  before broadcast — instead of stranding a feed mid-ceremony. Peg band matches the Solidity
- *  [0.98,1.02] clamp; syrupUSDC accrues so it takes the wide stable band. */
+ *  [0.98,1.02] clamp. */
 const PEG = [0.98, 1.02] as const;
 const BANDS: Record<string, readonly [number, number]> = {
-  syrupUSDC: [1.0, 1.5], WETH: [500, 20_000], WBTC: [20_000, 500_000], cbBTC: [20_000, 500_000],
+  WETH: [500, 20_000], WBTC: [20_000, 500_000], cbBTC: [20_000, 500_000],
   BNB: [100, 5_000], XAUT: [1_500, 10_000], PAXG: [1_500, 10_000], EURC: [0.9, 1.3],
   // FX core (fiat-backed stables). These legs are NOT ~1.0 against the USDC base — their mark is
   // the real fiat rate — so the PEG band below would reject every one of them. Each window is a
