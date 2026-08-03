@@ -396,6 +396,24 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
+    name: 'adminSetDeadSeedPow10',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'pow10',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'adminSetFeeParams',
     inputs: [
       {
@@ -860,6 +878,68 @@ export const POOL_AUX_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'DeadSharesSeeded',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'value',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'lpAmount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'IndexUpdated',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'index',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'reserves',
+        type: 'uint128',
+        indexed: false,
+        internalType: 'uint128',
+      },
+      {
+        name: 'liabilities',
+        type: 'uint128',
+        indexed: false,
+        internalType: 'uint128',
+      },
+      {
+        name: 'reason',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
+      },
+    ],
+    anonymous: false,
   },
   {
     type: 'error',

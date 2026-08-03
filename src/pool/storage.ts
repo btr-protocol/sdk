@@ -3,9 +3,11 @@
  *
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`), pinned by dex PoolStorageLayout.t.sol:
  *   slot0 = baseToken|initialized, 1 = wnative, 2 = treasury; mappings assets=3,
- *   oracleConfigs=4, riskConfigs=5, curves=6, lpBalances=7, protocolFees=8;
- *   feeParams=9, flowCooldownSeconds=10, lastDepositTime=11, lastLPStakeTime=12,
- *   factory=13, assetHooks=14, invested=15.
+ *   oracleConfigs=4, riskConfigs=5, curves=6, __reserved_lpBalances=7, protocolFees=8;
+ *   feeParams=9, flowCooldownSeconds=10 (factory packs into slot 10 @ byte offset 2),
+ *   assetHooks=11, invested=12, lpTokens=13.
+ * Slot 7 is a reserved pin, not live state: the per-leg LPToken clone is the share ledger, and
+ *   balances come from `Pool.getLPBalance` or the receipt's own `balanceOf`, never from a slot read.
  * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
@@ -36,15 +38,17 @@ export const POOL_STORAGE = {
   oracleConfigs: 4n,
   riskConfigs: 5n,
   curves: 6n,
-  lpBalances: 7n,
+  /** Reserved pin (was `lpBalances`); never read. Slot 7 is kept so `protocolFees` stays at 8. */
+  reservedLpBalances: 7n,
   protocolFees: 8n,
   feeParams: 9n,
+  /** `factory` (address) packs into this same word at byte offset 2. */
   flowCooldownSeconds: 10n,
-  lastDepositTime: 11n,
-  lastLPStakeTime: 12n,
-  factory: 13n,
-  assetHooks: 14n,
-  invested: 15n,
+  factory: 10n,
+  assetHooks: 11n,
+  invested: 12n,
+  /** Per-leg ERC-20 receipt registry: `mapping(leg => LPToken)`. */
+  lpTokens: 13n,
 } as const;
 
 /**
@@ -195,7 +199,8 @@ export async function readAssetPresetId(
 ): Promise<number> {
   const key = await resolveTokenStorageKey(provider, pool, token);
   const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assets) + 1n);
-  // Asset slot 1: minLiquidity[0:16) liquidityIndex[16:24) lastUpdate[24:28) presetId[28:30).
+  // Asset slot 1: minLiquidity[0:12) liquidityIndex[12:24) lastUpdate[24:28) presetId[28:30)
+  // deadSeedPow10[30:31).
   return u16At(word, 28);
 }
 
