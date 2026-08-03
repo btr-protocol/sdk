@@ -66,7 +66,14 @@ export const SEPOLIA_BTR = {
   fxPool: '0x18c7376A4F9B3C3fb8A0A33fAf3c55aD225CB229' as Address,
 } as const;
 
-export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; quoteVia?: string; token: Address; symbol: string; }
+/**
+ * `nxrQuote` names the ticker NXR ACTUALLY serves when it is the reciprocal of
+ * `nxrSymbol`. NXR publishes the fiat crosses USD-base only (USD-CAD, USD-BRL,
+ * USD-JPY, USD-KRW); /v1/price/CAD-USD and friends are 404. `nxrSymbol` stays
+ * the semantic X-USD cross every consumer displays, so a reader takes
+ * `nxrQuote ?? nxrSymbol` to fetch and reciprocates when `nxrQuote` is set.
+ */
+export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; nxrQuote?: string; quoteVia?: string; token: Address; symbol: string; }
 /**
  * ExternalOracle feeds per pool asset.
  * `name` = on-chain USDC-numeraire id (keccak(asset, USDC)).
@@ -99,7 +106,7 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'XAUT-USDC', feedId: '0x8afa125f9bb7cb165f10d443fc5b426d2bdd2a001e36fa52e0eb732644e2cb1d', nxrSymbol: 'XAUT-USDC', token: SEPOLIA_TOKENS['XAUT']!, symbol: 'XAUT' },
   { name: 'PAXG-USDC', feedId: '0x22562b1961d06a602fc9149b222c5cc50548fd80202b752ec666bbcf6a47c34a', nxrSymbol: 'PAXG-USD', token: SEPOLIA_TOKENS['PAXG']!, symbol: 'PAXG' },
   { name: 'EURC-USDC', feedId: '0x7b48a1509b4849707b3c406b7c1866cabb0938d87b5e0b0842df4b098c693575', nxrSymbol: 'EURC-USD', token: SEPOLIA_TOKENS['EURC']!, symbol: 'EURC' },
-  { name: 'QCAD-USDC', feedId: '0xe1cfd349e9e3e4d6891c8e33a7b1533e191ee3318ff034c049618caa57d74bad', nxrSymbol: 'CAD-USD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
+  { name: 'QCAD-USDC', feedId: '0xe1cfd349e9e3e4d6891c8e33a7b1533e191ee3318ff034c049618caa57d74bad', nxrSymbol: 'CAD-USD', nxrQuote: 'USD-CAD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
   { name: 'AUDF-USDC', feedId: '0x020409a061f1ccc6a3d0511f2bb1f18c175b4614e4c5c5e02ed715d6254a5dfa', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF' },
   // idx 24: the BASE-DEPEG REFERENCE, keccak(USDC, USD) — NOT keccak(USDC, USDC).
   // Omitting it left this array at 29 entries against the chain's 30, so every
@@ -111,9 +118,9 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   // `sepoliaFeedId('USDC')` still resolves to USDC-USDC. Feed-level callers must
   // use `sepoliaFeedByName` — see test/sepolia-feeds.test.ts.
   { name: 'USDC-USD', feedId: '0xd1d7f3873fb17b9dbd7bdf1c2c9e6b85b483f61c4f4ce08c48b2b7b668d1485d', nxrSymbol: 'USDC-USD', token: SEPOLIA_TOKENS['USDC']!, symbol: 'USDC' },
-  { name: 'BRLA-USDC', feedId: '0x515ee3abad05481e194281cf3698615c4dae80161051c75b5e5b8be9c14fda32', nxrSymbol: 'BRL-USD', token: SEPOLIA_TOKENS['BRLA']!, symbol: 'BRLA' },
-  { name: 'JPYC-USDC', feedId: '0x965b70a15f56a602d15397b5fff1893d2786ebb06ea0f5199d0bed022eb85453', nxrSymbol: 'JPY-USD', token: SEPOLIA_TOKENS['JPYC']!, symbol: 'JPYC' },
-  { name: 'KRW1-USDC', feedId: '0xc0322e276c809f19550dae0de4178c06042ea6b8802b1d813c9957c2fe84d1a0', nxrSymbol: 'KRW-USD', token: SEPOLIA_TOKENS['KRW1']!, symbol: 'KRW1' },
+  { name: 'BRLA-USDC', feedId: '0x515ee3abad05481e194281cf3698615c4dae80161051c75b5e5b8be9c14fda32', nxrSymbol: 'BRL-USD', nxrQuote: 'USD-BRL', token: SEPOLIA_TOKENS['BRLA']!, symbol: 'BRLA' },
+  { name: 'JPYC-USDC', feedId: '0x965b70a15f56a602d15397b5fff1893d2786ebb06ea0f5199d0bed022eb85453', nxrSymbol: 'JPY-USD', nxrQuote: 'USD-JPY', token: SEPOLIA_TOKENS['JPYC']!, symbol: 'JPYC' },
+  { name: 'KRW1-USDC', feedId: '0xc0322e276c809f19550dae0de4178c06042ea6b8802b1d813c9957c2fe84d1a0', nxrSymbol: 'KRW-USD', nxrQuote: 'USD-KRW', token: SEPOLIA_TOKENS['KRW1']!, symbol: 'KRW1' },
 ];
 
 /** symbol -> ExternalOracle feedId (getFeed key). null when no feed is registered.
