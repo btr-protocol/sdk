@@ -233,6 +233,8 @@ export {
   numberToHex,
   hexToBigInt,
   bigIntToHex,
+  encodeB64,
+  decodeB64,
 } from '../utils/encoding.js';
 
 // ─────────────────────────────────────────────────────────────

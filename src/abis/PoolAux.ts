@@ -880,6 +880,19 @@ export const POOL_AUX_ABI = [
     stateMutability: 'nonpayable',
   },
   {
+    type: 'function',
+    name: 'lpTokenImpl',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
     type: 'event',
     name: 'DeadSharesSeeded',
     inputs: [
