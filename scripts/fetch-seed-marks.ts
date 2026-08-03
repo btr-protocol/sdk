@@ -69,13 +69,17 @@ for (const f of SEPOLIA_ORACLE_FEEDS) {
   try {
     // /v1/price/{ticker} is the only endpoint serving a live px: {ticker,mid,bid,ask,ci,confidence}.
     // /v1/tickers/detail is a CATALOGUE and carries no price at all.
-    const r = await fetch(`${NXR}/v1/price/${encodeURIComponent(f.nxrSymbol)}`, {
+    // NXR serves the fiat crosses USD-base ONLY: /v1/price/CAD-USD is 404 while
+    // USD-CAD is 200. `nxrQuote` names that served ticker; reciprocate it back
+    // to the X-USD cross the feed is denominated in.
+    const quoted = f.nxrQuote ?? f.nxrSymbol;
+    const r = await fetch(`${NXR}/v1/price/${encodeURIComponent(quoted)}`, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(8_000),
     });
     if (r.ok) {
       const j = (await r.json()) as { mid?: number };
-      if (typeof j.mid === 'number' && j.mid > 0) mid = j.mid;
+      if (typeof j.mid === 'number' && j.mid > 0) mid = f.nxrQuote ? 1 / j.mid : j.mid;
     }
   } catch (e) {
     errs.push(`${f.symbol} (${f.nxrSymbol}): ${(e as Error).message}`);
