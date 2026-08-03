@@ -47,6 +47,13 @@ export interface SwapQuote {
   lpFee: bigint;
   skewIn: number;
   skewOut: number;
+  /** Path oracle mark, B64 (1e18), tokenOut per tokenIn. */
+  markPriceB64: bigint;
+  /** Path executable mid, B64 (1e18): the mark displaced by inventory skew, which is what the
+   *  book quotes around. (exec - mid) is extractable value, (mid - mark) is the skew premium. */
+  midPriceB64: bigint;
+  /** Coverage toll withheld from the gross output before the fee, tokenOut units. */
+  covToll: bigint;
   routeHops: Address[];
   hopAmounts: bigint[];
 }

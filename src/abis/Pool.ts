@@ -188,6 +188,19 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
+    name: 'flowCooldownSeconds',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getAsset',
     inputs: [
       {
@@ -372,38 +385,6 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
-    name: 'lpToken',
-    inputs: [
-      {
-        name: 'tk',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'flowCooldownSeconds',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'getProtocolFees',
     inputs: [
       {
@@ -502,6 +483,21 @@ export const POOL_ABI = [
             internalType: 'int8',
           },
           {
+            name: 'markPriceB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
+            name: 'midPriceB64',
+            type: 'uint64',
+            internalType: 'uint64',
+          },
+          {
+            name: 'covToll',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
             name: 'routeHops',
             type: 'address[]',
             internalType: 'address[]',
@@ -555,6 +551,25 @@ export const POOL_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'lpToken',
+    inputs: [
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -1240,6 +1255,24 @@ export const POOL_ABI = [
       },
       {
         name: 'lpFee',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'markPriceB64',
+        type: 'uint64',
+        indexed: false,
+        internalType: 'uint64',
+      },
+      {
+        name: 'midPriceB64',
+        type: 'uint64',
+        indexed: false,
+        internalType: 'uint64',
+      },
+      {
+        name: 'covToll',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
