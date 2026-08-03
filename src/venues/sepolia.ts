@@ -10,7 +10,7 @@ export const SEPOLIA_CHAIN_ID = 11155111;
  *  put all 26 `Deposited` events out of scope and they were never indexed. */
 export const SEPOLIA_DEPLOY_BLOCK = 11340000;
 
-/** Pool asset ERC20s (24 unique: 17 stable + 9 volatile, USDC/USDT shared). Keyed by canonical symbol. */
+/** Pool asset ERC20s (23 unique: 16 stable + 9 volatile, USDC/USDT shared). Keyed by canonical symbol. */
 export const SEPOLIA_TOKENS: Record<string, Address> = {
   USDC: '0x5AFaFEC0495e362976E1cA87D1Ce044AC49A39E9' as Address,
   USDT: '0xa7Dc0A8815acCbDfc22619b6F65b2dE710Eb2A7B' as Address,
@@ -21,7 +21,6 @@ export const SEPOLIA_TOKENS: Record<string, Address> = {
   USDG: '0xeE12a7072779a4ab85f2DD2a1E163DbF164291f9' as Address,
   PYUSD: '0x626eb915d4a4136F7c00352A54378d3A322488da' as Address,
   RLUSD: '0x35c625c07ed4a9123ab863f6e8722c9210c808A3' as Address,
-  syrupUSDC: '0xA1fe5aDcB5f5DD1c21d372D18E7dF7fa5bfbc09e' as Address,
   USDF: '0xee7D69C52c2F183A0389374E82ca841c5a463573' as Address,
   U: '0x89A9cD1dd6DE3ab7152EF9c7C5496c2946334D0D' as Address,
   GHO: '0xF36eEe851bf3e76E464609a717bAE4a239A8cC7b' as Address,
@@ -43,7 +42,7 @@ export const SEPOLIA_TOKENS: Record<string, Address> = {
   KRW1: '0xD5eE24Fb35b847F6b8bdFe71b2F9E051f289d08a' as Address,
 } as const;
 
-export const SEPOLIA_STABLE_SYMBOLS = ["USDC", "USDT", "USDE", "USDS", "DAI", "USD1", "USDG", "PYUSD", "RLUSD", "syrupUSDC", "USDF", "U", "GHO", "TUSD", "USDTB", "FDUSD", "AUSD"] as const;
+export const SEPOLIA_STABLE_SYMBOLS = ["USDC", "USDT", "USDE", "USDS", "DAI", "USD1", "USDG", "PYUSD", "RLUSD", "USDF", "U", "GHO", "TUSD", "USDTB", "FDUSD", "AUSD"] as const;
 export const SEPOLIA_VOLATILE_SYMBOLS = ["USDC", "USDT", "WETH", "WBTC", "cbBTC", "BNB", "XAUT", "PAXG", "EURC"] as const;
 export const SEPOLIA_FX_SYMBOLS = ["USDC", "EURC", "QCAD", "AUDF", "BRLA", "JPYC", "KRW1"] as const;
 
@@ -91,7 +90,6 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'USDG-USDC', feedId: '0xc5dae82a0540fe49220e35a55370c8b7f4626687789c3861598540ee6e5ba95d', nxrSymbol: 'USDG-USD', token: SEPOLIA_TOKENS['USDG']!, symbol: 'USDG' },
   { name: 'PYUSD-USDC', feedId: '0x5ce7bdb929429721a41bda720bd1b2c3a19a975af5dde19d4fb97c314f5ff352', nxrSymbol: 'PYUSD-USD', token: SEPOLIA_TOKENS['PYUSD']!, symbol: 'PYUSD' },
   { name: 'RLUSD-USDC', feedId: '0x059e09b4f6fd64f9e0e42d7923d95e1b880368066a03447d27bb65f68aaba499', nxrSymbol: 'RLUSD-USD', token: SEPOLIA_TOKENS['RLUSD']!, symbol: 'RLUSD' },
-  { name: 'syrupUSDC-USDC', feedId: '0xdb460767f85cdc11c18c5da9860196a33305ebcccf8c8305d9c63f26ee7c17fc', nxrSymbol: 'syrupUSDC-USDC', token: SEPOLIA_TOKENS['syrupUSDC']!, symbol: 'syrupUSDC' },
   { name: 'USDF-USDC', feedId: '0xa7fce6c9ae3f556f797b660d12480c4c7a988a6b65f02fda8692799022dd4e51', nxrSymbol: 'USDF-USD', token: SEPOLIA_TOKENS['USDF']!, symbol: 'USDF' },
   { name: 'U-USDC', feedId: '0x23ebdf3e1ac943e6d8c61a72f52d7fb0ed34b6fff0d9d92e4764988f86b59e64', nxrSymbol: 'U-USD', token: SEPOLIA_TOKENS['U']!, symbol: 'U' },
   { name: 'GHO-USDC', feedId: '0x11a05afba5a4531eb8ca4a6b92c376533319dcf882e1176b8f1285e18c4d7105', nxrSymbol: 'GHO-USD', token: SEPOLIA_TOKENS['GHO']!, symbol: 'GHO' },
@@ -108,8 +106,8 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'EURC-USDC', feedId: '0x7b48a1509b4849707b3c406b7c1866cabb0938d87b5e0b0842df4b098c693575', nxrSymbol: 'EURC-USD', token: SEPOLIA_TOKENS['EURC']!, symbol: 'EURC' },
   { name: 'QCAD-USDC', feedId: '0xe1cfd349e9e3e4d6891c8e33a7b1533e191ee3318ff034c049618caa57d74bad', nxrSymbol: 'CAD-USD', nxrQuote: 'USD-CAD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
   { name: 'AUDF-USDC', feedId: '0x020409a061f1ccc6a3d0511f2bb1f18c175b4614e4c5c5e02ed715d6254a5dfa', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF' },
-  // idx 24: the BASE-DEPEG REFERENCE, keccak(USDC, USD) — NOT keccak(USDC, USDC).
-  // Omitting it left this array at 29 entries against the chain's 30, so every
+  // idx 23: the BASE-DEPEG REFERENCE, keccak(USDC, USD) — NOT keccak(USDC, USDC).
+  // Omitting it left this array at 28 entries against the chain's 29, so every
   // position from here on was off-by-one versus `feedIds[]` despite the header
   // claiming on-chain order. Nothing indexes positionally today, so it was latent
   // — but `Pricing._denominate` now divides every `usdQuoted` asset by THIS feed,
@@ -143,10 +141,6 @@ export function sepoliaFeedByName(name: string): SepoliaFeed | null {
 export const SEPOLIA_REF_MARKS_USD: Record<string, number> = {
   USDC: 1, USDT: 1, USDE: 1, USDS: 1, DAI: 1, USD1: 1, USDG: 1, PYUSD: 1, RLUSD: 1,
   USDF: 1, U: 1, GHO: 1, TUSD: 1, USDTB: 1, FDUSD: 1, AUSD: 1,
-  // syrupUSDC is NOT a $1 peg — it is an accruing Maple NAV wrapper (~1.1757 on
-  // 2026-07-29), which is also why it is deliberately absent from
-  // cexs.stablecoins in NX Rates. Carrying it at 1 understated it by 17.6%.
-  syrupUSDC: 1.1757,
   // Refreshed 2026-07-28 against the live on-chain marks (and Binance spot).
   // The prior values (WETH 3800, WBTC 118k, BNB 1100) were ~2x the real market
   // and had gone unnoticed because they only surface when a feed read fails —
