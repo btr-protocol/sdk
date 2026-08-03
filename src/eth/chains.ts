@@ -404,6 +404,12 @@ export const CHAINS: Record<number, ChainConfig> = {
     // selectable and nothing routes here.
     rpcUrls: ['https://rpc.arc.network'],
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+    // ⚠ UNVERIFIED (2026-08-02). Reported by the operator as Arc's wrapped native, an ERC-20 USDC,
+    // but no Arc RPC was reachable to check it. BEFORE any Arc deploy, confirm against a live Arc
+    // RPC that this address (a) has code, (b) reports the expected symbol and decimals (native USDC
+    // is 6, not 18), and (c) exposes deposit()/withdraw(uint256). Pool.initialize writes wnative to
+    // an IMMUTABLE field: a wrong value is not patchable, it is a redeploy of the whole fleet.
+    wrappedNative: '0x3600000000000000000000000000000000000000',
   },
 
   5042002: {
@@ -414,6 +420,10 @@ export const CHAINS: Record<number, ChainConfig> = {
     rpcUrls: ['https://rpc.testnet.arc.network', 'https://arc-testnet.drpc.org'],
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
+    // ⚠ UNVERIFIED, and additionally ASSUMED to be the same address as Arc mainnet (5042). Same
+    // pre-deploy check applies, run against the TESTNET RPC: code present, expected symbol and
+    // decimals, deposit()/withdraw(uint256) present. wnative is IMMUTABLE once a pool is initialized.
+    wrappedNative: '0x3600000000000000000000000000000000000000',
     testnet: true,
   },
 
