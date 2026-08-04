@@ -59,9 +59,12 @@ for (const [key, addr] of Object.entries(SEPOLIA_BTR)) {
 const seen = new Set<string>();
 for (const f of SEPOLIA_ORACLE_FEEDS) {
   seen.add(f.symbol);
-  eq(`feed ${f.symbol}`, f.feedId, deploy[`feed_${f.symbol}`]);
-  eq(`feed ${f.symbol} token`, f.token, SEPOLIA_TOKENS[f.symbol]);
-  if (f.name !== `${f.symbol}-USDC`) fail(`feed ${f.symbol}: name '${f.name}' != '${f.symbol}-USDC'`);
+  const feedKey = f.name === 'USDC-USD' ? 'feed_USDC-USD' : `feed_${f.symbol}`;
+  eq(`feed ${f.name}`, f.feedId, deploy[feedKey]);
+  eq(`feed ${f.name} token`, f.token, SEPOLIA_TOKENS[f.symbol]);
+  if (f.name !== 'USDC-USD' && f.name !== `${f.symbol}-USDC`) {
+    fail(`feed ${f.symbol}: name '${f.name}' != '${f.symbol}-USDC'`);
+  }
 }
 
 // 4. Every pool asset must have a feed, or the AIMM cannot mark it.

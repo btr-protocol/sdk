@@ -58,9 +58,12 @@ export function activeFeedId(symbol: string): Hex | null {
 
 /** Static venue pools. */
 export function staticVenuePools(): VenuePool[] {
-  return [
+  const pools: VenuePool[] = [
     { venue: 'btr', tag: 'btr-stable', address: SEPOLIA_BTR.stablePool, tokens: symAddrs(SEPOLIA_STABLE_SYMBOLS) },
     { venue: 'btr', tag: 'btr-volatile', address: SEPOLIA_BTR.volatilePool, tokens: symAddrs(SEPOLIA_VOLATILE_SYMBOLS) },
-    { venue: 'btr', tag: 'btr-fx', address: SEPOLIA_BTR.fxPool, tokens: symAddrs(SEPOLIA_FX_SYMBOLS) },
   ];
+  // FX core not in the current Sepolia redeploy (11155111.pools.json has no fxPool).
+  const fx = (SEPOLIA_BTR as { fxPool?: typeof SEPOLIA_BTR.stablePool }).fxPool;
+  if (fx) pools.push({ venue: 'btr', tag: 'btr-fx', address: fx, tokens: symAddrs(SEPOLIA_FX_SYMBOLS) });
+  return pools;
 }
