@@ -322,6 +322,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   999: {
     id: 999,
     name: 'HyperEVM',
+    icon: '/networks/hyperevm.svg',
     rpcUrls: ['https://rpc.hyperliquid.xyz/evm'],
     nativeCurrency: { name: 'Hyperliquid', symbol: 'HYPE', decimals: 18 },
     blockExplorerUrls: ['https://hyperevmscan.io'],
@@ -465,6 +466,8 @@ export const CHAINS: Record<number, ChainConfig> = {
   84532: {
     id: 84532,
     name: 'Base Sepolia Testnet',
+    // Reuse mainnet Base mark — no separate base-sepolia asset.
+    icon: '/networks/base.svg',
     rpcUrls: [
       'https://sepolia.base.org',
       'https://base-sepolia.public.blastapi.io',
@@ -493,6 +496,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   998: {
     id: 998,
     name: 'HyperEVM Testnet',
+    icon: '/networks/hyperevm.svg',
     rpcUrls: ['https://rpc.hyperliquid-testnet.xyz/evm'],
     nativeCurrency: { name: 'Test Hyperliquid', symbol: 'HYPE', decimals: 18 },
     blockExplorerUrls: ['https://testnet.hyperevmscan.io'],

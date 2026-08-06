@@ -474,11 +474,20 @@ describe('compose + degenerate', () => {
     const half = (q.spreadBps * 100) / 2 / PBPS;
     expect(rel(q.amountOut, s2.grossOut * (1 - half))).toBeLessThan(1e-9);
   });
-  test('S ≫ maxIn clamps grossOut to reserve·0.999 (staircase terminates)', () => {
-    const state = volState();
-    const q = quoteExactIn(state, BASE, 'BTCB', 1e12); // buy far past capacity
-    expect(q.grossOut).toBeLessThanOrEqual(9.4 * 0.999 + 1e-9);
+  // The clip is EXACT on chain (`_legScaleOut`, Pricing.sol:561-562). A `res·0.999` haircut here
+  // made `_covToll`'s full-block branch (`grossOut >= r0` ⇒ toll eats the fill ⇒ PoolSwap reverts
+  // ZeroValue) structurally unreachable in the mirror, so the UI advertised fills the chain refuses.
+  test('S ≫ maxIn clips grossOut EXACTLY to reserves; κ>0 then blocks the whole fill', () => {
+    const q = quoteExactIn(volState(), BASE, 'BTCB', 1e12); // buy far past capacity
+    expect(q.grossOut).toBe(9.4);
+    expect(q.amountOut).toBeGreaterThan(0); // κ=0: the clipped fill still pays out
     expect(q.maxIn).toBeGreaterThan(0);
+
+    const state = volState();
+    state.legs.BTCB = { ...state.legs.BTCB!, kappaCovBps: 100 };
+    const qk = quoteExactIn(state, BASE, 'BTCB', 1e12);
+    expect(qk.grossOut).toBe(9.4);
+    expect(qk.amountOut).toBe(0);
   });
   test('degenerate: same-token and zero-size', () => {
     const state = volState();

@@ -274,6 +274,16 @@ export interface Quote {
   grossOut: number; // pre-toll, pre-fee (curve area)
   avgPrice: number; // trader-effective tokenOut-per-tokenIn
   midPrice: number; // skewed size-0 tokenOut-per-tokenIn
+  /** Oracle mark in the same out-per-in units as midPrice / avgPrice. */
+  markPrice: number;
+  /** Inventory mid premium: (mid − mark) / mark, bps. */
+  midPremiumBps: number;
+  /**
+   * Trader net premium vs mark on the executed rate (incl. impact, spread, toll):
+   * (mark / avg − 1) in bps. Positive ⇒ paid above mark; negative ⇒ discount.
+   * Zero when size-0 (no fill).
+   */
+  netPremiumBps: number;
   priceImpactBps: number; // pure-curve movement vs skewed mid
   spreadBps: number;
   lpFeeBps: number;
@@ -307,6 +317,19 @@ export interface DepthCurve {
 /** Inventory premium in bps: (mid − mark) / mark. Positive ⇒ mid above oracle. */
 export function premiumBps(mid: number, mark: number): number {
   return mark > 0 ? ((mid - mark) / mark) * 1e4 : 0;
+}
+
+/** Trader net premium vs mark: (mark / exec − 1) in bps. Positive ⇒ paid above mark. */
+export function netPremiumBps(execOutPerIn: number, markOutPerIn: number): number {
+  return execOutPerIn > 0 && markOutPerIn > 0
+    ? (markOutPerIn / execOutPerIn - 1) * 1e4
+    : 0;
+}
+
+/** Hub-relative spoke inventory premium (mid vs TWAP mark). Hub / missing leg ⇒ 0. */
+export function spokePremiumBps(leg: PoolLeg | undefined | null): number {
+  if (!leg || !(leg.twap > 0)) return 0;
+  return premiumBps(legKit(leg).mid, leg.twap);
 }
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
@@ -347,7 +370,8 @@ export function computeSkew(res: number, liab: number, p: AimmProfile): number {
   const numer = under ? 1 - c : c - 1;
   const denom = under ? 1 - critMin : critMax - 1;
   const s = Math.min((p.gamma / BPS) * 100 * (numer / denom), 100);
-  return under ? s : -s;
+  // Chain returns int8 from a uint256 integer division: truncate before signing, never after.
+  return under ? Math.trunc(s) : -Math.trunc(s);
 }
 
 /** Coverage-amplified effective pricing depth (NOT raw reserves). */
@@ -380,7 +404,10 @@ export function spreadPbps(
   const excess = opts?.staleExcess ?? 0;
   const uStale = excess > 0 ? (STALE_Z * sigma * Math.sqrt(excess)) / BPS : 0;
   const uConf = (opts?.confidence ?? 0) * (PBPS / BPS); // bps → PBPS
-  return clamp(sVol + uStale + uConf, p.minFee, p.maxFee);
+  const raw = sVol + uStale + uConf;
+  // `_pathSpread` clamps the CEILING only, then casts uint16 — no minFee floor (sVol already
+  // carries it), and the cast truncates. A float here reads ~0.005 bp wide against the chain.
+  return raw > p.maxFee ? p.maxFee : Math.floor(raw);
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
@@ -554,6 +581,51 @@ export function curveDensity(
 }
 
 /**
+ * Density of a two-leg cross. A cross trade crosses BOTH legs, so its offsets are the sum of the
+ * per-leg offsets and the cross density is their convolution: support adds, exactly as crossCurve's
+ * band does. Drawing one leg's profile against a cross book understates breadth by the other leg's
+ * support (RLUSD/DAI: 1.78 vs 1.78+11.18 bp). Same [offsetBp, densityPerBp] contract as
+ * curveDensity, offsets ascending, unit area.
+ */
+export function crossDensity(
+  a: [number, number][],
+  b: [number, number][],
+  n = 120,
+): [number, number][] {
+  if (!a.length || !b.length) return a.length ? a : b;
+  const lo = a[0][0] + b[0][0];
+  const h = (a[a.length - 1][0] + b[b.length - 1][0] - lo) / n;
+  if (!(h > 0)) return a;
+  // Resample onto the shared step, linear between the leg's own (non-uniform) nodes.
+  const grid = (p: [number, number][]): number[] => {
+    const m = Math.max(1, Math.round((p[p.length - 1][0] - p[0][0]) / h) + 1);
+    const out = new Array<number>(m);
+    let j = 0;
+    for (let i = 0; i < m; i++) {
+      const x = p[0][0] + i * h;
+      while (j < p.length - 2 && p[j + 1][0] < x) j++;
+      const [x0, y0] = p[j];
+      const [x1, y1] = p[Math.min(j + 1, p.length - 1)];
+      out[i] = y0 + (x1 > x0 ? ((x - x0) / (x1 - x0)) * (y1 - y0) : 0);
+    }
+    return out;
+  };
+  const ga = grid(a);
+  const gb = grid(b);
+  const out: [number, number][] = [];
+  for (let k = 0; k < ga.length + gb.length - 1; k++) {
+    let s = 0;
+    for (let i = Math.max(0, k - gb.length + 1), e = Math.min(k, ga.length - 1); i <= e; i++) {
+      s += ga[i] * gb[k - i];
+    }
+    out.push([lo + k * h, s * h]);
+  }
+  const area = out.reduce((t, p) => t + p[1], 0) * h;
+  if (area > 0) for (const p of out) p[1] /= area;
+  return out;
+}
+
+/**
  * Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at.
  * Mirrors Pricing._traverseCurve: areaQ(lo,hi)/width → scaleY → floor SPLINE_MIN_OFFSET_PBPS
  * → mark scale → MIN_EXEC_PRICE floor. Fallback: linear-impact average mid·(1 ± vf/2).
@@ -606,6 +678,9 @@ const zeroQuote = (route: string[]): Quote => ({
   grossOut: 0,
   avgPrice: 0,
   midPrice: 0,
+  markPrice: 0,
+  midPremiumBps: 0,
+  netPremiumBps: 0,
   priceImpactBps: 0,
   spreadBps: 0,
   lpFeeBps: 0,
@@ -635,6 +710,7 @@ export function quoteExactIn(
 
   let grossOut = 0;
   let midPrice = 0;
+  let markPrice = 0;
   let involved: PoolLeg[] = [];
   let route: string[];
   let maxIn = 0;
@@ -649,24 +725,25 @@ export function quoteExactIn(
     if (!leg) return zeroQuote([tokenIn, tokenOut]);
     const k = legKit(leg);
     midPrice = k.mid; // base-per-token = out(base)-per-in(token)
+    markPrice = leg.twap;
     involved = [leg];
     route = [tokenIn, tokenOut];
     maxIn = capBidTok(k, leg); // token capacity before base drains / depth exhausts
-    if (amountIn > 0)
-      grossOut = Math.min(amountIn * traverse(k, amountIn, true), leg.baseRes * 0.999);
+    if (amountIn > 0) grossOut = Math.min(amountIn * traverse(k, amountIn, true), leg.baseRes);
   } else if (inBase && !outBase) {
     // DIRECT BUY: base → token (one-step fixed point — replicate, don't solve).
     const leg = state.legs[tokenOut];
     if (!leg) return zeroQuote([tokenIn, tokenOut]);
     const k = legKit(leg);
     midPrice = 1 / k.mid; // token-per-base
+    markPrice = leg.twap > 0 ? 1 / leg.twap : 0;
     involved = [leg];
     outLeg = leg;
     route = [tokenIn, tokenOut];
     maxIn = capAskBase(k, leg); // base capacity
     if (amountIn > 0) {
       const exec = traverse(k, amountIn / k.mid, false);
-      grossOut = Math.min(amountIn / exec, leg.res * 0.999);
+      grossOut = Math.min(amountIn / exec, leg.res);
     }
   } else if (!inBase && !outBase) {
     // CROSS: sell tokenIn→base, buy tokenOut with that base (fixed point on the buy leg).
@@ -676,14 +753,19 @@ export function quoteExactIn(
     const kIn = legKit(legIn);
     const kOut = legKit(legOut);
     midPrice = kIn.mid / kOut.mid; // (base/in)/(base/out) = out-per-in
+    markPrice =
+      legIn.twap > 0 && legOut.twap > 0 ? legIn.twap / legOut.twap : 0;
     involved = [legIn, legOut];
     outLeg = legOut;
     route = [tokenIn, base, tokenOut];
-    maxIn = capBidTok(kIn, legIn);
+    // Same two walls as crossCurve: the sell leg's base drain AND the buy leg's token reserve.
+    // Capping on the sell leg alone advertised sizes the chain refuses outright, and this value
+    // is `Quote.maxIn` -> rankSwap order-splitting, so it sized real routes, not just a chart.
+    maxIn = Math.min(capBidTok(kIn, legIn), capAskBase(kOut, legOut) / kIn.mid);
     if (amountIn > 0) {
-      const baseMid = Math.min(amountIn * traverse(kIn, amountIn, true), legIn.baseRes * 0.999);
+      const baseMid = Math.min(amountIn * traverse(kIn, amountIn, true), legIn.baseRes);
       const exec = traverse(kOut, baseMid / kOut.mid, false);
-      grossOut = Math.min(baseMid / exec, legOut.res * 0.999);
+      grossOut = Math.min(baseMid / exec, legOut.res);
     }
   } else {
     return zeroQuote([tokenIn, tokenOut]); // base→base
@@ -701,20 +783,34 @@ export function quoteExactIn(
   const lpFeeBps = feeBps * (1 - wp.protoShare / 100);
   const protoFeeBps = feeBps * (wp.protoShare / 100);
 
+  const midPrem = premiumBps(midPrice, markPrice);
   if (amountIn <= 0 || grossOut <= 0) {
-    return { ...zeroQuote(route), midPrice, spreadBps, lpFeeBps, protoFeeBps, maxIn };
+    return {
+      ...zeroQuote(route),
+      midPrice,
+      markPrice,
+      midPremiumBps: midPrem,
+      spreadBps,
+      lpFeeBps,
+      protoFeeBps,
+      maxIn,
+    };
   }
   // GATE-07: coverage-wall toll charged on the drained output leg, BEFORE the spread/fee haircut —
   // mirrors Pricing.sol (`acc.currentAmount -= _covToll(...)` precedes the fee-out computation).
   const toll = outLeg ? covToll(outLeg.res, outLeg.liab, outLeg.kappaCovBps, grossOut) : 0;
   const netGross = grossOut - toll;
   const amountOut = netGross * (1 - spread / 2 / PBPS); // half-spread on output (path model)
+  const avgPrice = amountOut / amountIn;
   const grossAvg = grossOut / amountIn; // pure-curve avg (out-per-in); toll is a discrete charge, not curve slippage
   return {
     amountOut,
     grossOut,
-    avgPrice: amountOut / amountIn,
+    avgPrice,
     midPrice,
+    markPrice,
+    midPremiumBps: midPrem,
+    netPremiumBps: netPremiumBps(avgPrice, markPrice),
     priceImpactBps: midPrice > 0 ? Math.abs(grossAvg / midPrice - 1) * 1e4 : 0,
     spreadBps,
     lpFeeBps,
@@ -729,7 +825,7 @@ export function quoteExactIn(
 // cumBase(t) ⇒ bisect for the reserve clip.
 function capBidTok(k: LegKit, leg: PoolLeg): number {
   const depthEdge = (k.center / BPS) * k.depth;
-  const limit = leg.baseRes * 0.999;
+  const limit = leg.baseRes;
   const cumBase = (t: number) => t * bandPrice(k, k.center, k.center - (t * BPS) / k.depth);
   if (cumBase(depthEdge) <= limit) return depthEdge;
   let lo = 0;
@@ -743,9 +839,13 @@ function capBidTok(k: LegKit, leg: PoolLeg): number {
 }
 
 // Base capacity of the ask (buy) side: base needed to reach the token reserve clip / depth edge.
+// The clip is exact (`_legScaleOut`, Pricing.sol:561-562). When κ>0 the LAST unit of that capacity
+// is unfillable: grossOut == res trips `_covToll`'s full-block branch and the swap reverts ZeroValue.
+// So this is the chain's clip, not the largest PROFITABLE fill; routers must treat it as an
+// exclusive bound.
 function capAskBase(k: LegKit, leg: PoolLeg): number {
   const depthEdgeTok = ((BPS - k.center) / BPS) * k.depth;
-  const maxTok = Math.min(depthEdgeTok, leg.res * 0.999);
+  const maxTok = Math.min(depthEdgeTok, leg.res);
   const d = k.center + (maxTok / k.depth) * BPS;
   return maxTok * bandPrice(k, k.center, Math.min(d, BPS)); // base ≈ tok · avg fill
 }
@@ -802,7 +902,7 @@ export function depthCurve(
 
   // Caps = remaining FILLABLE liquidity (curve band ∩ physical reserves).
   // Ask drains spoke R; bid drains hub baseRes — both must clip the printed ladder.
-  const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res * 0.999);
+  const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res);
   const maxTokBid = capBidTok(k, leg);
 
   // ASK (buy token): d from skewed center→10000; size = tokens received along the band.
@@ -921,8 +1021,15 @@ function crossCurve(
   const half = spread / 2;
   const N = 24;
   // token=`to` (received/sold), base=`from` (spent/received) → x is from-per-to (base-per-token).
-  const askMax = capBidTok(legKit(legIn), legIn); // from-token capacity
-  const bidMax = capBidTok(legKit(legOut), legOut); // to-token capacity
+  // Each cross side hits TWO walls: the sell leg's base drain AND the buy leg's token reserve.
+  // Capping on the sell leg alone (both sides used capBidTok) advertised sizes the chain refuses
+  // outright — `_legScaleOut` clips the buy leg to its reserves and `_covToll` then blocks the
+  // whole fill. Buy-leg capacity is base-denominated, so divide by the sell leg's mid to reach
+  // input units.
+  const kIn = legKit(legIn);
+  const kOut = legKit(legOut);
+  const askMax = Math.min(capBidTok(kIn, legIn), capAskBase(kOut, legOut) / kIn.mid); // from-token
+  const bidMax = Math.min(capBidTok(kOut, legOut), capAskBase(kIn, legIn) / kOut.mid); // to-token
   const asks = sweep(N, askMax, (s) => {
     const q = quoteExactIn(state, from, to, s); // spend s `from`, receive grossOut `to`
     return { cumTok: q.grossOut, cumBase: s };
