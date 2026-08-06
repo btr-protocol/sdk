@@ -61,7 +61,28 @@ export const SEPOLIA_BTR = {
   volatilePool: '0xFfa427bc61315c3Fd5C32157675b31135f910cAc' as Address,
 } as const;
 
-export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; nxrQuote?: string; quoteVia?: string; token: Address; symbol: string; }
+/**
+ * Weekly OPEN windows as `[openMin, closeMin)` offsets from Sunday 00:00 UTC, ascending
+ * and non-overlapping. Absent = the tape never stops. Sole home for BTR market hours:
+ * NXR measures them (`.s10` tick_count buckets) but serves them on no endpoint, so they
+ * are declared beside the `nxrSymbol` they describe and read from here everywhere.
+ */
+export type MarketSession = readonly (readonly [number, number])[];
+const DAY_MIN = 1440;
+/** FX majors. Sun 21:00 to Fri 22:00 UTC: the venue week is pinned to 17:00 New York, so both
+ *  edges move an hour across US DST (21:00 on EDT, 22:00 on EST). Each edge takes the value
+ *  that errs OPEN, widening the window by the ambiguous hour on purpose: an hour we are unsure
+ *  about reads as a live market, so a dead feed still shows stale rather than being excused as
+ *  a scheduled close. The cost is the reverse hour reading stale while genuinely shut. */
+const FX_24X5: MarketSession = [[1260, 5 * DAY_MIN + 1320]];
+/** USD/BRL on Pyth Lazer: MEASURED Mon-Fri 12:00-21:00 UTC on the live .s10 corpus
+ *  2026-07-25..08-03 (nx-rates config.yml:1280-1288). No DST margin needed: the window is
+ *  09:00-18:00 in Brazil, which has been UTC-3 year-round since 2019. */
+const BRL_SESSION: MarketSession = [1, 2, 3, 4, 5].map(
+  (d) => [d * DAY_MIN + 720, d * DAY_MIN + 1260] as const,
+);
+
+export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; nxrQuote?: string; quoteVia?: string; token: Address; symbol: string; session?: MarketSession; }
 export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'USDC-USDC', feedId: '0x0c8bbb24907a4477af7953a3521644a319d7b062e56044543d63a365cc11b487', nxrSymbol: 'USDC-USDC', token: SEPOLIA_TOKENS['USDC']!, symbol: 'USDC' },
   { name: 'USDT-USDC', feedId: '0xe2ca0626104d5e537a71218cb1524d5f02623014f122c80e479cfb2698aaaef9', nxrSymbol: 'USDT-USD', token: SEPOLIA_TOKENS['USDT']!, symbol: 'USDT' },
@@ -87,11 +108,11 @@ export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
   { name: 'PAXG-USDC', feedId: '0xb6e3605879a0b64f7984843b5fc9e3d5aafcbdf1874c08030d85e5e0d05dc5bb', nxrSymbol: 'PAXG-USD', token: SEPOLIA_TOKENS['PAXG']!, symbol: 'PAXG' },
   { name: 'EURC-USDC', feedId: '0xc935b02202e468a1381f834951a37392b7c2b4ad80c8efe764f7ec9d5aca7504', nxrSymbol: 'EURC-USD', token: SEPOLIA_TOKENS['EURC']!, symbol: 'EURC' },
   { name: 'USDC-USD', feedId: '0xf097408cec312d10691ef8ff946389a6eab389bed1a574aa68222fdf45f1f1f2', nxrSymbol: 'USDC-USD', token: SEPOLIA_TOKENS['USDC']!, symbol: 'USDC' },
-  { name: 'QCAD-USDC', feedId: '0xfdcbda586491de458657b1ec84cf53b85add9adf3f7ff929ee6f811d1447b8ab', nxrSymbol: 'CAD-USD', nxrQuote: 'USD-CAD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD' },
-  { name: 'AUDF-USDC', feedId: '0xdc34b9876032749a1047d2af4ac6c8dd93a65093a17be701fbeae07f558cd8b7', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF' },
-  { name: 'BRLA-USDC', feedId: '0x18085d4edb9a77884122a7d83e60bf0ff1fc64a631020887eae17791ab4c94ba', nxrSymbol: 'BRL-USD', nxrQuote: 'USD-BRL', token: SEPOLIA_TOKENS['BRLA']!, symbol: 'BRLA' },
-  { name: 'JPYC-USDC', feedId: '0xcc35076388f2fb7e3a00d8e8d0530753b80853e7333aa2a11ff7ca090d217515', nxrSymbol: 'JPY-USD', nxrQuote: 'USD-JPY', token: SEPOLIA_TOKENS['JPYC']!, symbol: 'JPYC' },
-  { name: 'KRW1-USDC', feedId: '0xc6cba05bf7e0af179298ee4318bd6ae95c30b337542881623d60eb6a1ff25967', nxrSymbol: 'KRW-USD', nxrQuote: 'USD-KRW', token: SEPOLIA_TOKENS['KRW1']!, symbol: 'KRW1' },
+  { name: 'QCAD-USDC', feedId: '0xfdcbda586491de458657b1ec84cf53b85add9adf3f7ff929ee6f811d1447b8ab', nxrSymbol: 'CAD-USD', nxrQuote: 'USD-CAD', token: SEPOLIA_TOKENS['QCAD']!, symbol: 'QCAD', session: FX_24X5 },
+  { name: 'AUDF-USDC', feedId: '0xdc34b9876032749a1047d2af4ac6c8dd93a65093a17be701fbeae07f558cd8b7', nxrSymbol: 'AUD-USD', token: SEPOLIA_TOKENS['AUDF']!, symbol: 'AUDF', session: FX_24X5 },
+  { name: 'BRLA-USDC', feedId: '0x18085d4edb9a77884122a7d83e60bf0ff1fc64a631020887eae17791ab4c94ba', nxrSymbol: 'BRL-USD', nxrQuote: 'USD-BRL', token: SEPOLIA_TOKENS['BRLA']!, symbol: 'BRLA', session: BRL_SESSION },
+  { name: 'JPYC-USDC', feedId: '0xcc35076388f2fb7e3a00d8e8d0530753b80853e7333aa2a11ff7ca090d217515', nxrSymbol: 'JPY-USD', nxrQuote: 'USD-JPY', token: SEPOLIA_TOKENS['JPYC']!, symbol: 'JPYC', session: FX_24X5 },
+  { name: 'KRW1-USDC', feedId: '0xc6cba05bf7e0af179298ee4318bd6ae95c30b337542881623d60eb6a1ff25967', nxrSymbol: 'KRW-USD', nxrQuote: 'USD-KRW', token: SEPOLIA_TOKENS['KRW1']!, symbol: 'KRW1', session: FX_24X5 },
 ];
 
 export function sepoliaFeedId(symbol: string): `0x${string}` | null {
@@ -100,6 +121,34 @@ export function sepoliaFeedId(symbol: string): `0x${string}` | null {
 
 export function sepoliaFeedByName(name: string): SepoliaFeed | null {
   return SEPOLIA_ORACLE_FEEDS.find((f) => f.name === name) ?? null;
+}
+
+/**
+ * Null when the market is open or declares no session, else the ms instant it reopens.
+ * This is what separates a mark frozen BY DESIGN from a feed that has died: the same
+ * frozen mark is expected inside a closed window and a fault inside an open one, so
+ * every unresolvable case (unknown symbol, bad clock) returns null and reads as a fault.
+ */
+export function closedUntil(symbol: string, atMs: number = Date.now()): number | null {
+  const s = SEPOLIA_ORACLE_FEEDS.find((f) => f.symbol === symbol)?.session;
+  if (!s?.length || !Number.isFinite(atMs)) return null;
+  const d = new Date(atMs);
+  const min = d.getUTCDay() * DAY_MIN + d.getUTCHours() * 60 + d.getUTCMinutes();
+  if (s.some(([open, close]) => min >= open && min < close)) return null;
+  const next = s.find(([open]) => open > min)?.[0] ?? 7 * DAY_MIN + s[0]![0];
+  const minuteStart = Date.UTC(
+    d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(),
+  );
+  return minuteStart + (next - min) * 60_000;
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** `closedUntil` instant as "Mon 12:00 UTC". UTC because the session itself is declared in UTC. */
+export function sessionOpenLabel(atMs: number): string {
+  const d = new Date(atMs);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${WEEKDAYS[d.getUTCDay()]} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
 /** Static USD fallbacks for sizing when a live oracle read fails. */
