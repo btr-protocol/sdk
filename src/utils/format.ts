@@ -131,11 +131,23 @@ export function formatCompact(n: number | null | undefined, signed = false): str
   return sign + formatNumber(absN);
 }
 
-/** Format price with appropriate decimals (UI mid, depth rows, chart axis). */
-export function formatPrice(n: number | null | undefined): string {
+/**
+ * Format price with appropriate decimals (UI mid, depth rows, chart axis).
+ * `step` = the ladder tick the price lives on; without it a 1e-5 book prints eight identical
+ * rows at the default 4 decimals, so any tick-aware surface must pass its own step.
+ */
+export function formatPrice(n: number | null | undefined, step?: number): string {
   if (n == null || !isFinite(n)) return '0.00';
 
   const absN = Math.abs(n);
+
+  if (step != null && step > 0 && isFinite(step)) {
+    const decimals = Math.min(12, Math.max(0, Math.ceil(-Math.log10(step) - 1e-9)));
+    return n.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
 
   if (absN >= 1000) {
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

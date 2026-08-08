@@ -238,6 +238,11 @@ export interface AggregatedDepthBook {
   mark: number;
   mid: number;
   spreadBps: number;
+  /** Touch: best net executable price per side, `curve.bids[0]` / `curve.asks[0]` pre-bucketing.
+   *  0 when a side is empty. The bucketed `bids`/`asks` below are snapped to `step` and so
+   *  cannot carry the true touch. */
+  bid: number;
+  ask: number;
   step: number;
   /** Token-denominated (for fill simulation). */
   bids: AggRow[];
@@ -263,7 +268,16 @@ export function aggregateDepthCurves(
   const eligible = pools.filter((p) => poolHas(p.state, from) && poolHas(p.state, to));
   if (!eligible.length) return null;
 
-  type Part = { mark: number; mid: number; spreadBps: number; asks: Row[]; bids: Row[]; w: number };
+  type Part = {
+    mark: number;
+    mid: number;
+    spreadBps: number;
+    bid: number;
+    ask: number;
+    asks: Row[];
+    bids: Row[];
+    w: number;
+  };
   const parts: Part[] = [];
   for (const p of eligible) {
     const raw = curveForPool(p.state, from, to);
@@ -273,7 +287,16 @@ export function aggregateDepthCurves(
     const bids = depthLevelsToRows(curve.bids);
     const w = asks.reduce((s, r) => s + r.size, 0) + bids.reduce((s, r) => s + r.size, 0);
     if (!(w > 0)) continue;
-    parts.push({ mark: curve.mark, mid: curve.mid, spreadBps: curve.spreadBps, asks, bids, w });
+    parts.push({
+      mark: curve.mark,
+      mid: curve.mid,
+      spreadBps: curve.spreadBps,
+      bid: curve.bids[0]?.price ?? 0,
+      ask: curve.asks[0]?.price ?? 0,
+      asks,
+      bids,
+      w,
+    });
   }
   if (!parts.length) return null;
   // Allow one-sided books (skewed reserves clip the thin side — e.g. BTCB hub drain).
@@ -296,6 +319,18 @@ export function aggregateDepthCurves(
   const mark = markNum / wSum;
   const mid = midNum / wSum;
   const spreadBps = spreadNum / wSum;
+  // A one-sided pool must not drag the touch: weight each side over its own contributors only.
+  const touch = (side: 'bid' | 'ask'): number => {
+    let num = 0;
+    let den = 0;
+    for (const p of parts) {
+      const px = side === 'bid' ? p.bid : p.ask;
+      if (!(px > 0)) continue;
+      num += px * p.w;
+      den += p.w;
+    }
+    return den > 0 ? num / den : 0;
+  };
 
   let below = 0;
   let above = 0;
@@ -353,6 +388,8 @@ export function aggregateDepthCurves(
     mark,
     mid,
     spreadBps,
+    bid: touch('bid'),
+    ask: touch('ask'),
     step,
     bids: bidTok,
     asks: askTok,

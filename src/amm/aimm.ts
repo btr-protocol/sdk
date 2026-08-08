@@ -276,12 +276,12 @@ export interface Quote {
   midPrice: number; // skewed size-0 tokenOut-per-tokenIn
   /** Oracle mark in the same out-per-in units as midPrice / avgPrice. */
   markPrice: number;
-  /** Inventory mid premium: (mid − mark) / mark, bps. */
+  /** Inventory mid premium: (mid / mark − 1) in bps, out-per-in orientation. */
   midPremiumBps: number;
   /**
-   * Trader net premium vs mark on the executed rate (incl. impact, spread, toll):
-   * (mark / avg − 1) in bps. Positive ⇒ paid above mark; negative ⇒ discount.
-   * Zero when size-0 (no fill).
+   * Executed rate vs mark (incl. impact, spread, toll): (avg / mark − 1) in bps, SAME
+   * out-per-in orientation as midPremiumBps. Reciprocating one and not the other is what
+   * flipped the displayed sign the moment a size was typed. Zero when size-0 (no fill).
    */
   netPremiumBps: number;
   priceImpactBps: number; // pure-curve movement vs skewed mid
@@ -312,16 +312,13 @@ export interface DepthCurve {
   unit: 'token' | 'base';
 }
 
-/** Inventory premium in bps: (mid − mark) / mark. Positive ⇒ mid above oracle. */
-export function premiumBps(mid: number, mark: number): number {
-  return mark > 0 ? ((mid - mark) / mark) * 1e4 : 0;
-}
-
-/** Trader net premium vs mark: (mark / exec − 1) in bps. Positive ⇒ paid above mark. */
-export function netPremiumBps(execOutPerIn: number, markOutPerIn: number): number {
-  return execOutPerIn > 0 && markOutPerIn > 0
-    ? (markOutPerIn / execOutPerIn - 1) * 1e4
-    : 0;
+/**
+ * THE premium: (price / mark − 1) in bps, both arguments in the SAME orientation.
+ * Callers orient to display (quote-per-base, the chart axis) first, where positive reads
+ * "the pool is expensive vs the oracle". There is no reciprocal variant.
+ */
+export function premiumBps(price: number, mark: number): number {
+  return mark > 0 ? ((price - mark) / mark) * 1e4 : 0;
 }
 
 /** Hub-relative spoke inventory premium (mid vs TWAP mark). Hub / missing leg ⇒ 0. */
@@ -808,7 +805,7 @@ export function quoteExactIn(
     midPrice,
     markPrice,
     midPremiumBps: midPrem,
-    netPremiumBps: netPremiumBps(avgPrice, markPrice),
+    netPremiumBps: premiumBps(avgPrice, markPrice),
     priceImpactBps: midPrice > 0 ? Math.abs(grossAvg / midPrice - 1) * 1e4 : 0,
     spreadBps,
     lpFeeBps,

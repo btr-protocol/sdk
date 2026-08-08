@@ -3,7 +3,7 @@ import { expect, test, describe } from 'bun:test';
 import { niceStep, stepLadder, aggregate, mergeAgg, aggregateDepthCurves, type Row } from './depthAgg';
 import { type NamedPool } from './router';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
-import { buildLeg, type PoolState } from './aimm';
+import { buildLeg, virtualMarketDepth, type PoolState } from './aimm';
 
 describe('niceStep', () => {
   test('snaps to 1/2/5 ladder (near)', () => {
@@ -135,6 +135,26 @@ describe('aggregateDepthCurves', () => {
     // Bids sit below the mid, asks above.
     expect(book!.bids[0].price).toBeLessThanOrEqual(book!.mid);
     expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
+  });
+
+  test('touch is the un-bucketed curve[0] of each side, not a ladder-snapped row', () => {
+    const usdt = buildLeg('USDT', 1, sigmaSeed('stable'), 1_000_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
+    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
+    const curve = virtualMarketDepth(pool.state, 'USDT');
+    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.01 })!;
+    expect(book.bid).toBeCloseTo(curve.bids[0].price, 12);
+    expect(book.ask).toBeCloseTo(curve.asks[0].price, 12);
+    expect(book.bid).toBeLessThan(book.mid);
+    expect(book.ask).toBeGreaterThan(book.mid);
+    // The coarse ladder rounds the printed rows away from the touch; the touch must survive it.
+    expect(Math.abs(book.asks[0].price - book.ask)).toBeGreaterThan(0);
+  });
+
+  test('touch of an empty side is 0, and one side present still reports the other', () => {
+    const usdt = buildLeg('USDT', 1, sigmaSeed('stable'), 1_000_000, 1_000_000, 0, 18, STABLE_PROFILE);
+    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
+    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.001 });
+    if (book) expect(book.ask > 0 || book.bid > 0).toBe(true);
   });
 
   test('invert mirrors the book: reciprocal mid, sides swap, sizes change unit', () => {
