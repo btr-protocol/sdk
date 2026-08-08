@@ -294,7 +294,7 @@ export interface Quote {
 }
 
 export interface DepthLevel {
-  price: number; // marginal base-per-token at this vertex
+  price: number; // marginal NET (post-fee, post-toll) base-per-token at this vertex
   cumTok: number; // cumulative token size outward from mid
   cumBase: number; // cumulative base notional outward from mid
 }
@@ -304,8 +304,6 @@ export interface DepthCurve {
   mark: number;
   /** Skewed size-0 mid = mark + inventory premium, base-per-token. Book is centered here. */
   mid: number;
-  bidBest: number;
-  askBest: number;
   spreadBps: number;
   bids: DepthLevel[]; // price descending (sell token), outward from mid
   asks: DepthLevel[]; // price ascending (buy token), outward from mid
@@ -872,10 +870,50 @@ function depthBandSamples(center: number, edge: number, knotXs: number[], step =
 }
 
 /**
+ * Output-side haircut at cumulative gross output `g`: (1 − toll/g)·(1 − half-spread), i.e. the
+ * factor turning `Quote.grossOut` into `Quote.amountOut`. `g == 0` takes the marginal toll limit
+ * κ/BPS·(1/c − 1) (Q'(c) = 1/c − 1), which is the touch. 0 ⇒ `_covToll` blocks the whole fill.
+ */
+function netOutMul(leg: PoolLeg | undefined, g: number, half: number): number {
+  const fee = 1 - half / PBPS;
+  if (!leg || leg.kappaCovBps <= 0 || leg.liab <= 0) return fee;
+  if (g > 0) return fee * (1 - covToll(leg.res, leg.liab, leg.kappaCovBps, g) / g);
+  const c = leg.res / leg.liab;
+  return c >= 1 ? fee : Math.max(0, fee * (1 - (leg.kappaCovBps / BPS) * (1 / c - 1)));
+}
+
+/**
+ * Gross ladder → NET EXECUTABLE ladder. Every rung is repriced by the output haircut at its OWN
+ * cumulative size: the toll is a level shift (bps at q→0), not a slope, so a touch-only patch
+ * would leave every rung below it wrong by the same amount. Rung 0 then IS the touch, so the
+ * printed book carries the ticker's real spread — asymmetric exactly when the toll binds.
+ * Ask drains the spoke (tolled); bid drains the hub base, which can never carry κ (PoolAdminWrite
+ * rejects it), so a sell is toll-free by construction. Rungs the coverage wall blocks are dropped.
+ */
+function netLadder(
+  levels: DepthLevel[],
+  outLeg: PoolLeg | undefined,
+  half: number,
+  side: 'bid' | 'ask',
+): DepthLevel[] {
+  const out: DepthLevel[] = [];
+  for (const l of levels) {
+    const m = netOutMul(outLeg, side === 'ask' ? l.cumTok : l.cumBase, half);
+    if (!(m > 0)) break; // reserve cliff: amountOut is 0 from here out, so never print it
+    out.push(
+      side === 'ask'
+        ? { price: l.price / m, cumTok: l.cumTok * m, cumBase: l.cumBase }
+        : { price: l.price * m, cumTok: l.cumTok, cumBase: l.cumBase * m },
+    );
+  }
+  return out;
+}
+
+/**
  * The Binance-style book (x = price, y = cumulative size outward from mid). Direct pair = analytic
  * polyline through the quartic curve (depth-axis traversal via priceAt / bandPrice); cross pair =
- * numeric sweep of quoteExactIn (marginal = local slope). Cumulative base under the curve at size S
- * == quoteExactIn(S).grossOut by construction — the acceptance invariant (spec §2).
+ * numeric sweep of quoteExactIn (marginal = local slope). Prices and sizes are NET: every vertex
+ * satisfies quoteExactIn(cumBase).amountOut == cumTok — the acceptance invariant (spec §2).
  */
 export function depthCurve(
   state: PoolState,
@@ -902,7 +940,7 @@ export function depthCurve(
 
   // Caps = remaining FILLABLE liquidity (curve band ∩ physical reserves).
   // Ask drains spoke R; bid drains hub baseRes — both must clip the printed ladder.
-  const maxTokAsk = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res);
+  const capAskTok = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res);
   const maxTokBid = capBidTok(k, leg);
 
   // ASK (buy token): d from skewed center→10000; size = tokens received along the band.
@@ -924,16 +962,15 @@ export function depthCurve(
     return { price: priceAt(k, d), cumTok: t, cumBase: t * exec };
   });
 
+  const asks = netLadder(clipDepthLevels(asksRaw, capAskTok), leg, half, 'ask');
   return {
     mark: k.twap,
     mid: k.mid,
-    bidBest: k.mid * (1 - half / PBPS),
-    askBest: k.mid * (1 + half / PBPS),
     spreadBps: spread / 100,
-    bids: clipDepthLevels(bidsRaw, maxTokBid),
-    asks: clipDepthLevels(asksRaw, maxTokAsk),
+    bids: netLadder(clipDepthLevels(bidsRaw, maxTokBid), undefined, half, 'bid'),
+    asks,
     maxTokBid,
-    maxTokAsk,
+    maxTokAsk: asks[asks.length - 1]?.cumTok ?? 0, // net of fee and toll, cliff excluded
     unit,
   };
 }
@@ -945,8 +982,8 @@ export function depthCurve(
  * - **Bids** (sell `token` → hub): curve bid band ∩ hub `baseRes` (`capBidTok`)
  * - **Asks** (buy `token` ← hub): curve ask band ∩ spoke `res`
  *
- * Prices are always hub-per-token. Every cumulative size S satisfies
- * `quoteExactIn(…, S).grossOut` under the ladder (spec D3) — no fabricated depth.
+ * Prices are always hub-per-token and NET (post-fee, post-coverage-toll): every cumulative size S
+ * satisfies `quoteExactIn(…, S).amountOut` under the ladder (spec D3) — no fabricated depth.
  */
 export function virtualMarketDepth(state: PoolState, token: string): DepthCurve {
   if (token === state.base) return emptyCurve('base');
@@ -968,8 +1005,6 @@ export function invertDepthCurve(c: DepthCurve): DepthCurve {
   return {
     mark: inv(c.mark),
     mid: inv(c.mid),
-    bidBest: inv(c.askBest),
-    askBest: inv(c.bidBest),
     spreadBps: c.spreadBps,
     bids,
     asks,
@@ -1018,7 +1053,6 @@ function crossCurve(
   const q0 = quoteExactIn(state, from, to, 0);
   const mid = q0.midPrice; // out-per-in
   const spread = q0.spreadBps * 100; // back to PBPS
-  const half = spread / 2;
   const N = 24;
   // token=`to` (received/sold), base=`from` (spent/received) → x is from-per-to (base-per-token).
   // Each cross side hits TWO walls: the sell leg's base drain AND the buy leg's token reserve.
@@ -1030,13 +1064,14 @@ function crossCurve(
   const kOut = legKit(legOut);
   const askMax = Math.min(capBidTok(kIn, legIn), capAskBase(kOut, legOut) / kIn.mid); // from-token
   const bidMax = Math.min(capBidTok(kOut, legOut), capAskBase(kIn, legIn) / kOut.mid); // to-token
+  // amountOut, never grossOut: a ladder swept pre-toll, pre-fee depicts a free round trip.
   const asks = sweep(N, askMax, (s) => {
-    const q = quoteExactIn(state, from, to, s); // spend s `from`, receive grossOut `to`
-    return { cumTok: q.grossOut, cumBase: s };
+    const q = quoteExactIn(state, from, to, s); // spend s `from`, receive amountOut `to`
+    return { cumTok: q.amountOut, cumBase: s };
   });
   const bids = sweep(N, bidMax, (s) => {
-    const q = quoteExactIn(state, to, from, s); // sell s `to`, receive grossOut `from`
-    return { cumTok: s, cumBase: q.grossOut };
+    const q = quoteExactIn(state, to, from, s); // sell s `to`, receive amountOut `from`
+    return { cumTok: s, cumBase: q.amountOut };
   });
   const midX = mid > 0 ? 1 / mid : 0; // from-per-to
   // Oracle mark in the same orientation (from-per-to): twap_to / twap_from.
@@ -1044,8 +1079,6 @@ function crossCurve(
   return {
     mark: markX,
     mid: midX,
-    bidBest: midX * (1 - half / PBPS),
-    askBest: midX * (1 + half / PBPS),
     spreadBps: spread / 100,
     bids: withMarginal(bids, midX),
     asks: withMarginal(asks, midX),
@@ -1065,7 +1098,8 @@ function sweep(
   for (let i = 1; i <= n; i++) {
     const s = max * (i / n) ** 2;
     const c = at(s);
-    if (c.cumTok > 0 && c.cumBase > 0) out.push({ price: 0, cumTok: c.cumTok, cumBase: c.cumBase });
+    if (!(c.cumTok > 0 && c.cumBase > 0)) break; // reserve cliff: nothing fills at or beyond it
+    out.push({ price: 0, cumTok: c.cumTok, cumBase: c.cumBase });
   }
   return out;
 }
@@ -1090,8 +1124,6 @@ function emptyCurve(unit: 'token' | 'base'): DepthCurve {
   return {
     mark: 0,
     mid: 0,
-    bidBest: 0,
-    askBest: 0,
     spreadBps: 0,
     bids: [],
     asks: [],
