@@ -11,11 +11,17 @@
  */
 
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { quoteExactIn, buildLeg, type AimmProfile, type PoolState } from '../src/amm/aimm';
+import { EXTERNAL_ORACLE_ABI } from '../src/abis/ExternalOracle';
+import {
+  type AimmProfile,
+  type PoolState,
+  buildLeg,
+  depthCurve,
+  quoteExactIn,
+} from '../src/amm/aimm';
 import { decodeFn, encodeFn } from '../src/eth/abi';
 import { createHttpProvider } from '../src/eth/client';
 import type { Address, Eip1193Provider, Hex } from '../src/eth/types';
-import { EXTERNAL_ORACLE_ABI } from '../src/abis/ExternalOracle';
 import { getAsset, getSwapQuote, readCurve, readRiskConfig } from '../src/pool/index';
 import { decodeB64 } from '../src/utils/encoding';
 import {
@@ -241,5 +247,78 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
     // EXACT refusal parity: where the chain returns nothing, the SDK must draw nothing.
     expect(refusals).toEqual([]);
     expect(worstInterior).toBeLessThanOrEqual(0.05);
+  }, 300_000);
+
+  // The printed order book is the ladder, so parity on `quoteExactIn` alone is not enough: a rung
+  // swept pre-toll/pre-fee draws a spread the chain never quotes. Every rung must BE a fill.
+  test('ladder parity: every printed rung is an executable chain quote', async () => {
+    const b = built.stable!;
+    const { state, decimals } = b;
+    const rows: Array<{
+      leg: string;
+      side: string;
+      inAmt: number;
+      chain: number;
+      sdk: number;
+      deltaBp: number;
+    }> = [];
+    let worst = 0;
+    const dead: string[] = [];
+    for (const [from, to] of [
+      ['USDC', 'RLUSD'],
+      ['USDC', 'DAI'],
+      ['DAI', 'RLUSD'],
+    ] as const) {
+      const curve = depthCurve(state, from, to);
+      // ask: spend cumBase of `from` → cumTok of `to`; bid: sell cumTok of `to` → cumBase of `from`.
+      for (const [side, levels] of [
+        ['ask', curve.asks],
+        ['bid', curve.bids],
+      ] as const) {
+        const live = levels.filter((l) => l.cumTok > 1e-9 && l.cumBase > 1e-9);
+        const pick = [0, 1, Math.floor(live.length / 2), live.length - 1]
+          .filter((i, j, a) => i >= 0 && i < live.length && a.indexOf(i) === j)
+          .map((i) => live[i]!);
+        for (const l of pick) {
+          const [tIn, tOut, amtIn, amtOut] =
+            side === 'ask' ? [from, to, l.cumBase, l.cumTok] : [to, from, l.cumTok, l.cumBase];
+          const dIn = decimals[tIn] ?? 18;
+          const wei = BigInt(Math.round(amtIn * 10 ** dIn));
+          if (wei <= 0n) continue;
+          const cq = await getSwapQuote(
+            p,
+            pools.stable!,
+            SEPOLIA_TOKENS[tIn]!,
+            SEPOLIA_TOKENS[tOut]!,
+            wei,
+          ).catch(() => null);
+          const chain = cq ? Number(cq.amountOut) / 10 ** (decimals[tOut] ?? 18) : 0;
+          if (!(chain > 0)) {
+            dead.push(`${from}→${to} ${side} @ ${amtIn.toFixed(4)} ${tIn}: chain refused`);
+            continue;
+          }
+          const deltaBp = (amtOut / chain - 1) * 1e4;
+          worst = Math.max(worst, Math.abs(deltaBp));
+          rows.push({ leg: `${from}→${to}`, side, inAmt: amtIn, chain, sdk: amtOut, deltaBp });
+        }
+      }
+      const bp = (px: number) => (px / curve.mid - 1) * 1e4;
+      console.log(
+        `${from}/${to} mid ${curve.mid.toFixed(8)} bid ${bp(curve.bids[0]!.price).toFixed(3)} bp ask ${bp(curve.asks[0]!.price).toFixed(3)} bp round-trip ${(bp(curve.asks[0]!.price) - bp(curve.bids[0]!.price)).toFixed(3)} bp`,
+      );
+    }
+    console.log(
+      `\nrung            side        amountIn           chain             sdk        Δbp\n${rows
+        .map(
+          (r) =>
+            `${r.leg.padEnd(14)} ${r.side.padEnd(5)} ${r.inAmt.toFixed(4).padStart(14)} ${r.chain
+              .toFixed(4)
+              .padStart(15)} ${r.sdk.toFixed(4).padStart(15)} ${r.deltaBp.toFixed(4).padStart(10)}`,
+        )
+        .join('\n')}\nworst rung |Δ| = ${worst.toFixed(4)} bp\n`,
+    );
+    expect(dead).toEqual([]); // no rung at or beyond the reserve cliff
+    expect(rows.length).toBeGreaterThan(8);
+    expect(worst).toBeLessThanOrEqual(0.05);
   }, 300_000);
 });
