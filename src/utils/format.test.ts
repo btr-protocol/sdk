@@ -1,6 +1,6 @@
 // bun test — numeric display formatting.
 import { expect, test, describe } from 'bun:test';
-import { formatNumber, formatPercentSig } from './format';
+import { formatNumber, formatPercentSig, formatPrice } from './format';
 
 // A bare /\.?0+$/ strip on a toFixed(0) string has no decimal point to anchor on,
 // so it eats integer zeros: 19.8% rendered as "2%" on price impact and LP fee.
@@ -42,4 +42,20 @@ test('formatNumber keeps grouping and trims only fractional zeros', () => {
   expect(formatNumber(1.5)).toBe('1.5');
   expect(formatNumber(2.0)).toBe('2');
   expect(formatNumber(0)).toBe('0');
+});
+
+// A 1e-5 ladder printed at the default 4 decimals collapsed eight consecutive ask rows
+// onto the same string: the book has to render at its own tick, not a fixed one.
+describe('formatPrice honours the ladder step', () => {
+  test('step 1e-5 resolves rows the default 4-decimal path collapses', () => {
+    const rows = [1.00001, 1.00002, 1.00003];
+    expect(new Set(rows.map((r) => formatPrice(r))).size).toBe(1);
+    expect(new Set(rows.map((r) => formatPrice(r, 1e-5))).size).toBe(3);
+    expect(formatPrice(1.00002, 1e-5)).toBe('1.00002');
+  });
+  test('coarse step trims decimals; grouping survives', () => {
+    expect(formatPrice(1.23456, 0.01)).toBe('1.23');
+    expect(formatPrice(64321.5, 1)).toBe('64,322');
+    expect(formatPrice(1.5, 0)).toBe('1.5000'); // step<=0 → default path
+  });
 });
