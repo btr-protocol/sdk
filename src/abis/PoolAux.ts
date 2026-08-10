@@ -93,12 +93,17 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
-    name: 'adminFreezeAsset',
+    name: 'adminHaltAsset',
     inputs: [
       {
         name: 'token',
         type: 'address',
         internalType: 'address',
+      },
+      {
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],
@@ -231,19 +236,6 @@ export const POOL_AUX_ABI = [
         name: 'vega',
         type: 'uint16',
         internalType: 'uint16',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'adminPauseAsset',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
       },
     ],
     outputs: [],
@@ -603,25 +595,17 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
-    name: 'adminUnfreezeAsset',
+    name: 'adminUnhaltAsset',
     inputs: [
       {
         name: 'token',
         type: 'address',
         internalType: 'address',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'adminUnpauseAsset',
-    inputs: [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],

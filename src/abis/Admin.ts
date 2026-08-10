@@ -187,6 +187,11 @@ export const ADMIN_ABI = [
         type: 'uint8',
         internalType: 'enum IAdmin.BatchOp',
       },
+      {
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -446,7 +451,7 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
-    name: 'freezeAsset',
+    name: 'haltAsset',
     inputs: [
       {
         name: 'pool',
@@ -458,23 +463,10 @@ export const ADMIN_ABI = [
         type: 'address',
         internalType: 'address',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'pauseAsset',
-    inputs: [
       {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],
@@ -1266,7 +1258,7 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
-    name: 'unfreezeAsset',
+    name: 'unhaltAsset',
     inputs: [
       {
         name: 'pool',
@@ -1278,23 +1270,10 @@ export const ADMIN_ABI = [
         type: 'address',
         internalType: 'address',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'unpauseAsset',
-    inputs: [
       {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
       },
     ],
     outputs: [],
@@ -1352,6 +1331,31 @@ export const ADMIN_ABI = [
         type: 'uint128',
         indexed: false,
         internalType: 'uint128',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'AssetHalted',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'src',
+        type: 'uint16',
+        indexed: true,
+        internalType: 'uint16',
       },
     ],
     anonymous: false,
@@ -1457,6 +1461,31 @@ export const ADMIN_ABI = [
   },
   {
     type: 'event',
+    name: 'AssetUnhalted',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'src',
+        type: 'uint16',
+        indexed: true,
+        internalType: 'uint16',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'BaseTokenMigrated',
     inputs: [
       {
@@ -1521,6 +1550,12 @@ export const ADMIN_ABI = [
         indexed: false,
         internalType: 'uint8',
       },
+      {
+        name: 'src',
+        type: 'uint16',
+        indexed: false,
+        internalType: 'uint16',
+      },
     ],
     anonymous: false,
   },
@@ -1552,44 +1587,6 @@ export const ADMIN_ABI = [
         type: 'uint16',
         indexed: true,
         internalType: 'uint16',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'EmergencyFreeze',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'EmergencyUnfreeze',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
     ],
     anonymous: false,
@@ -1703,44 +1700,6 @@ export const ADMIN_ABI = [
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'ProtocolPause',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'ProtocolUnpause',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
     ],
     anonymous: false,
