@@ -804,13 +804,7 @@ export const STAKING_ABI = [
   {
     type: 'error',
     name: 'CooldownActive',
-    inputs: [
-      {
-        name: 'remainingSeconds',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',

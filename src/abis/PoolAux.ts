@@ -880,19 +880,6 @@ export const POOL_AUX_ABI = [
     stateMutability: 'nonpayable',
   },
   {
-    type: 'function',
-    name: 'lpTokenImpl',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
     type: 'event',
     name: 'DeadSharesSeeded',
     inputs: [
@@ -1004,6 +991,11 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'error',
+    name: 'InvalidInput',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'InvalidState',
     inputs: [],
   },
@@ -1040,6 +1032,11 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'error',
+    name: 'Overflow',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'Reentrancy',
     inputs: [],
   },
@@ -1052,5 +1049,224 @@ export const POOL_AUX_ABI = [
     type: 'error',
     name: 'ZeroValue',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'AlreadyConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'BadFeed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'BaseDepegged',
+    inputs: [
+      {
+        name: 'basePriceWad',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deviationBps',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'CooldownActive',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ExceedsMaxSupply',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'Expired',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeedAlreadyExists',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeedNotFound',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeedPaused',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeedStale',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidAnchor',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'anchor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InvalidDecimals',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidPath',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'KillCapExhausted',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoPending',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotAdapter',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotElapsed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotFactory',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotReady',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'OperationFailed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PriceOutsideReservation',
+    inputs: [
+      {
+        name: 'price',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+      {
+        name: 'bound',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'SeqDown',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'StaleData',
+    inputs: [
+      {
+        name: 'age',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'maxAge',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ThresholdViolation',
+    inputs: [
+      {
+        name: 'value',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'threshold',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
 ];

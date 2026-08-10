@@ -212,78 +212,6 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
-    name: 'cancelAddAsset',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelOracleUpdate',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelSetAssetHook',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelSetCurve',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'presetId',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'cancelTimelock',
     inputs: [
       {
@@ -296,41 +224,10 @@ export const ADMIN_ABI = [
         type: 'uint8',
         internalType: 'uint8',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelUpdateProfile',
-    inputs: [
       {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelUpdateRiskConfig',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
+        name: 'subject',
+        type: 'bytes32',
+        internalType: 'bytes32',
       },
     ],
     outputs: [],
@@ -434,6 +331,24 @@ export const ADMIN_ABI = [
   {
     type: 'function',
     name: 'executeSetAssetHook',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeSetAssetParams',
     inputs: [
       {
         name: 'pool',
@@ -1999,13 +1914,7 @@ export const ADMIN_ABI = [
   {
     type: 'error',
     name: 'PendingTimelock',
-    inputs: [
-      {
-        name: 'executeAt',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',

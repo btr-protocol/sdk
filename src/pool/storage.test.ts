@@ -34,6 +34,7 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     assetHooks: 11n,
     invested: 12n,
     lpTokens: 13n,
+    lastHookCreditAt: 14n,
   });
 });
 

@@ -82,40 +82,6 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
-    name: 'batchSwap',
-    inputs: [
-      {
-        name: 'inputs',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'outputs',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'recipient',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'deadline',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: 'amountsOut',
-        type: 'uint256[]',
-        internalType: 'uint256[]',
-      },
-    ],
-    stateMutability: 'payable',
-  },
-  {
-    type: 'function',
     name: 'deposit',
     inputs: [
       {
@@ -573,6 +539,30 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
+    name: 'maxRedeem',
+    inputs: [
+      {
+        name: 'owner',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'owner',
     inputs: [],
     outputs: [
@@ -859,35 +849,8 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'AssetNotInTree',
-    inputs: [
-      {
-        name: 'asset',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-  },
-  {
-    type: 'error',
     name: 'BadConfig',
     inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'BaseDepegged',
-    inputs: [
-      {
-        name: 'basePriceWad',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'deviationBps',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
   },
   {
     type: 'error',
@@ -896,33 +859,7 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'FeatureDisabled',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'FeedPaused',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'InvalidDecimals',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'InvalidInput',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'InvalidPath',
     inputs: [],
   },
   {
@@ -937,108 +874,13 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'NotConfigured',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-      {
-        name: 'target',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'Overflow',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'Reentrancy',
     inputs: [],
   },
   {
     type: 'error',
-    name: 'StaleData',
-    inputs: [
-      {
-        name: 'age',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'maxAge',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'ThresholdViolation',
-    inputs: [
-      {
-        name: 'value',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'threshold',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
     name: 'ZeroAddr',
     inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'ZeroValue',
-    inputs: [],
-  },
-  {
-    type: 'event',
-    name: 'BatchSwapped',
-    inputs: [
-      {
-        name: 'sender',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'recipient',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'inputCount',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-      {
-        name: 'outputCount',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-      {
-        name: 'totalBaseValue',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
   },
   {
     type: 'event',
@@ -1310,5 +1152,298 @@ export const POOL_ABI = [
       },
     ],
     anonymous: false,
+  },
+  {
+    type: 'error',
+    name: 'AlreadyConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'BadFeed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'BaseDepegged',
+    inputs: [
+      {
+        name: 'basePriceWad',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deviationBps',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'CooldownActive',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ExceedsMaxSupply',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ExcessiveAmount',
+    inputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeedAlreadyExists',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeedNotFound',
+    inputs: [
+      {
+        name: 'feedId',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'FeedPaused',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeedStale',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientAmount',
+    inputs: [
+      {
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InvalidAnchor',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'anchor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InvalidDecimals',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidPath',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'KillCapExhausted',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoPending',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotAdapter',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotElapsed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotFactory',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotFound',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotReady',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'OperationFailed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'Overflow',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PendingTimelock',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PriceOutsideReservation',
+    inputs: [
+      {
+        name: 'price',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+      {
+        name: 'bound',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'SeqDown',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'StaleData',
+    inputs: [
+      {
+        name: 'age',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'maxAge',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ThresholdViolation',
+    inputs: [
+      {
+        name: 'value',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'threshold',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
   },
 ];

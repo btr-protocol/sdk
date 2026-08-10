@@ -5,7 +5,7 @@
  *   slot0 = baseToken|initialized, 1 = wnative, 2 = treasury; mappings assets=3,
  *   oracleConfigs=4, riskConfigs=5, curves=6, __reserved_lpBalances=7, protocolFees=8;
  *   feeParams=9, flowCooldownSeconds=10 (factory packs into slot 10 @ byte offset 2),
- *   assetHooks=11, invested=12, lpTokens=13.
+ *   assetHooks=11, invested=12, lpTokens=13, lastHookCreditAt=14.
  * Slot 7 is a reserved pin, not live state: the per-leg LPToken clone is the share ledger, and
  *   balances come from `Pool.getLPBalance` or the receipt's own `balanceOf`, never from a slot read.
  * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
@@ -49,10 +49,12 @@ export const POOL_STORAGE = {
   invested: 12n,
   /** Per-leg ERC-20 receipt registry: `mapping(leg => LPToken)`. */
   lpTokens: 13n,
+  /** Last `hookCreditYield` timestamp per leg: `mapping(leg => uint32)`. */
+  lastHookCreditAt: 14n,
 } as const;
 
 /**
- * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/Constants.sol`
+ * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstants.sol`
  * (verified exact: HOOK_PRE_OUTFLOW=1<<0, HOOK_POST_INFLOW=1<<1). SSoT for back/front.
  * Pool dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
  */
@@ -72,7 +74,7 @@ export function decodeHookSlot(word: Hex): HookSlot {
   return { target: addressAt(word, 0), flags: u32At(word, 20) };
 }
 
-/** Read the per-asset HookSlot (assetHooks mapping, slot 15). `target == address(0)` ⇒ no hook. */
+/** Read the per-asset HookSlot (assetHooks mapping, slot 11). `target == address(0)` ⇒ no hook. */
 export async function readAssetHook(
   provider: Eip1193Provider,
   pool: Address,

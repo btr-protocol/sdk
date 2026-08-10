@@ -945,13 +945,7 @@ export const EXTERNAL_ORACLE_ABI = [
   {
     type: 'error',
     name: 'CooldownActive',
-    inputs: [
-      {
-        name: 'remainingSeconds',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',
@@ -1023,13 +1017,7 @@ export const EXTERNAL_ORACLE_ABI = [
   {
     type: 'error',
     name: 'PendingTimelock',
-    inputs: [
-      {
-        name: 'executeAt',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',
