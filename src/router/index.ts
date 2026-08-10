@@ -14,7 +14,6 @@ import { ERC20_ABI } from '../eth/erc20.js';
 import type { Abi } from '../eth/abi.js';
 import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
-import { parseUnits } from '../utils/format.js';
 
 /** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
  *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
@@ -87,8 +86,26 @@ export interface PlanLegOpts {
 const SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 const isSentinel = (a: Address): boolean => a.toLowerCase() === SENTINEL;
 
-const toUnits = (v: number, decimals: number): bigint =>
-  v > 0 ? parseUnits(v.toFixed(Math.min(decimals, 18)), decimals) : 0n;
+/** Human amount → integer units. Goes through `toExponential` rather than `toFixed`: at
+ *  1e21 and above `toFixed` emits exponential notation ("1e+21"), which the old `parseUnits`
+ *  path could not read, silently producing a garbage `minOut` for any large-supply token.
+ *  Rounds DOWN, so a `minOut` built from this is never rounded up past what the quote saw. */
+const toUnits = (v: number, decimals: number): bigint => {
+  if (!Number.isFinite(v) || v <= 0) return 0n;
+  const [mant, exp] = v.toExponential(15).split('e');
+  const digits = mant.replace('.', '');
+  // toExponential(15) is always one integer digit plus 15 fractional ones.
+  const shift = Number(exp) - (digits.length - 1) + Math.min(decimals, 18);
+  const n = BigInt(digits);
+  return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
+};
+
+const SLIP_SCALE = 1_000_000n; // 1e-6 granularity: finer than any venue's fee tick
+
+/** Haircut integer units by `slip` in BIGINT space. Doing `amountOut * (1 - slip)` in float
+ *  first loses precision on large amounts before the value is ever widened. Rounds DOWN. */
+const applySlip = (units: bigint, slip: number): bigint =>
+  (units * (SLIP_SCALE - BigInt(Math.round(slip * Number(SLIP_SCALE))))) / SLIP_SCALE;
 
 /** Map a router plan (amm/router rankSwap `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs
@@ -97,6 +114,11 @@ const toUnits = (v: number, decimals: number): bigint =>
  *  Null when any pool address or token meta is missing. */
 export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null {
   const slip = opts.slippageFrac;
+  // Unvalidated, slip >= 1 drives every minOut to 0 — a batch with no slippage floor at all,
+  // which is the one failure mode this function exists to prevent. NaN does the same.
+  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
+    throw new Error(`planToLegs: slippageFrac must be in [0, 1), got ${slip}`);
+  }
   const legs: ExecLeg[] = [];
   for (const part of [...plan.parts].sort((a, b) => b.fraction - a.fraction)) {
     const rl = part.route.legs;
@@ -110,7 +132,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenIn: tin.address,
         tokenOut: tout.address,
         amountIn: toUnits(partIn, tin.decimals),
-        minOut: toUnits(part.quote.amountOut * (1 - slip), tout.decimals),
+        minOut: applySlip(toUnits(part.quote.amountOut, tout.decimals), slip),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
       });
@@ -119,7 +141,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tmid = opts.tokenOf(rl[0].tokenOut);
       const t2out = opts.tokenOf(rl[1].tokenOut);
       if (!rl[0].poolAddr || !rl[1].poolAddr || !t1in || !tmid || !t2out) return null;
-      const leg1MinOut = toUnits(part.quote.fills[0].amountOut * (1 - slip), tmid.decimals);
+      const leg1MinOut = applySlip(toUnits(part.quote.fills[0].amountOut, tmid.decimals), slip);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
@@ -133,7 +155,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenIn: tmid.address,
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
-        minOut: toUnits(part.quote.amountOut * (1 - slip), t2out.decimals),
+        minOut: applySlip(toUnits(part.quote.amountOut, t2out.decimals), slip),
         unwrapOut: opts.nativeOut,
       });
     }
