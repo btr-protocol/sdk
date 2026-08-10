@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 // bun test — proves the shared model self-consistent (chart == quote) and the quartic curve
 // primitives (evalQ/areaQ/buildCurve) bit-faithful to NUQuartic.sol via the on-chain parity vectors.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   BOOTSTRAP_VOLATILE_CURVE,
@@ -140,10 +140,21 @@ interface ParityVec {
   yQ: number[];
   areas: { x1: number; x2: number; aQ: number }[];
 }
-const vectors = JSON.parse(readFileSync(VECTORS_PATH, 'utf8')) as Record<string, ParityVec>;
+// The vectors are tracked in the dex repo and stay there: they are the SSoT the Solidity suite
+// certifies against, and a second copy here would be free to drift. An sdk-only checkout has no
+// sibling to read, so this describe's cases skip WITH A REASON rather than taking the whole file
+// down with a module-load ENOENT (which is what silently cost this file all 44 of its tests).
+const hasVectors = existsSync(VECTORS_PATH);
+const vectors = hasVectors
+  ? (JSON.parse(readFileSync(VECTORS_PATH, 'utf8')) as Record<string, ParityVec>)
+  : ({} as Record<string, ParityVec>);
+const parityTest = hasVectors
+  ? test
+  : (name: string, _fn: () => void) =>
+      test.skip(`${name} — SKIPPED: ${VECTORS_PATH} absent (needs a sibling dex checkout)`, () => {});
 
 describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/areaQ on-chain)', () => {
-  test('evalQ matches every shape family within the on-chain parity band', () => {
+  parityTest('evalQ matches every shape family within the on-chain parity band', () => {
     let worst = 0n;
     let worstAt = '';
     for (const [name, v] of Object.entries(vectors)) {
@@ -162,7 +173,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     expect(worst).toBeLessThanOrEqual(200n);
   });
 
-  test('areaQ matches every shape family within the on-chain parity band', () => {
+  parityTest('areaQ matches every shape family within the on-chain parity band', () => {
     for (const [name, v] of Object.entries(vectors)) {
       const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
       for (const a of v.areas) {
@@ -175,7 +186,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     }
   });
 
-  test('monotone: Δw≥0 ⇒ nondecreasing evalQ on every shape', () => {
+  parityTest('monotone: Δw≥0 ⇒ nondecreasing evalQ on every shape', () => {
     for (const v of Object.values(vectors)) {
       const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
       let prev = evalQ(c, 0);
@@ -187,7 +198,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     }
   });
 
-  test('areaQ == Riemann sum of evalQ (internal consistency)', () => {
+  parityTest('areaQ == Riemann sum of evalQ (internal consistency)', () => {
     const v = vectors.hyper;
     const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
     const [lo, hi] = [200, 9800];
@@ -202,7 +213,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     expect(rel(exact, riemann)).toBeLessThan(1e-4);
   });
 
-  test('buildCurve validation mirrors NUQuartic.set reverts', () => {
+  parityTest('buildCurve validation mirrors NUQuartic.set reverts', () => {
     const v = vectors.hyper;
     const wQ = v.wQ.map(BigInt);
     const dec = [...wQ];
@@ -220,7 +231,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     expect(() => buildCurve(badKnot, wQ, 500)).toThrow(); // knot ≥ BPS
   });
 
-  test('fixture preset table: portable-only, wQ quantization identical to the exported vectors', () => {
+  parityTest('fixture preset table: portable-only, wQ quantization identical to the exported vectors', () => {
     expect(CURVE_PRESETS.length).toBeGreaterThan(0);
     // W5 presets are the unprefixed vector families — same quantized wQ by construction.
     for (const p of CURVE_PRESETS.filter((x) => x.W === 5)) {
