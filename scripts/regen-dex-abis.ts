@@ -19,12 +19,18 @@ const CONTRACTS: Array<{
   blurb: string;
   /** Which repo's evm/out holds the artifact (default 'dex'; periphery singletons moved to shared/evm). */
   root?: keyof typeof EVM_ROOTS;
-  /** Extra interface artifact(s) whose EVENT entries get merged in (dedup by name). Needed when an
+  /** Extra artifact(s) whose EVENT entries get merged in (dedup by name). Needed when an
    *  event is declared on an interface but only ever EMITTED from a library the contract calls into —
    *  solc's ABI generator doesn't pick up library-emitted events unless the contract itself `is` the
    *  declaring interface, so they're silently absent from the contract's own artifact (GATE-06: Pool's
-   *  Swapped/BatchSwapped/Deposited/Withdrawn/LiabilitySwapped/Donated all hit this). */
+   *  Swapped/Deposited/Withdrawn/LiabilitySwapped/Donated all hit this).
+   *  Spec is `Contract` (⇒ `out/Contract.sol/Contract.json`) or `File.sol/Contract`. */
   mergeEventsFrom?: string[];
+  /** Same, for ERROR entries. The swap path reverts from libraries (`Pricing`, `FeedMath`, ...), and
+   *  solc keeps library-thrown errors out of the caller's ABI, so `Pool`'s own artifact names only the
+   *  handful it throws inline. `venues/router.ts` decodes revert data against POOL_ABI to tell a
+   *  deliberate halt (StaleData / BaseDepegged) from an RPC blink — merging `Err` keeps that table whole. */
+  mergeErrorsFrom?: string[];
 }> = [
   {
     contract: 'Admin',
@@ -40,6 +46,7 @@ const CONTRACTS: Array<{
     title: 'Pool',
     blurb: 'Flat pool surface (swap/deposit/withdraw/view). Admin ops live on Admin singleton.',
     mergeEventsFrom: ['IPool'],
+    mergeErrorsFrom: ['Errors.sol/Err'],
   },
   {
     contract: 'PoolAux',
@@ -48,6 +55,7 @@ const CONTRACTS: Array<{
     title: 'PoolAux',
     blurb:
       'Cold-path dispatcher (Pool fallback → DELEGATECALL). Hook surface (getAssetHook/hookDeploy/hookRecall) + pool-scoped admin. Call against the POOL address, not PoolAux.',
+    mergeErrorsFrom: ['Errors.sol/Err'],
   },
   {
     contract: 'IPoolHooks',
@@ -188,6 +196,7 @@ for (const {
   blurb,
   root = 'dex',
   mergeEventsFrom,
+  mergeErrorsFrom,
 } of CONTRACTS) {
   const evmRoot = EVM_ROOTS[root];
   const artifactPath = resolve(evmRoot, `out/${contract}.sol/${contract}.json`);
@@ -195,18 +204,22 @@ for (const {
     abi: Array<Record<string, unknown>>;
   };
   let abi = artifact.abi;
-  if (mergeEventsFrom?.length) {
-    const have = new Set(abi.filter((e) => e.type === 'event').map((e) => e.name as string));
-    for (const ifaceName of mergeEventsFrom) {
-      const ifacePath = resolve(evmRoot, `out/${ifaceName}.sol/${ifaceName}.json`);
-      const iface = JSON.parse(readFileSync(ifacePath, 'utf8')) as {
+  /** Merge entries of `kind` from the named artifacts, deduped by name. */
+  const merge = (kind: 'event' | 'error', specs: string[] | undefined) => {
+    if (!specs?.length) return;
+    const have = new Set(abi.filter((e) => e.type === kind).map((e) => e.name as string));
+    for (const spec of specs) {
+      const rel = spec.includes('/') ? spec : `${spec}.sol/${spec}`;
+      const src = JSON.parse(readFileSync(resolve(evmRoot, `out/${rel}.json`), 'utf8')) as {
         abi: Array<Record<string, unknown>>;
       };
-      const missing = iface.abi.filter((e) => e.type === 'event' && !have.has(e.name as string));
+      const missing = src.abi.filter((e) => e.type === kind && !have.has(e.name as string));
       for (const e of missing) have.add(e.name as string);
       abi = [...abi, ...missing];
     }
-  }
+  };
+  merge('event', mergeEventsFrom);
+  merge('error', mergeErrorsFrom);
   const header = `/**
  * ${title} Contract ABI
  * @module @btr-protocol/sdk/abis

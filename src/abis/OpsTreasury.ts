@@ -302,31 +302,6 @@ export const OPS_TREASURY_ABI = [
   },
   {
     type: 'event',
-    name: 'ProtocolFeesCollected',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
     name: 'Salvaged',
     inputs: [
       {
@@ -466,13 +441,7 @@ export const OPS_TREASURY_ABI = [
   {
     type: 'error',
     name: 'PendingTimelock',
-    inputs: [
-      {
-        name: 'executeAt',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',

@@ -43,13 +43,15 @@ const EVM_ROOTS = {
  *  artifact (periphery singletons moved to shared/evm). `mergeEventsFrom` mirrors
  *  scripts/regen-dex-abis.ts: events declared on an interface but only ever EMITTED from a
  *  library aren't in the implementing contract's own artifact (solc doesn't attribute a
- *  library-emitted event to the caller unless it `is` the declaring interface) — GATE-06. */
+ *  library-emitted event to the caller unless it `is` the declaring interface) — GATE-06.
+ *  `mergeErrorsFrom` does the same for library-thrown errors, which the revert decoder needs. */
 const ABI_MAP: Array<{
   name: string;
   ts: readonly unknown[];
   contract: string;
   root?: keyof typeof EVM_ROOTS;
   mergeEventsFrom?: string[];
+  mergeErrorsFrom?: string[];
 }> = [
   { name: 'AccessControl', ts: ACCESS_CONTROL_ABI, contract: 'AccessControl', root: 'shared' },
   { name: 'Admin', ts: ADMIN_ABI, contract: 'Admin' },
@@ -66,8 +68,14 @@ const ABI_MAP: Array<{
   { name: 'GovToken', ts: GOV_TOKEN_ABI, contract: 'GovToken', root: 'shared' },
   { name: 'GovTreasury', ts: GOV_TREASURY_ABI, contract: 'GovTreasury', root: 'shared' },
   { name: 'OpsTreasury', ts: OPS_TREASURY_ABI, contract: 'OpsTreasury', root: 'shared' },
-  { name: 'Pool', ts: POOL_ABI, contract: 'Pool', mergeEventsFrom: ['IPool'] },
-  { name: 'PoolAux', ts: POOL_AUX_ABI, contract: 'PoolAux' },
+  {
+    name: 'Pool',
+    ts: POOL_ABI,
+    contract: 'Pool',
+    mergeEventsFrom: ['IPool'],
+    mergeErrorsFrom: ['Errors.sol/Err'],
+  },
+  { name: 'PoolAux', ts: POOL_AUX_ABI, contract: 'PoolAux', mergeErrorsFrom: ['Errors.sol/Err'] },
   { name: 'IPoolHooks', ts: POOL_HOOKS_ABI, contract: 'IPoolHooks' },
   { name: 'PoolFactory', ts: POOL_FACTORY_ABI, contract: 'PoolFactory' },
   { name: 'StakedAsset', ts: STAKED_ASSET_ABI, contract: 'StakedAsset', root: 'shared' },
@@ -85,20 +93,28 @@ function loadForgeAbi(
   contract: string,
   root: keyof typeof EVM_ROOTS = 'dex',
   mergeEventsFrom?: string[],
+  mergeErrorsFrom?: string[],
 ): AbiItem[] {
   const artifactPath = resolve(EVM_ROOTS[root], `out/${contract}.sol/${contract}.json`);
   const raw = readFileSync(artifactPath, 'utf8');
   let abi = (JSON.parse(raw) as { abi: AbiItem[] }).abi;
-  if (mergeEventsFrom?.length) {
-    const have = new Set(abi.filter((e) => e.type === 'event').map((e) => e.name as string));
-    for (const ifaceName of mergeEventsFrom) {
-      const ifacePath = resolve(EVM_ROOTS[root], `out/${ifaceName}.sol/${ifaceName}.json`);
-      const iface = (JSON.parse(readFileSync(ifacePath, 'utf8')) as { abi: AbiItem[] }).abi;
-      const missing = iface.filter((e) => e.type === 'event' && !have.has(e.name as string));
+  const merge = (kind: 'event' | 'error', specs?: string[]) => {
+    if (!specs?.length) return;
+    const have = new Set(abi.filter((e) => e.type === kind).map((e) => e.name as string));
+    for (const spec of specs) {
+      const rel = spec.includes('/') ? spec : `${spec}.sol/${spec}`;
+      const src = (
+        JSON.parse(readFileSync(resolve(EVM_ROOTS[root], `out/${rel}.json`), 'utf8')) as {
+          abi: AbiItem[];
+        }
+      ).abi;
+      const missing = src.filter((e) => e.type === kind && !have.has(e.name as string));
       for (const e of missing) have.add(e.name as string);
       abi = [...abi, ...missing];
     }
-  }
+  };
+  merge('event', mergeEventsFrom);
+  merge('error', mergeErrorsFrom);
   return abi;
 }
 
@@ -149,9 +165,9 @@ describe('ABI freshness vs dex/evm + shared/evm sources', () => {
 
   if (!rootsExist) return;
 
-  for (const { name, ts, contract, root, mergeEventsFrom } of ABI_MAP) {
+  for (const { name, ts, contract, root, mergeEventsFrom, mergeErrorsFrom } of ABI_MAP) {
     test(`${name} ABI matches ${root ?? 'dex'}/evm compiled artifact`, () => {
-      const onChain = loadForgeAbi(contract, root, mergeEventsFrom);
+      const onChain = loadForgeAbi(contract, root, mergeEventsFrom, mergeErrorsFrom);
       const a = canonical(normalize(onChain));
       const b = canonical(normalize(ts));
       if (a !== b) {

@@ -51,6 +51,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'MIN_GUARDIANS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'ROTATION_TIMELOCK',
     inputs: [],
     outputs: [
@@ -65,7 +78,13 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'function',
     name: 'armQuorumPolicy',
-    inputs: [],
+    inputs: [
+      {
+        name: 'guardians',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
+    ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -1164,6 +1183,22 @@ export const ACCESS_CONTROL_ABI = [
     type: 'error',
     name: 'BadConfig',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'Expired',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
   },
   {
     type: 'error',

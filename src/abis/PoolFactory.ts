@@ -43,32 +43,6 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
-    name: 'MAX_POOL_TOKENS',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'MAX_TOKEN_POOLS',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'UPGRADE_TIMELOCK',
     inputs: [],
     outputs: [
@@ -76,25 +50,6 @@ export const POOL_FACTORY_ABI = [
         name: '',
         type: 'uint256',
         internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'allPools',
-    inputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
       },
     ],
     stateMutability: 'view',
@@ -118,35 +73,6 @@ export const POOL_FACTORY_ABI = [
     inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'checkRoute',
-    inputs: [
-      {
-        name: 'tokenA',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'tokenB',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: 'hasDirectRoute',
-        type: 'bool',
-        internalType: 'bool',
-      },
-      {
-        name: 'commonPools',
-        type: 'address[]',
-        internalType: 'address[]',
-      },
-    ],
-    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -363,30 +289,6 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
-    name: 'officialTokenToPools',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'pendingReferencePool',
     inputs: [],
     outputs: [
@@ -408,43 +310,6 @@ export const POOL_FACTORY_ABI = [
         internalType: 'address',
       },
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'poolToTokens',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'protocolDeployer',
-    inputs: [],
     outputs: [
       {
         name: '',
@@ -518,54 +383,6 @@ export const POOL_FACTORY_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'tokenInPool',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'tokenToPools',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -803,13 +620,7 @@ export const POOL_FACTORY_ABI = [
   {
     type: 'error',
     name: 'PendingTimelock',
-    inputs: [
-      {
-        name: 'executeAt',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',

@@ -1086,6 +1086,11 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'error',
+    name: 'NotCode',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotConfigured',
     inputs: [
       {
@@ -1123,13 +1128,7 @@ export const BRIDGE_ABI = [
   {
     type: 'error',
     name: 'PendingTimelock',
-    inputs: [
-      {
-        name: 'executeAt',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
+    inputs: [],
   },
   {
     type: 'error',
