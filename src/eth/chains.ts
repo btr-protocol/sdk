@@ -400,17 +400,20 @@ export const CHAINS: Record<number, ChainConfig> = {
     id: 5042,
     name: 'Arc',
     icon: '/networks/arc.svg',
-    // ⚠ NOT LIVE YET (2026-07-28). Registered so the network list can show Arc
-    // as a roadmap entry; the deployment stays `pending`, so it is never
-    // selectable and nothing routes here.
-    rpcUrls: ['https://rpc.arc.network'],
-    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
-    // ⚠ UNVERIFIED (2026-08-02). Reported by the operator as Arc's wrapped native, an ERC-20 USDC,
-    // but no Arc RPC was reachable to check it. BEFORE any Arc deploy, confirm against a live Arc
-    // RPC that this address (a) has code, (b) reports the expected symbol and decimals (native USDC
-    // is 6, not 18), and (c) exposes deposit()/withdraw(uint256). Pool.initialize writes wnative to
-    // an IMMUTABLE field: a wrong value is not patchable, it is a redeploy of the whole fleet.
-    wrappedNative: '0x3600000000000000000000000000000000000000',
+    // ⚠ NOT LIVE. Circle has announced 2026-09-16 for Arc mainnet; until then this is a
+    // roadmap entry only and nothing may route here. `rpcUrls` is deliberately EMPTY: the
+    // previously listed https://rpc.arc.network is NXDOMAIN (no DNS record at all, verified
+    // 2026-08-10), and https://rpc.mainnet.arc.io resolves but answers 403. An endpoint that
+    // cannot serve is worse than none — it turns "unconfigured" into a silent hang. Fill this
+    // in from docs.arc.io once mainnet is live and the endpoint answers eth_chainId 0x13b2.
+    rpcUrls: [],
+    // Native gas is USDC at 18 decimals; the ERC-20 view at 0x3600… reports 6 for the SAME
+    // balance (verified on-chain: eth_getBalance/1e18 == balanceOf/1e6). Mixing the two
+    // interfaces in one accounting path is a 1e12 error.
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+    // No wrapped native on Arc, so no `wrappedNative`. 0x3600… is Circle's FiatToken ERC-20
+    // view of native USDC, NOT a WETH9: its bytecode has no deposit()/withdraw(uint256), and
+    // 0x4200…0006 has no code. Pools initialize with wnative=address(0).
   },
 
   5042002: {
@@ -418,13 +421,18 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: 'Arc Testnet',
     // One asset covers both Arc networks; the slug would be `arc-testnet.svg`.
     icon: '/networks/arc.svg',
-    rpcUrls: ['https://rpc.testnet.arc.network', 'https://arc-testnet.drpc.org'],
-    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+    // All three verified live 2026-08-10 (eth_chainId -> 0x4cef52). arc.network 301s to
+    // arc.io, so both spellings work; .io first because it is the canonical one in docs.
+    rpcUrls: [
+      'https://rpc.testnet.arc.io',
+      'https://rpc.testnet.arc.network',
+      'https://rpc.drpc.testnet.arc.io',
+    ],
+    // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
-    // ⚠ UNVERIFIED, and additionally ASSUMED to be the same address as Arc mainnet (5042). Same
-    // pre-deploy check applies, run against the TESTNET RPC: code present, expected symbol and
-    // decimals, deposit()/withdraw(uint256) present. wnative is IMMUTABLE once a pool is initialized.
-    wrappedNative: '0x3600000000000000000000000000000000000000',
+    // No `wrappedNative`: 0x3600… is the ERC-20 USDC view (6d) and the pool base, not a
+    // WETH9. No deposit()/withdraw(uint256) in its bytecode; pools use wnative=address(0).
     testnet: true,
   },
 

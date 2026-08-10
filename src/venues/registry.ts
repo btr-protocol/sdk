@@ -62,8 +62,9 @@ export function staticVenuePools(): VenuePool[] {
     { venue: 'btr', tag: 'btr-stable', address: SEPOLIA_BTR.stablePool, tokens: symAddrs(SEPOLIA_STABLE_SYMBOLS) },
     { venue: 'btr', tag: 'btr-volatile', address: SEPOLIA_BTR.volatilePool, tokens: symAddrs(SEPOLIA_VOLATILE_SYMBOLS) },
   ];
-  // FX core not in the current Sepolia redeploy (11155111.pools.json has no fxPool).
-  const fx = (SEPOLIA_BTR as { fxPool?: typeof SEPOLIA_BTR.stablePool }).fxPool;
+  // FX core not in the current Sepolia redeploy: `SEPOLIA_BTR.fxPool` is typed
+  // `Address | undefined` and is undefined until the pool is actually deployed.
+  const fx = SEPOLIA_BTR.fxPool;
   if (fx) pools.push({ venue: 'btr', tag: 'btr-fx', address: fx, tokens: symAddrs(SEPOLIA_FX_SYMBOLS) });
   return pools;
 }

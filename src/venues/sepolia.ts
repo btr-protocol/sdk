@@ -59,6 +59,19 @@ export const SEPOLIA_BTR = {
   treasuryProxy: '0xCcf51E56b58c0abcD494700aE94e4ade17B9BE66' as Address,
   stablePool: '0xfF6bf617cf2D3aB1608d6732cb5Efd8D184aDA8c' as Address,
   volatilePool: '0xFfa427bc61315c3Fd5C32157675b31135f910cAc' as Address,
+  /**
+   * FX core: DECLARED BUT NOT DEPLOYED in the current Sepolia fleet. The pool is scripted
+   * (`dex/evm/script/SepoliaPoolDeploy.s.sol` `deployFxPool()`) and an older broadcast holds
+   * 0x18c7376A4F9B3C3fb8A0A33fAf3c55aD225CB229, but `11155111.pools.json` — the canonical
+   * deployment record — carries no `fxPool`, so that address is a stale artifact of a
+   * superseded run and must NOT be resurrected here: pointing the router at a pool the
+   * current fleet does not own is worse than having no FX route.
+   *
+   * Kept as an explicitly-typed `Address | undefined` rather than omitted, so consumers get
+   * "not deployed yet, handle it" instead of "this key does not exist". Set it from
+   * `11155111.pools.json` the day the FX core is actually deployed.
+   */
+  fxPool: undefined as Address | undefined,
 } as const;
 
 /**
