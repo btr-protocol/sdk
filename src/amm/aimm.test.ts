@@ -594,7 +594,7 @@ describe('compose + degenerate', () => {
     expect(rel(q.amountOut, s2.grossOut * (1 - half))).toBeLessThan(1e-9);
   });
   // The clip is EXACT on chain (`_legScaleOut`, Pricing.sol:561-562). A `res·0.999` haircut here
-  // made `_covToll`'s full-block branch (`grossOut >= r0` ⇒ toll eats the fill ⇒ PoolSwap reverts
+  // made `_covToll`'s full-block branch (`grossOut >= r0` ⇒ toll eats the fill ⇒ the swap reverts
   // ZeroValue) structurally unreachable in the mirror, so the UI advertised fills the chain refuses.
   test('S ≫ maxIn clips grossOut EXACTLY to reserves; κ>0 then blocks the whole fill', () => {
     const q = quoteExactIn(volState(), BASE, 'BTCB', 1e12); // buy far past capacity

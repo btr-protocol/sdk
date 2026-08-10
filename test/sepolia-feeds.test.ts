@@ -20,10 +20,12 @@ describe('sepolia oracle feed table', () => {
 
   test('carries the USDC-USD base-depeg reference', () => {
     // Pricing._denominate divides every usdQuoted asset by this feed, so its
-    // absence is not cosmetic.
+    // absence is not cosmetic. Value = `feed_USDC-USD` in
+    // dex/evm/deployments/11155111.deploy.json (SoT; re-check with
+    // bun run scripts/verify-sepolia-venue.ts after every redeploy).
     const ref = sepoliaFeedByName('USDC-USD');
     expect(ref).not.toBeNull();
-    expect(ref!.feedId).toBe('0xd1d7f3873fb17b9dbd7bdf1c2c9e6b85b483f61c4f4ce08c48b2b7b668d1485d');
+    expect(ref!.feedId).toBe('0xf097408cec312d10691ef8ff946389a6eab389bed1a574aa68222fdf45f1f1f2');
     expect(ref!.name).not.toBe('USDC-USDC');
   });
 
