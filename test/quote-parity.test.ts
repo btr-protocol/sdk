@@ -280,8 +280,13 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
           .filter((i, j, a) => i >= 0 && i < live.length && a.indexOf(i) === j)
           .map((i) => live[i]!);
         for (const l of pick) {
+          // The printed rung is the SKEW curve (pre-fee, pre-toll); `netPrice` carries the
+          // haircut, so the executable size is the rung scaled by price/netPrice. That net size
+          // is what the chain must reproduce.
           const [tIn, tOut, amtIn, amtOut] =
-            side === 'ask' ? [from, to, l.cumBase, l.cumTok] : [to, from, l.cumTok, l.cumBase];
+            side === 'ask'
+              ? [from, to, l.cumBase, l.cumTok * (l.price / l.netPrice)]
+              : [to, from, l.cumTok, l.cumBase * (l.netPrice / l.price)];
           const dIn = decimals[tIn] ?? 18;
           const wei = BigInt(Math.round(amtIn * 10 ** dIn));
           if (wei <= 0n) continue;
@@ -303,8 +308,10 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
         }
       }
       const bp = (px: number) => (px / curve.mid - 1) * 1e4;
+      // Printed touch is the skew anchor (0.000 bp both sides by construction); the round trip
+      // that matters is the COST, read off netPrice.
       console.log(
-        `${from}/${to} mid ${curve.mid.toFixed(8)} bid ${bp(curve.bids[0]!.price).toFixed(3)} bp ask ${bp(curve.asks[0]!.price).toFixed(3)} bp round-trip ${(bp(curve.asks[0]!.price) - bp(curve.bids[0]!.price)).toFixed(3)} bp`,
+        `${from}/${to} mid ${curve.mid.toFixed(8)} touch ${bp(curve.bids[0]!.price).toFixed(3)}/${bp(curve.asks[0]!.price).toFixed(3)} bp cost ${bp(curve.bids[0]!.netPrice).toFixed(3)}/${bp(curve.asks[0]!.netPrice).toFixed(3)} bp round-trip ${(bp(curve.asks[0]!.netPrice) - bp(curve.bids[0]!.netPrice)).toFixed(3)} bp`,
       );
     }
     console.log(

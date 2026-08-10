@@ -236,13 +236,25 @@ export interface AggregateDepthOpts {
 
 export interface AggregatedDepthBook {
   mark: number;
+  /** Depth-weighted mean of the pool mids: ladder centre and premium reference (mid vs mark), never
+   *  an executable price. Clamped into the touch interval, so `bid <= mid <= ask` holds whenever the
+   *  touch is uncrossed; an empty side does not bind, and a crossed touch brackets mid the other
+   *  way round (`ask <= mid <= bid`) rather than hiding the cross. */
   mid: number;
   spreadBps: number;
-  /** Touch: best net executable price per side, `curve.bids[0]` / `curve.asks[0]` pre-bucketing.
-   *  0 when a side is empty. The bucketed `bids`/`asks` below are snapped to `step` and so
-   *  cannot carry the true touch. */
+  /** Touch: best SKEW-implied (pre-fee, pre-toll) price per side, `curve.bids[0]` / `curve.asks[0]`
+   *  pre-bucketing, taken as max over pools' bids and min over pools' asks (a taker routes to one
+   *  pool, the best one). 0 when a side is empty. The bucketed `bids`/`asks` below are snapped to
+   *  `step` and so cannot carry the true touch. This is the market data: it is what the book
+   *  prints. Pools differ by inventory skew, so pre-fee this touch can cross across pools: that is
+   *  cross-pool arbitrage, and the executable statement is `bidNet`/`askNet`. */
   bid: number;
   ask: number;
+  /** The same touch AFTER the fee and coverage toll: what a taker actually fills at. The gap
+   *  `bidNet`→`bid` / `ask`→`askNet` is the taker cost, disclosed on its own and never folded
+   *  into the printed rungs. Anything pricing a real crossing (OEV, limit seeding) uses these. */
+  bidNet: number;
+  askNet: number;
   step: number;
   /** Token-denominated (for fill simulation). */
   bids: AggRow[];
@@ -274,6 +286,8 @@ export function aggregateDepthCurves(
     spreadBps: number;
     bid: number;
     ask: number;
+    bidNet: number;
+    askNet: number;
     asks: Row[];
     bids: Row[];
     w: number;
@@ -293,6 +307,8 @@ export function aggregateDepthCurves(
       spreadBps: curve.spreadBps,
       bid: curve.bids[0]?.price ?? 0,
       ask: curve.asks[0]?.price ?? 0,
+      bidNet: curve.bids[0]?.netPrice ?? 0,
+      askNet: curve.asks[0]?.netPrice ?? 0,
       asks,
       bids,
       w,
@@ -317,20 +333,40 @@ export function aggregateDepthCurves(
   }
   if (wSum <= 0) return null;
   const mark = markNum / wSum;
-  const mid = midNum / wSum;
   const spreadBps = spreadNum / wSum;
-  // A one-sided pool must not drag the touch: weight each side over its own contributors only.
-  const touch = (side: 'bid' | 'ask'): number => {
-    let num = 0;
-    let den = 0;
+
+  /**
+   * The touch is an EXTREMUM, never a mean: a taker routes to one pool, the best one, so the venue's
+   * best bid is the max over pools and its best ask the min. Size-weighting a touch prints a bid
+   * below the best bid and an ask above the best ask, a price no router accepts and no fill reaches.
+   * Weighting stays where it belongs: the ladder behind the touch, where sizes add.
+   * A one-sided pool must not drag the touch: only pools actually quoting that side contribute.
+   */
+  const touch = (pick: (p: Part) => number, side: 'bid' | 'ask'): number => {
+    let best = 0;
     for (const p of parts) {
-      const px = side === 'bid' ? p.bid : p.ask;
+      const px = pick(p);
       if (!(px > 0)) continue;
-      num += px * p.w;
-      den += p.w;
+      best = best === 0 ? px : side === 'bid' ? Math.max(best, px) : Math.min(best, px);
     }
-    return den > 0 ? num / den : 0;
+    return best;
   };
+  const bid = touch((p) => p.bid, 'bid');
+  const ask = touch((p) => p.ask, 'ask');
+
+  /**
+   * Mid stays the depth-weighted mean of the pool mids: it is the ladder CENTRE and the premium
+   * reference (mid vs mark), both of which are venue-wide aggregates, not executable prices.
+   * Invariant enforced: `bid <= mid <= ask` (an absent side does not bind). Pool mids differ by
+   * inventory skew, so pre-fee the aggregated skew touch can cross (max bid > min ask); that cross
+   * is cross-pool arbitrage, not a spread. When it happens the mean already sits inside the crossed
+   * interval, and the clamp keeps mid bracketed by the two touch prices in every other case too
+   * (one-sided pools make the touch set differ from the mid set).
+   */
+  let mid = midNum / wSum;
+  if (bid > 0 && ask > 0) mid = Math.min(Math.max(mid, Math.min(bid, ask)), Math.max(bid, ask));
+  else if (bid > 0) mid = Math.max(mid, bid);
+  else if (ask > 0) mid = Math.min(mid, ask);
 
   let below = 0;
   let above = 0;
@@ -362,6 +398,10 @@ export function aggregateDepthCurves(
       ? opts.step
       : ladder.steps[Math.min(Math.max(0, idx), ladder.steps.length - 1)];
 
+  // No rung is priced through the touch: `aggregate` opens each pool's ladder strictly beyond that
+  // pool's own touch (bids floor below it, asks ceil above it), and the aggregated touch is the
+  // max / min over those same per-pool touches, so every merged bid rung < bid and every ask
+  // rung > ask. The old weighted-mean touch broke this: the tightest pool's rungs sat through it.
   const bidTok = mergeAgg(
     parts.map((p) => aggregate(p.bids, step, 'bid', 'base')),
     'bid',
@@ -388,8 +428,10 @@ export function aggregateDepthCurves(
     mark,
     mid,
     spreadBps,
-    bid: touch('bid'),
-    ask: touch('ask'),
+    bid,
+    ask,
+    bidNet: touch((p) => p.bidNet, 'bid'),
+    askNet: touch((p) => p.askNet, 'ask'),
     step,
     bids: bidTok,
     asks: askTok,

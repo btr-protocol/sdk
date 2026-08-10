@@ -144,8 +144,11 @@ describe('aggregateDepthCurves', () => {
     const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.01 })!;
     expect(book.bid).toBeCloseTo(curve.bids[0].price, 12);
     expect(book.ask).toBeCloseTo(curve.asks[0].price, 12);
-    expect(book.bid).toBeLessThan(book.mid);
-    expect(book.ask).toBeGreaterThan(book.mid);
+    // Pre-fee the two sides meet at the skewed mid; the cost sits on the NET touch beside it.
+    expect(book.bid).toBeCloseTo(book.mid, 12);
+    expect(book.ask).toBeCloseTo(book.mid, 12);
+    expect(book.bidNet).toBeLessThan(book.mid);
+    expect(book.askNet).toBeGreaterThan(book.mid);
     // The coarse ladder rounds the printed rows away from the touch; the touch must survive it.
     expect(Math.abs(book.asks[0].price - book.ask)).toBeGreaterThan(0);
   });
@@ -155,6 +158,81 @@ describe('aggregateDepthCurves', () => {
     const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
     const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.001 });
     if (book) expect(book.ask > 0 || book.bid > 0).toBe(true);
+  });
+
+  // Two pools quoting the same pair carry their own inventory skew, hence their own mid. A taker
+  // routes to the best pool, so the venue touch is max-bid / min-ask, never the size-weighted mean.
+  function skewedPair(): { pools: NamedPool[]; midHi: number; midLo: number } {
+    // Same profile, different reserve/liability balance ⇒ different skew ⇒ different mid.
+    const hi = buildLeg('USDT', 1, sigmaSeed('stable'), 600_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
+    const lo = buildLeg('USDT', 1, sigmaSeed('stable'), 1_400_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
+    const pools: NamedPool[] = [
+      { tag: 'stable', state: { base: 'USDC', legs: { USDT: hi } } },
+      { tag: 'volatile', state: { base: 'USDC', legs: { USDT: lo } } },
+    ];
+    const midHi = virtualMarketDepth(pools[0].state, 'USDT').mid;
+    const midLo = virtualMarketDepth(pools[1].state, 'USDT').mid;
+    return { pools, midHi, midLo };
+  }
+
+  test('two pools with different mids: touch is max-bid / min-ask, not the mean', () => {
+    const { pools, midHi, midLo } = skewedPair();
+    expect(Math.abs(midHi - midLo)).toBeGreaterThan(0); // premise: the pools really do differ
+    const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.0001 })!;
+    const bids = pools.map((p) => virtualMarketDepth(p.state, 'USDT').bids[0]);
+    const asks = pools.map((p) => virtualMarketDepth(p.state, 'USDT').asks[0]);
+    expect(book.bid).toBeCloseTo(Math.max(...bids.map((l) => l.price)), 12);
+    expect(book.ask).toBeCloseTo(Math.min(...asks.map((l) => l.price)), 12);
+    expect(book.bidNet).toBeCloseTo(Math.max(...bids.map((l) => l.netPrice)), 12);
+    expect(book.askNet).toBeCloseTo(Math.min(...asks.map((l) => l.netPrice)), 12);
+    // The mean would sit strictly inside: a bid worse than the best bid, an ask worse than the best.
+    expect(book.bid).toBeGreaterThan((midHi + midLo) / 2);
+    expect(book.ask).toBeLessThan((midHi + midLo) / 2);
+  });
+
+  test('a one-sided pool does not drag the touch', () => {
+    const two = buildLeg('USDT', 1, sigmaSeed('stable'), 1_000_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
+    // baseRes = 0 ⇒ no bid side (capBidTok = 0); over-covered ⇒ its ask is the better one.
+    const askOnly = buildLeg('USDT', 1, sigmaSeed('stable'), 1_200_000, 1_000_000, 0, 18, STABLE_PROFILE);
+    const solo: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: two } } };
+    const pools: NamedPool[] = [solo, { tag: 'volatile', state: { base: 'USDC', legs: { USDT: askOnly } } }];
+    const one = aggregateDepthCurves([solo], 'USDC', 'USDT', { step: 0.0001 })!;
+    const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.0001 })!;
+    const other = virtualMarketDepth(pools[1].state, 'USDT');
+    expect(other.bids.length).toBe(0); // premise: the second pool quotes one side only
+    expect(book.bid).toBeCloseTo(one.bid, 12); // bid untouched by the ask-only pool
+    expect(book.bidNet).toBeCloseTo(one.bidNet, 12);
+    expect(book.ask).toBeCloseTo(Math.min(one.ask, other.asks[0].price), 12);
+    expect(book.ask).toBeLessThan(one.ask); // it did contribute: the better ask won
+    expect(book.mid).toBeGreaterThanOrEqual(Math.min(book.bid, book.ask));
+    expect(book.mid).toBeLessThanOrEqual(Math.max(book.bid, book.ask));
+  });
+
+  test('single pool is unchanged by aggregation, and bid <= mid <= ask holds', () => {
+    const usdt = buildLeg('USDT', 1, sigmaSeed('stable'), 900_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
+    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
+    const curve = virtualMarketDepth(pool.state, 'USDT');
+    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.0001 })!;
+    expect(book.mid).toBeCloseTo(curve.mid, 12);
+    expect(book.mark).toBeCloseTo(curve.mark, 12);
+    expect(book.bid).toBeCloseTo(curve.bids[0].price, 12);
+    expect(book.ask).toBeCloseTo(curve.asks[0].price, 12);
+    expect(book.bid).toBeLessThanOrEqual(book.mid);
+    expect(book.ask).toBeGreaterThanOrEqual(book.mid);
+  });
+
+  test('bid <= mid <= ask, and no rung is priced through the touch', () => {
+    const { pools } = skewedPair();
+    for (const step of [0.0001, 0.001, 0.01]) {
+      const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step })!;
+      const lo = Math.min(book.bid, book.ask);
+      const hi = Math.max(book.bid, book.ask);
+      expect(book.mid).toBeGreaterThanOrEqual(lo);
+      expect(book.mid).toBeLessThanOrEqual(hi);
+      // Every printed rung sits behind the touch it belongs to.
+      for (const r of book.bids) expect(r.price).toBeLessThan(book.bid);
+      for (const r of book.asks) expect(r.price).toBeGreaterThan(book.ask);
+    }
   });
 
   test('invert mirrors the book: reciprocal mid, sides swap, sizes change unit', () => {
