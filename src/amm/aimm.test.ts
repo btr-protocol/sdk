@@ -233,31 +233,37 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
   });
 });
 
-describe('invariant: integrating the rendered depth tracks quote.amountOut', () => {
-  test('SELL ladder integral reproduces amountOut (direct)', () => {
+// The printed ladder is the SKEW-implied curve, so it integrates to `grossOut`; `netPrice` carries
+// the fee/toll haircut and recovers `amountOut`. Both must hold, or the book has lost the cost.
+describe('invariant: rendered depth tracks grossOut, netPrice tracks amountOut', () => {
+  test('SELL ladder integral reproduces grossOut (direct)', () => {
     const state = volState();
     const curve = depthCurve(state, 'BTCB', BASE);
     for (const S of [0.05, 0.5, 1.5, 3.2, 4.6]) {
       const q = quoteExactIn(state, 'BTCB', BASE, S);
       // Quartic marginal is degree-4 between vertices ⇒ trapezoid ladder ≈ exact area.
-      expect(rel(integrateLadder(curve.bids, S), q.amountOut)).toBeLessThan(2e-3);
+      expect(rel(integrateLadder(curve.bids, S), q.grossOut)).toBeLessThan(2e-3);
     }
   });
-  test('BUY book vertices are quote-consistent (direct)', () => {
+  test('BUY book vertices are quote-consistent (direct), gross and net', () => {
     const state = volState();
     const curve = depthCurve(state, BASE, 'BTCB');
     for (const lvl of curve.asks) {
       if (lvl.cumBase <= 0) continue;
       const q = quoteExactIn(state, BASE, 'BTCB', lvl.cumBase);
-      expect(rel(q.amountOut, lvl.cumTok)).toBeLessThan(1e-9);
+      expect(rel(q.grossOut, lvl.cumTok)).toBeLessThan(1e-9);
+      // netPrice is the marginal executable rate; the average over the whole rung reproduces the
+      // fill, so cumBase / netPrice at the terminal vertex is what the trader receives.
+      expect(rel(q.amountOut, lvl.cumTok * (lvl.price / lvl.netPrice))).toBeLessThan(1e-9);
     }
   });
   test('CROSS swept nodes reproduce quoteExactIn', () => {
     const state = crossState();
     const curve = depthCurve(state, 'BTCB', 'ETH');
     for (const lvl of curve.asks) {
+      if (lvl.cumBase <= 0) continue;
       const q = quoteExactIn(state, 'BTCB', 'ETH', lvl.cumBase); // spend `from`, receive `to`
-      expect(rel(q.amountOut, lvl.cumTok)).toBeLessThan(1e-9);
+      expect(rel(q.grossOut, lvl.cumTok)).toBeLessThan(1e-9);
     }
   });
 });
@@ -275,39 +281,95 @@ describe('monotonicity + spread gap', () => {
       expect(bidsOut[i].cumTok).toBeGreaterThan(bidsOut[i - 1].cumTok - 1e-12);
     }
   });
-  test('visible gap (asks[0]−bids[0])/mid == spread as S→0', () => {
+  // The PRINTED book has no touch spread: pre-fee and pre-toll, this AMM's bid and ask coincide
+  // at size 0 (both are priceAt(center)). Every bp of bid/ask gap is fee or toll, and it belongs
+  // in `netPrice`, not in the rung. Rendering it as the rung is what printed a ±45 bp WBTC/WETH
+  // touch that was entirely minFee plus oracle confidence.
+  test('printed touch has ZERO spread; the whole gap lives in netPrice', () => {
     const curve = depthCurve(volState(), 'BTCB', BASE);
     const q = quoteExactIn(volState(), 'BTCB', BASE, 0);
+    expect(curve.asks[0].price).toBe(curve.mid);
+    expect(curve.bids[0].price).toBe(curve.mid);
     expect(
-      rel(((curve.asks[0].price - curve.bids[0].price) / curve.mid) * 1e4, q.spreadBps),
+      rel(((curve.asks[0].netPrice - curve.bids[0].netPrice) / curve.mid) * 1e4, q.spreadBps),
     ).toBeLessThan(1e-3); // κ=0 ⇒ gap is 1/(1−h)−(1−h), i.e. 2h to O(h²)
   });
 });
 
 // GATE-07 is charged once on the TERMINAL out asset and the base can never carry κ, so a sell into
 // the base is toll-free while a buy of an under-covered spoke pays from the first wei.
-describe('net executable book: touch, toll asymmetry, reserve cliff', () => {
+describe('skew book + separately disclosed cost: touch, toll asymmetry, reserve cliff', () => {
   const offBp = (price: number, mid: number) => (price / mid - 1) * 1e4;
+  // The touch the UI PRINTS (skew) and the cost it discloses beside it (netPrice vs the rung).
   const touch = (state: PoolState, tok: string) => {
     const c = depthCurve(state, BASE, tok);
-    return { ask: offBp(c.asks[0].price, c.mid), bid: offBp(c.bids[0].price, c.mid), c };
+    return {
+      ask: offBp(c.asks[0].price, c.mid),
+      bid: offBp(c.bids[0].price, c.mid),
+      askCost: offBp(c.asks[0].netPrice, c.mid),
+      bidCost: offBp(c.bids[0].netPrice, c.mid),
+      c,
+    };
   };
 
-  test('over-covered leg (c ≥ 1): toll is 0 ⇒ book symmetric about mid', () => {
-    const { ask, bid, c } = touch(tolledState(), 'DAI');
-    expect(Math.abs(ask + bid)).toBeLessThan(0.01); // bp
-    expect(rel(ask - bid, c.spreadBps)).toBeLessThan(1e-3);
+  test('printed touch is the skew anchor on BOTH sides, whatever the fee and toll do', () => {
+    for (const tok of ['DAI', 'RLUSD']) {
+      const { ask, bid, c } = touch(tolledState(), tok);
+      expect(ask).toBe(0);
+      expect(bid).toBe(0);
+      expect(c.spreadBps).toBeGreaterThan(0); // a real fee exists; it just is not the touch
+    }
   });
 
-  test('under-covered leg (c < 1, κ > 0): ask carries the toll, bid does not', () => {
+  // Regression on the shipped bug: a WBTC/WETH book printed a ±45 bp touch that was minFee plus
+  // an oracle-confidence surcharge, against a few bp of real skew. The touch must track the skew
+  // premium and must NOT scale with the fee, on a quiet pair or a wide one.
+  test.each([
+    ['stable', () => tolledState(), 'DAI'],
+    ['volatile', () => volState(), 'BTCB'],
+  ])('%s touch is the skew premium, never spreadBps/2', (_kind, mk, tok) => {
+    const state = mk();
+    const c = depthCurve(state, BASE, tok);
+    const touchBp = (c.asks[0].price / c.mark - 1) * 1e4;
+    const skewBp = (c.mid / c.mark - 1) * 1e4;
+    expect(touchBp).toBe(skewBp); // the touch IS the skew, by construction
+    expect(Math.abs(touchBp)).toBeLessThan(50); // believable: inventory skew, not a fee
+    // Widening the fee 10x must not move the printed touch by a single bp.
+    const wide = {
+      ...state,
+      legs: {
+        ...state.legs,
+        [tok]: {
+          ...state.legs[tok]!,
+          profile: {
+            ...state.legs[tok]!.profile,
+            minFee: state.legs[tok]!.profile.minFee * 10,
+            maxFee: state.legs[tok]!.profile.maxFee * 10, // else the ceiling clamps the widening
+          },
+        },
+      },
+    };
+    const cw = depthCurve(wide, BASE, tok);
+    expect(cw.spreadBps).toBeGreaterThan(c.spreadBps * 2); // the fee really did widen
+    expect(cw.asks[0].price).toBe(c.asks[0].price); // …and the touch did not move
+    expect(cw.asks[0].netPrice).toBeGreaterThan(c.asks[0].netPrice); // the COST did
+  });
+
+  test('over-covered leg (c ≥ 1): toll is 0 ⇒ cost symmetric about mid', () => {
+    const { askCost, bidCost, c } = touch(tolledState(), 'DAI');
+    expect(Math.abs(askCost + bidCost)).toBeLessThan(0.01); // bp
+    expect(rel(askCost - bidCost, c.spreadBps)).toBeLessThan(1e-3);
+  });
+
+  test('under-covered leg (c < 1, κ > 0): ask cost carries the toll, bid cost does not', () => {
     const state = tolledState();
-    const { ask, bid, c } = touch(state, 'RLUSD');
+    const { askCost, bidCost, c } = touch(state, 'RLUSD');
     const leg = state.legs.RLUSD!;
     const tollBp = (leg.kappaCovBps / 1e4) * (leg.liab / leg.res - 1) * 1e4;
     expect(tollBp).toBeGreaterThan(1);
-    expect(rel(-bid, c.spreadBps / 2)).toBeLessThan(1e-3); // sell into base: half-spread only
-    expect(rel(ask - c.spreadBps / 2, tollBp)).toBeLessThan(2e-2); // buy: half-spread + toll
-    expect(ask + bid).toBeGreaterThan(0.9 * tollBp); // asymmetric by the toll
+    expect(rel(-bidCost, c.spreadBps / 2)).toBeLessThan(1e-3); // sell into base: half-spread only
+    expect(rel(askCost - c.spreadBps / 2, tollBp)).toBeLessThan(2e-2); // buy: half-spread + toll
+    expect(askCost + bidCost).toBeGreaterThan(0.9 * tollBp); // asymmetric by the toll
   });
 
   // Past the reserve clip `_covToll` returns grossOut, so amountOut is 0 with a normally populated
@@ -477,13 +539,15 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
     // Both sides still have fillable depth at moderate skew.
     expect(d.asks.length).toBeGreaterThan(0);
     expect(d.bids.length).toBeGreaterThan(0);
-    // First printed levels are the TOUCH at the mid vertex (cumTok=0): a half-spread off the
-    // skewed mid (κ=0 here, so no toll), never AT mid and never at mark.
+    // First printed levels are the TOUCH at the mid vertex (cumTok=0): the skewed mid itself,
+    // never mark and never a half-spread off it. The half-spread is the COST, on netPrice.
     expect(d.asks[0].cumTok).toBe(0);
     expect(d.bids[0].cumTok).toBe(0);
+    expect(d.asks[0].price).toBe(d.mid);
+    expect(d.bids[0].price).toBe(d.mid);
     const h = d.spreadBps / 2 / 1e4;
-    expect(rel(d.asks[0].price, d.mid / (1 - h))).toBeLessThan(1e-12);
-    expect(rel(d.bids[0].price, d.mid * (1 - h))).toBeLessThan(1e-12);
+    expect(rel(d.asks[0].netPrice, d.mid / (1 - h))).toBeLessThan(1e-12);
+    expect(rel(d.bids[0].netPrice, d.mid * (1 - h))).toBeLessThan(1e-12);
     // Asks above mid, bids below — book fans from mid, not mark.
     if (d.asks.length > 1) expect(d.asks[1].price).toBeGreaterThanOrEqual(d.mid - 1e-9);
     if (d.bids.length > 1) expect(d.bids[1].price).toBeLessThanOrEqual(d.mid + 1e-9);
