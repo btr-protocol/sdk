@@ -27,7 +27,7 @@ import {
   depthCurve,
   dispersion,
   evalQ,
-  pathRisk,
+  pathSpread,
   quoteExactIn,
   spreadPbps,
   virtualMarketDepth,
@@ -124,9 +124,12 @@ describe('model primitives (Pricing.sol mirrors)', () => {
   });
 });
 
-// ── Path risk composition (Pricing._walkLegs / _pathSpread, dex ba76f55) ────────
-// The chain COMPOSES per-leg risk; it used to reduce with max, and the mirror's max
-// under-quoted every cross by the second leg's fence (sepolia USDG↔PYUSD: 496 vs 496+226).
+// ── Path risk composition (Pricing._walkLegs / _pathSpread / _legCap) ──────────
+// dex ba76f55 (compose, don't max) + 7aa3a54 (per-leg fee ceiling) + 2270594 (per-leg
+// staleness premium). Chain formula, every division floored:
+//   raw = Σ minFee_i + ⌊√(Σσ_i²)·vega / 1e6⌋ + Σ staleTerm_i + Σ conf_i·100
+//   cap = Σ min( minFee_i + ⌊σ_i·vega / 1e6⌋ + staleTerm_i + conf_i·100 , maxFee_i )
+//   spread = sat_uint16( min(raw, cap) ),  staleTerm_i = ⌊100·σ_i·⌊√excess_i⌋ / 1e4⌋
 describe('path risk composes over legs, never maxes', () => {
   const leg = (sigma: number, minFee: number, maxFee: number, confidence = 0, staleExcess = 0) => ({
     sigma,
@@ -136,54 +139,72 @@ describe('path risk composes over legs, never maxes', () => {
     staleExcess,
   });
 
-  test('minFee/maxFee/confidence SUM; σ in quadrature; staleExcess maxes', () => {
-    // sepolia stable pool: USDG minFee 496 + PYUSD minFee 226 = 722, the chain floor the SDK
-    // used to quote as 496. σ = √(30000² + 40000²) = √2_500_000_000 = 50000 exactly.
-    const r = pathRisk([leg(30_000, 496, 5_000, 2, 30), leg(40_000, 226, 3_000, 5, 90)]);
-    expect(r.minFee).toBe(722);
-    expect(r.maxFee).toBe(8_000);
-    expect(r.confidence).toBe(7);
-    expect(r.staleExcess).toBe(90); // max over LEGS, not the two endpoints
-    expect(r.sigma).toBe(50_000);
+  test('fees, CI and the staleness premium SUM; σ composes in quadrature', () => {
+    // sepolia stable pool, vega 10000. USDG(σ 30000, minFee 496, maxFee 5000, CI 2, age 30) and
+    // PYUSD(σ 40000, minFee 226, maxFee 3000, CI 5, age 90).
+    //   staleTerm = ⌊100·30000·⌊√30⌋=5 / 1e4⌋ = 1500,  ⌊100·40000·⌊√90⌋=9 / 1e4⌋ = 3600  ⇒ 5100
+    //   σ_path    = ⌊√(30000² + 40000²)⌋ = ⌊√2_500_000_000⌋ = 50000 exactly
+    //   raw       = (496+226) + ⌊50000·10000/1e6⌋=500 + 5100 + 7·100=700           = 7022
+    //   rawLeg    = 496+300+1500+200 = 2496 → min(·,5000) = 2496
+    //               226+400+3600+500 = 4726 → min(·,3000) = 3000   ← PYUSD pins
+    //   cap       = 5496  ⇒ spread = min(7022, 5496) = 5496
+    // The SDK used to quote 496 here (max reduction, no CI/stale composition).
+    expect(
+      pathSpread([leg(30_000, 496, 5_000, 2, 30), leg(40_000, 226, 3_000, 5, 90)], 10_000),
+    ).toBe(5_496);
   });
 
   test('σ quadrature uses a FLOOR sqrt (Solady), not a float one', () => {
-    // √(2·50000²) = √5_000_000_000 = 70710.678…; 70710² = 4_999_904_100 ≤ 5e9 < 70711².
-    expect(pathRisk([leg(50_000, 0, 0), leg(50_000, 0, 0)]).sigma).toBe(70_710);
+    // ⌊√(2·50000²)⌋ = ⌊√5_000_000_000⌋: 70710² = 4_999_904_100 ≤ 5e9 < 70711² = 5_000_045_521.
+    // At vega = 65535 (uint16 max) the two sqrts land on different sides of a floor:
+    //   floor: ⌊70710·65535 / 1e6⌋     = ⌊4_633_979_850 / 1e6⌋ = ⌊4633.97985⌋ = 4633
+    //   float: ⌊70710.678…·65535 / 1e6⌋ = ⌊4634.02428⌋                        = 4634
+    //   cap = 2·min(⌊50000·65535/1e6⌋ = 3276, 1e6) = 6552, so raw binds.
+    expect(pathSpread([leg(50_000, 0, 1e6), leg(50_000, 0, 1e6)], 65_535)).toBe(4_633);
   });
 
-  test('a one-leg path is the identity — direct quotes are untouched', () => {
-    const r = pathRisk([leg(50_000, 1_000, 10_000, 3, 25)]);
-    expect(r).toEqual({
-      sigma: 50_000,
-      minFee: 1_000,
-      maxFee: 10_000,
-      confidence: 3,
-      staleExcess: 25,
-    });
+  test('the ceiling clamps PER LEG, so one pinned leg cannot license the other', () => {
+    // AAA pins on CI (maxFee 1000); BBB is healthy. vega 0, σ 0.
+    //   rawLeg = 100 + 0 + 0 + 500·100=50000 = 50100 → min(·,1000) = 1000   ← pinned
+    //            100 + 0 + 0 + 0             = 100   → min(·,10000) = 100
+    //   cap = 1100;  raw = (100+100) + 0 + 0 + 50000 = 50200  ⇒ 1100
+    // `min(raw, Σ maxFee_i)` gave 11000 — the healthy leg charged a ceiling it never earned,
+    // which made the composite dearer than trading the two legs apart.
+    expect(pathSpread([leg(0, 100, 1_000, 500), leg(0, 100, 10_000)], 0)).toBe(1_100);
+  });
+
+  test('the staleness premium is per leg, not _staleTerm(max age, σ_path)', () => {
+    // One keeper feeds both spokes, so an outage staleses them together: σ 10000, excess 100 each.
+    //   per leg: ⌊100·10000·⌊√100⌋=10 / 1e4⌋ = 1000  ⇒ Σ = 2000  (raw = cap = 2000)
+    //   coupled: σ_path = ⌊√(2·10000²)⌋ = ⌊√200_000_000⌋ = 14142
+    //            ⌊100·14142·10 / 1e4⌋ = 1414 = 70.7% of 2000 — the √2/2 shortfall exactly.
+    expect(pathSpread([leg(10_000, 0, 1e6, 0, 100), leg(10_000, 0, 1e6, 0, 100)], 0)).toBe(2_000);
   });
 
   test('every spread term floors SEPARATELY, as the chain computes it', () => {
-    // σ=150070, vega=9999, Σ minFee=722, Σ conf=7, staleExcess=50 (isqrt 7, NOT 7.0710678).
-    //   sVol   = 722 + floor(150070·9999 / 1e6) = 722 + floor(1500.54993) = 2222
-    //   uStale = floor(100·150070·7 / 1e4)      = floor(10504.9)          = 10504
-    //   uConf  = 7·(1e6/1e4)                                              = 700
-    //   raw    = 13426, under Σ maxFee = 40000 ⇒ 13426
+    // One leg: σ=150070, vega=9999, minFee=722, CI=7, excess=50 (⌊√50⌋ = 7, NOT 7.0710678).
+    //   sVol      = 722 + ⌊150070·9999 / 1e6⌋ = 722 + ⌊1500.54993⌋ = 2222
+    //   staleTerm = ⌊100·150070·7 / 1e4⌋      = ⌊10504.9⌋          = 10504
+    //   conf      = 7·(1e6/1e4)                                    = 700
+    //   raw = cap = 13426, under maxFee 40000 ⇒ 13426
     // Flooring only the SUM (and a float sqrt) reads 13534 — 1.08 bp wide.
     const p = { ...STABLE_PROFILE, vega: 9_999, minFee: 722, maxFee: 40_000 };
     expect(spreadPbps(150_070, p, { confidence: 7, staleExcess: 50 })).toBe(13_426);
   });
 
   test('the uint16 narrowing saturates, it does not wrap', () => {
-    // Σ maxFee = 80000 > uint16. raw > Σ maxFee ⇒ capped at 80000 ⇒ saturates to 65535.
+    // Both legs pin: cap = 2·min(40000, 40000) = 80000 > uint16 ⇒ saturates to 65535.
+    expect(pathSpread([leg(0, 40_000, 40_000), leg(0, 40_000, 40_000)], 0)).toBe(65_535);
     const p = { ...STABLE_PROFILE, minFee: 80_000, maxFee: 80_000 };
     expect(spreadPbps(1_000_000, p)).toBe(65_535);
   });
 
   test('quoteExactIn charges both legs of a cross, one leg of a direct', () => {
-    // Both legs VOLATILE_PROFILE: minFee 1000, vega 10000, σ 50000.
-    //   cross:  Σ minFee 2000 + floor(70710·10000 / 1e6) = 2000 + 707 = 2707 PBPS
-    //   direct:   minFee 1000 + floor(50000·10000 / 1e6) = 1000 + 500 = 1500 PBPS
+    // Both legs VOLATILE_PROFILE: minFee 1000, maxFee 10000, vega 10000, σ 50000, fresh.
+    //   cross:  raw = 2000 + ⌊70710·10000/1e6⌋ = 2000 + 707  = 2707 PBPS
+    //           cap = 2·min(1000 + 500, 10000) = 3000 — unpinned, so the quadrature
+    //           discount survives the ceiling untouched (2707 < 3000).
+    //   direct: raw = 1000 + ⌊50000·10000/1e6⌋ = 1000 + 500  = 1500 PBPS
     // Under the old max reduction the cross also quoted 1500 — a whole leg's fence free.
     expect(quoteExactIn(crossState(), 'BTCB', 'ETH', 0.01).spreadBps).toBeCloseTo(27.07, 12);
     expect(quoteExactIn(volState(), 'BTCB', BASE, 0.01).spreadBps).toBeCloseTo(15, 12);

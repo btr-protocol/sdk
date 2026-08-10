@@ -422,56 +422,84 @@ export interface LegRisk {
   staleExcess?: number; // seconds past the keeper grace
 }
 
-/**
- * Compose per-leg risk into the path aggregates — mirrors `Pricing._walkLegs` (dex ba76f55).
- * Risk COMPOSES over legs, it is never a `max`: crossing two legs crosses two per-leg 2θ fences,
- * so minFee/maxFee/confidence SUM and σ adds in QUADRATURE (√Σσ², independent leg innovations,
- * one floor-sqrt at the end). Only `staleExcess` is a max, and over ALL legs — it is an age, not
- * a cost. A `max` reduction under-fenced every multi-leg path and paid a cross-spoke round trip
- * the difference. `vega` is deliberately absent: it stays an ENDPOINT max (a pool per-asset σ
- * sensitivity dial, not a per-leg risk quantity), so callers reduce it themselves.
- */
-export function pathRisk(legs: LegRisk[]): Required<LegRisk> {
-  let sigmaSq = 0;
-  let minFee = 0;
-  let maxFee = 0;
-  let confidence = 0;
-  let staleExcess = 0;
-  for (const l of legs) {
-    const s = Math.floor(l.sigma); // uint32 on chain — floor before squaring
-    sigmaSq += s * s;
-    minFee += l.minFee;
-    maxFee += l.maxFee;
-    confidence += l.confidence ?? 0;
-    staleExcess = Math.max(staleExcess, l.staleExcess ?? 0);
-  }
-  // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling — the chain clamps rather than wraps.
-  return { sigma: Math.min(isqrt(sigmaSq), U32_MAX), minFee, maxFee, confidence, staleExcess };
+const STALE_Z = 100; // Pricing.sol
+
+/** One leg's staleness premium in PBPS = STALE_Z·σ·√excess/BPS (Pricing.sol `_staleTerm`), on that
+ *  leg's OWN age and σ. BigInt: the product overruns 2^53 at the uint32 ceilings, and the chain
+ *  never rounds. `√` is Solady's floor sqrt, one floored division at the end. */
+function staleTerm(staleExcess: number, sigma: number): number {
+  const e = Math.floor(staleExcess);
+  if (e <= 0 || sigma <= 0) return 0; // inside the keeper grace — the chain skips the sqrt too
+  return Number((BigInt(STALE_Z) * BigInt(sigma) * BigInt(isqrt(e))) / BigInt(BPS));
 }
 
-/** Path/leg spread (fee) in PBPS: S_vol + U_stale + U_conf (Pricing.sol `_pathSpread`).
- *  `sigma` and `p.minFee`/`p.maxFee` are the PATH aggregates from `pathRisk`, not one leg's —
- *  `p.vega` is the endpoint max. Every term is floored SEPARATELY because the chain computes each
- *  in integer arithmetic; flooring only the sum reads up to 2 PBPS wide. */
+/** One leg's contribution to the path CEILING = min(rawLeg_i, maxFee_i) (Pricing.sol `_legCap`).
+ *  `rawLeg_i` is what leg i would raw-quote STANDALONE, on its own σ_i — NOT any attribution of
+ *  the path quadrature, which does not decompose per leg and would reinstate the coupling this
+ *  removes. Sound because it is only ever an upper BOUND: √(Σσ²) ≤ Σσ, so Σ rawLeg_i ≥ rawPath
+ *  and the ceiling binds only when some leg genuinely pins its own maxFee. An unpinned path keeps
+ *  the quadrature discount exactly; a pinned one costs at most what its legs cost traded apart. */
+function legCap(l: LegRisk, sigma: number, vega: number, legStale: number): number {
+  const raw =
+    l.minFee +
+    Math.floor((sigma * vega) / (100 * BPS)) +
+    legStale +
+    (l.confidence ?? 0) * (PBPS / BPS);
+  return Math.min(raw, l.maxFee);
+}
+
+/**
+ * Full path spread (fee) in PBPS — mirrors `Pricing._walkLegs` + `_pathSpread` (dex ba76f55,
+ * 7aa3a54, 2270594). Risk COMPOSES over legs, it is never a `max`: crossing two legs crosses two
+ * per-leg 2θ fences, so minFee, confidence and the staleness premium SUM, and σ adds in QUADRATURE
+ * (√Σσ², independent leg innovations, one floor-sqrt at the end). A `max` reduction under-fenced
+ * every multi-leg path and paid a cross-spoke round trip the difference.
+ *
+ * The staleness premium is summed PER LEG off that leg's own age and σ, never `_staleTerm(max age,
+ * σ_path)`: one keeper feeds both spokes, so an outage staleses them together and the coupled form
+ * quoted √2/2 = 70.7% of what two equal legs each owe.
+ *
+ * The ceiling is `Σ min(rawLeg_i, maxFee_i)`, NOT `Σ maxFee_i`: one leg pinned at its own maxFee
+ * must not license charging a healthy leg's full ceiling too, which made a 2-leg quote cost MORE
+ * than trading the legs separately and paid a splitter to route around the hub.
+ *
+ * `vega` is a PATH CONSTANT the caller reduces: it stays `max(vega_in, vega_out)` over the two
+ * ENDPOINTS (a pool per-asset σ-sensitivity dial, not a per-leg risk quantity). Every term floors
+ * SEPARATELY because the chain computes each in integer arithmetic.
+ */
+export function pathSpread(legs: LegRisk[], vega: number): number {
+  let sigmaSq = 0;
+  let minFeePath = 0;
+  let confPath = 0;
+  let staleTermPath = 0;
+  let capPath = 0;
+  for (const l of legs) {
+    const s = Math.floor(l.sigma); // uint32 on chain — floor before squaring
+    const legStale = staleTerm(l.staleExcess ?? 0, s);
+    sigmaSq += s * s;
+    minFeePath += l.minFee;
+    confPath += l.confidence ?? 0;
+    staleTermPath += legStale;
+    capPath += legCap(l, s, vega, legStale);
+  }
+  // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling — the chain clamps rather than wraps.
+  const sigmaPath = Math.min(isqrt(sigmaSq), U32_MAX);
+  const sVol = minFeePath + Math.floor((sigmaPath * vega) / (100 * BPS));
+  const raw = sVol + staleTermPath + confPath * (PBPS / BPS); // bps → PBPS (PBPS/BPS = 100)
+  // Ceiling only (no minFee floor — sVol already carries it), then SATURATE into the uint16
+  // `SwapQuote.spreadPbps`: a sum of per-leg ceilings does not fit uint16, and an unchecked cast
+  // there would wrap a maximally-fenced path down to a near-zero spread.
+  return Math.min(Math.min(raw, capPath), U16_MAX);
+}
+
+/** Single-leg spread — `pathSpread` over the one leg, where every sum is that leg's own value and
+ *  the ceiling collapses to its `maxFee`. Direct (base-to-spoke) quotes and the depth chart. */
 export function spreadPbps(
   sigma: number,
   p: AimmProfile,
   opts?: { confidence?: number; staleExcess?: number },
 ): number {
-  const STALE_Z = 100; // Pricing.sol
-  const sVol = p.minFee + Math.floor((sigma * p.vega) / (100 * BPS));
-  const excess = Math.floor(opts?.staleExcess ?? 0);
-  // BigInt: STALE_Z·σ·√excess overruns 2^53 at the uint32 ceilings, and the chain never rounds.
-  const uStale =
-    excess > 0 && sigma > 0
-      ? Number((BigInt(STALE_Z) * BigInt(sigma) * BigInt(isqrt(excess))) / BigInt(BPS))
-      : 0;
-  const uConf = (opts?.confidence ?? 0) * (PBPS / BPS); // bps → PBPS (integer, PBPS/BPS = 100)
-  const raw = sVol + uStale + uConf;
-  // `_pathSpread` clamps the CEILING only (no minFee floor — sVol already carries it), then
-  // SATURATES into the uint16 `SwapQuote.spreadPbps`: Σ maxFee_i over legs does not fit uint16,
-  // and an unchecked cast there would wrap a maximally-fenced path down to a near-zero spread.
-  return Math.min(raw > p.maxFee ? p.maxFee : Math.floor(raw), U16_MAX);
+  return pathSpread([{ sigma, minFee: p.minFee, maxFee: p.maxFee, ...opts }], p.vega);
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
@@ -724,17 +752,15 @@ function traverse(k: LegKit, amountInTok: number, selling: boolean): number {
   return bandPrice(k, k.center, end);
 }
 
-// Path fee profile. minFee/maxFee SUM over legs (Pricing._walkLegs, via pathRisk) — a `max` there
-// charged one leg's fence while crossing two. vega stays an ENDPOINT max (Pricing._pathSpread keeps
-// it endpoint-scoped: it is the pool's per-asset σ dial, not a per-leg risk quantity). protoShare is
-// pool-level ($.feeParams.protoShare, equal across a pool's legs) and reduces unchanged.
-function pathProfile(profiles: AimmProfile[], risk: Required<LegRisk>): AimmProfile {
-  const w = { ...profiles[0], minFee: risk.minFee, maxFee: risk.maxFee };
-  for (const b of profiles.slice(1)) {
-    w.vega = Math.max(w.vega, b.vega);
-    w.protoShare = Math.max(w.protoShare, b.protoShare);
-  }
-  return w;
+// The only two path-level profile scalars. The fee terms are NOT here — they compose per leg inside
+// `pathSpread` (Pricing._walkLegs). `vega` is an ENDPOINT max, a path constant `_pathSpread` reads
+// off `acc.vega` (a pool per-asset σ dial, not a per-leg risk quantity); `protoShare` is pool-level
+// ($.feeParams.protoShare, equal across a pool's legs) and reduces unchanged.
+function pathProfile(profiles: AimmProfile[]): { vega: number; protoShare: number } {
+  return {
+    vega: Math.max(...profiles.map((p) => p.vega)),
+    protoShare: Math.max(...profiles.map((p) => p.protoShare)),
+  };
 }
 
 const zeroQuote = (route: string[]): Quote => ({
@@ -834,9 +860,10 @@ export function quoteExactIn(
     return zeroQuote([tokenIn, tokenOut]); // base→base
   }
 
-  // σ in quadrature, minFee/maxFee/confidence summed, staleExcess maxed over the walked LEGS
-  // (the base is never a leg) — Pricing._walkLegs. A cross walks two legs, a direct walks one.
-  const risk = pathRisk(
+  // Risk composes over the walked LEGS (the base is never a leg) — Pricing._walkLegs. A cross
+  // walks two legs, a direct walks one; `pathSpread` owns the composition.
+  const wp = pathProfile(involved.map((l) => l.profile));
+  const spread = pathSpread(
     involved.map((l) => ({
       sigma: l.sigma,
       minFee: l.profile.minFee,
@@ -844,15 +871,8 @@ export function quoteExactIn(
       confidence: l.confidence,
       staleExcess: l.staleExcess,
     })),
+    wp.vega,
   );
-  const wp = pathProfile(
-    involved.map((l) => l.profile),
-    risk,
-  );
-  const spread = spreadPbps(risk.sigma, wp, {
-    confidence: risk.confidence,
-    staleExcess: risk.staleExcess,
-  });
   const spreadBps = spread / 100;
   // Only a HALF-spread is actually deducted from amountOut (getAnchorPathQuote: feeOut = amount·halfSpread),
   // so the LP/proto split must sum to spreadBps/2 — not the full spread — or the fee reads 2× reality.
