@@ -156,19 +156,28 @@ export function formatPrice(n: number | null | undefined, step?: number): string
     const decimals = absN >= 100 ? 2 : absN >= 10 ? 3 : 4;
     return n.toFixed(decimals);
   }
-  if (absN > 0 && absN < 0.001) {
-    return n.toExponential(4);
-  }
+  // Sub-1: FIVE significant digits past the leading zeros, trailing zeros trimmed. Significant
+  // digits rather than a fixed decimal count because a fixed count is wrong at both ends of the
+  // range it has to cover: four decimals collapse a 0.0295 pair to "0.03" (adjacent chart ticks
+  // printed the identical label), while padding a 1e-5 price to twelve places is all zeros. The
+  // exponential form is kept only below 1e-8, where the fixed form is longer than it is readable.
   if (absN > 0) {
     const leadingZeros = Math.floor(-Math.log10(absN));
-    if (leadingZeros > 12) return n.toExponential(2);
-    return n.toFixed(leadingZeros + 4);
+    if (leadingZeros > 8) return n.toExponential(2);
+    const decimals = leadingZeros + 5;
+    return trimZeros(round(n, decimals), decimals) || '0.00';
   }
 
   return '0.00';
 }
 
-/** Format for chart axis labels */
+/**
+ * Chart axis tick. Large values compact so the gutter stays narrow; everything below 1 defers to
+ * `formatPrice`, so an axis tick and the same price in the book or the form are one string produced
+ * by one function. The old sub-1 branch carried its own decimal rule (leading zeros + 2) and lost
+ * to it: on a 0.0295 pair every tick rounded to "0.030" and the axis read as a column of one
+ * repeated number.
+ */
 export function formatAxisLabel(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return '0';
 
@@ -179,12 +188,7 @@ export function formatAxisLabel(n: number | null | undefined): string {
   if (absN >= 100) return round(n, 1).toLocaleString('en-US');
   if (absN >= 10) return round(n, 2).toString();
   if (absN >= 1) return round(n, 3).toString();
-  if (absN >= 0.001) {
-    const leadingZeros = Math.floor(-Math.log10(absN));
-    return n.toFixed(leadingZeros + 2);
-  }
-  // Use scientific notation for values under 0.001 with 4 significant digits
-  if (absN > 0) return n.toExponential(4);
+  if (absN > 0) return formatPrice(n);
 
   return '0';
 }
