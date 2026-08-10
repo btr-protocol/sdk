@@ -1068,11 +1068,6 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'error',
-    name: 'BadFeed',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'BaseDepegged',
     inputs: [
       {
@@ -1231,11 +1226,6 @@ export const POOL_AUX_ABI = [
         internalType: 'uint64',
       },
     ],
-  },
-  {
-    type: 'error',
-    name: 'SeqDown',
-    inputs: [],
   },
   {
     type: 'error',

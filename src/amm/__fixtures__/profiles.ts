@@ -1,7 +1,9 @@
 // Test profiles + σ seeds + the portable preset-curve table.
 //
 // Curve SSoT (machine): dex/research/stable-core/out/spline_shared_grid.json — quartic I-spline
-// fits per (regime, wall-width W). Only `portable: true` fits are exported (the deployability
+// fits per (regime, wall-width W). That artifact is gitignored, so the tracked input here is
+// `spline_grid.json`, its portable-preset slice (see grid.ts; regen + parity check documented
+// there). Only `portable: true` fits are exported (the deployability
 // whitelist, same rule as export_parity_vectors.ts). wQ quantization matches the exporter:
 // round(w_pbps · 1e9), interior knots rounded to strictly-increasing ints.
 //
@@ -12,32 +14,11 @@
 // dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps) — same ratio the
 // bootstrap curves below use (edge 500 → dispRef 1000, edge 50 → dispRef 100).
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { type AimmProfile, type QuarticCurve, buildCurve } from '../aimm';
+import type { SplineGrid } from './grid';
+import GRID_SLICE from './spline_grid.json';
 
-const GRID_PATH = resolve(
-  new URL('.', import.meta.url).pathname,
-  '../../../..',
-  'dex/research/stable-core/out/spline_shared_grid.json',
-);
-
-interface GridPreset {
-  portable: boolean;
-  w: number[];
-}
-interface GridWall {
-  W: number;
-  shared: { interiorX: number[] };
-  presets: Record<string, GridPreset>;
-}
-interface Grid {
-  regimes: string[];
-  pinVariants: string[];
-  walls: Record<string, GridWall>;
-}
-
-const grid = JSON.parse(readFileSync(GRID_PATH, 'utf8')) as Grid;
+const grid = GRID_SLICE as SplineGrid;
 
 const TIERS: Record<string, number> = { W0_5: 1, W1: 2, W2: 3, W5: 4 };
 const REGIME_ORDER = [...grid.regimes, ...grid.pinVariants];
