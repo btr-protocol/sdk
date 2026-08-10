@@ -398,21 +398,80 @@ export function dispersion(sigma: number, p: AimmProfile): number {
   return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
 }
 
-/** Path/leg spread (fee) in PBPS: S_vol + U_stale + U_conf (Pricing.sol `_pathSpread`). */
+const U16_MAX = 65535;
+const U32_MAX = 4294967295;
+
+/** Floor integer sqrt — Solady `FixedPointMathLib.sqrt`, which the chain uses in both `_pathSpread`
+ *  (σ quadrature) and `_staleTerm`. IEEE sqrt lands within 1 of the true floor, so one BigInt
+ *  correction step makes it exact for any integer `n` the caller can represent. */
+function isqrt(n: number): number {
+  if (!(n > 0)) return 0;
+  const bn = BigInt(Math.floor(n));
+  let x = Math.floor(Math.sqrt(n));
+  while (BigInt(x) * BigInt(x) > bn) x--;
+  while (BigInt(x + 1) * BigInt(x + 1) <= bn) x++;
+  return x;
+}
+
+/** Per-leg risk the path composition reduces over (Pricing.sol `LegResult`). */
+export interface LegRisk {
+  sigma: number; // uint32, PBPS-scaled (1e4 = 1%)
+  minFee: number; // PBPS
+  maxFee: number; // PBPS
+  confidence?: number; // feed 1σ CI, BPS
+  staleExcess?: number; // seconds past the keeper grace
+}
+
+/**
+ * Compose per-leg risk into the path aggregates — mirrors `Pricing._walkLegs` (dex ba76f55).
+ * Risk COMPOSES over legs, it is never a `max`: crossing two legs crosses two per-leg 2θ fences,
+ * so minFee/maxFee/confidence SUM and σ adds in QUADRATURE (√Σσ², independent leg innovations,
+ * one floor-sqrt at the end). Only `staleExcess` is a max, and over ALL legs — it is an age, not
+ * a cost. A `max` reduction under-fenced every multi-leg path and paid a cross-spoke round trip
+ * the difference. `vega` is deliberately absent: it stays an ENDPOINT max (a pool per-asset σ
+ * sensitivity dial, not a per-leg risk quantity), so callers reduce it themselves.
+ */
+export function pathRisk(legs: LegRisk[]): Required<LegRisk> {
+  let sigmaSq = 0;
+  let minFee = 0;
+  let maxFee = 0;
+  let confidence = 0;
+  let staleExcess = 0;
+  for (const l of legs) {
+    const s = Math.floor(l.sigma); // uint32 on chain — floor before squaring
+    sigmaSq += s * s;
+    minFee += l.minFee;
+    maxFee += l.maxFee;
+    confidence += l.confidence ?? 0;
+    staleExcess = Math.max(staleExcess, l.staleExcess ?? 0);
+  }
+  // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling — the chain clamps rather than wraps.
+  return { sigma: Math.min(isqrt(sigmaSq), U32_MAX), minFee, maxFee, confidence, staleExcess };
+}
+
+/** Path/leg spread (fee) in PBPS: S_vol + U_stale + U_conf (Pricing.sol `_pathSpread`).
+ *  `sigma` and `p.minFee`/`p.maxFee` are the PATH aggregates from `pathRisk`, not one leg's —
+ *  `p.vega` is the endpoint max. Every term is floored SEPARATELY because the chain computes each
+ *  in integer arithmetic; flooring only the sum reads up to 2 PBPS wide. */
 export function spreadPbps(
   sigma: number,
   p: AimmProfile,
   opts?: { confidence?: number; staleExcess?: number },
 ): number {
   const STALE_Z = 100; // Pricing.sol
-  const sVol = p.minFee + (sigma * p.vega) / (100 * BPS);
-  const excess = opts?.staleExcess ?? 0;
-  const uStale = excess > 0 ? (STALE_Z * sigma * Math.sqrt(excess)) / BPS : 0;
-  const uConf = (opts?.confidence ?? 0) * (PBPS / BPS); // bps → PBPS
+  const sVol = p.minFee + Math.floor((sigma * p.vega) / (100 * BPS));
+  const excess = Math.floor(opts?.staleExcess ?? 0);
+  // BigInt: STALE_Z·σ·√excess overruns 2^53 at the uint32 ceilings, and the chain never rounds.
+  const uStale =
+    excess > 0 && sigma > 0
+      ? Number((BigInt(STALE_Z) * BigInt(sigma) * BigInt(isqrt(excess))) / BigInt(BPS))
+      : 0;
+  const uConf = (opts?.confidence ?? 0) * (PBPS / BPS); // bps → PBPS (integer, PBPS/BPS = 100)
   const raw = sVol + uStale + uConf;
-  // `_pathSpread` clamps the CEILING only, then casts uint16 — no minFee floor (sVol already
-  // carries it), and the cast truncates. A float here reads ~0.005 bp wide against the chain.
-  return raw > p.maxFee ? p.maxFee : Math.floor(raw);
+  // `_pathSpread` clamps the CEILING only (no minFee floor — sVol already carries it), then
+  // SATURATES into the uint16 `SwapQuote.spreadPbps`: Σ maxFee_i over legs does not fit uint16,
+  // and an unchecked cast there would wrap a maximally-fenced path down to a near-zero spread.
+  return Math.min(raw > p.maxFee ? p.maxFee : Math.floor(raw), U16_MAX);
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
@@ -665,14 +724,14 @@ function traverse(k: LegKit, amountInTok: number, selling: boolean): number {
   return bandPrice(k, k.center, end);
 }
 
-// Fee profiles compose along a path by the worst (widest) leg — mirrors Pricing._pathSpread's
-// max(vega)/max(minFee)/max(maxFee) reduction; protoShare is pool-level (equal across a pool's legs).
-function worstProfile(profiles: AimmProfile[]): AimmProfile {
-  const w = { ...profiles[0] };
+// Path fee profile. minFee/maxFee SUM over legs (Pricing._walkLegs, via pathRisk) — a `max` there
+// charged one leg's fence while crossing two. vega stays an ENDPOINT max (Pricing._pathSpread keeps
+// it endpoint-scoped: it is the pool's per-asset σ dial, not a per-leg risk quantity). protoShare is
+// pool-level ($.feeParams.protoShare, equal across a pool's legs) and reduces unchanged.
+function pathProfile(profiles: AimmProfile[], risk: Required<LegRisk>): AimmProfile {
+  const w = { ...profiles[0], minFee: risk.minFee, maxFee: risk.maxFee };
   for (const b of profiles.slice(1)) {
     w.vega = Math.max(w.vega, b.vega);
-    w.minFee = Math.max(w.minFee, b.minFee);
-    w.maxFee = Math.max(w.maxFee, b.maxFee);
     w.protoShare = Math.max(w.protoShare, b.protoShare);
   }
   return w;
@@ -758,8 +817,7 @@ export function quoteExactIn(
     const kIn = legKit(legIn);
     const kOut = legKit(legOut);
     midPrice = kIn.mid / kOut.mid; // (base/in)/(base/out) = out-per-in
-    markPrice =
-      legIn.twap > 0 && legOut.twap > 0 ? legIn.twap / legOut.twap : 0;
+    markPrice = legIn.twap > 0 && legOut.twap > 0 ? legIn.twap / legOut.twap : 0;
     involved = [legIn, legOut];
     outLeg = legOut;
     route = [tokenIn, base, tokenOut];
@@ -776,11 +834,25 @@ export function quoteExactIn(
     return zeroQuote([tokenIn, tokenOut]); // base→base
   }
 
-  const wp = worstProfile(involved.map((l) => l.profile));
-  const sigmaPath = Math.max(...involved.map((l) => l.sigma));
-  const confPath = Math.max(0, ...involved.map((l) => l.confidence ?? 0));
-  const stalePath = Math.max(0, ...involved.map((l) => l.staleExcess ?? 0));
-  const spread = spreadPbps(sigmaPath, wp, { confidence: confPath, staleExcess: stalePath });
+  // σ in quadrature, minFee/maxFee/confidence summed, staleExcess maxed over the walked LEGS
+  // (the base is never a leg) — Pricing._walkLegs. A cross walks two legs, a direct walks one.
+  const risk = pathRisk(
+    involved.map((l) => ({
+      sigma: l.sigma,
+      minFee: l.profile.minFee,
+      maxFee: l.profile.maxFee,
+      confidence: l.confidence,
+      staleExcess: l.staleExcess,
+    })),
+  );
+  const wp = pathProfile(
+    involved.map((l) => l.profile),
+    risk,
+  );
+  const spread = spreadPbps(risk.sigma, wp, {
+    confidence: risk.confidence,
+    staleExcess: risk.staleExcess,
+  });
   const spreadBps = spread / 100;
   // Only a HALF-spread is actually deducted from amountOut (getAnchorPathQuote: feeOut = amount·halfSpread),
   // so the LP/proto split must sum to spreadBps/2 — not the full spread — or the fee reads 2× reality.

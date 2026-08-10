@@ -27,6 +27,7 @@ import {
   depthCurve,
   dispersion,
   evalQ,
+  pathRisk,
   quoteExactIn,
   spreadPbps,
   virtualMarketDepth,
@@ -120,6 +121,72 @@ describe('model primitives (Pricing.sol mirrors)', () => {
     );
     expect(spreadPbps(0, STABLE_PROFILE)).toBe(STABLE_PROFILE.minFee); // σ=0 → floor
     expect(spreadPbps(1e9, VOLATILE_PROFILE)).toBe(VOLATILE_PROFILE.maxFee); // saturate
+  });
+});
+
+// ── Path risk composition (Pricing._walkLegs / _pathSpread, dex ba76f55) ────────
+// The chain COMPOSES per-leg risk; it used to reduce with max, and the mirror's max
+// under-quoted every cross by the second leg's fence (sepolia USDG↔PYUSD: 496 vs 496+226).
+describe('path risk composes over legs, never maxes', () => {
+  const leg = (sigma: number, minFee: number, maxFee: number, confidence = 0, staleExcess = 0) => ({
+    sigma,
+    minFee,
+    maxFee,
+    confidence,
+    staleExcess,
+  });
+
+  test('minFee/maxFee/confidence SUM; σ in quadrature; staleExcess maxes', () => {
+    // sepolia stable pool: USDG minFee 496 + PYUSD minFee 226 = 722, the chain floor the SDK
+    // used to quote as 496. σ = √(30000² + 40000²) = √2_500_000_000 = 50000 exactly.
+    const r = pathRisk([leg(30_000, 496, 5_000, 2, 30), leg(40_000, 226, 3_000, 5, 90)]);
+    expect(r.minFee).toBe(722);
+    expect(r.maxFee).toBe(8_000);
+    expect(r.confidence).toBe(7);
+    expect(r.staleExcess).toBe(90); // max over LEGS, not the two endpoints
+    expect(r.sigma).toBe(50_000);
+  });
+
+  test('σ quadrature uses a FLOOR sqrt (Solady), not a float one', () => {
+    // √(2·50000²) = √5_000_000_000 = 70710.678…; 70710² = 4_999_904_100 ≤ 5e9 < 70711².
+    expect(pathRisk([leg(50_000, 0, 0), leg(50_000, 0, 0)]).sigma).toBe(70_710);
+  });
+
+  test('a one-leg path is the identity — direct quotes are untouched', () => {
+    const r = pathRisk([leg(50_000, 1_000, 10_000, 3, 25)]);
+    expect(r).toEqual({
+      sigma: 50_000,
+      minFee: 1_000,
+      maxFee: 10_000,
+      confidence: 3,
+      staleExcess: 25,
+    });
+  });
+
+  test('every spread term floors SEPARATELY, as the chain computes it', () => {
+    // σ=150070, vega=9999, Σ minFee=722, Σ conf=7, staleExcess=50 (isqrt 7, NOT 7.0710678).
+    //   sVol   = 722 + floor(150070·9999 / 1e6) = 722 + floor(1500.54993) = 2222
+    //   uStale = floor(100·150070·7 / 1e4)      = floor(10504.9)          = 10504
+    //   uConf  = 7·(1e6/1e4)                                              = 700
+    //   raw    = 13426, under Σ maxFee = 40000 ⇒ 13426
+    // Flooring only the SUM (and a float sqrt) reads 13534 — 1.08 bp wide.
+    const p = { ...STABLE_PROFILE, vega: 9_999, minFee: 722, maxFee: 40_000 };
+    expect(spreadPbps(150_070, p, { confidence: 7, staleExcess: 50 })).toBe(13_426);
+  });
+
+  test('the uint16 narrowing saturates, it does not wrap', () => {
+    // Σ maxFee = 80000 > uint16. raw > Σ maxFee ⇒ capped at 80000 ⇒ saturates to 65535.
+    const p = { ...STABLE_PROFILE, minFee: 80_000, maxFee: 80_000 };
+    expect(spreadPbps(1_000_000, p)).toBe(65_535);
+  });
+
+  test('quoteExactIn charges both legs of a cross, one leg of a direct', () => {
+    // Both legs VOLATILE_PROFILE: minFee 1000, vega 10000, σ 50000.
+    //   cross:  Σ minFee 2000 + floor(70710·10000 / 1e6) = 2000 + 707 = 2707 PBPS
+    //   direct:   minFee 1000 + floor(50000·10000 / 1e6) = 1000 + 500 = 1500 PBPS
+    // Under the old max reduction the cross also quoted 1500 — a whole leg's fence free.
+    expect(quoteExactIn(crossState(), 'BTCB', 'ETH', 0.01).spreadBps).toBeCloseTo(27.07, 12);
+    expect(quoteExactIn(volState(), 'BTCB', BASE, 0.01).spreadBps).toBeCloseTo(15, 12);
   });
 });
 
@@ -231,17 +298,20 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     expect(() => buildCurve(badKnot, wQ, 500)).toThrow(); // knot ≥ BPS
   });
 
-  parityTest('fixture preset table: portable-only, wQ quantization identical to the exported vectors', () => {
-    expect(CURVE_PRESETS.length).toBeGreaterThan(0);
-    // W5 presets are the unprefixed vector families — same quantized wQ by construction.
-    for (const p of CURVE_PRESETS.filter((x) => x.W === 5)) {
-      const v = vectors[p.regime];
-      if (!v) continue; // pin variants have no exported vector family
-      expect(p.interior).toEqual(v.interior);
-      expect(p.wQ.map(Number)).toEqual(v.wQ);
-      expect(() => presetCurve(p)).not.toThrow();
-    }
-  });
+  parityTest(
+    'fixture preset table: portable-only, wQ quantization identical to the exported vectors',
+    () => {
+      expect(CURVE_PRESETS.length).toBeGreaterThan(0);
+      // W5 presets are the unprefixed vector families — same quantized wQ by construction.
+      for (const p of CURVE_PRESETS.filter((x) => x.W === 5)) {
+        const v = vectors[p.regime];
+        if (!v) continue; // pin variants have no exported vector family
+        expect(p.interior).toEqual(v.interior);
+        expect(p.wQ.map(Number)).toEqual(v.wQ);
+        expect(() => presetCurve(p)).not.toThrow();
+      }
+    },
+  );
 });
 
 // The printed ladder is the SKEW-implied curve, so it integrates to `grossOut`; `netPrice` carries
