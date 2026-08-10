@@ -434,11 +434,19 @@ function staleTerm(staleExcess: number, sigma: number): number {
 }
 
 /** One leg's contribution to the path CEILING = min(rawLeg_i, maxFee_i) (Pricing.sol `_legCap`).
- *  `rawLeg_i` is what leg i would raw-quote STANDALONE, on its own σ_i — NOT any attribution of
- *  the path quadrature, which does not decompose per leg and would reinstate the coupling this
- *  removes. Sound because it is only ever an upper BOUND: √(Σσ²) ≤ Σσ, so Σ rawLeg_i ≥ rawPath
- *  and the ceiling binds only when some leg genuinely pins its own maxFee. An unpinned path keeps
- *  the quadrature discount exactly; a pinned one costs at most what its legs cost traded apart. */
+ *  `rawLeg_i` uses leg i's own σ_i — NOT any attribution of the path quadrature, which does not
+ *  decompose per leg and would reinstate the coupling this removes. It carries the PATH vega
+ *  max(vega_in, vega_out), so it is not what leg i quotes standalone: standalone would use
+ *  max(vega_base, vega_i), and the two differ whenever the endpoint vegas differ.
+ *  Sound because it is only ever an upper BOUND: √(Σσ²) ≤ Σσ, so a pinned path costs at most what
+ *  its legs cost traded apart.
+ *  The cap does NOT bind only when a leg pins. The σ term takes ONE floor on the path side and N
+ *  on the per-leg side, and Σ⌊·⌋ ≤ ⌊Σ·⌋, so sum-of-floors can fall below floor-of-sum with every
+ *  leg far from its ceiling. The quadrature discount survives up to (N−1) PBPS of floor residual,
+ *  not exactly. Witness (N=2, unpinned): σ₁=σ₂=80, vega=1e4, minFee=1 ⇒ rawPath 3, cap 2.
+ *  CO-FIX, do not revert in halves: this ceiling and the per-leg staleness SUM move together.
+ *  Paired with the old coupled premium they do not cancel and the ceiling lands far below the raw
+ *  spread it bounds, silently under-quoting an UNPINNED path (measured 9.89 bp). */
 function legCap(l: LegRisk, sigma: number, vega: number, legStale: number): number {
   const raw =
     l.minFee +
