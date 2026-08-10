@@ -400,13 +400,10 @@ export const CHAINS: Record<number, ChainConfig> = {
     id: 5042,
     name: 'Arc',
     icon: '/networks/arc.svg',
-    // ⚠ NOT LIVE. Circle has announced 2026-09-16 for Arc mainnet; until then this is a
-    // roadmap entry only and nothing may route here. `rpcUrls` is deliberately EMPTY: the
-    // previously listed https://rpc.arc.network is NXDOMAIN (no DNS record at all, verified
-    // 2026-08-10), and https://rpc.mainnet.arc.io resolves but answers 403. An endpoint that
-    // cannot serve is worse than none — it turns "unconfigured" into a silent hang. Fill this
-    // in from docs.arc.io once mainnet is live and the endpoint answers eth_chainId 0x13b2.
-    rpcUrls: [],
+    // ⚠ NOT LIVE UNTIL LAUNCH. The endpoint below is the owner-authoritative mainnet URL, but
+    // Arc mainnet has not launched: it is NOT verified and must not be treated as reachable.
+    // Nothing may route here until launch; a `pending` deployment is never selectable.
+    rpcUrls: ['https://rpc.mainnet.arc.network'],
     // Native gas is USDC at 18 decimals; the ERC-20 view at 0x3600… reports 6 for the SAME
     // balance (verified on-chain: eth_getBalance/1e18 == balanceOf/1e6). Mixing the two
     // interfaces in one accounting path is a 1e12 error.
@@ -421,13 +418,10 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: 'Arc Testnet',
     // One asset covers both Arc networks; the slug would be `arc-testnet.svg`.
     icon: '/networks/arc.svg',
-    // All three verified live 2026-08-10 (eth_chainId -> 0x4cef52). arc.network 301s to
-    // arc.io, so both spellings work; .io first because it is the canonical one in docs.
-    rpcUrls: [
-      'https://rpc.testnet.arc.io',
-      'https://rpc.testnet.arc.network',
-      'https://rpc.drpc.testnet.arc.io',
-    ],
+    // Owner-authoritative list; these two hosts only. Both verified live 2026-08-10
+    // (eth_chainId -> 0x4cef52). Earlier entries rpc.testnet.arc.io / rpc.drpc.testnet.arc.io
+    // were invented by mechanical renaming — do not reintroduce them.
+    rpcUrls: ['https://rpc.testnet.arc.network', 'https://arc-testnet.drpc.org'],
     // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
