@@ -1,13 +1,13 @@
 /**
  * PoolStorage slot readers — Solana-style deterministic layout, no Solidity getters.
  *
- * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`), pinned by dex PoolStorageLayout.t.sol:
- *   slot0 = baseToken|initialized, 1 = wnative, 2 = treasury; mappings assets=3,
- *   oracleConfigs=4, riskConfigs=5, curves=6, __reserved_lpBalances=7, protocolFees=8;
- *   feeParams=9, flowCooldownSeconds=10 (factory packs into slot 10 @ byte offset 2),
- *   assetHooks=11, invested=12, lpTokens=13, lastHookCreditAt=14.
- * Slot 7 is a reserved pin, not live state: the per-leg LPToken clone is the share ledger, and
- *   balances come from `Pool.getLPBalance` or the receipt's own `balanceOf`, never from a slot read.
+ * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`), pinned by dex PoolStorageLayout.t.sol.
+ * `POOL_STORAGE` (slots) and `POOL_STRUCTS` (in-struct [slot, byteOffset]) below are the ONLY
+ * place either number appears — every decoder reads them — and both tables are asserted
+ * field-by-field against the `storageLayout` of dex/evm's forge artifacts by
+ * test/storage-layout.test.ts.
+ * An ABI diff cannot see packing, so that test, not test/abi-freshness.test.ts, is what catches
+ * a repack.
  * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
@@ -30,28 +30,81 @@ function isNativeKey(token: Address): boolean {
 
 /** Absolute slots of `IPool.PoolStorage` fields (pinned by PoolStorageLayout.t.sol). */
 export const POOL_STORAGE = {
-  /** Packed: baseToken (address, bytes 0..19) + initialized (bool @ byte 20). */
+  /** Packed word: baseToken + initialized + protoShare + flashFeePbps + flowCooldownSeconds. */
   baseToken: 0n,
+  initialized: 0n,
+  protoShare: 0n,
+  flashFeePbps: 0n,
+  flowCooldownSeconds: 0n,
   wnative: 1n,
   treasury: 2n,
-  assets: 3n,
-  oracleConfigs: 4n,
-  riskConfigs: 5n,
-  curves: 6n,
-  /** Reserved pin (was `lpBalances`); never read. Slot 7 is kept so `protocolFees` stays at 8. */
-  reservedLpBalances: 7n,
+  factory: 3n,
+  assets: 4n,
+  oracleConfigs: 5n,
+  riskConfigs: 6n,
+  curves: 7n,
   protocolFees: 8n,
-  feeParams: 9n,
-  /** `factory` (address) packs into this same word at byte offset 2. */
-  flowCooldownSeconds: 10n,
-  factory: 10n,
-  assetHooks: 11n,
-  invested: 12n,
+  /** Per-leg `HookSlot`: target + flags + the `hookCreditYield` clock, one word. */
+  assetHooks: 9n,
+  invested: 10n,
   /** Per-leg ERC-20 receipt registry: `mapping(leg => LPToken)`. */
-  lpTokens: 13n,
-  /** Last `hookCreditYield` timestamp per leg: `mapping(leg => uint32)`. */
-  lastHookCreditAt: 14n,
+  lpTokens: 11n,
 } as const;
+
+/**
+ * In-struct field position as `[slot, byteOffset]`, LSB-aligned exactly as solc packs.
+ * `slot` is relative to the struct's own base (the mapping-entry base for a mapping value).
+ */
+export const POOL_STRUCTS = {
+  /** Flat scalars of `PoolStorage` itself (slot 0 is a packed word; the rest are whole slots). */
+  PoolStorage: {
+    baseToken: [0, 0],
+    initialized: [0, 20],
+    protoShare: [0, 21],
+    flashFeePbps: [0, 22],
+    flowCooldownSeconds: [0, 24],
+    wnative: [1, 0],
+    treasury: [2, 0],
+    factory: [3, 0],
+  },
+  Asset: {
+    reserves: [0, 0],
+    liabilities: [0, 16],
+    minLiquidity: [1, 0],
+    liquidityIndex: [1, 12],
+    presetId: [1, 24],
+    deadSeedPow10: [1, 26],
+    anchor: [2, 0],
+    minFeePbps: [2, 20],
+    maxFeePbps: [2, 22],
+    maxDispersion: [2, 24],
+    decimals: [2, 28],
+    gamma: [2, 29],
+    vega: [3, 0],
+    haircutSuppressor: [3, 2],
+    minDispersion: [3, 4],
+  },
+  RiskConfig: {
+    coverageMin: [0, 0],
+    coverageMax: [0, 2],
+    flags: [0, 4],
+    kappaCovBps: [0, 6],
+  },
+  OracleConfig: {
+    feedId: [0, 0],
+    refFeedId: [1, 0],
+    primary: [2, 0],
+    refBandBps: [2, 20],
+    mode: [2, 22],
+    quoteUnit: [2, 23],
+    refPrimary: [3, 0],
+  },
+  HookSlot: {
+    target: [0, 0],
+    flags: [0, 20],
+    lastCreditAt: [0, 24],
+  },
+} as const satisfies Record<string, Record<string, readonly [number, number]>>;
 
 /**
  * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstants.sol`
@@ -63,18 +116,25 @@ export const HOOK_POST_INFLOW = 1 << 1;
 /** Known-bits mask; dex rejects unknown bits at adminSetAssetHook. */
 export const HOOK_FLAGS_MASK = HOOK_PRE_OUTFLOW | HOOK_POST_INFLOW;
 
-/** Decoded `IPool.HookSlot { address target; uint32 flags }` (single packed storage word). */
+/** Decoded `IPool.HookSlot` (single packed storage word). */
 export interface HookSlot {
   target: Address;
   flags: number;
+  /** Unix seconds of the last `hookCreditYield` rate bucket; 0 until the leg is seeded. */
+  lastCreditAt: number;
 }
 
-/** Decode a packed HookSlot word: target @ byte offset 0 (low 20B), uint32 flags @ offset 20. */
+/** Decode a packed HookSlot word (offsets: POOL_STRUCTS.HookSlot). */
 export function decodeHookSlot(word: Hex): HookSlot {
-  return { target: addressAt(word, 0), flags: u32At(word, 20) };
+  const f = POOL_STRUCTS.HookSlot;
+  return {
+    target: addressAt(word, f.target[1]),
+    flags: u32At(word, f.flags[1]),
+    lastCreditAt: u32At(word, f.lastCreditAt[1]),
+  };
 }
 
-/** Read the per-asset HookSlot (assetHooks mapping, slot 11). `target == address(0)` ⇒ no hook. */
+/** Read the per-asset HookSlot (assetHooks mapping). `target == address(0)` ⇒ no hook. */
 export async function readAssetHook(
   provider: Eip1193Provider,
   pool: Address,
@@ -85,13 +145,12 @@ export async function readAssetHook(
   return decodeHookSlot(word);
 }
 
+/** `IPool.RiskConfig` — 4×uint16 in one word. */
 export interface RiskConfig {
-  decayStartRatioBps: number;
   coverageMin: number;
   coverageMax: number;
-  decaySlope: number;
-  depthAmplifier: number;
   flags: number;
+  /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). */
   kappaCovBps: number;
 }
 
@@ -102,11 +161,11 @@ export interface OracleConfig {
   refBandBps: number;
   mode: number;
   /**
-   * DEN-01: the attested mark is quoted in USD (`<TOKEN>-USD`) rather than in the pool's base token,
-   * so the pool divides it by the base's own USD mark at consumption. True for the stable/FX feeds
-   * NXR signs as `X-USD` under an `X-USDC` on-chain name; false for genuine base crosses.
+   * DEN-01 mark denomination (`uint8`, the byte the former `bool usdQuoted` occupied):
+   * 0 = ANCHOR_UNIT (mark already in anchor units), 1 = UNIT_OF_ACCOUNT (`<TOKEN>-USD`, so the
+   * pool divides by the base's own USD mark at consumption).
    */
-  usdQuoted: boolean;
+  quoteUnit: number;
   /** Ref-band oracle instance (independent signer set); zero address = legacy fallback to primary. */
   refPrimary: Address;
 }
@@ -191,19 +250,22 @@ function i64AtBits(word: bigint, shift: number): bigint {
 }
 
 /**
- * Read the asset's pricing-shape pointer (Asset slot 1, bits [224:240), byte 28): presetId into
- * `PoolStorage.curves`. 0 = no preset (fallback quote).
+ * Read the asset's pricing-shape pointer (`Asset.presetId`): index into `PoolStorage.curves`.
+ * 0 = no preset (fallback quote).
  */
 export async function readAssetPresetId(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
 ): Promise<number> {
+  const [slot, offset] = POOL_STRUCTS.Asset.presetId;
   const key = await resolveTokenStorageKey(provider, pool, token);
-  const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assets) + 1n);
-  // Asset slot 1: minLiquidity[0:12) liquidityIndex[12:24) lastUpdate[24:28) presetId[28:30)
-  // deadSeedPow10[30:31).
-  return u16At(word, 28);
+  const word = await getStorageAt(
+    provider,
+    pool,
+    mappingBase(key, POOL_STORAGE.assets) + BigInt(slot),
+  );
+  return u16At(word, offset);
 }
 
 /**
@@ -254,14 +316,12 @@ export async function readRiskConfig(
 ): Promise<RiskConfig> {
   const key = await resolveTokenStorageKey(provider, pool, token);
   const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.riskConfigs));
+  const f = POOL_STRUCTS.RiskConfig;
   return {
-    decayStartRatioBps: u16At(word, 0),
-    coverageMin: u16At(word, 2),
-    coverageMax: u16At(word, 4),
-    decaySlope: u32At(word, 6),
-    depthAmplifier: u16At(word, 10),
-    flags: u16At(word, 12),
-    kappaCovBps: u16At(word, 14),
+    coverageMin: u16At(word, f.coverageMin[1]),
+    coverageMax: u16At(word, f.coverageMax[1]),
+    flags: u16At(word, f.flags[1]),
+    kappaCovBps: u16At(word, f.kappaCovBps[1]),
   };
 }
 
@@ -272,20 +332,22 @@ export async function readOracleConfig(
 ): Promise<OracleConfig> {
   const key = await resolveTokenStorageKey(provider, pool, token);
   const base = mappingBase(key, POOL_STORAGE.oracleConfigs);
-  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode|usdQuoted (packed), 3=refPrimary.
+  const f = POOL_STRUCTS.OracleConfig;
+  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode|quoteUnit (packed), 3=refPrimary.
+  const at = (slot: number) => getStorageAt(provider, pool, base + BigInt(slot));
   const [feedId, refFeedId, packed, refWord] = await Promise.all([
-    getStorageAt(provider, pool, base),
-    getStorageAt(provider, pool, base + 1n),
-    getStorageAt(provider, pool, base + 2n),
-    getStorageAt(provider, pool, base + 3n),
+    at(f.feedId[0]),
+    at(f.refFeedId[0]),
+    at(f.primary[0]),
+    at(f.refPrimary[0]),
   ]);
   return {
     feedId,
     refFeedId,
-    primary: addressAt(packed, 0),
-    refBandBps: u16At(packed, 20),
-    mode: u8At(packed, 22),
-    usdQuoted: u8At(packed, 23) !== 0,
-    refPrimary: addressAt(refWord, 0),
+    primary: addressAt(packed, f.primary[1]),
+    refBandBps: u16At(packed, f.refBandBps[1]),
+    mode: u8At(packed, f.mode[1]),
+    quoteUnit: u8At(packed, f.quoteUnit[1]),
+    refPrimary: addressAt(refWord, f.refPrimary[1]),
   };
 }

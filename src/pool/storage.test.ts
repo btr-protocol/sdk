@@ -17,24 +17,26 @@ import {
   u32At,
 } from './storage';
 
+// The authoritative check is test/storage-layout.test.ts, which reads solc's own storageLayout.
+// This one runs with no dex checkout at all, so it stays as the offline tripwire.
 test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
   expect(POOL_STORAGE).toEqual({
     baseToken: 0n,
+    initialized: 0n,
+    protoShare: 0n,
+    flashFeePbps: 0n,
+    flowCooldownSeconds: 0n,
     wnative: 1n,
     treasury: 2n,
-    assets: 3n,
-    oracleConfigs: 4n,
-    riskConfigs: 5n,
-    curves: 6n,
-    reservedLpBalances: 7n,
+    factory: 3n,
+    assets: 4n,
+    oracleConfigs: 5n,
+    riskConfigs: 6n,
+    curves: 7n,
     protocolFees: 8n,
-    feeParams: 9n,
-    flowCooldownSeconds: 10n,
-    factory: 10n,
-    assetHooks: 11n,
-    invested: 12n,
-    lpTokens: 13n,
-    lastHookCreditAt: 14n,
+    assetHooks: 9n,
+    invested: 10n,
+    lpTokens: 11n,
   });
 });
 
