@@ -1,0 +1,55 @@
+# sdk had NO workflow until 2026-08-12, which is why its two drift detectors never ran anywhere:
+# `abi-freshness` and `storage-layout` both compare against dex/evm + shared/evm forge artifacts,
+# and on a machine without those siblings built they SKIP. A storage repack (mappings renumbered,
+# RiskConfig collapsed to 4 fields) therefore shipped with every slot reader returning garbage and
+# a green local suite. This job materialises the siblings, builds them, and sets
+# SDK_REQUIRE_ARTIFACTS=1 so a missing artifact fails instead of skipping.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Bun tests + typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk
+    env:
+      SDK_REQUIRE_ARTIFACTS: '1'
+    steps:
+      # Sibling layout is not optional: test/abi-freshness.test.ts and
+      # test/storage-layout.test.ts resolve ../../dex/evm and ../../shared/evm, and dex/evm itself
+      # remaps `@btr-shared/` into shared/evm/src.
+      - uses: actions/checkout@v4
+        with:
+          path: sdk
+      - uses: actions/checkout@v4
+        with:
+          repository: btr-protocol/dex
+          path: dex
+      - uses: actions/checkout@v4
+        with:
+          repository: btr-protocol/shared
+          path: shared
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      # storageLayout (what the layout test reads) rides in the standard artifact JSON.
+      - name: Build shared artifacts
+        working-directory: shared/evm
+        run: forge build
+      - name: Build dex artifacts
+        working-directory: dex/evm
+        run: forge build
+
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      # `bun run lint` is NOT wired in: `biome check src` is red on a clean tree today
+      # (177 errors, mostly noUncheckedIndexedAccess-style bracket-key rules in src/venues).
+      # Adding it here would land CI permanently red, which is how a gate stops being read.
