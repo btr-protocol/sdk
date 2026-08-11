@@ -123,6 +123,7 @@ export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
 export type { HookSlot, OracleConfig, RiskConfig } from './storage.js';
 export {
   POOL_STORAGE,
+  POOL_STRUCTS,
   HOOK_PRE_OUTFLOW,
   HOOK_POST_INFLOW,
   HOOK_FLAGS_MASK,
