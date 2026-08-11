@@ -19,7 +19,6 @@ import {
   areaQ,
   buildCurve,
   buildLeg,
-  calcDepth,
   computeSkew,
   covQ,
   covToll,
@@ -27,6 +26,7 @@ import {
   depthCurve,
   dispersion,
   evalQ,
+  legKit,
   pathSpread,
   quoteExactIn,
   spreadPbps,
@@ -109,11 +109,19 @@ describe('model primitives (Pricing.sol mirrors)', () => {
     expect(computeSkew(0.4, 1, VOLATILE_PROFILE)).toBe(100); // c ≤ covMin
     expect(computeSkew(3, 1, VOLATILE_PROFILE)).toBe(-100); // c ≥ covMax
   });
-  test('calcDepth == reserves when c ≥ 1; virtual-depth amplification toward L when under-covered', () => {
-    expect(calcDepth(9.4, 9.4, VOLATILE_PROFILE)).toBe(9.4); // c = 1
-    const d = calcDepth(800, 1000, VOLATILE_PROFILE); // c = 0.8 ⇒ depth ∈ (R, L]
-    expect(d).toBeGreaterThan(800);
-    expect(d).toBeLessThanOrEqual(1000);
+  // Regression guard: `depthAmplifier`/`calculateDepth` were deleted from Pricing.sol, so the
+  // traverse denominator is the leg's RAW reserves at every coverage. An under-covered leg is the
+  // case a coverage-dependent depth term would move, so pin it explicitly — a reintroduced
+  // amplifier inflates `depth` and quotes a book the chain will not fill.
+  test('traverse depth == raw reserves at every coverage (no amplification when under-covered)', () => {
+    for (const c of [0.6, 0.75, 0.9, 1, 1.5]) {
+      const liab = 1000;
+      const res = c * liab;
+      const leg = buildLeg('TKN', 1, sigmaSeed('volatile'), res, liab, 5000, 18, VOLATILE_PROFILE);
+      expect(legKit(leg).depth).toBe(res);
+    }
+    // Chain guard: `reserves == 0 ? 1 : reserves` keeps the traverse divisor non-zero.
+    expect(legKit(buildLeg('TKN', 1, 0, 0, 1000, 5000, 18, VOLATILE_PROFILE)).depth).toBe(1);
   });
   test('dispersion / spread clamp to profile bounds', () => {
     expect(dispersion(sigmaSeed('stable'), STABLE_PROFILE)).toBeGreaterThanOrEqual(

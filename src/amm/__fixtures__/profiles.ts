@@ -89,7 +89,6 @@ const RISK = {
   lambda: 10_000,
   covMin: 5_000,
   covMax: 20_000,
-  depthAmp: 10_000,
   protoShare: 20,
 };
 

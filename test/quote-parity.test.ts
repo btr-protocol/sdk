@@ -127,7 +127,6 @@ async function buildState(
       maxDisp: Number(asset.maxDispersion),
       covMin: risk.coverageMin,
       covMax: risk.coverageMax,
-      depthAmp: risk.depthAmplifier,
       protoShare: 0,
       curve,
     };
