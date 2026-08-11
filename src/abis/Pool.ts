@@ -202,11 +202,6 @@ export const POOL_ABI = [
             internalType: 'uint96',
           },
           {
-            name: 'lastUpdate',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
             name: 'presetId',
             type: 'uint16',
             internalType: 'uint16',
@@ -260,21 +255,6 @@ export const POOL_ABI = [
             name: 'minDispersion',
             type: 'uint32',
             internalType: 'uint32',
-          },
-          {
-            name: 'reservationPrice',
-            type: 'uint64',
-            internalType: 'uint64',
-          },
-          {
-            name: 'reservationPriceMax',
-            type: 'uint64',
-            internalType: 'uint64',
-          },
-          {
-            name: 'pegB64',
-            type: 'uint64',
-            internalType: 'uint64',
           },
         ],
       },
@@ -1189,6 +1169,33 @@ export const POOL_ABI = [
     type: 'error',
     name: 'CooldownActive',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'CycleDetected',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'DepthExceeded',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'depth',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
   },
   {
     type: 'error',

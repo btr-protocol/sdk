@@ -69,6 +69,24 @@ export const POOL_AUX_ABI = [
   },
   {
     type: 'function',
+    name: 'adminCollapseAnchor',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'newAnchor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'adminCollectProtocolFees',
     inputs: [
       {
@@ -149,9 +167,9 @@ export const POOL_AUX_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'usdQuoted',
-            type: 'bool',
-            internalType: 'bool',
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
           },
           {
             name: 'refPrimary',
@@ -166,27 +184,12 @@ export const POOL_AUX_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'decayStartRatioBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'coverageMin',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
             name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'decaySlope',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
-            name: 'depthAmplifier',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -255,6 +258,48 @@ export const POOL_AUX_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IPool.OracleConfig',
+        components: [
+          {
+            name: 'feedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'refFeedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'refBandBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'mode',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
+        ],
+      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -320,16 +365,6 @@ export const POOL_AUX_ABI = [
         name: 'haircutSuppressor',
         type: 'uint16',
         internalType: 'uint16',
-      },
-      {
-        name: 'reservationPrice',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-      {
-        name: 'reservationPriceMax',
-        type: 'uint64',
-        internalType: 'uint64',
       },
     ],
     outputs: [],
@@ -482,9 +517,9 @@ export const POOL_AUX_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'usdQuoted',
-            type: 'bool',
-            internalType: 'bool',
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
           },
           {
             name: 'refPrimary',
@@ -540,27 +575,12 @@ export const POOL_AUX_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'decayStartRatioBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'coverageMin',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
             name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'decaySlope',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
-            name: 'depthAmplifier',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -716,6 +736,11 @@ export const POOL_AUX_ABI = [
           },
           {
             name: 'flags',
+            type: 'uint32',
+            internalType: 'uint32',
+          },
+          {
+            name: 'lastCreditAt',
             type: 'uint32',
             internalType: 'uint32',
           },
@@ -1070,6 +1095,33 @@ export const POOL_AUX_ABI = [
     type: 'error',
     name: 'CooldownActive',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'CycleDetected',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'DepthExceeded',
+    inputs: [
+      {
+        name: 'asset',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'depth',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
   },
   {
     type: 'error',
