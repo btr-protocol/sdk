@@ -76,9 +76,9 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'usdQuoted',
-            type: 'bool',
-            internalType: 'bool',
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
           },
           {
             name: 'refPrimary',
@@ -93,27 +93,12 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'decayStartRatioBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'coverageMin',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
             name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'decaySlope',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
-            name: 'depthAmplifier',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -258,6 +243,29 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
+    name: 'collapseAnchor',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'newAnchor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'collectProtocolFees',
     inputs: [
       {
@@ -282,6 +290,24 @@ export const ADMIN_ABI = [
   {
     type: 'function',
     name: 'executeAddAsset',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'executeAnchorUpdate',
     inputs: [
       {
         name: 'pool',
@@ -517,9 +543,9 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'usdQuoted',
-            type: 'bool',
-            internalType: 'bool',
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
           },
           {
             name: 'refPrimary',
@@ -534,27 +560,12 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'decayStartRatioBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'coverageMin',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
             name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'decaySlope',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
-            name: 'depthAmplifier',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -604,6 +615,71 @@ export const ADMIN_ABI = [
         name: 'vega',
         type: 'uint16',
         internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'requestAnchorUpdate',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'anchor',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IPool.OracleConfig',
+        components: [
+          {
+            name: 'feedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'refFeedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'refBandBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'mode',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
+        ],
       },
     ],
     outputs: [],
@@ -672,9 +748,9 @@ export const ADMIN_ABI = [
             internalType: 'uint8',
           },
           {
-            name: 'usdQuoted',
-            type: 'bool',
-            internalType: 'bool',
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
           },
           {
             name: 'refPrimary',
@@ -854,27 +930,12 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'decayStartRatioBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'coverageMin',
             type: 'uint16',
             internalType: 'uint16',
           },
           {
             name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'decaySlope',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
-            name: 'depthAmplifier',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -955,16 +1016,6 @@ export const ADMIN_ABI = [
         type: 'uint16',
         internalType: 'uint16',
       },
-      {
-        name: 'reservationHardLoMin',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-      {
-        name: 'reservationHardHiMax',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
     ],
     stateMutability: 'view',
   },
@@ -974,29 +1025,6 @@ export const ADMIN_ABI = [
     inputs: [
       {
         name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'setAnchor',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'anchor',
         type: 'address',
         internalType: 'address',
       },
@@ -1048,16 +1076,6 @@ export const ADMIN_ABI = [
         type: 'uint16',
         internalType: 'uint16',
       },
-      {
-        name: 'reservationPrice',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-      {
-        name: 'reservationPriceMax',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1105,16 +1123,6 @@ export const ADMIN_ABI = [
         name: 'haircutSuppressor',
         type: 'uint16',
         internalType: 'uint16',
-      },
-      {
-        name: 'reservationPrice',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-      {
-        name: 'reservationPriceMax',
-        type: 'uint64',
-        internalType: 'uint64',
       },
     ],
     outputs: [],
@@ -1239,16 +1247,6 @@ export const ADMIN_ABI = [
             name: 'maxDeltaBps',
             type: 'uint16',
             internalType: 'uint16',
-          },
-          {
-            name: 'reservationHardLoMin',
-            type: 'uint64',
-            internalType: 'uint64',
-          },
-          {
-            name: 'reservationHardHiMax',
-            type: 'uint64',
-            internalType: 'uint64',
           },
         ],
       },
@@ -1449,12 +1447,6 @@ export const ADMIN_ABI = [
         type: 'uint128',
         indexed: false,
         internalType: 'uint128',
-      },
-      {
-        name: 'reservationPrice',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
       },
     ],
     anonymous: false,
