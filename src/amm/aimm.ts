@@ -236,7 +236,6 @@ export interface AimmProfile {
   maxDisp: number; // PBPS
   covMin: number; // 0.01% units (5000 = 50%)
   covMax: number; // 0.01% units (20000 = 200%)
-  depthAmp: number;
   protoShare: number; // % of spread routed to protocol (fee split)
   /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). null = presetId 0 / unset
    *  ⇒ the skew-anchored linear-impact fallback quote (Pricing._traverseCurveByVolume). */
@@ -377,20 +376,6 @@ export function computeSkew(res: number, liab: number, p: AimmProfile): number {
   const s = Math.min((p.gamma / BPS) * 100 * (numer / denom), 100);
   // Chain returns int8 from a uint256 integer division: truncate before signing, never after.
   return under ? Math.trunc(s) : -Math.trunc(s);
-}
-
-/** Coverage-amplified effective pricing depth (NOT raw reserves). */
-export function calcDepth(res: number, liab: number, p: AimmProfile): number {
-  if (res <= 0) return 1;
-  if (liab <= 0) return res;
-  const c = res / liab;
-  if (c >= 1 || p.depthAmp === 0) return res;
-  const floor = 0.5;
-  if (c <= floor) return res;
-  const progress = (c - floor) / (1 - floor);
-  const exponent = PBPS / (PBPS + 2 * p.depthAmp);
-  const cp = progress ** exponent;
-  return clamp(res + (p.depthAmp * (liab - res) * cp) / PBPS, 1, liab);
 }
 
 /** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing `_calculateDispersion`) */
@@ -584,7 +569,9 @@ export function legKit(leg: PoolLeg): LegKit {
   const disp = dispersion(leg.sigma, p);
   const skew = computeSkew(leg.res, leg.liab, p);
   const center = 5000 + skew * 50; // Pricing._skewToDepth
-  const depth = calcDepth(leg.res, leg.liab, p);
+  // Impact denominator is the leg's own reserves, never amplified (Pricing._quoteSell); the zero
+  // guard mirrors the chain's `reserves == 0 ? 1 : reserves`, which keeps the traverse divisor > 0.
+  const depth = leg.res > 0 ? leg.res : 1;
   const k: LegKit = {
     leg,
     twap: leg.twap,
