@@ -164,6 +164,13 @@ describe('ABI freshness vs dex/evm + shared/evm sources', () => {
     (r) => !existsSync(resolve(EVM_ROOTS[r], 'out')),
   );
   const why = `${missingRoots.join(' + ')}/evm/out absent — run (cd ../<repo>/evm && forge build)`;
+  // CI checks the siblings out and builds them, so there the skip is a failure: the whole point of
+  // this file is that it never silently stops running.
+  if (missingRoots.length && process.env.SDK_REQUIRE_ARTIFACTS === '1') {
+    test('sibling forge artifacts present', () => {
+      throw new Error(why);
+    });
+  }
 
   for (const { name, ts, contract, root, mergeEventsFrom, mergeErrorsFrom } of ABI_MAP) {
     const label = `${name} ABI matches ${root ?? 'dex'}/evm compiled artifact`;
