@@ -4,12 +4,16 @@
 // (multicall3 aggregate3), and container-resolved pointer decoding.
 
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { POOL_ABI } from '../abis/Pool';
+import type { AbiFunction } from './abi';
 import {
   canonicalType,
   decodeAbiParameters,
   decodeFn,
   encodeAbiParameters,
   encodeFn,
+  getPlan,
   getSelector,
 } from './abi';
 
@@ -27,7 +31,7 @@ const MC3_ABI = [{
 }];
 
 describe('getSelector', () => {
-  test('precomputed table entries unchanged', () => {
+  test('derives well-known selectors (4byte-verified)', () => {
     expect(getSelector('balanceOf(address)')).toBe('0x70a08231');
     expect(getSelector('aggregate3((address,bool,bytes)[])')).toBe('0x82ad56cb');
   });
@@ -39,6 +43,40 @@ describe('getSelector', () => {
     expect(getSelector('maxWithdraw(address)')).toBe('0xce96cb77');
     expect(getSelector('redeem(uint256,address,address)')).toBe('0xba087652');
     expect(getSelector('withdraw(uint256,address,address)')).toBe('0xb460af94');
+  });
+});
+
+// Guards the defect class that put a selector for the retired 5-arg
+// `swap(address,address,uint256,uint256,address)` into a hand-written table: BTR contract
+// signatures must exist in exactly one place, the generated ABIs under src/abis.
+describe('no hand-maintained mirrors of on-chain signatures', () => {
+  test('POOL_ABI is the sole source of the swap signature', () => {
+    const swaps = (POOL_ABI as unknown as AbiFunction[]).filter((f) => f.name === 'swap');
+    expect(swaps.length).toBe(1); // no overloads: one signature to keep straight
+    const sig = `swap(${(swaps[0]?.inputs ?? []).map(canonicalType).join(',')})`;
+    // Pinned by hand off Pool.sol: 6 args, trailing deadline.
+    expect(sig).toBe('swap(address,address,uint256,uint256,address,uint256)');
+    expect(getPlan(POOL_ABI, 'swap').selector).toBe('0x9908fc8b');
+    // The retired 5-arg form hashes to a real-looking selector that no longer resolves —
+    // it would land in Pool.fallback and be DELEGATECALLed into PoolAux.
+    expect(getSelector('swap(address,address,uint256,uint256,address)')).toBe('0xd5bcb9b5');
+    expect(getPlan(POOL_ABI, 'swap').selector).not.toBe('0xd5bcb9b5');
+  });
+
+  test('only external-standard modules declare ABI fragments outside src/abis', () => {
+    // ERC/WETH9/LayerZero shapes are frozen by their standards and have no generated ABI here.
+    // Everything BTR-owned must import from src/abis, so no other file may inline a function ABI.
+    const allowed = new Set([
+      'eth/erc20.ts', 'eth/erc721.ts', 'eth/erc777.ts', 'eth/erc1155.ts',
+      'eth/erc4626.ts', 'eth/erc7540.ts', 'eth/layerzero-oft.ts',
+      'eth/abi.ts', // type declarations, not fragments
+      'router/index.ts', // WNATIVE_ABI (WETH9 wrap/unwrap)
+    ]);
+    const src = new URL('..', import.meta.url).pathname;
+    const offenders = [...new Bun.Glob('**/*.ts').scanSync({ cwd: src })]
+      .filter((f) => !f.startsWith('abis/') && !f.endsWith('.test.ts') && !allowed.has(f))
+      .filter((f) => readFileSync(`${src}${f}`, 'utf8').includes("type: 'function'"));
+    expect(offenders).toEqual([]);
   });
 });
 

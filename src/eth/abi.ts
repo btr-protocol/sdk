@@ -52,36 +52,18 @@ const numToHex = (n: bigint | number | boolean) => BN(n).toString(16);
 const utf8 = new TextEncoder();
 const decUtf8 = new TextDecoder();
 
-// Common selectors (precomputed cache; any other signature is derived via
-// keccak-256 on demand and memoized — see getSelector)
-const SELECTORS: Record<string, string> = {
-  // ERC20
-  'balanceOf(address)': '70a08231', 'allowance(address,address)': 'dd62ed3e',
-  'approve(address,uint256)': '095ea7b3', 'transfer(address,uint256)': 'a9059cbb',
-  'transferFrom(address,address,uint256)': '23b872dd', 'name()': '06fdde03',
-  'symbol()': '95d89b41', 'decimals()': '313ce567', 'totalSupply()': '18160ddd',
-  // Multicall
-  'aggregate3((address,bool,bytes)[])': '82ad56cb', 'aggregate((address,bytes)[])': '252dba42',
-  // Pool functions (from IPool.sol)
-  'baseToken()': 'c55dae63',
-  'deposit(address,uint256)': '47e7ef24',
-  'getAsset(address)': '30b8b2c6',
-  'getCoverageRatio(address)': '2bb01437',
-  'getLPBalance(address,address)': 'a8f8278e',
-  'getSwapQuote(address,address,uint256)': '42606771',
-  'swap(address,address,uint256,uint256,address)': 'd5bcb9b5',
-  'withdraw(address,uint256,uint256)': 'b5c5f672',
-};
+// Runtime memo only. A hand-written table of signature→selector pairs is
+// unmaintainable: the hashes stay right while the *signatures* rot against the
+// contracts (a stale `swap(address,address,uint256,uint256,address)` entry
+// silently served a selector for a function that no longer exists, sending the
+// call into Pool.fallback). Deriving costs ~2.3us once per unique signature per
+// process, which no hot path notices — getPlan memoizes per (abi, fn) anyway.
+const SELECTORS: Record<string, string> = {};
 
 export const getSelector = (sig: string): Hex => {
+  // selector = first 4 bytes of keccak-256(signature)
   let sel = SELECTORS[sig];
-  if (!sel) {
-    // Derive selector = first 4 bytes of keccak-256(signature). The static
-    // table above is only a precomputed cache — throwing on unknown
-    // signatures broke every ABI function not hand-listed (e.g. ERC-4626).
-    sel = bytesToHex(keccak_256(utf8.encode(sig))).slice(0, 8);
-    SELECTORS[sig] = sel;
-  }
+  if (!sel) SELECTORS[sig] = sel = bytesToHex(keccak_256(utf8.encode(sig))).slice(0, 8);
   return `0x${sel}` as Hex;
 };
 
