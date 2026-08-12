@@ -84,11 +84,8 @@ export const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
 );
 
 const RISK = {
-  gamma: 10_000,
   vega: 10_000,
   lambda: 10_000,
-  covMin: 5_000,
-  covMax: 20_000,
   protoShare: 20,
 };
 
@@ -96,7 +93,6 @@ const RISK = {
 export const STABLE_PROFILE: AimmProfile = {
   ...RISK,
   minFee: 10,
-  maxFee: 2_000,
   minDisp: 500,
   maxDisp: 5_000,
   curve: BOOTSTRAP_STABLE_CURVE,
@@ -112,7 +108,6 @@ const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
   minFee: 1_000,
-  maxFee: 10_000,
   minDisp: VOL_CAP / 5,
   maxDisp: VOL_CAP,
   curve: BOOTSTRAP_VOLATILE_CURVE,

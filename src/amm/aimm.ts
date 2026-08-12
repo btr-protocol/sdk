@@ -274,15 +274,11 @@ export function sanitizeDispersion(
 // ── Profile / pool-state types ──────────────────────────────────────────────────
 
 export interface AimmProfile {
-  gamma: number; // inventory sensitivity, BPS
   vega: number; // volatility sensitivity, BPS
   lambda: number; // deviation sensitivity, BPS (unused while U=0)
   minFee: number; // PBPS (1 = 0.01 bp floor; 100 = 1 bp)
-  maxFee: number; // PBPS
   minDisp: number; // PBPS
   maxDisp: number; // PBPS
-  covMin: number; // 0.01% units (5000 = 50%)
-  covMax: number; // 0.01% units (20000 = 200%)
   protoShare: number; // % of spread routed to protocol (fee split)
   /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). null = presetId 0 / unset
    *  ⇒ the skew-anchored linear-impact fallback quote (Pricing._traverseCurveByVolume). */
@@ -409,20 +405,19 @@ function skewToPrice(mark: number, skew: number, disp: number): number {
   return offsetToPrice(mark, (skew * disp) / 100);
 }
 
-/** Linear inventory skew ∈ [-100, 100] from a leg's coverage (Pricing.computeInventorySkew). */
-export function computeSkew(res: number, liab: number, p: AimmProfile): number {
+/** Inventory skew ∈ [-100, 100] from a leg's coverage (Pricing.computeInventorySkew).
+ *  A FIXED law, no per-asset dial: the coverage bounds are hardwired at c ≤ 1/2 → +100 and c ≥ 2 →
+ *  -100, and the ramps between are ASYMMETRIC — slope 200 under the peg, 100 over it — because the
+ *  under-covered side must reach the clamp in half the distance. `Asset.gamma` and
+ *  `RiskConfig.coverageMin/Max`, which used to parameterize this, are deleted on chain. */
+export function computeSkew(res: number, liab: number): number {
   if (liab <= 0) return -100;
   const c = res / liab;
-  const critMin = p.covMin / BPS;
-  const critMax = p.covMax / BPS;
-  if (c <= critMin) return 100;
-  if (c >= critMax) return -100;
-  const under = c < 1;
-  const numer = under ? 1 - c : c - 1;
-  const denom = under ? 1 - critMin : critMax - 1;
-  const s = Math.min((p.gamma / BPS) * 100 * (numer / denom), 100);
+  if (c <= 0.5) return 100;
+  if (c >= 2) return -100;
   // Chain returns int8 from a uint256 integer division: truncate before signing, never after.
-  return under ? Math.trunc(s) : -Math.trunc(s);
+  // `|| 0` normalizes the -0 that negating a truncated-to-zero fill arm produces; int8 has no -0.
+  return c < 1 ? Math.trunc(200 * (1 - c)) : -Math.trunc(100 * (c - 1)) || 0;
 }
 
 /** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing `_calculateDispersion`) */
@@ -449,7 +444,6 @@ function isqrt(n: number): number {
 export interface LegRisk {
   sigma: number; // uint32, PBPS-scaled (1e4 = 1%)
   minFee: number; // PBPS
-  maxFee: number; // PBPS
   confidence?: number; // feed 1σ CI, BPS
   staleExcess?: number; // seconds past the keeper grace
 }
@@ -465,29 +459,6 @@ function staleTerm(staleExcess: number, sigma: number): number {
   return Number((BigInt(STALE_Z) * BigInt(sigma) * BigInt(isqrt(e))) / BigInt(BPS));
 }
 
-/** One leg's contribution to the path CEILING = min(rawLeg_i, maxFee_i) (Pricing.sol `_legCap`).
- *  `rawLeg_i` uses leg i's own σ_i — NOT any attribution of the path quadrature, which does not
- *  decompose per leg and would reinstate the coupling this removes. It carries the PATH vega
- *  max(vega_in, vega_out), so it is not what leg i quotes standalone: standalone would use
- *  max(vega_base, vega_i), and the two differ whenever the endpoint vegas differ.
- *  Sound because it is only ever an upper BOUND: √(Σσ²) ≤ Σσ, so a pinned path costs at most what
- *  its legs cost traded apart.
- *  The cap does NOT bind only when a leg pins. The σ term takes ONE floor on the path side and N
- *  on the per-leg side, and Σ⌊·⌋ ≤ ⌊Σ·⌋, so sum-of-floors can fall below floor-of-sum with every
- *  leg far from its ceiling. The quadrature discount survives up to (N−1) PBPS of floor residual,
- *  not exactly. Witness (N=2, unpinned): σ₁=σ₂=80, vega=1e4, minFee=1 ⇒ rawPath 3, cap 2.
- *  CO-FIX, do not revert in halves: this ceiling and the per-leg staleness SUM move together.
- *  Paired with the old coupled premium they do not cancel and the ceiling lands far below the raw
- *  spread it bounds, silently under-quoting an UNPINNED path (measured 9.89 bp). */
-function legCap(l: LegRisk, sigma: number, vega: number, legStale: number): number {
-  const raw =
-    l.minFee +
-    Math.floor((sigma * vega) / (100 * BPS)) +
-    legStale +
-    (l.confidence ?? 0) * (PBPS / BPS);
-  return Math.min(raw, l.maxFee);
-}
-
 /**
  * Full path spread (fee) in PBPS — mirrors `Pricing._walkLegs` + `_pathSpread` (dex ba76f55,
  * 7aa3a54, 2270594). Risk COMPOSES over legs, it is never a `max`: crossing two legs crosses two
@@ -499,9 +470,11 @@ function legCap(l: LegRisk, sigma: number, vega: number, legStale: number): numb
  * σ_path)`: one keeper feeds both spokes, so an outage staleses them together and the coupled form
  * quoted √2/2 = 70.7% of what two equal legs each owe.
  *
- * The ceiling is `Σ min(rawLeg_i, maxFee_i)`, NOT `Σ maxFee_i`: one leg pinned at its own maxFee
- * must not license charging a healthy leg's full ceiling too, which made a 2-leg quote cost MORE
- * than trading the legs separately and paid a splitter to route around the hub.
+ * THERE IS NO FEE CEILING (Pricing.sol `_pathSpread`, dex f6c26e0): `Asset.maxFeePbps` and the
+ * per-leg `_legCap` that bounded the path by it are deleted. A ceiling is not trader protection —
+ * `minAmountOut` is — and it capped the pool's own defense exactly where it is needed (a stale or
+ * high-CI leg), on an attacker-TIMEABLE clamp. The only bound left is the uint16 saturation of
+ * `SwapQuote.spreadPbps` below, which is a field width, not a policy.
  *
  * `vega` is a PATH CONSTANT the caller reduces: it stays `max(vega_in, vega_out)` over the two
  * ENDPOINTS (a pool per-asset σ-sensitivity dial, not a per-leg risk quantity). Every term floors
@@ -512,34 +485,30 @@ export function pathSpread(legs: LegRisk[], vega: number): number {
   let minFeePath = 0;
   let confPath = 0;
   let staleTermPath = 0;
-  let capPath = 0;
   for (const l of legs) {
     const s = Math.floor(l.sigma); // uint32 on chain — floor before squaring
-    const legStale = staleTerm(l.staleExcess ?? 0, s);
     sigmaSq += s * s;
     minFeePath += l.minFee;
     confPath += l.confidence ?? 0;
-    staleTermPath += legStale;
-    capPath += legCap(l, s, vega, legStale);
+    staleTermPath += staleTerm(l.staleExcess ?? 0, s);
   }
   // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling — the chain clamps rather than wraps.
   const sigmaPath = Math.min(isqrt(sigmaSq), U32_MAX);
   const sVol = minFeePath + Math.floor((sigmaPath * vega) / (100 * BPS));
   const raw = sVol + staleTermPath + confPath * (PBPS / BPS); // bps → PBPS (PBPS/BPS = 100)
-  // Ceiling only (no minFee floor — sVol already carries it), then SATURATE into the uint16
-  // `SwapQuote.spreadPbps`: a sum of per-leg ceilings does not fit uint16, and an unchecked cast
-  // there would wrap a maximally-fenced path down to a near-zero spread.
-  return Math.min(Math.min(raw, capPath), U16_MAX);
+  // SATURATE into the uint16 `SwapQuote.spreadPbps` — the chain's only remaining bound. What
+  // saturates away is a risk PREMIUM, never the interior fence (composed fence ≤ 60306 < 65535).
+  return Math.min(raw, U16_MAX);
 }
 
-/** Single-leg spread — `pathSpread` over the one leg, where every sum is that leg's own value and
- *  the ceiling collapses to its `maxFee`. Direct (base-to-spoke) quotes and the depth chart. */
+/** Single-leg spread — `pathSpread` over the one leg, where every sum is that leg's own value.
+ *  Direct (base-to-spoke) quotes and the depth chart. */
 export function spreadPbps(
   sigma: number,
   p: AimmProfile,
   opts?: { confidence?: number; staleExcess?: number },
 ): number {
-  return pathSpread([{ sigma, minFee: p.minFee, maxFee: p.maxFee, ...opts }], p.vega);
+  return pathSpread([{ sigma, minFee: p.minFee, ...opts }], p.vega);
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
@@ -614,7 +583,7 @@ interface LegKit {
 export function legKit(leg: PoolLeg): LegKit {
   const p = leg.profile;
   const disp = dispersion(leg.sigma, p);
-  const skew = computeSkew(leg.res, leg.liab, p);
+  const skew = computeSkew(leg.res, leg.liab);
   const center = 5000 + skew * 50; // Pricing._skewToDepth
   // Impact denominator is the leg's own reserves, never amplified (Pricing._quoteSell); the zero
   // guard mirrors the chain's `reserves == 0 ? 1 : reserves`, which keeps the traverse divisor > 0.
@@ -909,7 +878,6 @@ export function quoteExactIn(
     involved.map((l) => ({
       sigma: l.sigma,
       minFee: l.profile.minFee,
-      maxFee: l.profile.maxFee,
       confidence: l.confidence,
       staleExcess: l.staleExcess,
     })),
