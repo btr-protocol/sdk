@@ -13,9 +13,11 @@ import {
   sigmaSeed,
 } from './__fixtures__/profiles';
 import {
+  BPS,
   type DepthLevel,
   PBPS,
   type PoolState,
+  type QuarticCurve,
   areaQ,
   buildCurve,
   buildLeg,
@@ -249,14 +251,20 @@ const parityTest = hasVectors
   : (name: string, _fn: () => void) =>
       test.skip(`${name} — SKIPPED: ${VECTORS_PATH} absent (needs a sibling dex checkout)`, () => {});
 
+/** `NUQuartic._centre` shift the WRITE applies but the vectors (uncentred fitter snapshots) do not.
+ *  Truncating `/` mirrors NUQuartic.t.sol's own reference centre; the ≤1-unit gap against the
+ *  library's floor `>>1` sits inside the parity band. */
+const refCentre = (wQ: number[]): bigint => (BigInt(wQ[0]) + BigInt(wQ[wQ.length - 1])) / 2n;
+
 describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/areaQ on-chain)', () => {
   parityTest('evalQ matches every shape family within the on-chain parity band', () => {
     let worst = 0n;
     let worstAt = '';
     for (const [name, v] of Object.entries(vectors)) {
       const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+      const centre = refCentre(v.wQ);
       for (let i = 0; i < v.xs.length; i++) {
-        let d = evalQ(c, v.xs[i]) - BigInt(v.yQ[i]);
+        let d = evalQ(c, v.xs[i]) - (BigInt(v.yQ[i]) - centre);
         if (d < 0n) d = -d;
         if (d > worst) {
           worst = d;
@@ -272,8 +280,10 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
   parityTest('areaQ matches every shape family within the on-chain parity band', () => {
     for (const [name, v] of Object.entries(vectors)) {
       const c = buildCurve(v.interior, v.wQ.map(BigInt), 500);
+      // The centring shift integrates to centre·(x2−x1) over the window (NUQuartic.t.sol).
+      const centre = refCentre(v.wQ);
       for (const a of v.areas) {
-        let d = areaQ(c, a.x1, a.x2) - BigInt(a.aQ);
+        let d = areaQ(c, a.x1, a.x2) - (BigInt(a.aQ) - centre * BigInt(a.x2 - a.x1));
         if (d < 0n) d = -d;
         const mag = a.aQ < 0 ? -a.aQ : a.aQ;
         expect(Number(d)).toBeLessThanOrEqual(mag / 1_000_000 + 100_000_000);
@@ -325,6 +335,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     const badKnot = [...v.interior];
     badKnot[badKnot.length - 1] = 10_000;
     expect(() => buildCurve(badKnot, wQ, 500)).toThrow(); // knot ≥ BPS
+    expect(() => buildCurve(v.interior, wQ, 0)).toThrow(); // dispRef 0 bricks _scaleY
   });
 
   parityTest(
@@ -839,5 +850,58 @@ describe('curveDensity (offset-space liquidity density)', () => {
     const area = trapz(pts);
     expect(area).toBeGreaterThan(0.7);
     expect(area).toBeLessThan(1.3);
+  });
+});
+
+// ── buildCurve mirrors the WRITE, not just the read (NUQuartic._centre) ─────────
+// `set` centres the control polygon before packing, so the level the caller fitted reaches no
+// quote. A read-side mirror that skips it stores a curve the chain would not: off by span/2 on
+// EVERY quote for any wQ that is not already antisymmetric — 27 of the 28 shipped CURVE_PRESETS
+// and every family in quartic_vectors.json.
+// These mirror NUQuartic.t.sol's `test_the_write_centres_the_curve_on_the_mark` and
+// `test_the_centring_is_level_independent_on_an_odd_span`. The SDK-vs-Solidity NUMBER agreement is
+// the parity-vector suite above, which compensates the uncentred reference vectors by exactly the
+// shift the write applies — so dropping the shift here reddens both.
+describe('buildCurve centring (NUQuartic._centre — write-path parity)', () => {
+  // Deliberately NON-antisymmetric monotone polygon, submitted as a pure premium (β=0), with an
+  // ODD rise so the floor-divide residual has a sign to depend on.
+  const INTERIOR = [2000, 4000, 6000, 8000];
+  const premium = [0n, 31n, 147n, 402n, 913n, 1_507n, 1_902n, 2_013n, 2_041n].map(
+    (v) => v * 1_000_000n,
+  );
+  premium[premium.length - 1] += 1n;
+  const RISE = premium[premium.length - 1] - premium[0];
+  const discount = premium.map((v) => v - premium[premium.length - 1]); // β = −1, same shape
+  const y0 = (c: QuarticCurve) => evalQ(c, 0);
+  const span = (c: QuarticCurve) => evalQ(c, BPS) - evalQ(c, 0);
+
+  test('the write centres the curve on the mark: 2·y(0) + span == span & 1', () => {
+    for (const w of [premium, discount]) {
+      const c = buildCurve(INTERIOR, w, 500);
+      expect(span(c)).toBe(RISE); // shape preserved: only the level moved
+      expect(2n * y0(c) + span(c)).toBe(span(c) & 1n);
+    }
+  });
+
+  test('centring is level-independent on an odd span (FLOOR divide, not truncate)', () => {
+    const up = buildCurve(INTERIOR, premium, 500);
+    const dn = buildCurve(INTERIOR, discount, 500);
+    expect(y0(dn)).toBe(y0(up)); // one polygon at two levels ⇒ ONE stored curve
+    expect(dn.segs).toEqual(up.segs);
+    expect(dn.boundaries).toEqual(up.boundaries);
+  });
+
+  test('every shipped preset lands centred once built', () => {
+    for (const p of CURVE_PRESETS) {
+      const c = presetCurve(p);
+      const s = span(c);
+      expect(2n * y0(c) + s).toBe(s & 1n);
+    }
+  });
+
+  test("the caller's wQ is never mutated (Solidity centres its own memory copy)", () => {
+    const w = [...premium];
+    buildCurve(INTERIOR, w, 500);
+    expect(w).toEqual(premium);
   });
 });

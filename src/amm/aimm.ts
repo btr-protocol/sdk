@@ -186,6 +186,7 @@ export function buildCurve(
   dispRef: number,
   flags = 0,
 ): QuarticCurve {
+  if (dispRef === 0) throw new Error('dispRef 0 ⇒ _scaleY divides by zero');
   const n = wQ.length;
   if (n < 5 || n - 4 > MAX_SEGS || interior.length !== n - 5)
     throw new Error('invalid curve input');
@@ -203,6 +204,15 @@ export function buildCurve(
   }
   for (let i = n; i < n + 5; i++) t[i] = BPS;
 
+  // NUQuartic._centre — the write-path transform, applied AFTER validation exactly as `set` does.
+  // Clamped endpoints ⇒ y(0)=wQ[0], y(BPS)=wQ[n−1], so one subtraction pins y(0)+y(BPS) == span&1
+  // (β ≡ −1/2). BigInt `>>` is an arithmetic (FLOOR) shift, matching `sar`, NOT truncate-toward-zero:
+  // truncating makes the residual sign-dependent and `rangeQ`'s re-derivation rejects odd spans.
+  // Shape-preserving and idempotent, so the fitted density is untouched. Never mutates the caller's
+  // array — Solidity centres its own memory copy.
+  const shift = (wQ[0] + wQ[n - 1]) >> 1n;
+  const wC = shift === 0n ? wQ : wQ.map((v) => v - shift);
+
   const m = n - 4;
   const boundaries: number[] = [];
   for (let j = 1; j <= m; j++) boundaries.push(t[j + 4]);
@@ -211,7 +221,7 @@ export function buildCurve(
   const segs: QuarticSeg[] = [];
   let S = 0n;
   for (let j = 0; j < m; j++) {
-    const k = segCoeffs(t, wQ, j + 4);
+    const k = segCoeffs(t, wC, j + 4);
     for (const v of k) if (v > LIM || v < -LIM) throw new Error('coefficient overflow');
     if (S > I128_MAX || S < -I128_MAX - 1n) throw new Error('prefix-integral overflow');
     segs.push({ c0: k[0], c1: k[1], c2: k[2], c3: k[3], c4: k[4], S });
