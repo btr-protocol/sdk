@@ -138,18 +138,7 @@ async function quoteBtr(
     amountIn,
     amountOut: q.amountOut,
     calldata: encodeFn({
-      abi: [{
-        type: 'function', name: 'swap', stateMutability: 'nonpayable',
-        inputs: [
-          { name: 'tokenIn', type: 'address' },
-          { name: 'tokenOut', type: 'address' },
-          { name: 'amountIn', type: 'uint256' },
-          { name: 'minAmountOut', type: 'uint256' },
-          { name: 'recipient', type: 'address' },
-          { name: 'deadline', type: 'uint256' },
-        ],
-        outputs: [],
-      }],
+      abi: POOL_ABI,
       functionName: 'swap',
       args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
     }),
