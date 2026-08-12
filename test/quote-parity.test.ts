@@ -110,7 +110,11 @@ async function buildState(
     const dec = Number(asset.decimals);
     if (!(Number(asset.liabilities) > 0)) continue;
     const presetId = Number(asset.presetId);
+    // A listed leg always carries a preset (`PoolAdmin.validatePresetAssign`) and there is no
+    // curve-less pricing law, so a missing curve is a broken read, not a quoting mode: skip the
+    // symbol rather than compare against a fallback that does not exist on either side.
     const curve = presetId > 0 ? await readCurve(p, pool, presetId) : null;
+    if (!curve) continue;
     let mark = Number(decodeB64(BigInt(row.lastPriceB64 ?? 0n), 18)) / 1e18;
     if (USD_QUOTED.has(sym)) {
       if (!(baseUsd > 0)) continue; // fail closed, as the front does
@@ -119,10 +123,8 @@ async function buildState(
     if (!(mark > 0)) continue;
     const profile: AimmProfile = {
       vega: Number(asset.vega),
-      lambda: 0,
       minFee: Number(asset.minFeePbps),
       minDisp: Number(asset.minDispersion),
-      maxDisp: Number(asset.maxDispersion),
       protoShare: 0,
       curve,
     };

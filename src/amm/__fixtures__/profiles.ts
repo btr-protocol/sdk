@@ -85,7 +85,6 @@ export const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
 
 const RISK = {
   vega: 10_000,
-  lambda: 10_000,
   protoShare: 20,
 };
 
@@ -94,22 +93,21 @@ export const STABLE_PROFILE: AimmProfile = {
   ...RISK,
   minFee: 10,
   minDisp: 500,
-  maxDisp: 5_000,
   curve: BOOTSTRAP_STABLE_CURVE,
 };
 
-// Volatile: generic preset-1 curve at the WIDEST band the preset actually admits. The ceiling is
-// the curve's own `Pricing.dispersionCap` (floor(SWING_CAP·dispRef·Q / span) = 10_000 here), which
-// `PoolAdmin.sanitizeDispersion` BINDS the band to at the write — so it is derived, never picked.
-// The old 50_000/500_000 pair reverted `BadConfig` on install: every test that used it validated a
-// pool configuration that cannot exist on chain. Effective edge = (span/2)·disp/(dispRef·Q):
-// ±0.1% at the floor, ±0.5% at the cap (= INTERIOR_SWING_CAP_PBPS/2, by construction).
+// Volatile: generic preset-1 curve at a floor DERIVED from the preset, never picked. The only
+// configurable endpoint left is `minDispersion`, and `PoolAdmin.sanitizeDispersion` CHECKS it
+// against the curve's own `Pricing.dispersionCap` (floor(SWING_CAP·dispRef·Q / span) = 10_000
+// here) — a floor above the cap reverts `BadConfig` at the write. The old 50_000 floor did exactly
+// that: every test that used it validated a pool configuration that cannot exist on chain.
+// Effective edge = (span/2)·disp/(dispRef·Q): ±0.1% at this floor, ±0.5% at the cap
+// (= INTERIOR_SWING_CAP_PBPS/2, by construction).
 const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
   minFee: 1_000,
   minDisp: VOL_CAP / 5,
-  maxDisp: VOL_CAP,
   curve: BOOTSTRAP_VOLATILE_CURVE,
 };
 

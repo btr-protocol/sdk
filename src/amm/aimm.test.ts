@@ -138,10 +138,14 @@ describe('model primitives (Pricing.sol mirrors)', () => {
     // Chain guard: `reserves == 0 ? 1 : reserves` keeps the traverse divisor non-zero.
     expect(legKit(buildLeg('TKN', 1, 0, 0, 1000, 5000, 18, VOLATILE_PROFILE)).depth).toBe(1);
   });
-  test('dispersion / spread clamp to profile bounds', () => {
+  test('dispersion floors at the profile, ceilings at the PROTOCOL constant', () => {
     expect(dispersion(sigmaSeed('stable'), STABLE_PROFILE)).toBeGreaterThanOrEqual(
       STABLE_PROFILE.minDisp,
     );
+    // `Asset.maxDispersion` is deleted (dex e2e87a7): the σ ramp runs to the protocol ceiling and
+    // stops there, so a saturating σ must land on MAX_DISPERSION_PBPS exactly — not on any
+    // per-asset dial, which is what a reintroduced field would make this return instead.
+    expect(dispersion(1e12, VOLATILE_PROFILE)).toBe(MAX_DISPERSION_PBPS);
     expect(spreadPbps(0, STABLE_PROFILE)).toBe(STABLE_PROFILE.minFee); // σ=0 → floor
     // No upper bound but the uint16 field width: the old `maxFee` ceiling (10_000 here) is deleted,
     // so a huge σ runs all the way to saturation instead of stopping at a per-asset dial.
@@ -742,43 +746,28 @@ describe('compose + degenerate', () => {
   });
 });
 
-describe('fallback quote (presetId 0 — skew-anchored linear impact)', () => {
-  const noCurve = { ...VOLATILE_PROFILE, curve: null };
-  test('quotes stay live without a preset; impact grows with size', () => {
-    const leg = buildLeg(
-      'BTCB',
-      62_000,
-      sigmaSeed('volatile'),
-      9.4,
-      9.4,
-      9.4 * 62_000,
-      18,
-      noCurve,
-    );
-    const state: PoolState = { base: BASE, legs: { BTCB: leg } };
-    const small = quoteExactIn(state, 'BTCB', BASE, 0.1);
-    const large = quoteExactIn(state, 'BTCB', BASE, 3);
-    expect(small.amountOut).toBeGreaterThan(0);
-    expect(large.amountOut).toBeGreaterThan(0);
-    // avg fill degrades with size (selling: mid·(1 − impact/2))
-    expect(large.grossOut / 3).toBeLessThan(small.grossOut / 0.1);
-    // size-0 mid = skewToPrice(mark, skew=0) = mark at c=1
-    expect(small.midPrice).toBeCloseTo(62_000, 6);
+// Inverted from the old `fallback quote (presetId 0 — skew-anchored linear impact)` block, which
+// asserted a curve-less leg still quoted. That was a SECOND pricing law (skew-anchored linear
+// impact) mirroring one the chain deleted: `Pricing._traverseCurveByVolume` now documents "there is
+// no empty-curve fallback", and `PoolAdmin.validatePresetAssign` refuses to list an asset without a
+// curve, so presetId 0 is unconstructible. The behaviour it tested is genuinely gone, so what is
+// pinned instead is its ABSENCE: a curve-less profile must not produce a number.
+describe('there is exactly ONE pricing law (no empty-curve fallback)', () => {
+  // `AimmProfile.curve` is non-nullable, so this is the shape only a stale caller can build.
+  const noCurve = { ...VOLATILE_PROFILE, curve: null } as unknown as typeof VOLATILE_PROFILE;
+  const noCurveLeg = () =>
+    buildLeg('BTCB', 62_000, sigmaSeed('volatile'), 9.4, 9.4, 9.4 * 62_000, 18, noCurve);
+
+  test('a curve-less leg FAILS instead of quoting a second, nonexistent law', () => {
+    expect(() => legKit(noCurveLeg())).toThrow();
+    const state: PoolState = { base: BASE, legs: { BTCB: noCurveLeg() } };
+    expect(() => quoteExactIn(state, 'BTCB', BASE, 0.1)).toThrow();
   });
-  test('depth chart still renders off the fallback marginal', () => {
-    const leg = buildLeg(
-      'BTCB',
-      62_000,
-      sigmaSeed('volatile'),
-      9.4,
-      9.4,
-      9.4 * 62_000,
-      18,
-      noCurve,
-    );
-    const d = virtualMarketDepth({ base: BASE, legs: { BTCB: leg } }, 'BTCB');
-    expect(d.asks.length).toBeGreaterThan(0);
-    expect(d.bids.length).toBeGreaterThan(0);
+
+  test('the depth chart fails closed too — no fallback marginal to render', () => {
+    expect(() =>
+      virtualMarketDepth({ base: BASE, legs: { BTCB: noCurveLeg() } }, 'BTCB'),
+    ).toThrow();
   });
 });
 
@@ -921,16 +910,13 @@ describe('fixture profiles satisfy the on-chain admissibility rules', () => {
     ['VOLATILE_PROFILE', VOLATILE_PROFILE],
   ];
 
-  test('PoolAdmin.sanitizeDispersion accepts the band AND leaves it untouched', () => {
+  test('PoolAdmin.sanitizeDispersion accepts the floor AND leaves it untouched', () => {
     for (const [name, p] of SHIPPED) {
       expect(p.curve, name).not.toBeNull();
       const cap = dispersionCap(p.curve as QuarticCurve);
-      // Not merely "does not revert": a silently CLAMPED max means the fixture's quotes are not the
-      // quotes the installed asset would produce.
-      expect(sanitizeDispersion(p.minDisp, p.maxDisp, cap), name).toEqual({
-        mn: p.minDisp,
-        mx: p.maxDisp,
-      });
+      // Not merely "does not revert": a silently NARROWED floor means the fixture's quotes are not
+      // the quotes the installed asset would produce. The chain checks and reverts, never clamps.
+      expect(sanitizeDispersion(p.minDisp, cap), name).toBe(p.minDisp);
     }
   });
 
@@ -948,8 +934,8 @@ describe('fixture profiles satisfy the on-chain admissibility rules', () => {
   test('cap+1 is NOT admissible — the cap is the exact largest quotable dispersion', () => {
     for (const [name, p] of SHIPPED) {
       const cap = dispersionCap(p.curve as QuarticCurve);
-      expect(sanitizeDispersion(cap, cap, cap), name).toEqual({ mn: cap, mx: cap });
-      expect(() => sanitizeDispersion(cap + 1, cap + 1, cap)).toThrow();
+      expect(sanitizeDispersion(cap, cap), name).toBe(cap);
+      expect(() => sanitizeDispersion(cap + 1, cap)).toThrow();
     }
   });
 

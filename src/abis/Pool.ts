@@ -212,11 +212,6 @@ export const POOL_ABI = [
             internalType: 'uint32',
           },
           {
-            name: 'maxDispersion',
-            type: 'uint32',
-            internalType: 'uint32',
-          },
-          {
             name: 'presetId',
             type: 'uint16',
             internalType: 'uint16',
