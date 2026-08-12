@@ -13,8 +13,10 @@ import {
   sigmaSeed,
 } from './__fixtures__/profiles';
 import {
+  type AimmProfile,
   BPS,
   type DepthLevel,
+  MAX_DISPERSION_PBPS,
   PBPS,
   type PoolState,
   type QuarticCurve,
@@ -27,10 +29,12 @@ import {
   curveDensity,
   depthCurve,
   dispersion,
+  dispersionCap,
   evalQ,
   legKit,
   pathSpread,
   quoteExactIn,
+  sanitizeDispersion,
   spreadPbps,
   virtualMarketDepth,
 } from './aimm';
@@ -903,5 +907,56 @@ describe('buildCurve centring (NUQuartic._centre — write-path parity)', () => 
     const w = [...premium];
     buildCurve(INTERIOR, w, 500);
     expect(w).toEqual(premium);
+  });
+});
+
+// ── Every shipped fixture must be INSTALLABLE on chain ─────────────────────────
+// A fixture the pool would reject validates nothing: `VOLATILE_PROFILE` carried minDisp 50_000
+// against a `dispersionCap` of 10_000 and `PoolAdmin.sanitizeDispersion` reverts `BadConfig` on it.
+// Bounds are DERIVED from the preset's cap (profiles.ts), and this pins that they stay derived.
+describe('fixture profiles satisfy the on-chain admissibility rules', () => {
+  const SHIPPED: [string, AimmProfile][] = [
+    ['STABLE_PROFILE', STABLE_PROFILE],
+    ['VOLATILE_PROFILE', VOLATILE_PROFILE],
+  ];
+
+  test('PoolAdmin.sanitizeDispersion accepts the band AND leaves it untouched', () => {
+    for (const [name, p] of SHIPPED) {
+      expect(p.curve, name).not.toBeNull();
+      const cap = dispersionCap(p.curve as QuarticCurve);
+      // Not merely "does not revert": a silently CLAMPED max means the fixture's quotes are not the
+      // quotes the installed asset would produce.
+      expect(sanitizeDispersion(p.minDisp, p.maxDisp, cap), name).toEqual({
+        mn: p.minDisp,
+        mx: p.maxDisp,
+      });
+    }
+  });
+
+  test('PoolAdmin.requireGammaWithinBand accepts γ against the coverage band', () => {
+    for (const [name, p] of SHIPPED) {
+      expect(p.covMin, name).toBeLessThan(BPS);
+      expect(p.covMax, name).toBeGreaterThan(BPS);
+      const drain = 2 * (BPS - p.covMin);
+      const fill = Math.floor((2 * (p.covMax - BPS) * BPS) / p.covMax);
+      expect(p.gamma, name).toBeGreaterThan(0);
+      expect(p.gamma, name).toBeLessThanOrEqual(Math.min(drain, fill));
+    }
+  });
+
+  test('cap+1 is NOT admissible — the cap is the exact largest quotable dispersion', () => {
+    for (const [name, p] of SHIPPED) {
+      const cap = dispersionCap(p.curve as QuarticCurve);
+      expect(sanitizeDispersion(cap, cap, cap), name).toEqual({ mn: cap, mx: cap });
+      expect(() => sanitizeDispersion(cap + 1, cap + 1, cap)).toThrow();
+    }
+  });
+
+  test('every preset curve exposes a cap a band can be bound to', () => {
+    for (const p of CURVE_PRESETS) {
+      const cap = dispersionCap(presetCurve(p));
+      expect(cap).toBeGreaterThan(0);
+      expect(cap).toBeLessThanOrEqual(MAX_DISPERSION_PBPS);
+    }
   });
 });
