@@ -228,8 +228,13 @@ const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowe
 const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
 
-/** Opt-out sentinel for the trailing `deadline` param (type(uint256).max = no expiry). */
-export const NO_DEADLINE: bigint = 2n ** 256n - 1n;
+/** Opt-out sentinel for the trailing `deadline` param. `beforeDeadline` is a bare
+ *  `block.timestamp > deadline` compare, so any far-future value opts out; uint32-max is the
+ *  cheapest one. type(uint256).max is 32 nonzero calldata bytes (512 gas), this is 4 nonzero +
+ *  28 zero (176 gas) — same semantics, 336 gas less. Pool.sol natspec still says
+ *  type(uint256).max; that is descriptive, not enforced.
+ *  ponytail: expires 2106-02-07, widen to uint40 if anything is still running. */
+export const NO_DEADLINE: bigint = 0xffffffffn;
 /** Default tx validity window (seconds) when no deadline is supplied. */
 export const DEFAULT_DEADLINE_S = 600;
 /** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now. */
