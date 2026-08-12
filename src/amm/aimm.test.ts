@@ -110,10 +110,19 @@ function integrateLadder(levels: DepthLevel[], S: number): number {
 }
 
 describe('model primitives (Pricing.sol mirrors)', () => {
-  test('computeSkew symmetric around c=1; clamps at coverage bounds', () => {
-    expect(computeSkew(1, 1, VOLATILE_PROFILE)).toBeCloseTo(0, 9);
-    expect(computeSkew(0.4, 1, VOLATILE_PROFILE)).toBe(100); // c ≤ covMin
-    expect(computeSkew(3, 1, VOLATILE_PROFILE)).toBe(-100); // c ≥ covMax
+  // The law is FIXED (dex f6c26e0): γ / coverageMin / coverageMax are deleted, the band [1/2, 2]
+  // is folded in as constants, and the two arms are DELIBERATELY asymmetric — 200·(1−c) draining,
+  // 100·(c−1) filling. A "tidied" symmetric 200 on the fill arm refunds more on the return leg of
+  // a round trip than the outbound charged (Pricing.sol, ImpactConservation.t.sol).
+  test('computeSkew is the fixed piecewise law, asymmetric arms, clamped at ±100', () => {
+    expect(computeSkew(1, 1)).toBe(0);
+    expect(computeSkew(0.5, 1)).toBe(100); // c ≤ 1/2 clamps
+    expect(computeSkew(0.4, 1)).toBe(100);
+    expect(computeSkew(2, 1)).toBe(-100); // c ≥ 2 clamps
+    expect(computeSkew(3, 1)).toBe(-100);
+    expect(computeSkew(0.75, 1)).toBe(50); // ⌊200·(1−0.75)⌋
+    expect(computeSkew(1.5, 1)).toBe(-50); // −⌊100·(1.5−1)⌋ — NOT −100
+    expect(computeSkew(1, 0)).toBe(-100); // no liabilities
   });
   // Regression guard: `depthAmplifier`/`calculateDepth` were deleted from Pricing.sol, so the
   // traverse denominator is the leg's RAW reserves at every coverage. An under-covered leg is the
@@ -134,38 +143,34 @@ describe('model primitives (Pricing.sol mirrors)', () => {
       STABLE_PROFILE.minDisp,
     );
     expect(spreadPbps(0, STABLE_PROFILE)).toBe(STABLE_PROFILE.minFee); // σ=0 → floor
-    expect(spreadPbps(1e9, VOLATILE_PROFILE)).toBe(VOLATILE_PROFILE.maxFee); // saturate
+    // No upper bound but the uint16 field width: the old `maxFee` ceiling (10_000 here) is deleted,
+    // so a huge σ runs all the way to saturation instead of stopping at a per-asset dial.
+    expect(spreadPbps(1e9, VOLATILE_PROFILE)).toBe(65_535);
   });
 });
 
-// ── Path risk composition (Pricing._walkLegs / _pathSpread / _legCap) ──────────
-// dex ba76f55 (compose, don't max) + 7aa3a54 (per-leg fee ceiling) + 2270594 (per-leg
-// staleness premium). Chain formula, every division floored:
+// ── Path risk composition (Pricing._walkLegs / _pathSpread) ───────────────────
+// dex ba76f55 (compose, don't max) + 2270594 (per-leg staleness premium) + f6c26e0 (fee ceiling
+// DELETED). Chain formula, every division floored:
 //   raw = Σ minFee_i + ⌊√(Σσ_i²)·vega / 1e6⌋ + Σ staleTerm_i + Σ conf_i·100
-//   cap = Σ min( minFee_i + ⌊σ_i·vega / 1e6⌋ + staleTerm_i + conf_i·100 , maxFee_i )
-//   spread = sat_uint16( min(raw, cap) ),  staleTerm_i = ⌊100·σ_i·⌊√excess_i⌋ / 1e4⌋
+//   spread = sat_uint16(raw),  staleTerm_i = ⌊100·σ_i·⌊√excess_i⌋ / 1e4⌋
 describe('path risk composes over legs, never maxes', () => {
-  const leg = (sigma: number, minFee: number, maxFee: number, confidence = 0, staleExcess = 0) => ({
+  const leg = (sigma: number, minFee: number, confidence = 0, staleExcess = 0) => ({
     sigma,
     minFee,
-    maxFee,
     confidence,
     staleExcess,
   });
 
   test('fees, CI and the staleness premium SUM; σ composes in quadrature', () => {
-    // sepolia stable pool, vega 10000. USDG(σ 30000, minFee 496, maxFee 5000, CI 2, age 30) and
-    // PYUSD(σ 40000, minFee 226, maxFee 3000, CI 5, age 90).
+    // sepolia stable pool, vega 10000. USDG(σ 30000, minFee 496, CI 2, age 30) and
+    // PYUSD(σ 40000, minFee 226, CI 5, age 90).
     //   staleTerm = ⌊100·30000·⌊√30⌋=5 / 1e4⌋ = 1500,  ⌊100·40000·⌊√90⌋=9 / 1e4⌋ = 3600  ⇒ 5100
     //   σ_path    = ⌊√(30000² + 40000²)⌋ = ⌊√2_500_000_000⌋ = 50000 exactly
     //   raw       = (496+226) + ⌊50000·10000/1e6⌋=500 + 5100 + 7·100=700           = 7022
-    //   rawLeg    = 496+300+1500+200 = 2496 → min(·,5000) = 2496
-    //               226+400+3600+500 = 4726 → min(·,3000) = 3000   ← PYUSD pins
-    //   cap       = 5496  ⇒ spread = min(7022, 5496) = 5496
-    // The SDK used to quote 496 here (max reduction, no CI/stale composition).
-    expect(
-      pathSpread([leg(30_000, 496, 5_000, 2, 30), leg(40_000, 226, 3_000, 5, 90)], 10_000),
-    ).toBe(5_496);
+    // The SDK used to quote 496 here (max reduction, no CI/stale composition), then 5496 while it
+    // mirrored the `maxFee` ceiling — 15.26 bp under the chain, on a path this stale.
+    expect(pathSpread([leg(30_000, 496, 2, 30), leg(40_000, 226, 5, 90)], 10_000)).toBe(7_022);
   });
 
   test('σ quadrature uses a FLOOR sqrt (Solady), not a float one', () => {
@@ -173,26 +178,25 @@ describe('path risk composes over legs, never maxes', () => {
     // At vega = 65535 (uint16 max) the two sqrts land on different sides of a floor:
     //   floor: ⌊70710·65535 / 1e6⌋     = ⌊4_633_979_850 / 1e6⌋ = ⌊4633.97985⌋ = 4633
     //   float: ⌊70710.678…·65535 / 1e6⌋ = ⌊4634.02428⌋                        = 4634
-    //   cap = 2·min(⌊50000·65535/1e6⌋ = 3276, 1e6) = 6552, so raw binds.
-    expect(pathSpread([leg(50_000, 0, 1e6), leg(50_000, 0, 1e6)], 65_535)).toBe(4_633);
+    expect(pathSpread([leg(50_000, 0), leg(50_000, 0)], 65_535)).toBe(4_633);
   });
 
-  test('the ceiling clamps PER LEG, so one pinned leg cannot license the other', () => {
-    // AAA pins on CI (maxFee 1000); BBB is healthy. vega 0, σ 0.
-    //   rawLeg = 100 + 0 + 0 + 500·100=50000 = 50100 → min(·,1000) = 1000   ← pinned
-    //            100 + 0 + 0 + 0             = 100   → min(·,10000) = 100
-    //   cap = 1100;  raw = (100+100) + 0 + 0 + 50000 = 50200  ⇒ 1100
-    // `min(raw, Σ maxFee_i)` gave 11000 — the healthy leg charged a ceiling it never earned,
-    // which made the composite dearer than trading the two legs apart.
-    expect(pathSpread([leg(0, 100, 1_000, 500), leg(0, 100, 10_000)], 0)).toBe(1_100);
+  // Inverted from the old `the ceiling clamps PER LEG` case: there is NO ceiling now (dex f6c26e0),
+  // so the property to pin is that a wide-CI leg's premium is charged IN FULL. A ceiling capped the
+  // pool's defense exactly on the tape where it was owed, and every clamp was attacker-TIMEABLE.
+  test('a high-CI leg is charged in full — no per-leg or path ceiling caps it', () => {
+    // AAA has CI 500 bps; BBB is healthy. vega 0, σ 0.
+    //   raw = (100+100) + 0 + 0 + 500·100=50000 = 50200, under the uint16 field width ⇒ 50200
+    // The per-leg ceiling read 1100 here and the older Σ maxFee_i read 11000.
+    expect(pathSpread([leg(0, 100, 500), leg(0, 100)], 0)).toBe(50_200);
   });
 
   test('the staleness premium is per leg, not _staleTerm(max age, σ_path)', () => {
     // One keeper feeds both spokes, so an outage staleses them together: σ 10000, excess 100 each.
-    //   per leg: ⌊100·10000·⌊√100⌋=10 / 1e4⌋ = 1000  ⇒ Σ = 2000  (raw = cap = 2000)
+    //   per leg: ⌊100·10000·⌊√100⌋=10 / 1e4⌋ = 1000  ⇒ Σ = 2000
     //   coupled: σ_path = ⌊√(2·10000²)⌋ = ⌊√200_000_000⌋ = 14142
     //            ⌊100·14142·10 / 1e4⌋ = 1414 = 70.7% of 2000 — the √2/2 shortfall exactly.
-    expect(pathSpread([leg(10_000, 0, 1e6, 0, 100), leg(10_000, 0, 1e6, 0, 100)], 0)).toBe(2_000);
+    expect(pathSpread([leg(10_000, 0, 0, 100), leg(10_000, 0, 0, 100)], 0)).toBe(2_000);
   });
 
   test('every spread term floors SEPARATELY, as the chain computes it', () => {
@@ -200,24 +204,22 @@ describe('path risk composes over legs, never maxes', () => {
     //   sVol      = 722 + ⌊150070·9999 / 1e6⌋ = 722 + ⌊1500.54993⌋ = 2222
     //   staleTerm = ⌊100·150070·7 / 1e4⌋      = ⌊10504.9⌋          = 10504
     //   conf      = 7·(1e6/1e4)                                    = 700
-    //   raw = cap = 13426, under maxFee 40000 ⇒ 13426
+    //   raw = 13426
     // Flooring only the SUM (and a float sqrt) reads 13534 — 1.08 bp wide.
-    const p = { ...STABLE_PROFILE, vega: 9_999, minFee: 722, maxFee: 40_000 };
+    const p = { ...STABLE_PROFILE, vega: 9_999, minFee: 722 };
     expect(spreadPbps(150_070, p, { confidence: 7, staleExcess: 50 })).toBe(13_426);
   });
 
   test('the uint16 narrowing saturates, it does not wrap', () => {
-    // Both legs pin: cap = 2·min(40000, 40000) = 80000 > uint16 ⇒ saturates to 65535.
-    expect(pathSpread([leg(0, 40_000, 40_000), leg(0, 40_000, 40_000)], 0)).toBe(65_535);
-    const p = { ...STABLE_PROFILE, minFee: 80_000, maxFee: 80_000 };
+    // Σ minFee_i = 80000 > uint16 ⇒ saturates to 65535, never wraps to 14464.
+    expect(pathSpread([leg(0, 40_000), leg(0, 40_000)], 0)).toBe(65_535);
+    const p = { ...STABLE_PROFILE, minFee: 80_000 };
     expect(spreadPbps(1_000_000, p)).toBe(65_535);
   });
 
   test('quoteExactIn charges both legs of a cross, one leg of a direct', () => {
-    // Both legs VOLATILE_PROFILE: minFee 1000, maxFee 10000, vega 10000, σ 50000, fresh.
+    // Both legs VOLATILE_PROFILE: minFee 1000, vega 10000, σ 50000, fresh.
     //   cross:  raw = 2000 + ⌊70710·10000/1e6⌋ = 2000 + 707  = 2707 PBPS
-    //           cap = 2·min(1000 + 500, 10000) = 3000 — unpinned, so the quadrature
-    //           discount survives the ceiling untouched (2707 < 3000).
     //   direct: raw = 1000 + ⌊50000·10000/1e6⌋ = 1000 + 500  = 1500 PBPS
     // Under the old max reduction the cross also quoted 1500 — a whole leg's fence free.
     expect(quoteExactIn(crossState(), 'BTCB', 'ETH', 0.01).spreadBps).toBeCloseTo(27.07, 12);
@@ -469,7 +471,6 @@ describe('skew book + separately disclosed cost: touch, toll asymmetry, reserve 
           profile: {
             ...state.legs[tok]!.profile,
             minFee: state.legs[tok]!.profile.minFee * 10,
-            maxFee: state.legs[tok]!.profile.maxFee * 10, // else the ceiling clamps the widening
           },
         },
       },
@@ -933,14 +934,14 @@ describe('fixture profiles satisfy the on-chain admissibility rules', () => {
     }
   });
 
-  test('PoolAdmin.requireGammaWithinBand accepts γ against the coverage band', () => {
-    for (const [name, p] of SHIPPED) {
-      expect(p.covMin, name).toBeLessThan(BPS);
-      expect(p.covMax, name).toBeGreaterThan(BPS);
-      const drain = 2 * (BPS - p.covMin);
-      const fill = Math.floor((2 * (p.covMax - BPS) * BPS) / p.covMax);
-      expect(p.gamma, name).toBeGreaterThan(0);
-      expect(p.gamma, name).toBeLessThanOrEqual(Math.min(drain, fill));
+  // Replaces the old `requireGammaWithinBand` case: γ / coverageMin / coverageMax are deleted on
+  // chain and the validator with them, so there is no per-asset write left to check. The bound that
+  // validator existed to enforce (PRC-03 round-trip conservation) is now folded into the two fixed
+  // arm slopes, so pin THAT instead — it is the property an asset config could no longer violate
+  // but a "tidy the arms into one 200·(1−c)" edit still can.
+  test('the fill arm never refunds more than the drain arm charged (PRC-03)', () => {
+    for (let d = 0.01; d < 0.5; d += 0.01) {
+      expect(Math.abs(computeSkew(1 + d, 1))).toBeLessThanOrEqual(computeSkew(1 - d, 1));
     }
   });
 

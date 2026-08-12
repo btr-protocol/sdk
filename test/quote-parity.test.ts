@@ -118,15 +118,11 @@ async function buildState(
     }
     if (!(mark > 0)) continue;
     const profile: AimmProfile = {
-      gamma: Number(asset.gamma),
       vega: Number(asset.vega),
       lambda: 0,
       minFee: Number(asset.minFeePbps),
-      maxFee: Number(asset.maxFeePbps),
       minDisp: Number(asset.minDispersion),
       maxDisp: Number(asset.maxDispersion),
-      covMin: risk.coverageMin,
-      covMax: risk.coverageMax,
       protoShare: 0,
       curve,
     };
