@@ -184,16 +184,6 @@ export const POOL_AUX_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'coverageMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'flags',
             type: 'uint16',
             internalType: 'uint16',
@@ -216,24 +206,9 @@ export const POOL_AUX_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'decimals',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-      {
         name: 'minDispersion',
         type: 'uint32',
         internalType: 'uint32',
-      },
-      {
-        name: 'maxDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'gamma',
-        type: 'uint16',
-        internalType: 'uint16',
       },
       {
         name: 'vega',
@@ -241,7 +216,13 @@ export const POOL_AUX_ABI = [
         internalType: 'uint16',
       },
     ],
-    outputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
     stateMutability: 'nonpayable',
   },
   {
@@ -343,16 +324,6 @@ export const POOL_AUX_ABI = [
       },
       {
         name: 'minFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'maxFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'gamma',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -574,16 +545,6 @@ export const POOL_AUX_ABI = [
         type: 'tuple',
         internalType: 'struct IPool.RiskConfig',
         components: [
-          {
-            name: 'coverageMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
           {
             name: 'flags',
             type: 'uint16',

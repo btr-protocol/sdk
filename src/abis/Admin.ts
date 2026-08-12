@@ -93,16 +93,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'coverageMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'flags',
             type: 'uint16',
             internalType: 'uint16',
@@ -125,24 +115,9 @@ export const ADMIN_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'decimals',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-      {
         name: 'minDispersion',
         type: 'uint32',
         internalType: 'uint32',
-      },
-      {
-        name: 'maxDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'gamma',
-        type: 'uint16',
-        internalType: 'uint16',
       },
       {
         name: 'vega',
@@ -560,16 +535,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'coverageMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'flags',
             type: 'uint16',
             internalType: 'uint16',
@@ -592,24 +557,9 @@ export const ADMIN_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'decimals',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-      {
         name: 'minDispersion',
         type: 'uint32',
         internalType: 'uint32',
-      },
-      {
-        name: 'maxDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'gamma',
-        type: 'uint16',
-        internalType: 'uint16',
       },
       {
         name: 'vega',
@@ -930,16 +880,6 @@ export const ADMIN_ABI = [
         internalType: 'struct IPool.RiskConfig',
         components: [
           {
-            name: 'coverageMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'coverageMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
             name: 'flags',
             type: 'uint16',
             internalType: 'uint16',
@@ -978,21 +918,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'minFeeHardMax',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'maxFeeHardMax',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'gammaHardMin',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'gammaHardMax',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -1057,16 +982,6 @@ export const ADMIN_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'maxFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'gamma',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
         name: 'vega',
         type: 'uint16',
         internalType: 'uint16',
@@ -1101,16 +1016,6 @@ export const ADMIN_ABI = [
       },
       {
         name: 'minFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'maxFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'gamma',
         type: 'uint16',
         internalType: 'uint16',
       },
@@ -1210,21 +1115,6 @@ export const ADMIN_ABI = [
           },
           {
             name: 'minFeeHardMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'maxFeeHardMax',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'gammaHardMin',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'gammaHardMax',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -1412,7 +1302,7 @@ export const ADMIN_ABI = [
         internalType: 'uint16',
       },
       {
-        name: 'gamma',
+        name: 'vega',
         type: 'uint16',
         indexed: false,
         internalType: 'uint16',
