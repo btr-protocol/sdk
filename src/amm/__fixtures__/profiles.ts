@@ -14,7 +14,7 @@
 // dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps) — same ratio the
 // bootstrap curves below use (edge 500 → dispRef 1000, edge 50 → dispRef 100).
 
-import { type AimmProfile, type QuarticCurve, buildCurve } from '../aimm';
+import { type AimmProfile, type QuarticCurve, buildCurve, dispersionCap } from '../aimm';
 import type { SplineGrid } from './grid';
 import GRID_SLICE from './spline_grid.json';
 
@@ -102,13 +102,19 @@ export const STABLE_PROFILE: AimmProfile = {
   curve: BOOTSTRAP_STABLE_CURVE,
 };
 
-/** Volatile: generic preset-1 curve + wider band (minDisp 50_000 → ±2.5% effective edge). */
+// Volatile: generic preset-1 curve at the WIDEST band the preset actually admits. The ceiling is
+// the curve's own `Pricing.dispersionCap` (floor(SWING_CAP·dispRef·Q / span) = 10_000 here), which
+// `PoolAdmin.sanitizeDispersion` BINDS the band to at the write — so it is derived, never picked.
+// The old 50_000/500_000 pair reverted `BadConfig` on install: every test that used it validated a
+// pool configuration that cannot exist on chain. Effective edge = (span/2)·disp/(dispRef·Q):
+// ±0.1% at the floor, ±0.5% at the cap (= INTERIOR_SWING_CAP_PBPS/2, by construction).
+const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
   minFee: 1_000,
   maxFee: 10_000,
-  minDisp: 50_000,
-  maxDisp: 500_000,
+  minDisp: VOL_CAP / 5,
+  maxDisp: VOL_CAP,
   curve: BOOTSTRAP_VOLATILE_CURVE,
 };
 

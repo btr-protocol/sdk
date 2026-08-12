@@ -234,6 +234,43 @@ export function buildCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
+// ── Dispersion admissibility (the on-chain write-path rules) ───────────────────
+// A profile is only DEPLOYABLE if `PoolAdmin.sanitizeDispersion` accepts its band against the
+// preset's `Pricing.dispersionCap`. Mirroring both here is what lets an off-chain config (or a
+// test fixture) be rejected before it reaches a reverting `setProfile`.
+
+/** Pricing.INTERIOR_SWING_CAP_PBPS — the interior mid swing the fence can bound (fail-closed). */
+export const INTERIOR_SWING_CAP_PBPS = 10_000;
+/** PoolAdmin.MAX_DISPERSION_PBPS. */
+export const MAX_DISPERSION_PBPS = 900_000;
+
+/** y(BPS) − y(0) in pbps·Q — NUQuartic.rangeQ's span (exact at both clamped ends). */
+export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
+
+/** `Pricing.dispersionCap`: floor(SWING_CAP·dispRef·Q / span). A property of the preset, not the
+ *  asset — the widest dispersion whose interior mid swing still fits the fence. FLOORED, never
+ *  ceiled: cap must be the largest dispersion the read still quotes, and cap+1 must not be. */
+export function dispersionCap(c: QuarticCurve): number {
+  const span = curveSpanQ(c);
+  if (span <= 0n) throw new Error('flat curve has no dispersion cap');
+  const cap = (BigInt(INTERIOR_SWING_CAP_PBPS) * BigInt(c.dispRef) * QI) / span;
+  return Number(cap > 4294967295n ? 4294967295n : cap);
+}
+
+/** `PoolAdmin.sanitizeDispersion`: 0 → protocol default, max BOUND to `cap`, floor only CHECKED.
+ *  Throws exactly where the chain reverts `BadConfig`. */
+export function sanitizeDispersion(
+  minDispersion: number,
+  maxDispersion: number,
+  cap: number,
+): { mn: number; mx: number } {
+  const mn = minDispersion === 0 ? 1000 : minDispersion;
+  let mx = maxDispersion === 0 ? 100_000 : maxDispersion;
+  if (mx > cap) mx = cap;
+  if (mn > mx || mx > MAX_DISPERSION_PBPS) throw new Error('BadConfig: dispersion band');
+  return { mn, mx };
+}
+
 // ── Profile / pool-state types ──────────────────────────────────────────────────
 
 export interface AimmProfile {
