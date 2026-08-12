@@ -192,6 +192,11 @@ export const POOL_ABI = [
             internalType: 'uint128',
           },
           {
+            name: 'anchor',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
             name: 'minLiquidity',
             type: 'uint96',
             internalType: 'uint96',
@@ -202,29 +207,9 @@ export const POOL_ABI = [
             internalType: 'uint96',
           },
           {
-            name: 'presetId',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'deadSeedPow10',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'anchor',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'minFeePbps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'maxFeePbps',
-            type: 'uint16',
-            internalType: 'uint16',
+            name: 'minDispersion',
+            type: 'uint32',
+            internalType: 'uint32',
           },
           {
             name: 'maxDispersion',
@@ -232,12 +217,12 @@ export const POOL_ABI = [
             internalType: 'uint32',
           },
           {
-            name: 'decimals',
-            type: 'uint8',
-            internalType: 'uint8',
+            name: 'presetId',
+            type: 'uint16',
+            internalType: 'uint16',
           },
           {
-            name: 'gamma',
+            name: 'minFeePbps',
             type: 'uint16',
             internalType: 'uint16',
           },
@@ -252,9 +237,14 @@ export const POOL_ABI = [
             internalType: 'uint16',
           },
           {
-            name: 'minDispersion',
-            type: 'uint32',
-            internalType: 'uint32',
+            name: 'decimals',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'deadSeedPow10',
+            type: 'uint8',
+            internalType: 'uint8',
           },
         ],
       },
