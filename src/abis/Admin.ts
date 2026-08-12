@@ -851,11 +851,6 @@ export const ADMIN_ABI = [
         type: 'uint32',
         internalType: 'uint32',
       },
-      {
-        name: 'maxDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
     ],
     outputs: [],
     stateMutability: 'nonpayable',

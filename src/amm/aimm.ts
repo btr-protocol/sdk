@@ -241,7 +241,10 @@ export function buildCurve(
 
 /** Pricing.INTERIOR_SWING_CAP_PBPS — the interior mid swing the fence can bound (fail-closed). */
 export const INTERIOR_SWING_CAP_PBPS = 10_000;
-/** PoolAdmin.MAX_DISPERSION_PBPS. */
+/** `PoolConstants.MAX_DISPERSION_PBPS` — the band CEILING, a protocol constant. It is not a
+ *  per-asset field: `Asset.maxDispersion` is deleted on chain (dex e2e87a7), because how wide a leg
+ *  may quote is a property of the shared preset it quotes on, not of the leg. Only the floor
+ *  (`minDispersion`) is configurable. */
 export const MAX_DISPERSION_PBPS = 900_000;
 
 /** y(BPS) − y(0) in pbps·Q — NUQuartic.rangeQ's span (exact at both clamped ends). */
@@ -257,32 +260,28 @@ export function dispersionCap(c: QuarticCurve): number {
   return Number(cap > 4294967295n ? 4294967295n : cap);
 }
 
-/** `PoolAdmin.sanitizeDispersion`: 0 → protocol default, max BOUND to `cap`, floor only CHECKED.
+/** `PoolAdmin.sanitizeDispersion`: 0 → protocol default (1000), then the floor is CHECKED against
+ *  the preset's `cap` and the protocol ceiling — never clamped to either, because narrowing it
+ *  silently would move the leg's quiet-tape quote instead of reporting a fit that does not fit.
  *  Throws exactly where the chain reverts `BadConfig`. */
-export function sanitizeDispersion(
-  minDispersion: number,
-  maxDispersion: number,
-  cap: number,
-): { mn: number; mx: number } {
+export function sanitizeDispersion(minDispersion: number, cap: number): number {
   const mn = minDispersion === 0 ? 1000 : minDispersion;
-  let mx = maxDispersion === 0 ? 100_000 : maxDispersion;
-  if (mx > cap) mx = cap;
-  if (mn > mx || mx > MAX_DISPERSION_PBPS) throw new Error('BadConfig: dispersion band');
-  return { mn, mx };
+  if (mn > cap || mn > MAX_DISPERSION_PBPS) throw new Error('BadConfig: dispersion floor');
+  return mn;
 }
 
 // ── Profile / pool-state types ──────────────────────────────────────────────────
 
 export interface AimmProfile {
   vega: number; // volatility sensitivity, BPS
-  lambda: number; // deviation sensitivity, BPS (unused while U=0)
   minFee: number; // PBPS (1 = 0.01 bp floor; 100 = 1 bp)
-  minDisp: number; // PBPS
-  maxDisp: number; // PBPS
+  minDisp: number; // PBPS — the QUIET-TAPE FLOOR. The ceiling is MAX_DISPERSION_PBPS, protocol-wide.
   protoShare: number; // % of spread routed to protocol (fee split)
-  /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). null = presetId 0 / unset
-   *  ⇒ the skew-anchored linear-impact fallback quote (Pricing._traverseCurveByVolume). */
-  curve: QuarticCurve | null;
+  /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). REQUIRED: there is ONE pricing law
+   *  (`Pricing._traverseCurveByVolume`) and `PoolAdmin.validatePresetAssign` will not list an asset
+   *  without a curve, so a null here is a read that has not landed — fail closed at the caller
+   *  rather than quote a second, nonexistent law. */
+  curve: QuarticCurve;
 }
 
 /** One spoke edge vs the base numeraire. */
@@ -385,24 +384,15 @@ const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > 
 
 // Pricing.sol constants mirrored by the float quote path.
 const SPLINE_MIN_OFFSET_PBPS = -0.9 * PBPS;
-const MIN_EXEC_PRICE_FRAC = 0.05; // MIN_EXEC_PRICE_BPS = 500
-const MAX_IMPACT = 2; // 200% (WAD-scaled on-chain)
-const MIN_ADJ = 0.001; // WAD/1000
 
-/** Clamp + scale a PBPS price offset onto the mark (Pricing._offsetToPrice). */
-function offsetToPrice(mark: number, offsetPbps: number): number {
-  return (mark * Math.max(PBPS + offsetPbps, 0)) / PBPS;
-}
-
-/** Floored offset → price on ALL curve paths (Pricing._flooredOffsetPrice): SPLINE_MIN_OFFSET_PBPS then MIN_EXEC_PRICE_FRAC. */
+/** Floored offset → price on every price path (Pricing._flooredOffsetPrice): clamp the offset at
+ *  SPLINE_MIN_OFFSET_PBPS, then scale onto the mark. That single floor is the whole law — the
+ *  second `MIN_EXEC_PRICE_BPS` floor this mirrored is deleted on chain, and while it never bound
+ *  (−90% of PBPS already pins price ≥ 10% of mark, above the old 5%) it was a live divergence
+ *  waiting on any change to either constant. */
 function flooredOffsetPrice(mark: number, offsetPbps: number): number {
   const off = Math.max(offsetPbps, SPLINE_MIN_OFFSET_PBPS);
-  return Math.max((mark * (PBPS + off)) / PBPS, mark * MIN_EXEC_PRICE_FRAC);
-}
-
-/** skew → absolute price (no-profile fallback; Pricing._skewToPrice): offset = skew·disp/100. */
-function skewToPrice(mark: number, skew: number, disp: number): number {
-  return offsetToPrice(mark, (skew * disp) / 100);
+  return (mark * Math.max(PBPS + off, 0)) / PBPS;
 }
 
 /** Inventory skew ∈ [-100, 100] from a leg's coverage (Pricing.computeInventorySkew).
@@ -420,9 +410,10 @@ export function computeSkew(res: number, liab: number): number {
   return c < 1 ? Math.trunc(200 * (1 - c)) : -Math.trunc(100 * (c - 1)) || 0;
 }
 
-/** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it. (Pricing `_calculateDispersion`) */
+/** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it, up to the PROTOCOL ceiling
+ *  `MAX_DISPERSION_PBPS` (Pricing `_calculateDispersion`) — there is no per-asset ceiling. */
 export function dispersion(sigma: number, p: AimmProfile): number {
-  return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, p.maxDisp);
+  return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, MAX_DISPERSION_PBPS);
 }
 
 const U16_MAX = 65535;
@@ -571,7 +562,7 @@ export function buildLeg(
 interface LegKit {
   leg: PoolLeg;
   twap: number;
-  curve: QuarticCurve | null;
+  curve: QuarticCurve;
   center: number; // skewed book center in depth coords, 5000 + skew·50
   depth: number;
   mid: number; // priceAt(center), base-per-token
@@ -603,15 +594,11 @@ export function legKit(leg: PoolLeg): LegKit {
 }
 
 /**
- * Marginal base-per-token at depth-coord d. Curve: offsetToPrice(scaleY(evalQ(d))) — the exact
- * width-0 branch of Pricing._traverseCurve. Fallback (no preset): marginal of the skew-anchored
- * linear-impact model, mid·(1 ± |d−center|/BPS).
+ * Marginal base-per-token at depth-coord d = flooredOffsetPrice(scaleY(evalQ(d))) — the exact
+ * width-0 branch of `Pricing._traverseCurve`. ONE law, no fallback arm.
  */
 export function priceAt(k: LegKit, d: number): number {
-  if (k.curve) return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, d), k.curve, k.dispersion));
-  const mid = skewToPrice(k.twap, k.skew, k.dispersion);
-  const vf = Math.min(Math.abs(d - k.center) / BPS, MAX_IMPACT);
-  return d <= k.center ? Math.max(mid * (1 - vf), mid * MIN_ADJ) : mid * (1 + vf);
+  return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, d), k.curve, k.dispersion));
 }
 
 /** Sample the quartic bonding curve for charting: depth ∈ [0,10000] → marginal price. */
@@ -731,33 +718,22 @@ export function crossDensity(
 /**
  * Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at.
  * Mirrors Pricing._traverseCurve: areaQ(lo,hi)/width → scaleY → floor SPLINE_MIN_OFFSET_PBPS
- * → mark scale → MIN_EXEC_PRICE floor. Fallback: linear-impact average mid·(1 ± vf/2).
+ * → mark scale.
  */
 function bandPrice(k: LegKit, a: number, b: number): number {
-  if (!k.curve) {
-    const mid = skewToPrice(k.twap, k.skew, k.dispersion);
-    const impact = Math.min(Math.abs(b - a) / BPS, MAX_IMPACT);
-    const half = impact / 2;
-    return b <= a ? Math.max(mid * (1 - half), mid * MIN_ADJ) : mid * (1 + half);
-  }
   const lo = xInt(Math.min(a, b));
   const hi = xInt(Math.max(a, b));
   const w = hi - lo;
   if (w === 0) return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, a), k.curve, k.dispersion));
   // On-chain order: areaQ / width (integer), THEN scaleY — mirrored exactly.
-  let off = scaleY(areaQ(k.curve, lo, hi) / BigInt(w), k.curve, k.dispersion);
-  off = Math.max(off, SPLINE_MIN_OFFSET_PBPS);
-  return Math.max((k.twap * (PBPS + off)) / PBPS, k.twap * MIN_EXEC_PRICE_FRAC);
+  return flooredOffsetPrice(
+    k.twap,
+    scaleY(areaQ(k.curve, lo, hi) / BigInt(w), k.curve, k.dispersion),
+  );
 }
 
 /** Average fill price over a traded volume by walking the curve (Pricing._traverseCurveByVolume). */
 function traverse(k: LegKit, amountInTok: number, selling: boolean): number {
-  if (!k.curve) {
-    const impact = Math.min(amountInTok / k.depth, MAX_IMPACT);
-    const mid = skewToPrice(k.twap, k.skew, k.dispersion);
-    const half = impact / 2;
-    return selling ? Math.max(mid * (1 - half), mid * MIN_ADJ) : mid * (1 + half);
-  }
   const vf = Math.min((amountInTok * BPS) / k.depth, BPS);
   const end = selling ? Math.max(k.center - vf, 0) : Math.min(k.center + vf, BPS);
   return bandPrice(k, k.center, end);
