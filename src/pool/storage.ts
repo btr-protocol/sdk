@@ -70,25 +70,21 @@ export const POOL_STRUCTS = {
   Asset: {
     reserves: [0, 0],
     liabilities: [0, 16],
-    minLiquidity: [1, 0],
-    liquidityIndex: [1, 12],
-    presetId: [1, 24],
-    deadSeedPow10: [1, 26],
-    anchor: [2, 0],
-    minFeePbps: [2, 20],
-    maxFeePbps: [2, 22],
-    maxDispersion: [2, 24],
+    anchor: [1, 0],
+    minLiquidity: [1, 20],
+    liquidityIndex: [2, 0],
+    minDispersion: [2, 12],
+    maxDispersion: [2, 16],
+    presetId: [2, 20],
+    minFeePbps: [2, 22],
+    vega: [2, 24],
+    haircutSuppressor: [2, 26],
     decimals: [2, 28],
-    gamma: [2, 29],
-    vega: [3, 0],
-    haircutSuppressor: [3, 2],
-    minDispersion: [3, 4],
+    deadSeedPow10: [2, 29],
   },
   RiskConfig: {
-    coverageMin: [0, 0],
-    coverageMax: [0, 2],
-    flags: [0, 4],
-    kappaCovBps: [0, 6],
+    flags: [0, 0],
+    kappaCovBps: [0, 2],
   },
   OracleConfig: {
     feedId: [0, 0],
@@ -145,10 +141,8 @@ export async function readAssetHook(
   return decodeHookSlot(word);
 }
 
-/** `IPool.RiskConfig` — 4×uint16 in one word. */
+/** `IPool.RiskConfig` — 2×uint16 in one word. */
 export interface RiskConfig {
-  coverageMin: number;
-  coverageMax: number;
   flags: number;
   /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). */
   kappaCovBps: number;
@@ -318,8 +312,6 @@ export async function readRiskConfig(
   const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.riskConfigs));
   const f = POOL_STRUCTS.RiskConfig;
   return {
-    coverageMin: u16At(word, f.coverageMin[1]),
-    coverageMax: u16At(word, f.coverageMax[1]),
     flags: u16At(word, f.flags[1]),
     kappaCovBps: u16At(word, f.kappaCovBps[1]),
   };

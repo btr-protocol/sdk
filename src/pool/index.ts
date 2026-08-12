@@ -17,26 +17,23 @@ export { POOL_ABI } from '../abis/Pool.js';
 // Types
 // ─────────────────────────────────────────────────────────────
 
+/** `IPool.Asset`, field-for-field as `getAsset` returns it (POOL_ABI is the SSoT; the layout twin
+ *  is `POOL_STRUCTS.Asset` in ./storage). */
 export interface Asset {
   reserves: bigint;
   liabilities: bigint;
+  anchor: Address;
   minLiquidity: bigint;
   liquidityIndex: bigint;
-  lastUpdate: number;
+  minDispersion: number;
+  maxDispersion: number;
   /** Pricing-shape pointer into PoolStorage.curves (shared preset table). 0 = fallback quote. */
   presetId: number;
-  anchor: Address;
   minFeePbps: number;
-  maxFeePbps: number;
-  maxDispersion: number;
-  decimals: number;
-  gamma: number;
   vega: number;
   haircutSuppressor: number;
-  minDispersion: number;
-  reservationPrice: bigint;
-  reservationPriceMax: bigint;
-  pegB64: bigint;
+  decimals: number;
+  deadSeedPow10: number;
 }
 
 export interface SwapQuote {
