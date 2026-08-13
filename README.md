@@ -48,7 +48,7 @@ bun install
 
 ### Multi-pool routing
 
-There is no on-chain `Router` contract (retired; routing is deliberately off-chain — see `dex/README.md`). Route-finding lives in `./amm`: `enumerateRoutes` (direct + 2-hop shared-anchor), `quoteRoute`, `rankSwap` (best plan, greedy order-splitting across routes when that beats the best single route net of gas), `aggregateDepth`; `poolStateFrom(assets, base, feedOf)` converts on-chain `getPoolData()` reads + per-spoke `LegFeed`s (mark, σ, profile, κ) into the pricer's `PoolState`. `./router` executes: `planToLegs` maps a `rankSwap` plan to `ExecLeg[]` (largest part first, per-leg slippage floors, EIP-7528 native sentinel → `ExecLeg.native`); `buildSwapCalls` emits deduplicated `[approvals…, swaps…]`. Submit atomically via EIP-5792 `wallet_sendCalls` where supported, else sequentially (`Pool.swap` pulls from `msg.sender`, so Multicall3 can't execute the batch); `totalValue` sums the `msg.value` to attach.
+Routing is deliberately off-chain: there is no on-chain `Router` contract. Route-finding lives in `./amm`: `enumerateRoutes` (direct + 2-hop shared-anchor), `quoteRoute`, `rankSwap` (best plan, greedy order-splitting across routes when that beats the best single route net of gas), `aggregateDepth`; `poolStateFrom(assets, base, feedOf)` converts on-chain `getPoolData()` reads + per-spoke `LegFeed`s (mark, σ, profile, κ) into the pricer's `PoolState`. `./router` executes: `planToLegs` maps a `rankSwap` plan to `ExecLeg[]` (largest part first, per-leg slippage floors, EIP-7528 native sentinel → `ExecLeg.native`); `buildSwapCalls` emits deduplicated `[approvals…, swaps…]`. Submit atomically via EIP-5792 `wallet_sendCalls` where supported, else sequentially (`Pool.swap` pulls from `msg.sender`, so Multicall3 can't execute the batch); `totalValue` sums the `msg.value` to attach.
 
 ## Toolchain
 
@@ -128,8 +128,7 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 ## Consumers
 
 - `front/` — `@btr-protocol/front` (Preact SPA) via `file:../sdk`
-- `back/` — `@btr-protocol/back` Bun monorepo (collector, agents, docs) via `file:../sdk`
+- `back/` — `@btr-protocol/back` Bun monorepo (collector, data, docs, referrals) via `file:../sdk`
+- `keepers/` — `btr-keeper` bots via `file:../../sdk`
 
-## Remote
-
-No upstream remote configured yet — local-only. Create `btr-protocol/sdk` on GitHub and add origin to publish.
+Repo: https://github.com/btr-protocol/sdk
