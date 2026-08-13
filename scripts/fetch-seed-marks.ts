@@ -10,14 +10,22 @@
  * on-chain feed seed). One fetch, one artifact, no second source that can disagree.
  *
  * The ROSTER is never restated here: it is the `symbols` array of that chain's risk-params JSON,
- * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 14 = 8 peg stables + 6 FX; the
- * idx-14 USDC/USD depeg reference is seeded from ORACLE_SEED_USDCUSD_1E18, not from this file).
- * A symbol with no NXR mapping in the feed table is a hard error, never a silent skip. The mapping
- * itself is `nxrSymbol`/`nxrQuote` on SEPOLIA_ORACLE_FEEDS, the one table that carries it (stables →
- * Pyth `X-USD` USDC≈1 proxy; WETH→ETH-USDC; FX→`X-USD` for /v1/price).
+ * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 19, the idx-18 USDC/USD depeg
+ * reference is seeded from ORACLE_SEED_USDCUSD_1E18, not from this file). A symbol with no NXR
+ * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS` —
+ * chain-free, because an asset's mark source does not change when it is listed on a second chain.
+ * This script therefore needs no per-chain feed table and cannot exit 1 on a chain simply for not
+ * being Sepolia, which is what it did before.
  *
  * Auth: NXR serves /v1/price anonymously; if NXR_API_KEY is exported it is sent as the API key
  * header. Never inline a key here.
+ *
+ * A mark is accepted only when the EXPLICIT pair answers 200, is inside its declared scale band, and
+ * is fresh. All three are load-bearing. NXR's ticker parser is delimiter-less, so a wrong-shaped
+ * symbol does not 404 — it resolves to something else and returns a plausible mid (`CVX-USD` is
+ * Chevron at ~197, not Convex at ~3). And `status` is served per-mark: `USDG-USD` answered 200 with
+ * a peg-plausible 0.99986 and `status: "dead", age_ms: 469991` on 2026-08-14. Neither the band nor
+ * the peg clamp can see either failure; only the pair being declared and the age being checked can.
  *
  * Why fresh marks matter beyond the seed size: the first signed keeper push has dt=0, so its
  * deviation band is the bare maxDev floor (50bp stable / 100bp volatile) around the SEED. A seed
@@ -27,7 +35,8 @@
  */
 
 import { join } from 'node:path';
-import { SEPOLIA_CHAIN_ID, SEPOLIA_ORACLE_FEEDS } from '../src/venues/sepolia.js';
+import { closedUntil, nxrMark, sessionOpenLabel } from '../src/venues/nxr.js';
+import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
 
 /** Deploy targets. `seedUsdPerLeg` is the value the ceremony was SIZED for; the risk JSON is the
  *  source of truth and is asserted against it, so an edited JSON fails here, not at broadcast. */
@@ -48,28 +57,13 @@ const RISK = join(DEX, `evm/deployments/${CHAIN.risk}`);
 const OUT = join(DEX, `evm/deployments/${CHAIN.chainId}.seed-marks.json`);
 const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$/, '');
 
-/** Plausibility bands, mirroring the deploy scripts' own requires so a bad snapshot fails HERE —
- *  before broadcast — instead of stranding a feed mid-ceremony. Peg band matches the Solidity
- *  [0.98,1.02] clamp. */
+/** Peg band for an asset that declares no scale band of its own; matches the Solidity [0.98,1.02]
+ *  clamp. Per-asset bands live on `NXR_MARKS[...].band` — they mirror the deploy scripts' own
+ *  requires so a bad snapshot fails HERE, before broadcast, rather than stranding a feed. */
 const PEG = [0.98, 1.02] as const;
-const BANDS: Record<string, readonly [number, number]> = {
-  WETH: [500, 20_000], WBTC: [20_000, 500_000], cbBTC: [20_000, 500_000],
-  BNB: [100, 5_000], XAUT: [1_500, 10_000], PAXG: [1_500, 10_000], EURC: [0.9, 1.3],
-  // FX core (fiat-backed stables). These legs are NOT ~1.0 against the USDC base — their mark is
-  // the real fiat rate — so the PEG band below would reject every one of them. Each window is a
-  // SCALE guard (catches a 1e3 fat-finger or an inverted pair) around the measured 2026-07-27
-  // rate, deliberately wide enough for any plausible FX move: a tight window on a live rate would
-  // strand the ceremony, and an absent one silently applies PEG and fails at 0.98.
-  // ⚠ INVERSION IS THE DANGEROUS ERROR, not magnitude: NXR serves CAD/BRL/JPY/KRW natively as
-  // USD/X (1.41, 5.10, 163.5, 1469.9). The nxrSymbol for these legs is the X-USD cross, so a
-  // mis-set symbol yields the reciprocal — and only these bands catch it.
-  QCAD: [0.5, 1.0],        // CAD/USD 0.7099
-  AUDF: [0.4, 1.0],        // AUD/USD 0.7002
-  BRLA: [0.1, 0.4],        // BRL/USD 0.1963
-  JPYC: [0.003, 0.012],    // JPY/USD 0.0061197
-  KRW1: [0.0003, 0.0015],  // KRW/USD 0.00068070
-};
-/** The ceremony runbook's freshness bound: seeds must come from live NXR shortly pre-broadcast. */
+/** The ceremony runbook's freshness bound: seeds must come from live NXR shortly pre-broadcast.
+ *  ENFORCED against the per-mark `age_ms`/`status` NXR serves, not merely stamped on the output —
+ *  a peg-plausible mid from a dead ticker is exactly what the band cannot see. */
 const MAX_AGE_MS = 5 * 60_000;
 
 const risk: { chainId: number; seedUsdPerLeg: number; symbols: string[] } =
@@ -94,12 +88,16 @@ if (seedUsdPerLeg !== CHAIN.seedUsdPerLeg) {
 
 // Roster = the chain's own listed assets, resolved through the single symbol→NXR mapping table.
 const roster = (risk.symbols ?? []).map((symbol) => {
-  const f = SEPOLIA_ORACLE_FEEDS.find((x) => x.symbol === symbol);
-  if (!f) {
-    console.error(`${RISK}: symbol ${symbol} has no NXR mapping in the oracle feed table`);
+  const m = nxrMark(symbol);
+  if (!m) {
+    console.error(
+      `${RISK}: symbol ${symbol} has no NXR mark source — add a row to src/venues/nxr.ts NXR_MARKS.` +
+        ` Probe the EXPLICIT pair first (/v1/price/<TICKER>-USD): a delimiter-less near-miss answers` +
+        ` 200 with another asset's mid, so "it returns a price" is not evidence the pair exists.`,
+    );
     process.exit(1);
   }
-  return f;
+  return { symbol, ...m };
 });
 if (!roster.length) {
   console.error(`${RISK}: empty symbols[] — nothing to seed`);
@@ -118,32 +116,67 @@ for (const f of roster) {
     continue;
   }
   let mid: number | null = null;
+  // /v1/price/{ticker} is the only endpoint serving a live px:
+  // {ticker,mid,bid,ask,ci,confidence,flags,age_ms,status}. /v1/tickers/detail is a CATALOGUE and
+  // carries no price at all. `nxrQuote` names the served ticker when NXR only carries the
+  // reciprocal of the pair the feed is denominated in; the mid is reciprocated back.
+  const quoted = f.nxrQuote ?? f.nxrSymbol;
   try {
-    // /v1/price/{ticker} is the only endpoint serving a live px: {ticker,mid,bid,ask,ci,confidence}.
-    // /v1/tickers/detail is a CATALOGUE and carries no price at all.
-    // NXR serves the fiat crosses USD-base ONLY: /v1/price/CAD-USD is 404 while
-    // USD-CAD is 200. `nxrQuote` names that served ticker; reciprocate it back
-    // to the X-USD cross the feed is denominated in.
-    const quoted = f.nxrQuote ?? f.nxrSymbol;
     const r = await fetch(`${NXR}/v1/price/${encodeURIComponent(quoted)}`, {
-      headers: KEY ? { Accept: 'application/json', 'X-NXR-Key': KEY } : { Accept: 'application/json' },
+      headers: KEY
+        ? { Accept: 'application/json', 'X-NXR-Key': KEY }
+        : { Accept: 'application/json' },
       signal: AbortSignal.timeout(8_000),
     });
-    if (r.ok) {
-      const j = (await r.json()) as { mid?: number };
-      if (typeof j.mid === 'number' && j.mid > 0) mid = f.nxrQuote ? 1 / j.mid : j.mid;
+    if (!r.ok) {
+      errs.push(
+        `${f.symbol} (${quoted}): NXR ${r.status} — pair absent, do NOT substitute a variant`,
+      );
+      continue;
     }
+    const j = (await r.json()) as { mid?: number; age_ms?: number; status?: string };
+    // Freshness is per-mark and NXR reports it, but the band cannot see it: a dead ticker still
+    // returns a peg-plausible mid. USDG-USD served 0.99986 with `status: "dead", age_ms: 469991`
+    // on 2026-08-14. Seeding from that puts the first signed push a whole staleness window away
+    // from the seed it has to land beside, and dt=0 gives it only the bare maxDev floor to do it.
+    //
+    // A CLOSED market is exempt from the age bound and only from that: an FX mark frozen inside a
+    // scheduled halt is correct, the keeper's first push carries the same frozen mark, and failing
+    // here would block the ceremony every weekend. `dead` is never exempt — it is NXR's own verdict
+    // that nothing is feeding the ticker, which a scheduled close does not cause.
+    const age = j.age_ms;
+    const shut = closedUntil(f.symbol) !== null;
+    if (j.status === 'dead') {
+      errs.push(
+        `${f.symbol} (${quoted}): NXR reports the ticker dead at age ${age ?? '?'}ms — not seedable`,
+      );
+      continue;
+    }
+    if (typeof age === 'number' && age > MAX_AGE_MS && !shut) {
+      errs.push(
+        `${f.symbol} (${quoted}): mark is ${Math.round(age / 1000)}s old (status ${j.status ?? '?'}),` +
+          ` bound is ${MAX_AGE_MS / 1000}s and the market is open`,
+      );
+      continue;
+    }
+    if (shut)
+      console.warn(
+        `  ${f.symbol}: market closed until ${sessionOpenLabel(closedUntil(f.symbol)!)}, seeding the frozen mark`,
+      );
+    if (typeof j.mid === 'number' && j.mid > 0) mid = f.nxrQuote ? 1 / j.mid : j.mid;
   } catch (e) {
-    errs.push(`${f.symbol} (${f.nxrSymbol}): ${(e as Error).message}`);
+    errs.push(`${f.symbol} (${quoted}): ${(e as Error).message}`);
     continue;
   }
   if (mid == null) {
-    errs.push(`${f.symbol} (${f.nxrSymbol}): no live mid from NXR`);
+    errs.push(`${f.symbol} (${quoted}): no live mid from NXR`);
     continue;
   }
-  const [lo, hi] = BANDS[f.symbol] ?? PEG;
+  const [lo, hi] = f.band ?? PEG;
   if (mid < lo || mid > hi) {
-    errs.push(`${f.symbol}: mid ${mid} outside plausible [${lo}, ${hi}] — fat-finger or wrong pair`);
+    errs.push(
+      `${f.symbol}: mid ${mid} outside plausible [${lo}, ${hi}] — fat-finger or wrong pair`,
+    );
     continue;
   }
   marks[f.symbol] = {

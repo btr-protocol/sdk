@@ -637,11 +637,8 @@ export function getTokenIcon(symbol: string): string {
 /**
  * Get token address for a specific chain
  */
-export function getTokenAddress(
-  symbol: string,
-  chainId: number | string
-): string | undefined {
-  return TOKENS[symbol]?.addresses[chainId.toString()];
+export function getTokenAddress(symbol: string, chainId: number | string): string | undefined {
+  return tokenBySymbol(symbol)?.addresses[chainId.toString()];
 }
 
 /**
@@ -660,15 +657,48 @@ export function getAllTokensForChain(chainId: number | string): Record<string, s
   return result;
 }
 
+/** Registry key by upper-cased key, so a mixed-case entry is reachable from any casing. */
+const TOKEN_KEY_BY_UPPER = new Map(Object.keys(TOKENS).map((k) => [k.toUpperCase(), k]));
+
 /**
- * Resolve token to canonical symbol (unwraps if needed)
- * @param symbol Token symbol (may be wrapped)
- * @returns Canonical symbol (unwrapped)
+ * The registry key a user-facing symbol names, or the upper-cased input when nothing is registered.
+ *
+ * Two normalisations, and only two:
+ *  - the trailing `.b` FAUCET SUFFIX is dropped. Testnet mocks carry it in their ERC-20 `name()`
+ *    and `symbol()` and nowhere else (`dex/evm/deployments/arc-risk-params.json`
+ *    `.noteSymbolConvention`), so `USDT.b` is the token `USDT`.
+ *  - case is folded. 18 of the registry's keys are mixed-case (`stETH`, `wstETH`, `cbETH`, …), so
+ *    an upper-case-only lookup misses every one of them.
+ *
+ * ⚠ ONLY the trailing `.b` is stripped, never punctuation in general: blanket-stripping `.` turns
+ * `USDT.b` into `USDTB`, which is a DIFFERENT registered token (Ethena USDtb, listed beside USDT on
+ * the same core). Ticker-to-roster-symbol folding (`BRK.B` → `BRKB`) is a roster-authoring step and
+ * is deliberately not done here.
  */
-export function resolveTokenAlias(symbol: string): string {
-  const symbolUpper = symbol.toUpperCase();
-  const token = TOKENS[symbolUpper];
-  return token?.wrapperOf || symbolUpper;
+export function canonicalTokenSymbol(symbol: string): string {
+  const upper = symbol.replace(/\.b$/i, '').toUpperCase();
+  return TOKEN_KEY_BY_UPPER.get(upper) ?? upper;
+}
+
+/** Registry entry for a symbol in any casing, with or without the `.b` faucet suffix. */
+export function tokenBySymbol(symbol: string): TokenMetadata | undefined {
+  return TOKENS[canonicalTokenSymbol(symbol)];
+}
+
+/**
+ * Canonical symbol for a token, unwrapping wrappers (`WETH` → `ETH`, `stETH` → `ETH`).
+ *
+ * `null` — not a plausible-looking guess — is the answer for an unregistered symbol. The previous
+ * `|| symbol.toUpperCase()` fallback is why two live bugs stayed invisible: no wrapper whose
+ * registry key is mixed-case ever unwrapped, and every faucet symbol resolved to itself with the
+ * suffix glued on (`USDT.b` → `USDT.B`), both reported as if canonical. A resolver that invents an
+ * answer on a miss cannot be monitored; a `null` has to be handled.
+ */
+export function resolveTokenAlias(symbol: string): string | null {
+  const key = canonicalTokenSymbol(symbol);
+  const token = TOKENS[key];
+  if (!token) return null;
+  return token.wrapperOf ?? key;
 }
 
 /**
