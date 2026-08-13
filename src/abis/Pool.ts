@@ -2,7 +2,7 @@
  * Pool Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Flat pool surface (swap/deposit/withdraw/view). Admin ops live on Admin singleton.
+ * Flat pool surface: swap/deposit/withdraw/view, the per-asset yield-hook surface (getAssetHook/hookDeploy/hookRecall), and the pool-scoped `admin*` entrypoints the Admin singleton calls into. One contract, no catch-all entrypoint.
  * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 
@@ -25,17 +25,8 @@ export const POOL_ABI = [
         type: 'address',
         internalType: 'address',
       },
-      {
-        name: 'poolAux_',
-        type: 'address',
-        internalType: 'address',
-      },
     ],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'fallback',
-    stateMutability: 'payable',
   },
   {
     type: 'receive',
@@ -66,6 +57,539 @@ export const POOL_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'adminClearAssetHook',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminCollapseAnchor',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'newAnchor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminCollectProtocolFees',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'recipient',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminHaltAsset',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminInitAsset',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'oracleCfg',
+        type: 'tuple',
+        internalType: 'struct IPool.OracleConfig',
+        components: [
+          {
+            name: 'feedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'refFeedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'refBandBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'mode',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
+        ],
+      },
+      {
+        name: 'riskCfg',
+        type: 'tuple',
+        internalType: 'struct IPool.RiskConfig',
+        components: [
+          {
+            name: 'flags',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'kappaCovBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+        ],
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'minFeePbps',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'minDispersion',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'vega',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetAnchor',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'anchor',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IPool.OracleConfig',
+        components: [
+          {
+            name: 'feedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'refFeedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'refBandBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'mode',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetAssetHook',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'hook',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'flags',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetAssetParams',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'minLiquidity',
+        type: 'uint128',
+        internalType: 'uint128',
+      },
+      {
+        name: 'minFeePbps',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'vega',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'haircutSuppressor',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetBaseToken',
+    inputs: [
+      {
+        name: 'newBase',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'spokes',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetCurve',
+    inputs: [
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'interior',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'wQ',
+        type: 'int256[]',
+        internalType: 'int256[]',
+      },
+      {
+        name: 'dispRef',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'flags',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetDeadSeedPow10',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'pow10',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetFeeParams',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        internalType: 'struct IPool.FeeParams',
+        components: [
+          {
+            name: 'protoShare',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'flashFeePbps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetFlowCooldown',
+    inputs: [
+      {
+        name: 'cooldownSeconds',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetOracleConfig',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IPool.OracleConfig',
+        components: [
+          {
+            name: 'feedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'refFeedId',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'primary',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'refBandBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'mode',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'quoteUnit',
+            type: 'uint8',
+            internalType: 'uint8',
+          },
+          {
+            name: 'refPrimary',
+            type: 'address',
+            internalType: 'address',
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetProfile',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'presetId',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+      {
+        name: 'minDispersion',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetRiskConfig',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'cfg',
+        type: 'tuple',
+        internalType: 'struct IPool.RiskConfig',
+        components: [
+          {
+            name: 'flags',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+          {
+            name: 'kappaCovBps',
+            type: 'uint16',
+            internalType: 'uint16',
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminSetTreasury',
+    inputs: [
+      {
+        name: 'newTreasury',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'adminUnhaltAsset',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'src',
+        type: 'uint16',
+        internalType: 'uint16',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -151,6 +675,75 @@ export const POOL_ABI = [
       },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'flashAccount',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'fee',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'protoFee',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'flashPrepare',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'initiator',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'flashSend',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'to',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -258,6 +851,71 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
+    name: 'getAssetHook',
+    inputs: [
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        internalType: 'struct IPool.HookSlot',
+        components: [
+          {
+            name: 'target',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'flags',
+            type: 'uint32',
+            internalType: 'uint32',
+          },
+          {
+            name: 'lastCreditAt',
+            type: 'uint32',
+            internalType: 'uint32',
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getBuffer',
+    inputs: [
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'reserves',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'invested',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'minLiquidity',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getCoverageRatio',
     inputs: [
       {
@@ -302,6 +960,25 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
+    name: 'getInvested',
+    inputs: [
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint128',
+        internalType: 'uint128',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getLPBalance',
     inputs: [
       {
@@ -309,6 +986,25 @@ export const POOL_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'tk',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getLiquidReserves',
+    inputs: [
       {
         name: 'tk',
         type: 'address',
@@ -460,6 +1156,78 @@ export const POOL_ABI = [
   },
   {
     type: 'function',
+    name: 'hookCreditYield',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'hookDeploy',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'hookRecall',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'hookWriteDown',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'initialize',
     inputs: [
       {
@@ -539,19 +1307,6 @@ export const POOL_ABI = [
   {
     type: 'function',
     name: 'owner',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'poolAux',
     inputs: [],
     outputs: [
       {
@@ -799,6 +1554,68 @@ export const POOL_ABI = [
   },
   {
     type: 'event',
+    name: 'DeadSharesSeeded',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'value',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'lpAmount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'IndexUpdated',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'index',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'reserves',
+        type: 'uint128',
+        indexed: false,
+        internalType: 'uint128',
+      },
+      {
+        name: 'liabilities',
+        type: 'uint128',
+        indexed: false,
+        internalType: 'uint128',
+      },
+      {
+        name: 'reason',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'uint8',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
     name: 'PoolInitialized',
     inputs: [
       {
@@ -829,8 +1646,51 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
+    name: 'ExcessiveAmount',
+    inputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'Expired',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'FeatureDisabled',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientAmount',
+    inputs: [
+      {
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
   },
   {
     type: 'error',
@@ -844,7 +1704,38 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
+    name: 'NotAuth',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'NotCode',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotFound',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'Overflow',
     inputs: [],
   },
   {
@@ -858,29 +1749,9 @@ export const POOL_ABI = [
     inputs: [],
   },
   {
-    type: 'event',
-    name: 'DeadSharesSeeded',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'value',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-      {
-        name: 'lpAmount',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
+    type: 'error',
+    name: 'ZeroValue',
+    inputs: [],
   },
   {
     type: 'event',
@@ -934,43 +1805,6 @@ export const POOL_ABI = [
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'IndexUpdated',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'index',
-        type: 'uint256',
-        indexed: false,
-        internalType: 'uint256',
-      },
-      {
-        name: 'reserves',
-        type: 'uint128',
-        indexed: false,
-        internalType: 'uint128',
-      },
-      {
-        name: 'liabilities',
-        type: 'uint128',
-        indexed: false,
-        internalType: 'uint128',
-      },
-      {
-        name: 'reason',
-        type: 'uint8',
-        indexed: false,
-        internalType: 'uint8',
       },
     ],
     anonymous: false,
@@ -1199,33 +2033,6 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'ExcessiveAmount',
-    inputs: [
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'limit',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'FeatureDisabled',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-    ],
-  },
-  {
-    type: 'error',
     name: 'FeedAlreadyExists',
     inputs: [
       {
@@ -1255,22 +2062,6 @@ export const POOL_ABI = [
     type: 'error',
     name: 'FeedStale',
     inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'InsufficientAmount',
-    inputs: [
-      {
-        name: 'available',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'required',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
   },
   {
     type: 'error',
@@ -1315,11 +2106,6 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'NotAuth',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'NotConfigured',
     inputs: [
       {
@@ -1346,38 +2132,12 @@ export const POOL_ABI = [
   },
   {
     type: 'error',
-    name: 'NotFound',
-    inputs: [
-      {
-        name: 'resource',
-        type: 'uint8',
-        internalType: 'enum Err.Resource',
-      },
-      {
-        name: 'target',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'NotOwner',
-    inputs: [],
-  },
-  {
-    type: 'error',
     name: 'NotReady',
     inputs: [],
   },
   {
     type: 'error',
     name: 'OperationFailed',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'Overflow',
     inputs: [],
   },
   {
@@ -1432,10 +2192,5 @@ export const POOL_ABI = [
         internalType: 'uint256',
       },
     ],
-  },
-  {
-    type: 'error',
-    name: 'ZeroValue',
-    inputs: [],
   },
 ];

@@ -241,7 +241,7 @@ export function buildCurve(
 
 /** Pricing.INTERIOR_SWING_CAP_PBPS — the interior mid swing the fence can bound (fail-closed). */
 export const INTERIOR_SWING_CAP_PBPS = 10_000;
-/** `PoolConstants.MAX_DISPERSION_PBPS` — the band CEILING, a protocol constant. It is not a
+/** `PoolConstantsLib.MAX_DISPERSION_PBPS` — the band CEILING, a protocol constant. It is not a
  *  per-asset field: `Asset.maxDispersion` is deleted on chain (dex e2e87a7), because how wide a leg
  *  may quote is a property of the shared preset it quotes on, not of the leg. Only the floor
  *  (`minDispersion`) is configurable. */

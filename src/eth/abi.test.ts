@@ -57,8 +57,8 @@ describe('no hand-maintained mirrors of on-chain signatures', () => {
     // Pinned by hand off Pool.sol: 6 args, trailing deadline.
     expect(sig).toBe('swap(address,address,uint256,uint256,address,uint256)');
     expect(getPlan(POOL_ABI, 'swap').selector).toBe('0x9908fc8b');
-    // The retired 5-arg form hashes to a real-looking selector that no longer resolves —
-    // it would land in Pool.fallback and be DELEGATECALLed into PoolAux.
+    // The 5-arg form hashes to a real-looking selector `Pool` does not implement. `Pool` has
+    // no catch-all entrypoint, so it reverts empty rather than executing something else.
     expect(getSelector('swap(address,address,uint256,uint256,address)')).toBe('0xd5bcb9b5');
     expect(getPlan(POOL_ABI, 'swap').selector).not.toBe('0xd5bcb9b5');
   });

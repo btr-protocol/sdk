@@ -26,7 +26,7 @@ const CONTRACTS: Array<{
    *  Swapped/Deposited/Withdrawn/LiabilitySwapped/Donated all hit this).
    *  Spec is `Contract` (⇒ `out/Contract.sol/Contract.json`) or `File.sol/Contract`. */
   mergeEventsFrom?: string[];
-  /** Same, for ERROR entries. The swap path reverts from libraries (`Pricing`, `FeedMath`, ...), and
+  /** Same, for ERROR entries. The swap path reverts from libraries (`Pricing`, `FeedMathLib`, ...), and
    *  solc keeps library-thrown errors out of the caller's ABI, so `Pool`'s own artifact names only the
    *  handful it throws inline. `venues/router.ts` decodes revert data against POOL_ABI to tell a
    *  deliberate halt (StaleData / BaseDepegged) from an RPC blink — merging `Err` keeps that table whole. */
@@ -44,17 +44,9 @@ const CONTRACTS: Array<{
     file: 'Pool.ts',
     constName: 'POOL_ABI',
     title: 'Pool',
-    blurb: 'Flat pool surface (swap/deposit/withdraw/view). Admin ops live on Admin singleton.',
-    mergeEventsFrom: ['IPool'],
-    mergeErrorsFrom: ['Errors.sol/Err'],
-  },
-  {
-    contract: 'PoolAux',
-    file: 'PoolAux.ts',
-    constName: 'POOL_AUX_ABI',
-    title: 'PoolAux',
     blurb:
-      'Cold-path dispatcher (Pool fallback → DELEGATECALL). Hook surface (getAssetHook/hookDeploy/hookRecall) + pool-scoped admin. Call against the POOL address, not PoolAux.',
+      'Flat pool surface: swap/deposit/withdraw/view, the per-asset yield-hook surface (getAssetHook/hookDeploy/hookRecall), and the pool-scoped `admin*` entrypoints the Admin singleton calls into. One contract, no catch-all entrypoint.',
+    mergeEventsFrom: ['IPool'],
     mergeErrorsFrom: ['Errors.sol/Err'],
   },
   {

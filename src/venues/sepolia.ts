@@ -46,7 +46,6 @@ export const SEPOLIA_FX_SYMBOLS = ["USDC", "EURC", "QCAD", "AUDF", "BRLA", "JPYC
 export const SEPOLIA_BTR = {
   poolFactory: '0x9257A8F30e31e5Dc5f88C6623BB761b29D57Fd80' as Address,
   poolImpl: '0x44339E6451fE7858b1375BcF66b4f180945F235B' as Address,
-  poolAux: '0x35C5cf4216924B98BdA505EA4250e1Bb1DE243E1' as Address,
   oracle: '0xd3FB5bfF347265Aa7744582360Aaf3Eb6fdcf0e4' as Address,
   refOracle: '0x260ee8798eFb960017e8a6fC52E5B10695507670' as Address,
   flash: '0x42E2CD71031f30C0cb4D16B9A9F3598d3e8a405b' as Address,
