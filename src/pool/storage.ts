@@ -31,17 +31,16 @@ function isNativeKey(token: Address): boolean {
  * so a repack cannot silently desync them. Re-exported here because every decoder below reads them
  * and callers import them from this module.
  */
+import { HOOK_POST_INFLOW, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 
 /**
- * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstantsLib.sol`
- * (verified exact: HOOK_PRE_OUTFLOW=1<<0, HOOK_POST_INFLOW=1<<1). SSoT for back/front.
- * Pool dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
+ * Per-asset yield-hook flag bits, generated from dex `libraries/PoolConstantsLib.sol`. Pool
+ * dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
  */
-export const HOOK_PRE_OUTFLOW = 1 << 0;
-export const HOOK_POST_INFLOW = 1 << 1;
+export { HOOK_POST_INFLOW, HOOK_PRE_OUTFLOW };
 /** Known-bits mask; dex rejects unknown bits at adminSetAssetHook. */
 export const HOOK_FLAGS_MASK = HOOK_PRE_OUTFLOW | HOOK_POST_INFLOW;
 
