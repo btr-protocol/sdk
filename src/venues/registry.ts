@@ -1,17 +1,18 @@
-// Venue registry for BTR pool quoting. Sepolia is the only deployed venue
-// (Chapel retired 2026-07-25) and it hosts no incumbents, so the venue set is
-// the three BTR cores. Addresses live in ./sepolia.ts.
+// Venue registry for BTR pool quoting, resolved PER CHAIN.
+//
+// Every lookup here takes a `chainId` and throws when BTR is not deployed on it. That is the
+// whole point of the module: the previous shape hardcoded Sepolia and took no chain at all, so a
+// bot configured for Arc quoted Sepolia pool addresses and *succeeded* — the worst failure mode
+// available, because nothing reverts and nothing logs. There is deliberately no default chain and
+// no fallback: a caller that cannot name its chain has no business building swap calldata.
+//
+// Facts come from `./deployments.generated.ts`, which is generated from the broadcast records in
+// `dex/evm/deployments/`. A chain with no record is simply absent, so an undeployed chain fails
+// at the first lookup instead of resolving to plausible-looking addresses.
 
 import type { Address, Hex } from '../eth/index.js';
-import {
-  SEPOLIA_BTR,
-  SEPOLIA_FX_SYMBOLS,
-  SEPOLIA_REF_MARKS_USD,
-  SEPOLIA_STABLE_SYMBOLS,
-  SEPOLIA_TOKENS,
-  SEPOLIA_VOLATILE_SYMBOLS,
-  sepoliaFeedId,
-} from './sepolia.js';
+import { DEPLOYED_VENUES, type ChainVenue } from './deployments.generated.js';
+import { SEPOLIA_REF_MARKS_USD } from './sepolia.js';
 
 export type VenueKind = 'btr';
 
@@ -27,44 +28,87 @@ export const eqAddr = (a: string, b: string): boolean => a.toLowerCase() === b.t
 export const hasToken = (tokens: readonly Address[] | undefined, t: Address): boolean =>
   !!tokens?.some((x) => eqAddr(x, t));
 
-// ── Venue set ─────────────────────────────────────────────────────────────────
-// Single chain: Sepolia is the only deployed venue and hosts no incumbents, so
-// the venue set is the three BTR cores. Token lists gate which pool quotes a
-// pair; a dual-listed asset quotes every pool that lists it and the router
-// picks the better price (best-route across pools).
+/** Chain ids BTR is actually deployed on, ascending. */
+export function deployedChainIds(): number[] {
+  return Object.keys(DEPLOYED_VENUES)
+    .map(Number)
+    .sort((a, b) => a - b);
+}
 
-const symAddrs = (syms: readonly string[]): Address[] =>
-  syms.map((s) => SEPOLIA_TOKENS[s]!).filter(Boolean);
+/**
+ * The deployment record for `chainId`, or a throw naming what is deployed.
+ *
+ * Throwing is the contract. Every caller below funnels through here, so a bot started against an
+ * undeployed chain dies on its first quote with the chain id in the message, rather than trading
+ * another chain's addresses.
+ */
+export function chainVenue(chainId: number): ChainVenue {
+  const v = DEPLOYED_VENUES[chainId];
+  if (!v) {
+    throw new Error(
+      `no BTR deployment for chain ${chainId} — deployed: [${deployedChainIds().join(', ')}]. Run the deploy ceremony, then \`bun run gen\` in sdk/ to pick up dex/evm/deployments/${chainId}.{deploy,pools}.json.`,
+    );
+  }
+  return v;
+}
 
-/** USDC base (USDC-hub numeraire). */
-export function activeUsdc(): Address {
-  return SEPOLIA_TOKENS['USDC']!;
+/** USDC base (USDC-hub numeraire) — the first symbol of every roster. */
+export function activeUsdc(chainId: number): Address {
+  const v = chainVenue(chainId);
+  const usdc = v.tokens.USDC;
+  if (!usdc) throw new Error(`chain ${chainId} deployment carries no USDC base`);
+  return usdc;
 }
 
 /** ExternalOracle address. */
-export function activeOracle(): Address {
-  return SEPOLIA_BTR.oracle;
+export function activeOracle(chainId: number): Address {
+  const v = chainVenue(chainId);
+  const oracle = v.contracts.oracle;
+  if (!oracle) throw new Error(`chain ${chainId} deployment carries no oracle`);
+  return oracle;
 }
 
-/** Static USD ref marks (fallback while live oracle is down / stale). */
-export function activeRefMarksUsd(): Record<string, number> {
-  return { ...SEPOLIA_REF_MARKS_USD };
+/**
+ * Static USD ref marks for the chain's assets (sizing fallback while the live oracle is stale).
+ *
+ * Marks are a property of the ASSET, not of the chain, so the table is shared; it is narrowed to
+ * the chain's roster so an asset listed on one chain and not another cannot be sized off a mark
+ * for a token that chain does not have. A symbol with no static mark is absent, and the caller
+ * falls back rather than sizing off a fabricated number.
+ */
+export function activeRefMarksUsd(chainId: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const sym of Object.keys(chainVenue(chainId).tokens)) {
+    const m = SEPOLIA_REF_MARKS_USD[sym];
+    if (m !== undefined) out[sym] = m;
+  }
+  return out;
 }
 
-/** ExternalOracle getFeed key for a symbol (registered Pyth-style feedId); null when unknown. */
-export function activeFeedId(symbol: string): Hex | null {
-  return sepoliaFeedId(symbol);
+/**
+ * `ExternalOracle.getFeed` key for a token symbol; null when the chain has no feed for it.
+ *
+ * The base resolves to its signed `USDC-USD` reference: there is no `USDC/USDC` identity feed, and
+ * `Pricing._denominate` divides every usd-quoted asset by that reference.
+ */
+export function activeFeedId(chainId: number, symbol: string): Hex | null {
+  const v = chainVenue(chainId);
+  return v.feedIds[`${symbol}-USDC`] ?? v.feedIds[`${symbol}-USD`] ?? null;
 }
 
-/** Static venue pools. */
-export function staticVenuePools(): VenuePool[] {
-  const pools: VenuePool[] = [
-    { venue: 'btr', tag: 'btr-stable', address: SEPOLIA_BTR.stablePool, tokens: symAddrs(SEPOLIA_STABLE_SYMBOLS) },
-    { venue: 'btr', tag: 'btr-volatile', address: SEPOLIA_BTR.volatilePool, tokens: symAddrs(SEPOLIA_VOLATILE_SYMBOLS) },
-  ];
-  // FX core not in the current Sepolia redeploy: `SEPOLIA_BTR.fxPool` is typed
-  // `Address | undefined` and is undefined until the pool is actually deployed.
-  const fx = SEPOLIA_BTR.fxPool;
-  if (fx) pools.push({ venue: 'btr', tag: 'btr-fx', address: fx, tokens: symAddrs(SEPOLIA_FX_SYMBOLS) });
-  return pools;
+/**
+ * Deployed pools on `chainId`, with the token list that gates which pair each one quotes.
+ *
+ * A dual-listed asset quotes every pool that lists it and the router picks the better price
+ * (best-route across pools). Only broadcast pools appear — a scripted-but-undeployed core is
+ * absent from the generated record, so it can never be handed to the router.
+ */
+export function staticVenuePools(chainId: number): VenuePool[] {
+  const v = chainVenue(chainId);
+  return v.pools.map((p) => ({
+    venue: 'btr' as const,
+    tag: p.tag,
+    address: p.address,
+    tokens: p.symbols.map((s) => v.tokens[s]!).filter(Boolean),
+  }));
 }

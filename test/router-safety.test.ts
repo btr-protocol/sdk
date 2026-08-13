@@ -12,8 +12,15 @@
 import { describe, expect, test } from 'bun:test';
 import { planToLegs } from '../src/router/index';
 import { quoteAllExactIn } from '../src/venues/router';
-import { SEPOLIA_BTR, SEPOLIA_TOKENS } from '../src/venues/sepolia';
-import { staticVenuePools } from '../src/venues/registry';
+import { SEPOLIA_BTR, SEPOLIA_CHAIN_ID, SEPOLIA_TOKENS } from '../src/venues/sepolia';
+import {
+  activeFeedId,
+  activeOracle,
+  activeUsdc,
+  chainVenue,
+  deployedChainIds,
+  staticVenuePools,
+} from '../src/venues/registry';
 import { RpcRevertError } from '../src/eth/transport';
 import { encodeErrorResult, type AbiError } from '../src/eth/abi';
 import { POOL_ABI } from '../src/abis/Pool';
@@ -41,6 +48,7 @@ const deadProvider: Eip1193Provider = {
 
 describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
   const base = {
+    chainId: SEPOLIA_CHAIN_ID,
     provider: deadProvider,
     tokenIn: TOKEN_A,
     tokenOut: TOKEN_B,
@@ -74,8 +82,8 @@ describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
 });
 
 describe('quoteAllExactIn separates a protocol halt from a transport failure', () => {
-  const poolTag = staticVenuePools()[0].tag;
-  const poolAddr = staticVenuePools()[0].address;
+  const poolTag = staticVenuePools(SEPOLIA_CHAIN_ID)[0].tag;
+  const poolAddr = staticVenuePools(SEPOLIA_CHAIN_ID)[0].address;
 
   const runWith = async (err: Error) => {
     const skips: { kind: string; reason: string; tag: string }[] = [];
@@ -85,6 +93,7 @@ describe('quoteAllExactIn separates a protocol halt from a transport failure', (
       },
     } as unknown as Eip1193Provider;
     await quoteAllExactIn({
+      chainId: SEPOLIA_CHAIN_ID,
       provider,
       tokenIn: TOKEN_A,
       tokenOut: TOKEN_B,
@@ -193,11 +202,49 @@ describe('SEPOLIA_BTR.fxPool is declared-but-undeployed', () => {
   });
 
   test('the venue registry lists no FX pool while it is undeployed', () => {
-    expect(staticVenuePools().some((p) => p.tag === 'btr-fx')).toBe(false);
+    expect(staticVenuePools(SEPOLIA_CHAIN_ID).some((p) => p.tag === 'btr-fx')).toBe(false);
   });
 
   test('no stale FX address from a superseded broadcast leaks into the registry', () => {
     const stale = '0x18c7376a4f9b3c3fb8a0a33faf3c55ad225cb229';
-    expect(staticVenuePools().some((p) => p.address.toLowerCase() === stale)).toBe(false);
+    expect(staticVenuePools(SEPOLIA_CHAIN_ID).some((p) => p.address.toLowerCase() === stale)).toBe(
+      false,
+    );
+  });
+});
+
+/**
+ * The registry is the one place a bot can silently trade the wrong chain: quoting Sepolia
+ * addresses from an Arc-configured bot reverts nowhere and logs nothing, it just executes against
+ * a chain nobody meant. So resolution for an undeployed chain must THROW, not fall back.
+ */
+describe('chain resolution refuses to guess', () => {
+  test('an undeployed chain throws instead of falling back to a deployed one', () => {
+    const ARC = 5_042_002;
+    expect(deployedChainIds()).not.toContain(ARC);
+    expect(() => staticVenuePools(ARC)).toThrow(/no BTR deployment for chain 5042002/);
+    expect(() => activeUsdc(ARC)).toThrow(/no BTR deployment for chain 5042002/);
+    expect(() => activeOracle(ARC)).toThrow(/no BTR deployment for chain 5042002/);
+    expect(() => activeFeedId(ARC, 'USDC')).toThrow(/no BTR deployment for chain 5042002/);
+  });
+
+  test('the error names what IS deployed, so the operator sees the mismatch', () => {
+    expect(() => chainVenue(0)).toThrow(new RegExp(`deployed: \\[${SEPOLIA_CHAIN_ID}`));
+  });
+
+  test('every deployed chain resolves a base, an oracle and at least one pool', () => {
+    for (const id of deployedChainIds()) {
+      expect(activeUsdc(id)).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(activeOracle(id)).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(staticVenuePools(id).length).toBeGreaterThan(0);
+      // Every pool must list at least both its base and one counter-asset, else it quotes nothing.
+      for (const p of staticVenuePools(id)) expect(p.tokens!.length).toBeGreaterThan(1);
+    }
+  });
+
+  test('the base resolves to the signed USDC-USD reference, never a USDC/USDC identity', () => {
+    const id = SEPOLIA_CHAIN_ID;
+    expect(activeFeedId(id, 'USDC')).toBe(chainVenue(id).feedIds['USDC-USD']!);
+    expect(chainVenue(id).feedIds['USDC-USDC']).toBeUndefined();
   });
 });

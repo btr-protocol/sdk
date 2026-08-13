@@ -59,6 +59,9 @@ export interface VenueSkip {
 }
 
 export interface QuoteBestOpts {
+  /** Chain the quotes are for. REQUIRED and has no default: the venue set is per-chain, and a
+   *  defaulted chain quotes one chain's pools for a caller running on another. */
+  chainId: number;
   tokenIn: Address;
   tokenOut: Address;
   amountIn: bigint;
@@ -147,7 +150,7 @@ async function quoteBtr(
 
 /** Quote every single-hop candidate for (tokenIn → tokenOut). */
 export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuote[]> {
-  const { tokenIn, tokenOut, amountIn, provider, recipient, minOut } = opts;
+  const { chainId, tokenIn, tokenOut, amountIn, provider, recipient, minOut } = opts;
   if (eqAddr(tokenIn, tokenOut) || amountIn <= 0n) return [];
 
   // Guard the value the type system cannot: `recipient` is required, but a caller
@@ -160,7 +163,7 @@ export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuot
 
   const onSkip = opts.onSkip ?? defaultOnSkip;
   const settled = await Promise.all(
-    staticVenuePools().map((pool) =>
+    staticVenuePools(chainId).map((pool) =>
       quoteBtr(provider, pool, tokenIn, tokenOut, amountIn, recipient, minOut, onSkip),
     ),
   );
