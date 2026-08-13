@@ -48,21 +48,21 @@ function sign(digest: Hex, priv: Hex): Uint8Array {
   return out;
 }
 
-/** Build a 24-byte record big-endian: idx u16 | price u64 | sigma u32 | conf u16 | sourceTs u64. */
+/** Build a 24-byte record big-endian: idx u16 | price u64 | sigmaPbps u32 | conf u16 | sourceTsMs u64. */
 function record(
   idx: number,
   priceB64: bigint,
-  sigma: number,
+  sigmaPbps: number,
   conf: number,
-  sourceTs: bigint,
+  sourceTsMs: bigint,
 ): Uint8Array {
   const b = new Uint8Array(24);
   const dv = new DataView(b.buffer);
   dv.setUint16(0, idx);
   dv.setBigUint64(2, priceB64);
-  dv.setUint32(10, sigma);
+  dv.setUint32(10, sigmaPbps);
   dv.setUint16(14, conf);
-  dv.setBigUint64(16, sourceTs);
+  dv.setBigUint64(16, sourceTsMs);
   return b;
 }
 
@@ -84,9 +84,9 @@ describe('decodeBlob', () => {
     expect(r.idx).toBe(3);
     expect(r.priceB64).toBe(priceB64);
     expect(r.mark1e18).toBe(decodeB64(priceB64, 18));
-    expect(r.sigma).toBe(4200);
+    expect(r.sigmaPbps).toBe(4200);
     expect(r.confidence).toBe(15);
-    expect(r.sourceTs).toBe(1_700_000_000_000n);
+    expect(r.sourceTsMs).toBe(1_700_000_000_000n);
   });
 
   it('decodes multi-record blobs and rejects misaligned length', () => {
