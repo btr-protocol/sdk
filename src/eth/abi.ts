@@ -271,8 +271,7 @@ export function getPlan(abi: any, functionName: string): FnPlan {
   if (!p) {
     const fn = abi.find((i: any) => i.name === functionName);
     if (!fn) throw new Error(`Fn not found: ${functionName}`);
-    const sig = `${fn.name}(${(fn.inputs || []).map(canonicalType).join(',')})`;
-    p = { fn, selector: getSelector(sig) };
+    p = { fn, selector: getSelector(getFunctionSignature(fn)) };
     m.set(functionName, p);
   }
   return p;
@@ -331,6 +330,16 @@ export function decodeAbiParameters(params: AbiParameter[], data: string): any[]
   }
 
   return result;
+}
+
+/**
+ * Canonical signature of a function entry, the string `getSelector` hashes. Exported so a caller
+ * that needs to LABEL calldata can build the selector table off an ABI instead of writing hashes
+ * out: a written-out selector keeps hashing correctly while the signature rots against the
+ * contracts, and mislabels the calldata it was added to explain.
+ */
+export function getFunctionSignature(fn: { name: string; inputs?: readonly AbiParameter[] }): string {
+  return `${fn.name}(${(fn.inputs || []).map(canonicalType).join(',')})`;
 }
 
 /**
