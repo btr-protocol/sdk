@@ -10,7 +10,7 @@
  * on-chain feed seed). One fetch, one artifact, no second source that can disagree.
  *
  * The ROSTER is never restated here: it is the `symbols` array of that chain's risk-params JSON,
- * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 19, the idx-18 USDC/USD depeg
+ * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 18, the idx-17 USDC/USD depeg
  * reference is seeded from ORACLE_SEED_USDCUSD_1E18, not from this file). A symbol with no NXR
  * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS` —
  * chain-free, because an asset's mark source does not change when it is listed on a second chain.
@@ -38,11 +38,15 @@ import { join } from 'node:path';
 import { closedUntil, nxrMark, sessionOpenLabel } from '../src/venues/nxr.js';
 import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
 
-/** Deploy targets. `seedUsdPerLeg` is the value the ceremony was SIZED for; the risk JSON is the
- *  source of truth and is asserted against it, so an edited JSON fails here, not at broadcast. */
+/** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
+ *  file and is checked against the risk JSON, so `arc` can never write Sepolia's snapshot. The seed
+ *  SIZE is deliberately NOT pinned here — it is read from the risk JSON below. A second hand-written
+ *  copy of it guarded nothing this ceremony does not already guard (`ArcPoolDeploy._loadCfg` asserts
+ *  the snapshot against the risk JSON, and `checkSeedBudget()` refuses a roster it cannot fund),
+ *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
 const CHAINS = {
-  sepolia: { chainId: SEPOLIA_CHAIN_ID, risk: 'sepolia-risk-params.json', seedUsdPerLeg: 50_000 },
-  arc: { chainId: 5_042_002, risk: 'arc-risk-params.json', seedUsdPerLeg: 4_000 },
+  sepolia: { chainId: SEPOLIA_CHAIN_ID, risk: 'sepolia-risk-params.json' },
+  arc: { chainId: 5_042_002, risk: 'arc-risk-params.json' },
 } as const;
 
 const chainArg = (process.argv[2] || process.env.CHAIN || 'sepolia').toLowerCase();
@@ -73,16 +77,10 @@ if (!Number.isFinite(seedUsdPerLeg) || seedUsdPerLeg <= 0) {
   console.error(`${RISK}: seedUsdPerLeg absent or non-positive — nothing to size a seed from`);
   process.exit(1);
 }
-// The risk JSON is the SoT for both the chain and the seed size; the table above is the pinned
-// expectation. A mismatch means the operator is seeding a different ceremony than they think.
+// The risk JSON is the SoT for the roster and the seed size; the chain arg only selects WHICH file.
+// A mismatch means the operator is seeding a different ceremony than they think.
 if (risk.chainId !== CHAIN.chainId) {
   console.error(`${RISK}: chainId ${risk.chainId} != ${CHAIN.chainId} (${chainArg})`);
-  process.exit(1);
-}
-if (seedUsdPerLeg !== CHAIN.seedUsdPerLeg) {
-  console.error(
-    `${RISK}: seedUsdPerLeg ${seedUsdPerLeg} != pinned ${CHAIN.seedUsdPerLeg} for ${chainArg} — update the pin deliberately if the ceremony was resized`,
-  );
   process.exit(1);
 }
 
