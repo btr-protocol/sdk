@@ -48,15 +48,18 @@ export interface SwapQuote {
   lpFee: bigint;
   skewIn: number;
   skewOut: number;
-  /** Path oracle mark, B64 (1e18), tokenOut per tokenIn. */
-  markPriceB64: bigint;
-  /** Path executable mid, B64 (1e18): the mark displaced by inventory skew, which is what the
+  /** Path oracle mark, exact WAD (1e18), tokenOut per tokenIn. */
+  markPrice: bigint;
+  /** Path executable mid, exact WAD (1e18): the mark displaced by inventory skew, which is what the
    *  book quotes around. (exec - mid) is extractable value, (mid - mark) is the skew premium. */
-  midPriceB64: bigint;
+  midPrice: bigint;
   /** Coverage toll withheld from the gross output before the fee, tokenOut units. */
   covToll: bigint;
   routeHops: Address[];
   hopAmounts: bigint[];
+  /** Per-leg realised execution price, WAD, oriented anchor-per-child. Analytics only: the pool
+   *  populates it on `getSwapQuote` and leaves it empty on the swap-exec path. */
+  hopPrices: bigint[];
 }
 
 export interface PoolAsset {
