@@ -88,25 +88,17 @@ export const BRIDGE_ABI = [
   },
   {
     type: 'function',
-    name: 'cancelConfigChange',
+    name: 'cancelOp',
     inputs: [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
+        name: 'opType',
+        type: 'uint8',
+        internalType: 'uint8',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelSetPeer',
-    inputs: [
       {
-        name: 'eid',
-        type: 'uint32',
-        internalType: 'uint32',
+        name: 'subject',
+        type: 'bytes32',
+        internalType: 'bytes32',
       },
     ],
     outputs: [],

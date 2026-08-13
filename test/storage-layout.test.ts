@@ -58,7 +58,6 @@ function solcStructs(): Record<string, Record<string, [number, number]>> {
 const MAPPINGS = [
   'assets',
   'oracleConfigs',
-  'riskConfigs',
   'curves',
   'protocolFees',
   'assetHooks',

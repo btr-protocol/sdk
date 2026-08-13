@@ -31,12 +31,11 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     factory: 3n,
     assets: 4n,
     oracleConfigs: 5n,
-    riskConfigs: 6n,
-    curves: 7n,
-    protocolFees: 8n,
-    assetHooks: 9n,
-    invested: 10n,
-    lpTokens: 11n,
+    curves: 6n,
+    protocolFees: 7n,
+    assetHooks: 8n,
+    invested: 9n,
+    lpTokens: 10n,
   });
 });
 

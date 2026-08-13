@@ -90,60 +90,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'bootstrapFactory',
+    name: 'bootstrapRole',
     inputs: [
       {
-        name: 'f',
+        name: 'role',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
+      },
+      {
+        name: 'a',
         type: 'address',
         internalType: 'address',
       },
     ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'bootstrapStaking',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'bootstrapSwapper',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'bootstrapTreasuryOwner',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelFactory',
-    inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -156,29 +115,14 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'cancelStaking',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelSwapper',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelTreasury',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'cancelTreasuryOwner',
-    inputs: [],
+    name: 'cancelRole',
+    inputs: [
+      {
+        name: 'role',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
+      },
+    ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -217,36 +161,14 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'executeFactory',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'executeStaking',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'executeSwapper',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'executeTreasury',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'executeTreasuryOwner',
-    inputs: [],
+    name: 'executeRole',
+    inputs: [
+      {
+        name: 'role',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
+      },
+    ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -449,8 +371,14 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'pendingFactory',
-    inputs: [],
+    name: 'pendingRole',
+    inputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
+      },
+    ],
     outputs: [
       {
         name: 'addr',
@@ -467,134 +395,15 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
-    name: 'pendingStaking',
-    inputs: [],
-    outputs: [
-      {
-        name: 'addr',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'pendingSwapper',
-    inputs: [],
-    outputs: [
-      {
-        name: 'addr',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'pendingTreasury',
-    inputs: [],
-    outputs: [
-      {
-        name: 'addr',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'pendingTreasuryOwner',
-    inputs: [],
-    outputs: [
-      {
-        name: 'addr',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        internalType: 'uint64',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'queueFactory',
+    name: 'queueRole',
     inputs: [
       {
-        name: 'f',
-        type: 'address',
-        internalType: 'address',
+        name: 'role',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'queueStaking',
-    inputs: [
       {
-        name: 's',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'queueSwapper',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'queueTreasury',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'queueTreasuryOwner',
-    inputs: [
-      {
-        name: 't',
+        name: 'a',
         type: 'address',
         internalType: 'address',
       },
@@ -830,51 +639,6 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
-    name: 'FactoryCancelled',
-    inputs: [
-      {
-        name: 'f',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'FactoryQueued',
-    inputs: [
-      {
-        name: 'f',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'FactorySet',
-    inputs: [
-      {
-        name: 'f',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
     name: 'GuardianQuorumMaxSet',
     inputs: [
       {
@@ -996,10 +760,16 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
-    name: 'StakingCancelled',
+    name: 'RoleCancelled',
     inputs: [
       {
-        name: 's',
+        name: 'role',
+        type: 'uint8',
+        indexed: true,
+        internalType: 'enum AccessControl.Role',
+      },
+      {
+        name: 'addr',
         type: 'address',
         indexed: true,
         internalType: 'address',
@@ -1009,55 +779,16 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
-    name: 'StakingQueued',
+    name: 'RoleQueued',
     inputs: [
       {
-        name: 's',
-        type: 'address',
+        name: 'role',
+        type: 'uint8',
         indexed: true,
-        internalType: 'address',
+        internalType: 'enum AccessControl.Role',
       },
       {
-        name: 'eta',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'StakingSet',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'SwapperCancelled',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'SwapperQueued',
-    inputs: [
-      {
-        name: 's',
+        name: 'addr',
         type: 'address',
         indexed: true,
         internalType: 'address',
@@ -1073,100 +804,16 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'event',
-    name: 'SwapperSet',
+    name: 'RoleSet',
     inputs: [
       {
-        name: 's',
-        type: 'address',
+        name: 'role',
+        type: 'uint8',
         indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasuryCancelled',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasuryOwnerCancelled',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasuryOwnerQueued',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
+        internalType: 'enum AccessControl.Role',
       },
       {
-        name: 'eta',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasuryOwnerSet',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasuryQueued',
-    inputs: [
-      {
-        name: 't',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'eta',
-        type: 'uint64',
-        indexed: false,
-        internalType: 'uint64',
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'TreasurySet',
-    inputs: [
-      {
-        name: 't',
+        name: 'addr',
         type: 'address',
         indexed: true,
         internalType: 'address',

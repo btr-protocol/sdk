@@ -41,14 +41,13 @@ export const POOL_STORAGE = {
   factory: 3n,
   assets: 4n,
   oracleConfigs: 5n,
-  riskConfigs: 6n,
-  curves: 7n,
-  protocolFees: 8n,
+  curves: 6n,
+  protocolFees: 7n,
   /** Per-leg `HookSlot`: target + flags + the `hookCreditYield` clock, one word. */
-  assetHooks: 9n,
-  invested: 10n,
+  assetHooks: 8n,
+  invested: 9n,
   /** Per-leg ERC-20 receipt registry: `mapping(leg => LPToken)`. */
-  lpTokens: 11n,
+  lpTokens: 10n,
 } as const;
 
 /**
@@ -80,10 +79,10 @@ export const POOL_STRUCTS = {
     haircutSuppressor: [2, 22],
     decimals: [2, 24],
     deadSeedPow10: [2, 25],
-  },
-  RiskConfig: {
-    flags: [0, 0],
-    kappaCovBps: [0, 2],
+    /** Was `RiskConfig` in its own `riskConfigs` mapping; folded into `Asset` slot 2, which is now
+     *  240 of 256 bits used. There is no `RiskConfig` storage struct any more — see readRiskConfig. */
+    flags: [2, 26],
+    kappaCovBps: [2, 28],
   },
   OracleConfig: {
     feedId: [0, 0],
@@ -140,7 +139,8 @@ export async function readAssetHook(
   return decodeHookSlot(word);
 }
 
-/** `IPool.RiskConfig` — 2×uint16 in one word. */
+/** `IPool.RiskConfig` — 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
+ *  no longer a storage struct of its own: both fields live in `Asset` slot 2. */
 export interface RiskConfig {
   flags: number;
   /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). */
@@ -302,14 +302,25 @@ export async function readCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
+/**
+ * Per-leg risk fields. The `riskConfigs` mapping is GONE — `flags` and `kappaCovBps` were folded
+ * into `Asset` slot 2 — so this reads that word instead. Kept as its own function rather than
+ * folded into `getAsset` because it is one raw `eth_getStorageAt` against a slot the SDK already
+ * pins, where `getAsset` is a full `eth_call` returning fourteen fields; callers that want only
+ * the coverage wall (front's per-asset risk cache) should not pay for the rest.
+ */
 export async function readRiskConfig(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
 ): Promise<RiskConfig> {
   const key = await resolveTokenStorageKey(provider, pool, token);
-  const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.riskConfigs));
-  const f = POOL_STRUCTS.RiskConfig;
+  const f = POOL_STRUCTS.Asset;
+  const word = await getStorageAt(
+    provider,
+    pool,
+    mappingBase(key, POOL_STORAGE.assets) + BigInt(f.flags[0]),
+  );
   return {
     flags: u16At(word, f.flags[1]),
     kappaCovBps: u16At(word, f.kappaCovBps[1]),
