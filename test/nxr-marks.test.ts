@@ -29,17 +29,16 @@ describe('NXR mark sources', () => {
 
   // Arc is the roster the four-core ceremony deploys. Pinned by name so a silent roster edit in the
   // sibling repo surfaces here rather than at `fetch-seed-marks` time, mid-ceremony.
-  test('the arc roster is 19 symbols and maps to the expected pairs', () => {
+  test('the arc roster is 18 symbols and maps to the expected pairs', () => {
     const syms = roster('arc');
     if (!syms.length) return;
-    expect(syms).toHaveLength(19);
+    expect(syms).toHaveLength(18);
     expect(Object.fromEntries(syms.map((s) => [s, nxrMark(s)!.nxrSymbol]))).toEqual({
       USDC: 'USDC-USD',
       USDT: 'USDT-USD',
       USDE: 'USDE-USD',
       USDS: 'USDS-USD',
       USD1: 'USD1-USD',
-      USDG: 'USDG-USD',
       PYUSD: 'PYUSD-USD',
       EURC: 'EUR-USD',
       QCAD: 'CAD-USD',
@@ -54,9 +53,12 @@ describe('NXR mark sources', () => {
       XAUT: 'XAUT-USDC',
       PAXG: 'PAXG-USD',
     });
-    // RLUSD is in the TOKENS registry and in the Sepolia fleet, but NXR does not serve it
-    // (/v1/price/RLUSD-USD is 404, probed 2026-08-14), so it is not on the Arc roster.
+    // Both are in the TOKENS registry and in the Sepolia fleet, and both keep their NXR_MARKS row
+    // so re-listing is a roster line and nothing more — but NXR serves neither pair today
+    // (/v1/price/RLUSD-USD and /v1/price/USDG-USD both 404, probed 2026-08-14), and a 404 fails the
+    // seed-marks fetch for the WHOLE roster, not just its own leg.
     expect(syms).not.toContain('RLUSD');
+    expect(syms).not.toContain('USDG');
     // The only mixed-case symbol in the Sepolia emit is renamed. `.` and case quirks are both
     // forbidden in a roster symbol: it is simultaneously the risk-params key, the seed-marks key,
     // the `feed_<SYM>` record key and the keeper feed name, and Foundry reads `.` as a JSONPath
