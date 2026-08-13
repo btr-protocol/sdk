@@ -70,7 +70,7 @@ const CONTRACTS: Array<{
     constName: 'EXTERNAL_ORACLE_ABI',
     title: 'ExternalOracle',
     blurb:
-      'Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> BASE_TIMELOCK -> executeFeedWiden (guardian-vetoable).',
+      'Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> the BASE tier of GOV_DELAYS -> executeFeedWiden (guardian-vetoable).',
   },
   {
     contract: 'Flash',

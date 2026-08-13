@@ -27,7 +27,7 @@ export interface Asset {
   liquidityIndex: bigint;
   minDispersion: number;
   /** Pricing-shape pointer into PoolStorage.curves (shared preset table). Never 0 on a listed leg:
-   *  `PoolAdmin.validatePresetAssign` refuses the assignment, so there is no curve-less quote. */
+   *  `PoolConfig.validatePresetAssign` refuses the assignment, so there is no curve-less quote. */
   presetId: number;
   minFeePbps: number;
   vega: number;
