@@ -73,8 +73,7 @@
   "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
   "files": [
     "src",
-    "README.md",
-    "CHANGELOG.md"
+    "README.md"
   ],
   "keywords": [
     "btr",

@@ -2,7 +2,7 @@
 
 Protocol-internal TypeScript SDK for the BTR stack. Single source of truth for ABIs, EVM RPC client, chain registry, token list, and shared helpers — consumed by **front**, **back**, and contract tooling.
 
-Version pinned in `package.json` (`version` field). See `CHANGELOG.md`.
+Version pinned in `package.json` (`version` field).
 
 ## Purpose
 
