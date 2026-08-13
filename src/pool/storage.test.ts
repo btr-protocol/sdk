@@ -7,6 +7,7 @@ import { buildCurve } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
 import {
   POOL_STORAGE,
+  POOL_STRUCTS,
   addressAt,
   i8At,
   mappingBase,
@@ -17,15 +18,17 @@ import {
   u32At,
 } from './storage';
 
-// The authoritative check is test/storage-layout.test.ts, which reads solc's own storageLayout.
-// This one runs with no dex checkout at all, so it stays as the offline tripwire.
+// POOL_STORAGE / POOL_STRUCTS are generated from solc's storageLayout, so a test that re-reads
+// that same artifact proves nothing. These expectations are written out by hand on purpose: they
+// are the offline tripwire that catches a regeneration against the wrong build, and they run with
+// no dex checkout at all.
 test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
   expect(POOL_STORAGE).toEqual({
     baseToken: 0n,
     initialized: 0n,
-    protoShare: 0n,
+    protoSharePct: 0n,
     flashFeePbps: 0n,
-    flowCooldownSeconds: 0n,
+    flowCooldownSecs: 0n,
     wnative: 1n,
     treasury: 2n,
     factory: 3n,
@@ -36,6 +39,52 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     assetHooks: 8n,
     invested: 9n,
     lpTokens: 10n,
+  });
+});
+
+test('packed field offsets match the Solidity struct packing', () => {
+  expect(POOL_STRUCTS).toEqual({
+    PoolStorage: {
+      baseToken: [0, 0],
+      initialized: [0, 20],
+      protoSharePct: [0, 21],
+      flashFeePbps: [0, 22],
+      flowCooldownSecs: [0, 24],
+      wnative: [1, 0],
+      treasury: [2, 0],
+      factory: [3, 0],
+    },
+    Asset: {
+      reserves: [0, 0],
+      liabilities: [0, 16],
+      anchor: [1, 0],
+      minLiquidity: [1, 20],
+      liquidityIndexWad: [2, 0],
+      minDispersionPbps: [2, 12],
+      presetId: [2, 16],
+      minFeePbps: [2, 18],
+      vegaBps: [2, 20],
+      haircutSuppressorBps: [2, 22],
+      decimals: [2, 24],
+      deadSeedPow10: [2, 25],
+      flags: [2, 26],
+      kappaCovBps: [2, 28],
+    },
+    // Quote-source half (feedId, primary, mode, quoteUnit) then the breaker half.
+    OracleConfig: {
+      feedId: [0, 0],
+      primary: [1, 0],
+      mode: [1, 20],
+      quoteUnit: [1, 21],
+      refBandBps: [1, 22],
+      refFeedId: [2, 0],
+      refPrimary: [3, 0],
+    },
+    HookSlot: {
+      target: [0, 0],
+      flags: [0, 20],
+      lastCreditAt: [0, 24],
+    },
   });
 });
 
@@ -98,7 +147,9 @@ describe('readCurve (NUQuartic.Curve storage decode)', () => {
   // Pack a decoded curve exactly like NUQuartic.set writes storage.
   function packWords(c: ReturnType<typeof buildCurve>): Map<bigint, bigint> {
     let header = BigInt(c.m);
-    c.boundaries.forEach((b, j) => {
+    // Interior boundaries ONLY — b_m is the BPS constant and is never stored (NUQuartic.set).
+    // Writing it here too would leave the directory one entry wider than the contract's.
+    c.boundaries.slice(0, -1).forEach((b, j) => {
       header |= BigInt(b) << BigInt(8 + 16 * j);
     });
     header |= BigInt(c.dispRef) << 232n;

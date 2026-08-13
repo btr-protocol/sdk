@@ -1,20 +1,18 @@
 /**
  * PoolStorage slot readers — Solana-style deterministic layout, no Solidity getters.
  *
- * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`), pinned by dex PoolStorageLayout.t.sol.
- * `POOL_STORAGE` (slots) and `POOL_STRUCTS` (in-struct [slot, byteOffset]) below are the ONLY
- * place either number appears — every decoder reads them — and both tables are asserted
- * field-by-field against the `storageLayout` of dex/evm's forge artifacts by
- * test/storage-layout.test.ts.
- * An ABI diff cannot see packing, so that test, not test/abi-freshness.test.ts, is what catches
- * a repack.
+ * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). `POOL_STORAGE` (slots) and `POOL_STRUCTS`
+ * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout` — they are the only
+ * place either number appears, and every decoder reads them. An ABI diff cannot see packing, so
+ * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
+ * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
  * Policy: dex/evm/README.md § "Off-chain reads (no storage getters)".
  */
 
-import type { QuarticCurve, QuarticSeg } from '../amm/aimm.js';
+import { BPS, type QuarticCurve, type QuarticSeg } from '../amm/aimm.js';
 import { encodeAbiParameters } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
@@ -28,77 +26,14 @@ function isNativeKey(token: Address): boolean {
   return t === NATIVE_SENTINEL || t === ZERO_ADDR;
 }
 
-/** Absolute slots of `IPool.PoolStorage` fields (pinned by PoolStorageLayout.t.sol). */
-export const POOL_STORAGE = {
-  /** Packed word: baseToken + initialized + protoShare + flashFeePbps + flowCooldownSeconds. */
-  baseToken: 0n,
-  initialized: 0n,
-  protoShare: 0n,
-  flashFeePbps: 0n,
-  flowCooldownSeconds: 0n,
-  wnative: 1n,
-  treasury: 2n,
-  factory: 3n,
-  assets: 4n,
-  oracleConfigs: 5n,
-  curves: 6n,
-  protocolFees: 7n,
-  /** Per-leg `HookSlot`: target + flags + the `hookCreditYield` clock, one word. */
-  assetHooks: 8n,
-  invested: 9n,
-  /** Per-leg ERC-20 receipt registry: `mapping(leg => LPToken)`. */
-  lpTokens: 10n,
-} as const;
-
 /**
- * In-struct field position as `[slot, byteOffset]`, LSB-aligned exactly as solc packs.
- * `slot` is relative to the struct's own base (the mapping-entry base for a mapping value).
+ * Slot and packing tables, generated from dex/evm's compiled `storageLayout` — solc's own numbers,
+ * so a repack cannot silently desync them. Re-exported here because every decoder below reads them
+ * and callers import them from this module.
  */
-export const POOL_STRUCTS = {
-  /** Flat scalars of `PoolStorage` itself (slot 0 is a packed word; the rest are whole slots). */
-  PoolStorage: {
-    baseToken: [0, 0],
-    initialized: [0, 20],
-    protoShare: [0, 21],
-    flashFeePbps: [0, 22],
-    flowCooldownSeconds: [0, 24],
-    wnative: [1, 0],
-    treasury: [2, 0],
-    factory: [3, 0],
-  },
-  Asset: {
-    reserves: [0, 0],
-    liabilities: [0, 16],
-    anchor: [1, 0],
-    minLiquidity: [1, 20],
-    liquidityIndex: [2, 0],
-    minDispersion: [2, 12],
-    presetId: [2, 16],
-    minFeePbps: [2, 18],
-    vega: [2, 20],
-    haircutSuppressor: [2, 22],
-    decimals: [2, 24],
-    deadSeedPow10: [2, 25],
-    /** Was `RiskConfig` in its own `riskConfigs` mapping; folded into `Asset` slot 2, which is now
-     *  240 of 256 bits used. There is no `RiskConfig` storage struct any more — see readRiskConfig. */
-    flags: [2, 26],
-    kappaCovBps: [2, 28],
-  },
-  OracleConfig: {
-    feedId: [0, 0],
-    refFeedId: [1, 0],
-    primary: [2, 0],
-    refBandBps: [2, 20],
-    mode: [2, 22],
-    quoteUnit: [2, 23],
-    refPrimary: [3, 0],
-  },
-  HookSlot: {
-    target: [0, 0],
-    flags: [0, 20],
-    lastCreditAt: [0, 24],
-  },
-} as const satisfies Record<string, Record<string, readonly [number, number]>>;
+import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
+
+export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 
 /**
  * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstantsLib.sol`
@@ -276,10 +211,14 @@ export async function readCurve(
   const header = BigInt(await getStorageAt(provider, pool, base));
   if (header === 0n) return null;
   const m = Number(header & 0xffn);
+  // The directory holds the m-1 INTERIOR boundaries only; the last right edge is the BPS constant,
+  // never stored (NUQuartic.set: "interior boundaries only; b_m = SC.BPS"). Those freed bits carry
+  // the median at 216, so reading m entries here both loses b_m and mis-reads the median as one.
   const boundaries: number[] = [];
-  for (let j = 1; j <= m; j++) {
+  for (let j = 1; j < m; j++) {
     boundaries.push(Number((header >> BigInt(8 + 16 * (j - 1))) & 0xffffn));
   }
+  boundaries.push(BPS);
   const dispRef = Number((header >> 232n) & 0xffffn);
   const flags = Number((header >> 248n) & 0xffn);
   const words = await Promise.all(

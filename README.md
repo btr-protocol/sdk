@@ -7,7 +7,7 @@ Version pinned in `package.json` (`version` field). See `CHANGELOG.md`.
 ## Purpose
 
 - Framework-agnostic EVM JSON-RPC client (`./eth`) — no `ethers`, no `viem` dep.
-- Canonical ABIs (`./abis`) for every deployed BTR DEX contract: AccessControl, Admin, Bridge, BridgeableERC20, Distributor, ExternalOracle, Flash, GovToken, Pool, PoolFactory, Staking, Treasury.
+- Canonical ABIs (`./abis`) for every deployed BTR DEX contract: AccessControl, Admin, ExternalOracle, Flash, IPoolHooks, LPToken, Pool, PoolFactory. Generated from the dex/shared forge artifacts by `bun run gen` — never hand-edited.
 - Pool helpers: data fetch + swap quoting, single-pool, caller supplies the pool address (`./pool`).
 - Off-chain AIMM pricer + route-finding: `quoteExactIn`, `enumerateRoutes`, `quoteRoute`, `rankSwap` (best plan incl. order splitting), `aggregateDepth`, plus the `poolStateFrom` on-chain seam (`./amm`).
 - Off-chain swap-execution call builder: `planToLegs` maps a `rankSwap` plan to executable legs; `buildSwapCalls` turns legs into a deduplicated, ordered `approve`+`swap` calldata sequence (`./router`).
@@ -36,8 +36,8 @@ bun install
 
 | Subpath | Purpose |
 |---|---|
-| `@btr-protocol/sdk` | Curated root re-export (utils, pool incl. `POOL_ABI`, router, amm, eth) — the other 12 ABIs are `@btr-protocol/sdk/abis`-only, not re-exported at root |
-| `@btr-protocol/sdk/abis` | Raw ABIs: `ACCESS_CONTROL_ABI`, `ADMIN_ABI`, `BRIDGE_ABI`, `BRIDGEABLE_ERC20_ABI`, `DISTRIBUTOR_ABI`, `EXTERNAL_ORACLE_ABI`, `FLASH_ABI`, `GOV_TOKEN_ABI`, `POOL_ABI`, `POOL_FACTORY_ABI`, `STAKED_ASSET_ABI`, `STAKING_ABI`, `TREASURY_ABI` |
+| `@btr-protocol/sdk` | Curated root re-export (utils, pool incl. `POOL_ABI`, router, amm, eth) — the other ABIs are `@btr-protocol/sdk/abis`-only, not re-exported at root |
+| `@btr-protocol/sdk/abis` | Raw ABIs: `ACCESS_CONTROL_ABI`, `ADMIN_ABI`, `EXTERNAL_ORACLE_ABI`, `FLASH_ABI`, `LP_TOKEN_ABI`, `POOL_ABI`, `POOL_FACTORY_ABI`, `POOL_HOOKS_ABI` |
 | `@btr-protocol/sdk/amm` | Off-chain AIMM pricer (`buildLeg`, `quoteExactIn`, `depthCurve`) + route-finding (`enumerateRoutes`, `quoteRoute`, `rankSwap`, `aggregateDepth`) + `poolStateFrom` seam (see below) |
 | `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
 | `@btr-protocol/sdk/pool` | Single-pool data + tx: `getAsset`, `getCoverageRatio`, `getLPBalance`, `getSwapQuote`, `getPoolData`, `swap`, `deposit`, `withdraw`, `NATIVE_TOKEN` (canonical `POOL_ABI`, `SwapQuote`, `PoolAsset`) |
@@ -63,6 +63,32 @@ bun run build
 bun run test
 bun run lint
 ```
+
+## Generated code (single source of truth)
+
+Everything the SDK knows about the contracts is derived from the sibling forge artifacts, never
+written by hand. `scripts/manifest.ts` is the one table saying which artifact backs which export;
+`scripts/gen.ts` writes from it:
+
+| Generated | Contents |
+|---|---|
+| `src/abis/*.ts` + `index.ts` | Contract ABIs, with library-thrown events/errors merged into `POOL_ABI` |
+| `src/pool/layout.generated.ts` | `POOL_STORAGE` / `POOL_MAPPINGS` / `POOL_STRUCTS` from solc's `storageLayout` |
+| `src/pool/structs.generated.ts` | Per-struct field-name unions + the `Assert`/`FieldsMatch` conformance types |
+
+```bash
+cd ../dex/evm && forge build && cd ../../shared/evm && forge build   # artifacts first
+bun run gen          # regenerate
+bun run gen:check    # verify only — non-zero exit on drift
+```
+
+`gen:check` runs as the first step of `bun run build` and `bun run check`, so a contract change that
+skips regeneration fails the build instead of shipping a stale wire format. Hand-editing any file
+above is always wrong: it is overwritten wholesale and `gen:check` will fail on it.
+
+**Consumers (`back`, `front`, `keepers`) must not keep their own selector or ABI maps.** Import from
+`@btr-protocol/sdk/abis` and derive selectors/topic0s at runtime from those ABIs. Four independent
+hand-maintained copies of this data have drifted from the contracts and caused real bugs.
 
 ## Usage
 

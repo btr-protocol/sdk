@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.35;
+pragma solidity =0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {NUQuartic as NUQ} from "../../src/libraries/NUQuartic.sol";
