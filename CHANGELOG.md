@@ -2,6 +2,36 @@
 
 All notable changes to `@btr-protocol/sdk` are documented here.
 
+## [0.5.0] - 2026-08-13
+
+Regenerated against the frozen contracts (`dex` b131ec7, `shared` 4364039). Breaking.
+
+### Changed
+- ABIs, storage slot/offset tables and per-struct field-name unions are now GENERATED
+  (`bun run gen`) from one manifest, `scripts/manifest.ts`. `bun run gen:check` compares them
+  byte-for-byte and runs first in `build` and `check`, so a skipped regen fails the build.
+- `Asset` / `PoolStorage` fields renamed to carry units: `vega`→`vegaBps`,
+  `haircutSuppressor`→`haircutSuppressorBps`, `liquidityIndex`→`liquidityIndexWad`,
+  `minDispersion`→`minDispersionPbps`, `protoShare`→`protoSharePct`,
+  `flowCooldownSeconds`→`flowCooldownSecs`.
+- `OracleConfig` reordered into quote-source then breaker halves; `primary` moved slot 2→1.
+- Sepolia oracle feed indices all shift down one: the `USDC/USDC` identity feed is gone and the
+  base's mark is the signed `USDC-USD` reference at idx 22. 28 feeds, `0..27`.
+- Error selectors: `PriceOutsideReservation`→`PriceOutsideRefBand`, `FeedStale`→`StaleData`,
+  `FeedPaused`→`FeatureDisabled`. Nine event topic0s changed (`*Set`→`*Updated`,
+  `UpgradeAuthorized`→`UpgradeRequested`).
+
+### Fixed
+- `readCurve` read `m` boundaries from the NUQuartic header directory, which holds the `m-1`
+  interior edges only — the last is the `BPS` constant and the freed bits now carry the median.
+  Every decoded curve had a `0` final boundary. Its certifying fixture could not be regenerated
+  (pragma pinned `=0.8.35` against dex's `=0.8.36`), which is why this went unseen.
+
+### Removed
+- Tokenomics ABIs (`BRIDGE_ABI`, `BRIDGEABLE_ERC20_ABI`, `DISTRIBUTOR_ABI`, `GOV_TOKEN_ABI`,
+  `GOV_TREASURY_ABI`, `OPS_TREASURY_ABI`, `STAKED_ASSET_ABI`, `STAKING_ABI`) — those contracts no
+  longer exist. `LP_TOKEN_ABI` added.
+
 ## [0.4.6] - 2026-05-14
 
 ### Changed (Track-1 Wave-1)
