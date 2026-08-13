@@ -10,9 +10,10 @@
  * ZERO_ADDRESS. The real SoT is dex/evm/deployments/<chainId>.{deploy,pools}.json, which the
  * front end consumes via the btr-deployment vite plugin (front/src/config/deployment.ts).
  *
- * There is no CREATE3 anywhere in the stack. Pool proxies use a salted deterministic beacon-proxy
- * deploy whose salt includes block.chainid (PoolFactory.sol:111-114), so addresses are NOT
- * identical across chains. Mock tokens are plain nonce-ordered CREATE.
+ * There is no CREATE3 anywhere in the stack. Pool proxies are ERC-1967 beacon proxies pointing at
+ * `PoolFactory` itself (the factory IS the beacon), deployed at a salt that includes block.chainid
+ * (`PoolFactory.createPool`), so addresses are NOT identical across chains. Mock tokens are plain
+ * nonce-ordered CREATE.
  */
 
 import type { Address } from './types';

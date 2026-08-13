@@ -20,18 +20,23 @@ export const ACCESS_CONTROL_ABI = [
         type: 'address',
         internalType: 'address',
       },
+      {
+        name: 'govDelays_',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    name: 'FACTORY_TIMELOCK',
+    name: 'GOV_DELAYS',
     inputs: [],
     outputs: [
       {
         name: '',
-        type: 'uint64',
-        internalType: 'uint64',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -58,19 +63,6 @@ export const ACCESS_CONTROL_ABI = [
         name: '',
         type: 'uint8',
         internalType: 'uint8',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'ROTATION_TIMELOCK',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint64',
-        internalType: 'uint64',
       },
     ],
     stateMutability: 'view',
@@ -817,6 +809,31 @@ export const ACCESS_CONTROL_ABI = [
         type: 'address',
         indexed: true,
         internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'ZeroDelayGovernance',
+    inputs: [
+      {
+        name: 'deployer',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'owner',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'schedule',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
       },
     ],
     anonymous: false,

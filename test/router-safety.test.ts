@@ -49,7 +49,7 @@ describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
   };
 
   test('an explicit zero recipient throws instead of building burn-address calldata', async () => {
-    // Pool.sol:152 does not reject recipient == 0 and PoolIO.push -> safeTransferETH(0)
+    // Pool.swap does not reject recipient == 0 and PoolIOLib.push -> safeTransferETH(0)
     // SUCCEEDS, so this calldata would have executed and paid the burn address.
     expect(quoteAllExactIn({ ...base, recipient: ZERO })).rejects.toThrow(/non-zero address/);
   });

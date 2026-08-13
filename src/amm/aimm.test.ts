@@ -749,7 +749,7 @@ describe('compose + degenerate', () => {
 // Inverted from the old `fallback quote (presetId 0 — skew-anchored linear impact)` block, which
 // asserted a curve-less leg still quoted. That was a SECOND pricing law (skew-anchored linear
 // impact) mirroring one the chain deleted: `Pricing._traverseCurveByVolume` now documents "there is
-// no empty-curve fallback", and `PoolAdmin.validatePresetAssign` refuses to list an asset without a
+// no empty-curve fallback", and `PoolConfig.validatePresetAssign` refuses to list an asset without a
 // curve, so presetId 0 is unconstructible. The behaviour it tested is genuinely gone, so what is
 // pinned instead is its ABSENCE: a curve-less profile must not produce a number.
 describe('there is exactly ONE pricing law (no empty-curve fallback)', () => {
@@ -902,7 +902,7 @@ describe('buildCurve centring (NUQuartic._centre — write-path parity)', () => 
 
 // ── Every shipped fixture must be INSTALLABLE on chain ─────────────────────────
 // A fixture the pool would reject validates nothing: `VOLATILE_PROFILE` carried minDisp 50_000
-// against a `dispersionCap` of 10_000 and `PoolAdmin.sanitizeDispersion` reverts `BadConfig` on it.
+// against a `dispersionCap` of 10_000 and `PoolConfig.sanitizeDispersion` reverts `BadConfig` on it.
 // Bounds are DERIVED from the preset's cap (profiles.ts), and this pins that they stay derived.
 describe('fixture profiles satisfy the on-chain admissibility rules', () => {
   const SHIPPED: [string, AimmProfile][] = [

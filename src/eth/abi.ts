@@ -55,8 +55,9 @@ const decUtf8 = new TextDecoder();
 // Runtime memo only. A hand-written table of signature→selector pairs is
 // unmaintainable: the hashes stay right while the *signatures* rot against the
 // contracts (a stale `swap(address,address,uint256,uint256,address)` entry
-// silently served a selector for a function that no longer exists, sending the
-// call into Pool.fallback). Deriving costs ~2.3us once per unique signature per
+// silently served a selector for a function no contract answers, and `Pool` has
+// no catch-all entrypoint, so the call reverts empty — which reads as an RPC
+// blink, not as a bug). Deriving costs ~2.3us once per unique signature per
 // process, which no hot path notices — getPlan memoizes per (abi, fn) anyway.
 const SELECTORS: Record<string, string> = {};
 

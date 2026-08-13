@@ -4,7 +4,8 @@
  *
  * DEX-only public surface. ALM/vault ABIs archived under `archive/alm-abis/` on
  * branch `archive/pre-dex-pivot`. Post-Phase 42H: Admin/Staking/Distributor/Flash
- * are singletons with `pool` as first arg of pool-scoped fns. Pool surface is flat.
+ * are singletons with `pool` as first arg of pool-scoped fns. Pool surface is flat: one
+ * contract answers every pool call directly.
  */
 
 export * from './AccessControl.js';
@@ -19,7 +20,6 @@ export * from './GovTreasury.js';
 export * from './IPoolHooks.js';
 export * from './OpsTreasury.js';
 export * from './Pool.js';
-export * from './PoolAux.js';
 export * from './PoolFactory.js';
 export * from './StakedAsset.js';
 export * from './Staking.js';

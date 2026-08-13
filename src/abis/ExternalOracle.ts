@@ -87,19 +87,6 @@ export const EXTERNAL_ORACLE_ABI = [
   },
   {
     type: 'function',
-    name: 'SIGNER_GOV_TIMELOCK',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint48',
-        internalType: 'uint48',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'SOURCE_TS_FUTURE_SKEW_S',
     inputs: [],
     outputs: [

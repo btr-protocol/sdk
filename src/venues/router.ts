@@ -65,7 +65,7 @@ export interface QuoteBestOpts {
   provider: Eip1193Provider;
   /**
    * Recipient baked into the executable swap calldata. REQUIRED and must be non-zero:
-   * `Pool.sol:152` does not reject `recipient == 0`, and `PoolIO.push` on the native
+   * `Pool.swap` does not reject `recipient == 0`, and `PoolIOLib.push` on the native
    * sentinel does `safeTransferETH(0)`, which SUCCEEDS. A defaulted zero recipient is a
    * swap that pays the burn address, so there is no safe default to fall back to.
    */

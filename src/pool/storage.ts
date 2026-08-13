@@ -101,7 +101,7 @@ export const POOL_STRUCTS = {
 } as const satisfies Record<string, Record<string, readonly [number, number]>>;
 
 /**
- * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstants.sol`
+ * Per-asset yield-hook flag bits — canonical mirror of dex `libraries/PoolConstantsLib.sol`
  * (verified exact: HOOK_PRE_OUTFLOW=1<<0, HOOK_POST_INFLOW=1<<1). SSoT for back/front.
  * Pool dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
  */

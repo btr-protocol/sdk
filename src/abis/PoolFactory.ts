@@ -43,19 +43,6 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
-    name: 'UPGRADE_TIMELOCK',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'beacon',
     inputs: [],
     outputs: [
@@ -226,6 +213,19 @@ export const POOL_FACTORY_ABI = [
         name: '',
         type: 'address[]',
         internalType: 'address[]',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'implementation',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
       },
     ],
     stateMutability: 'view',
