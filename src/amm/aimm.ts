@@ -7,11 +7,13 @@
 // math (truncating division included) so front depth charts match on-chain quotes bit-for-bit at
 // the curve level. Amount/price plumbing around them stays f64 (UI floats).
 //
-// SEAMS (the only deferrals): σ (sigmaSeed → live feed.sigma on deploy), reserves/L
+// SEAMS (the only deferrals): σ (sigmaSeed → live feed.sigmaPbps on deploy), reserves/L
 // (usePoolData stub → on-chain), and each leg's kappaCovBps (defaults 0 = off, matching the
 // current testnet risk config — dex/evm/deploy/testnet-asset-params.json sharedRiskConfig; wire
 // per-asset RiskConfig.kappaCovBps via Pool once a risk-config view fn exists on-chain). Everything
 // else is built fully, including the convex coverage-wall toll (GATE-07; Pricing.sol `_covToll`).
+
+import { STALE_Z } from '../abis/solidity.generated.js';
 
 export const BPS = 1e4; // 0.01%
 export const PBPS = 1e6; // 0.0001% (fee/offset/dispersion unit)
@@ -439,7 +441,6 @@ export interface LegRisk {
   staleExcess?: number; // seconds past the keeper grace
 }
 
-const STALE_Z = 100; // Pricing.sol
 
 /** One leg's staleness premium in PBPS = STALE_Z·σ·√excess/BPS (Pricing.sol `_staleTerm`), on that
  *  leg's OWN age and σ. BigInt: the product overruns 2^53 at the uint32 ceilings, and the chain

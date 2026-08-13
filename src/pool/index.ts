@@ -6,7 +6,7 @@
 import { POOL_ABI } from '../abis/Pool.js';
 import { decodeFn, encodeFn } from '../eth/abi';
 import type { Address, Eip1193Provider, Hex } from '../eth/types';
-import type { Assert, AssetFields, FieldsMatch, SwapQuoteFields } from './structs.generated.js';
+import type { Assert, AssetFields, FieldsMatch, SwapQuoteFields } from '../abis/structs.generated.js';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)

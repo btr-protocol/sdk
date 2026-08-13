@@ -1,7 +1,8 @@
 /**
  * Generate every artifact-derived file in the SDK from the sibling forge builds.
  *
- * Writes `src/abis/*.ts` (+ its barrel) and `src/pool/layout.generated.ts`. Nothing it writes may
+ * Writes `src/abis/*.ts` (+ its barrel + the enum and struct-field tables) and
+ * `src/pool/layout.generated.ts`. Nothing it writes may
  * be hand-edited: it is overwritten wholesale, and `--check` fails when the working tree differs
  * from what the current artifacts produce. Wire `--check` into CI/build so a contract change that
  * skips regeneration breaks the build instead of shipping a stale wire format.
@@ -11,7 +12,16 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { artifact, CONTRACTS, resolveAbi } from './manifest.js';
+import {
+  artifact,
+  CONTRACTS,
+  CONSTANTS,
+  ENUMS,
+  constantValues,
+  enumMembers,
+  poolScopedOps,
+  resolveAbi,
+} from './manifest.js';
 
 const SRC = resolve(import.meta.dir, '../src');
 const CHECK = process.argv.includes('--check');
@@ -90,29 +100,41 @@ export const POOL_STRUCTS = ${toTs(structs)} as const satisfies Record<
 }
 
 /**
- * Field-name unions for the `IPool` structs the SDK mirrors as hand-written, documented interfaces.
+ * Field-name unions for every struct the SDK mirrors as a hand-written, documented interface.
  *
  * The interfaces stay hand-written because their doc comments carry meaning solc has no room for;
- * these unions are what makes them safe. `pool/index.ts` and `pool/storage.ts` assert their keys
- * against these, so a Solidity field rename is a typecheck failure instead of a silently
- * `undefined` read — which is exactly how `Asset.vega`→`vegaBps` slipped through before.
+ * these unions are what makes them safe. Each mirror asserts its keys against one, so a Solidity
+ * field rename is a typecheck failure naming the field instead of a silently `undefined` read —
+ * which is exactly how `Asset.vega`→`vegaBps` and `FeedData.sigma`→`sigmaPbps` both slipped
+ * through, the second one all the way into a deployed indexer that reported every feed stale.
  */
 function structFieldsFile(): string {
-  const abi = resolveAbi(CONTRACTS.find((c) => c.contract === 'Pool')!);
   const found = new Map<string, string[]>();
-  const walk = (node: unknown): void => {
-    if (Array.isArray(node)) return void node.forEach(walk);
+  const owner = new Map<string, string>();
+  const walk = (node: unknown, from: string): void => {
+    if (Array.isArray(node)) return void node.forEach((e) => walk(e, from));
     if (!node || typeof node !== 'object') return;
     const n = node as Record<string, unknown>;
     const it = n.internalType;
     if (typeof it === 'string' && it.startsWith('struct ') && Array.isArray(n.components)) {
       const short = it.replace(/^struct\s+/, '').split('.').pop()!;
       const fields = (n.components as Array<{ name: string }>).map((c) => c.name);
-      if (!found.has(short)) found.set(short, fields);
+      const prev = found.get(short);
+      // Two ABIs declaring one struct name with different members would make the union depend on
+      // iteration order, i.e. on nothing. Fail rather than pick.
+      if (prev && prev.join() !== fields.join()) {
+        throw new Error(
+          `struct ${short} differs between ${owner.get(short)} and ${from}: [${prev}] vs [${fields}]`,
+        );
+      }
+      if (!prev) {
+        found.set(short, fields);
+        owner.set(short, from);
+      }
     }
-    for (const v of Object.values(n)) walk(v);
+    for (const v of Object.values(n)) walk(v, from);
   };
-  walk(abi);
+  for (const spec of CONTRACTS) walk(resolveAbi(spec), spec.contract);
   const body = [...found.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(
@@ -121,7 +143,7 @@ function structFieldsFile(): string {
     )
     .join('\n\n');
   return `${banner('bun scripts/gen.ts')}
-/** Exact field names of each \`IPool\` struct, as the ABI declares them. */
+/** Exact field names of each ABI struct, as the ABI declares them. */
 ${body}
 
 /**
@@ -141,9 +163,63 @@ export type Assert<T extends true> = T;
 `;
 }
 
+// ── what solc erases ─────────────────────────────────────────────────────────────────────────
+/**
+ * Enum ordinals and `internal`/`private constant` values, read from the declaring `.sol` source.
+ *
+ * These cannot come from `out/`: the ABI records `internalType: 'enum X.Y'` and nothing at all
+ * for a constant, so an artifact-only generator has no value to check and a hand-copied table is
+ * unfalsifiable. Source is therefore the input, and `--check` is what makes it stay true.
+ */
+function solidityFile(): string {
+  const blocks = ENUMS.map((spec) => {
+    const members = enumMembers(spec);
+    const entries = members.map((m, i) => `  ${m}: ${i},`).join('\n');
+    return `/** ${spec.blurb}
+ *  Source: ${spec.root}/evm/${spec.path} */
+export const ${spec.name} = {
+${entries}
+} as const;
+export type ${spec.name} = (typeof ${spec.name})[keyof typeof ${spec.name}];`;
+  }).join('\n\n');
+
+  const consts = CONSTANTS.map((spec) => {
+    const body = constantValues(spec)
+      .map(([n, v]) => `export const ${n} = ${v};`)
+      .join('\n');
+    return `// ${spec.root}/evm/${spec.path}\n${body}`;
+  }).join('\n\n');
+
+  return `${banner('bun scripts/gen.ts')}
+/**
+ * Solidity enum ordinals and internal constants
+ * @module @btr-protocol/sdk/abis
+ *
+ * solc keeps neither in the ABI, so both are parsed out of the declaring \`.sol\` file. Never
+ * hand-write an ordinal: \`OpType\` is grouped by timelock tier and \`Resource\` by meaning, so both
+ * renumber whenever a member joins a group.
+ */
+
+${blocks}
+
+${consts}
+
+/**
+ * Ops whose timelock key ignores \`subject\` (\`Admin._keyOf\` returns \`_key(pool, opId)\`). Every
+ * other op keys on \`(pool, opId, subject)\`, so cancelling one with \`subject = 0\` computes a key
+ * nothing was queued under and reverts \`NoPending\` instead of vetoing.
+ */
+export const POOL_SCOPED_OPS: readonly OpType[] = [
+${poolScopedOps()
+  .map((o) => `  OpType.${o},`)
+  .join('\n')}
+];
+`;
+}
+
 // ── emit ─────────────────────────────────────────────────────────────────────────────────────
 function banner(cmd: string): string {
-  return `// Generated by \`${cmd}\` from the sibling forge artifacts. Do not edit by hand —
+  return `// Generated by \`${cmd}\` from the sibling dex/shared checkouts. Do not edit by hand —
 // \`bun run gen:check\` fails the build when this file and the contracts disagree.
 `;
 }
@@ -187,14 +263,17 @@ files.set(
  * logs decode against one ABI; see scripts/manifest.ts for which artifact backs which export.
  */
 
-${CONTRACTS.map((c) => `export * from './${c.file.replace(/\.ts$/, '.js')}';`)
-  .sort()
-  .join('\n')}
+${[
+  ...CONTRACTS.map((c) => `export * from './${c.file.replace(/\.ts$/, '.js')}';`),
+  `export * from './solidity.generated.js';`,
+  `export * from './structs.generated.js';`,
+].sort().join('\n')}
 `,
 );
 
+files.set(resolve(SRC, 'abis', 'solidity.generated.ts'), solidityFile());
+files.set(resolve(SRC, 'abis', 'structs.generated.ts'), structFieldsFile());
 files.set(resolve(SRC, 'pool', 'layout.generated.ts'), layoutFile());
-files.set(resolve(SRC, 'pool', 'structs.generated.ts'), structFieldsFile());
 
 let drift = 0;
 for (const [path, raw] of files) {

@@ -116,6 +116,145 @@ export const CONTRACTS: ContractSpec[] = [
   },
 ];
 
+/**
+ * Solidity enums that cross the ABI boundary as bare `uint8`.
+ *
+ * solc erases the members: the ABI keeps only `internalType: 'enum X.Y'`, so an ordinal is
+ * unrecoverable from `out/`. Every consumer therefore used to hand-copy the list, and every
+ * consumer drifted — a guardian veto sent `UPDATE_TREASURY` as 6 (`ADD_ASSET`) for as long as
+ * `OpType` had been regrouped. These are read straight from the declaring source instead.
+ */
+export interface EnumSpec {
+  /** Generated const/type name. */
+  name: string;
+  root: Root;
+  /** Source path relative to the root's `evm/`. */
+  path: string;
+  /** Solidity enum name, when it differs from `name`. */
+  solName?: string;
+  blurb: string;
+}
+
+export const ENUMS: EnumSpec[] = [
+  {
+    name: 'OpType',
+    root: 'dex',
+    path: 'src/interfaces/IPool.sol',
+    blurb:
+      'Second arg of `Admin.requestOp` / `execute` / `cancelTimelock`. Grouped by timelock tier, so a member added to a group SHIFTS every ordinal after it.',
+  },
+  {
+    name: 'BatchOp',
+    root: 'dex',
+    path: 'src/interfaces/IAdmin.sol',
+    blurb: 'Risk-op selector for `Admin.batchRiskOp`.',
+  },
+  {
+    name: 'Resource',
+    root: 'shared',
+    path: 'src/Errors.sol',
+    blurb:
+      'Subsystem tag carried by `Err.NotFound` / `Err.FeatureDisabled` and friends. Ordered by MEANING, so ordinals move when a member joins its group.',
+  },
+  {
+    name: 'Tier',
+    root: 'shared',
+    path: 'src/Constants.sol',
+    blurb:
+      'Index into the packed `AccessControl.GOV_DELAYS()` word (8 x uint32 seconds). See `govDelays` in src/governance.',
+  },
+  {
+    name: 'Role',
+    root: 'shared',
+    path: 'src/access/AccessControl.sol',
+    blurb: 'Key of `AccessControl.pendingRole` and of `queueRole`/`executeRole`/`cancelRole`.',
+  },
+];
+
+/** Members of a Solidity enum, in declaration order. Comments and trailing commas are stripped. */
+export function enumMembers(spec: EnumSpec): string[] {
+  const src = readFileSync(resolve(EVM_ROOTS[spec.root], spec.path), 'utf8');
+  const name = spec.solName ?? spec.name;
+  const m = new RegExp(`enum\\s+${name}\\s*\\{([^}]*)\\}`).exec(src);
+  if (!m?.[1]) throw new Error(`enum ${name} not found in ${spec.root}/evm/${spec.path}`);
+  const members = m[1]
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!members.length || members.some((s) => !/^[A-Z][A-Z0-9_]*$/.test(s))) {
+    throw new Error(`enum ${name} parsed to [${members}] — the declaration shape changed`);
+  }
+  return members;
+}
+
+/**
+ * `OpType` members whose timelock key ignores the `subject` argument, read out of the ONE
+ * function that derives the key (`Admin._keyOf`): those arms return `_key(pool, ...)`, every
+ * other op keys on `(pool, opId, subject)`. A UI that offers a pool-scoped op must pass a
+ * subject anyway — it is ignored — but a token-keyed op cancelled with `subject = 0` computes a
+ * key nothing was ever queued under and reverts `NoPending`.
+ */
+export function poolScopedOps(): string[] {
+  const src = readFileSync(resolve(EVM_ROOTS.dex, 'src/Admin.sol'), 'utf8');
+  const body = /function _keyOf\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/.exec(src)?.[1];
+  if (!body) throw new Error('Admin._keyOf not found — the key derivation moved');
+  const ops = [...body.matchAll(/OpType\.([A-Z_]+)\)\)\s*return\s+_key\(/g)].map((m) => m[1]!);
+  if (!ops.length) throw new Error('Admin._keyOf declares no pool-scoped op — parse is stale');
+  return ops;
+}
+
+/**
+ * Solidity numeric constants consumers must agree with bit-for-bit: flag masks, the confidence
+ * halt bound, the staleness grace. `internal`/`private constant` never reaches the ABI, so these
+ * were hand-copied too — and back's copy cited a file and a constant name (`FEED_PAUSED_BIT` in
+ * `Constants.sol`) that have not existed for some time. Pull only what a consumer reads.
+ */
+export const CONSTANTS: Array<{ root: Root; path: string; names: string[] }> = [
+  {
+    root: 'dex',
+    path: 'src/libraries/PoolConstantsLib.sol',
+    names: [
+      'HALT_RISK_BIT',
+      'HALT_GUARDIAN_BIT',
+      'HALT_MASK',
+      'SWAP_ENABLED_BIT',
+      'LIABILITY_SWAP_ENABLED_BIT',
+      'FLASH_ENABLED_BIT',
+      'FEED_HALT_BIT',
+      'MAX_CONFIDENCE_HALT_BPS',
+      'MAX_DISPERSION_PBPS',
+      'HOOK_PRE_OUTFLOW',
+      'HOOK_POST_INFLOW',
+    ],
+  },
+  { root: 'dex', path: 'src/libraries/Pricing.sol', names: ['STALE_Z', 'STALE_GRACE_CAP_SECS'] },
+];
+
+/** Integer literal | shift | bit-or | reference to a constant already resolved in the same file. */
+const CONST_EXPR = /^[\dA-Z_\s()|&<>+*-]+$/;
+
+/** Resolve the named constants of one source file to plain numbers, in declaration order. */
+export function constantValues(spec: (typeof CONSTANTS)[number]): Array<[string, number]> {
+  const src = readFileSync(resolve(EVM_ROOTS[spec.root], spec.path), 'utf8');
+  const seen: Record<string, number> = {};
+  const out: Array<[string, number]> = [];
+  for (const name of spec.names) {
+    const m = new RegExp(
+      `\\b(?:internal|private|public)\\s+constant\\s+${name}\\s*=\\s*([^;]+);`,
+    ).exec(src);
+    if (!m?.[1]) throw new Error(`constant ${name} not found in ${spec.root}/evm/${spec.path}`);
+    const expr = m[1].replace(/_(?=\d)/g, '').trim();
+    if (!CONST_EXPR.test(expr)) throw new Error(`constant ${name} is not a plain integer: ${expr}`);
+    const v = new Function(...Object.keys(seen), `return (${expr});`)(...Object.values(seen));
+    if (!Number.isSafeInteger(v)) throw new Error(`constant ${name} did not evaluate: ${expr}`);
+    seen[name] = v;
+    out.push([name, v]);
+  }
+  return out;
+}
+
 export type AbiItem = Record<string, unknown>;
 
 interface Artifact {

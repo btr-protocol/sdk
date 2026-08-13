@@ -10,12 +10,21 @@
  * also catches cosmetic drift and a stale barrel. This test survives when only the ABI moved.
  */
 
-import { describe, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as ABIS from '../src/abis/index.js';
-import { CONTRACTS, EVM_ROOTS, resolveAbi } from '../scripts/manifest.js';
+import {
+  CONSTANTS,
+  CONTRACTS,
+  ENUMS,
+  EVM_ROOTS,
+  constantValues,
+  enumMembers,
+  poolScopedOps,
+  resolveAbi,
+} from '../scripts/manifest.js';
 
 type AbiItem = Record<string, unknown> & {
   type: string;
@@ -97,4 +106,33 @@ describe('ABI freshness vs dex/evm + shared/evm sources', () => {
       throw new Error(`${spec.contract} ABI drift detected.${hint}`);
     });
   }
+});
+
+/**
+ * Enums and internal constants have no artifact to compare against — they are read out of the
+ * `.sol` sources, which exist whenever the sibling checkout does (no `forge build` needed). So
+ * this runs unconditionally where the ABI cases skip, and it is the only guard on the numbers a
+ * hand-copied table used to carry: a `Resource` member inserted mid-enum, an `OpType` regrouped
+ * by tier, a flag bit renumbered.
+ */
+describe('enum ordinals and internal constants vs the declaring sources', () => {
+  const sdk = ABIS as unknown as Record<string, unknown>;
+
+  for (const spec of ENUMS) {
+    test(`${spec.name} matches ${spec.root}/evm/${spec.path}`, () => {
+      const want = Object.fromEntries(enumMembers(spec).map((m, i) => [m, i]));
+      expect(sdk[spec.name]).toEqual(want);
+    });
+  }
+
+  for (const spec of CONSTANTS) {
+    test(`constants of ${spec.root}/evm/${spec.path}`, () => {
+      for (const [name, value] of constantValues(spec)) expect(sdk[name]).toBe(value);
+    });
+  }
+
+  test('POOL_SCOPED_OPS is exactly the subject-less arm set of Admin._keyOf', () => {
+    const OpType = sdk.OpType as Record<string, number>;
+    expect(sdk.POOL_SCOPED_OPS).toEqual(poolScopedOps().map((o) => OpType[o]!));
+  });
 });
