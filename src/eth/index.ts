@@ -89,6 +89,8 @@ export {
   getTokenIcon,
   getTokenAddress,
   getAllTokensForChain,
+  canonicalTokenSymbol,
+  tokenBySymbol,
   resolveTokenAlias,
   tokenMatchesSearch,
 } from './tokens';

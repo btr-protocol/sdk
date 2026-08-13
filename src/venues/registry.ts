@@ -12,7 +12,7 @@
 
 import type { Address, Hex } from '../eth/index.js';
 import { DEPLOYED_VENUES, type ChainVenue } from './deployments.generated.js';
-import { SEPOLIA_REF_MARKS_USD } from './sepolia.js';
+import { nxrMark } from './nxr.js';
 
 export type VenueKind = 'btr';
 
@@ -75,11 +75,15 @@ export function activeOracle(chainId: number): Address {
  * the chain's roster so an asset listed on one chain and not another cannot be sized off a mark
  * for a token that chain does not have. A symbol with no static mark is absent, and the caller
  * falls back rather than sizing off a fabricated number.
+ *
+ * Resolution is case-folded (`nxrMark`) because the roster spelling is per chain: Sepolia lists
+ * `cbBTC` and Arc lists `CBBTC` for the same asset, and an exact-key lookup silently drops one of
+ * them — sizing then falls back for a token that has a perfectly good mark.
  */
 export function activeRefMarksUsd(chainId: number): Record<string, number> {
   const out: Record<string, number> = {};
   for (const sym of Object.keys(chainVenue(chainId).tokens)) {
-    const m = SEPOLIA_REF_MARKS_USD[sym];
+    const m = nxrMark(sym)?.refUsd;
     if (m !== undefined) out[sym] = m;
   }
   return out;
