@@ -34,12 +34,12 @@ export interface QuoteRecord {
   priceB64: bigint;
   /** mark scaled to 1e18 (== on-chain `b64To1e18(price)`). 0 is invalid on-chain. */
   mark1e18: bigint;
-  /** NXR-signed volatility, PBPS (stored directly as `sigma`). */
-  sigma: number;
+  /** NXR-signed volatility, PBPS (stored directly as `sigmaPbps`). */
+  sigmaPbps: number;
   /** mark confidence interval, bps. */
   confidence: number;
   /** NXR-attested source timestamp, ms since epoch (strictly monotonic per feed). */
-  sourceTs: bigint;
+  sourceTsMs: bigint;
 }
 
 export interface Eip712Domain {
@@ -76,7 +76,7 @@ function readUint(bytes: Uint8Array, off: number, len: number): bigint {
 
 /**
  * Decode a packed batch blob into quote records. Mirrors the 24-byte big-endian record
- * (idx u16 | price u64 | sigma u32 | conf u16 | sourceTs u64) read by `batchPushSigned`.
+ * (idx u16 | price u64 | sigmaPbps u32 | conf u16 | sourceTsMs u64) read by `batchPushSigned`.
  */
 export function decodeBlob(blob: Hex | Uint8Array): QuoteRecord[] {
   const bytes = toBytes(blob);
@@ -91,9 +91,9 @@ export function decodeBlob(blob: Hex | Uint8Array): QuoteRecord[] {
       priceB64,
       // reuse the SDK B64 decoder (== on-chain b64To1e18) — do NOT reimplement.
       mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
-      sigma: Number(readUint(bytes, o + 10, 4)),
+      sigmaPbps: Number(readUint(bytes, o + 10, 4)),
       confidence: Number(readUint(bytes, o + 14, 2)),
-      sourceTs: readUint(bytes, o + 16, 8),
+      sourceTsMs: readUint(bytes, o + 16, 8),
     });
   }
   return out;
