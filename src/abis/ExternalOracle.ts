@@ -2,7 +2,7 @@
  * ExternalOracle Contract ABI
  * @module @btr-protocol/sdk/abis
  *
- * Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> BASE_TIMELOCK -> executeFeedWiden (guardian-vetoable).
+ * Signed external oracle. batchPushSigned carries NXR-signed (price, sigma, confidence, sourceTs); guardian fast-freeze via pauseFeed/revokeSigner/narrowMaxDeviation/cancelSignerGrant/cancelFeedWiden. updateFeed is TIGHTEN-ONLY: widening maxDeviation/ttl goes requestFeedWiden -> the BASE tier of GOV_DELAYS -> executeFeedWiden (guardian-vetoable).
  * Source: dex/evm out/ — regen via bun scripts/regen-dex-abis.ts
  */
 

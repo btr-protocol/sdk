@@ -235,7 +235,7 @@ export function buildCurve(
 }
 
 // ── Dispersion admissibility (the on-chain write-path rules) ───────────────────
-// A profile is only DEPLOYABLE if `PoolAdmin.sanitizeDispersion` accepts its band against the
+// A profile is only DEPLOYABLE if `PoolConfig.sanitizeDispersion` accepts its band against the
 // preset's `Pricing.dispersionCap`. Mirroring both here is what lets an off-chain config (or a
 // test fixture) be rejected before it reaches a reverting `setProfile`.
 
@@ -260,7 +260,7 @@ export function dispersionCap(c: QuarticCurve): number {
   return Number(cap > 4294967295n ? 4294967295n : cap);
 }
 
-/** `PoolAdmin.sanitizeDispersion`: 0 → protocol default (1000), then the floor is CHECKED against
+/** `PoolConfig.sanitizeDispersion`: 0 → protocol default (1000), then the floor is CHECKED against
  *  the preset's `cap` and the protocol ceiling — never clamped to either, because narrowing it
  *  silently would move the leg's quiet-tape quote instead of reporting a fit that does not fit.
  *  Throws exactly where the chain reverts `BadConfig`. */
@@ -278,7 +278,7 @@ export interface AimmProfile {
   minDisp: number; // PBPS — the QUIET-TAPE FLOOR. The ceiling is MAX_DISPERSION_PBPS, protocol-wide.
   protoShare: number; // % of spread routed to protocol (fee split)
   /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). REQUIRED: there is ONE pricing law
-   *  (`Pricing._traverseCurveByVolume`) and `PoolAdmin.validatePresetAssign` will not list an asset
+   *  (`Pricing._traverseCurveByVolume`) and `PoolConfig.validatePresetAssign` will not list an asset
    *  without a curve, so a null here is a read that has not landed — fail closed at the caller
    *  rather than quote a second, nonexistent law. */
   curve: QuarticCurve;
@@ -973,8 +973,8 @@ function netOutMul(leg: PoolLeg | undefined, g: number, half: number): number {
  * them in renders a fee as market data (a WBTC/WETH touch of ±45 bp that is all minFee and oracle
  * confidence, against a few bp of real skew). `netPrice` carries the cost so the UI can disclose
  * it separately and so the OEV band still prices a crossing at what it actually fills.
- * Ask drains the out leg (tolled); a bid into the hub base can never carry κ (PoolAdminWrite
- * rejects it), so a sell is toll-free by construction. Rungs the coverage wall blocks are dropped:
+ * Ask drains the out leg (tolled); a bid into the hub base can never carry κ (`PoolConfig` rejects it
+ * at the risk-config write), so a sell is toll-free by construction. Rungs the coverage wall blocks are dropped:
  * `amountOut` is 0 from there out, so the chain refuses them.
  */
 function annotateNet(

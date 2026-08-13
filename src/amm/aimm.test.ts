@@ -910,7 +910,7 @@ describe('fixture profiles satisfy the on-chain admissibility rules', () => {
     ['VOLATILE_PROFILE', VOLATILE_PROFILE],
   ];
 
-  test('PoolAdmin.sanitizeDispersion accepts the floor AND leaves it untouched', () => {
+  test('PoolConfig.sanitizeDispersion accepts the floor AND leaves it untouched', () => {
     for (const [name, p] of SHIPPED) {
       expect(p.curve, name).not.toBeNull();
       const cap = dispersionCap(p.curve as QuarticCurve);

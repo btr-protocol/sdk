@@ -110,7 +110,7 @@ async function buildState(
     const dec = Number(asset.decimals);
     if (!(Number(asset.liabilities) > 0)) continue;
     const presetId = Number(asset.presetId);
-    // A listed leg always carries a preset (`PoolAdmin.validatePresetAssign`) and there is no
+    // A listed leg always carries a preset (`PoolConfig.validatePresetAssign`) and there is no
     // curve-less pricing law, so a missing curve is a broken read, not a quoting mode: skip the
     // symbol rather than compare against a fallback that does not exist on either side.
     const curve = presetId > 0 ? await readCurve(p, pool, presetId) : null;

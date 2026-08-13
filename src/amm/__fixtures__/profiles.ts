@@ -97,7 +97,7 @@ export const STABLE_PROFILE: AimmProfile = {
 };
 
 // Volatile: generic preset-1 curve at a floor DERIVED from the preset, never picked. The only
-// configurable endpoint left is `minDispersion`, and `PoolAdmin.sanitizeDispersion` CHECKS it
+// configurable endpoint left is `minDispersion`, and `PoolConfig.sanitizeDispersion` CHECKS it
 // against the curve's own `Pricing.dispersionCap` (floor(SWING_CAP·dispRef·Q / span) = 10_000
 // here) — a floor above the cap reverts `BadConfig` at the write. The old 50_000 floor did exactly
 // that: every test that used it validated a pool configuration that cannot exist on chain.
