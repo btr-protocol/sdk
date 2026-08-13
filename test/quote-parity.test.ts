@@ -122,9 +122,9 @@ async function buildState(
     }
     if (!(mark > 0)) continue;
     const profile: AimmProfile = {
-      vega: Number(asset.vega),
+      vega: Number(asset.vegaBps),
       minFee: Number(asset.minFeePbps),
-      minDisp: Number(asset.minDispersion),
+      minDisp: Number(asset.minDispersionPbps),
       protoShare: 0,
       curve,
     };

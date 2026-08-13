@@ -87,11 +87,18 @@ describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
 
   test('rangeQ: the clamped ends are the CENTRED control weights, exactly', async () => {
     const c = (await read()) as NonNullable<Awaited<ReturnType<typeof readCurve>>>;
-    // Solidity's own rangeQ, and the centred polygon `set` stored (not the polygon submitted).
+    // Solidity's own rangeQ.
     expect(`${evalQ(c, 0)}`).toBe(fx.y0);
     expect(`${evalQ(c, 10_000) - evalQ(c, 0)}`).toBe(fx.span);
-    expect(`${evalQ(c, 0)}`).toBe(fx.wQ[0]);
-    expect(`${evalQ(c, 10_000)}`).toBe(fx.wQ[fx.wQ.length - 1]);
+    // `NUQuartic.set` is external, so its `memory` params are ABI-decoded copies: `_centre` shifts
+    // them in the callee only and the fixture records the polygon as SUBMITTED. Re-apply the same
+    // shift here — `(wQ[0] + wQ[n-1]) >> 1`, arithmetic shift as in Solidity — so this still
+    // asserts the stored ends against the centred weights rather than against the raw input.
+    const first = BigInt(fx.wQ[0]!);
+    const last = BigInt(fx.wQ[fx.wQ.length - 1]!);
+    const shift = (first + last) >> 1n;
+    expect(`${evalQ(c, 0)}`).toBe(`${first - shift}`);
+    expect(`${evalQ(c, 10_000)}`).toBe(`${last - shift}`);
   });
 
   test('reads exactly the header + 2m live segment words, and no more', async () => {

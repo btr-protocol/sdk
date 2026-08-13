@@ -95,8 +95,17 @@ const BRL_SESSION: MarketSession = [1, 2, 3, 4, 5].map(
 );
 
 export interface SepoliaFeed { name: string; feedId: `0x${string}`; nxrSymbol: string; nxrQuote?: string; quoteVia?: string; token: Address; symbol: string; session?: MarketSession; }
+/**
+ * ORDER IS THE ON-CHAIN `feedIds[]` INDEX — the idx every NXR-signed record carries. Append only;
+ * reordering re-binds signed quotes to the wrong feed.
+ *
+ * The order is not free-form: it is `addFeed` call order across the deploy scripts, which
+ * `test/sepolia-feeds.test.ts` re-derives from dex's own risk-params rather than trusting this
+ * list. There is NO `USDC/USDC` identity feed — the base's mark is the signed `USDC-USD`
+ * reference at idx 22 (`SepoliaPoolDeploy.s.sol` "BASE: its mark is the SIGNED USDC/USD
+ * reference ... not a USDC/USDC identity").
+ */
 export const SEPOLIA_ORACLE_FEEDS: SepoliaFeed[] = [
-  { name: 'USDC-USDC', feedId: '0x0c8bbb24907a4477af7953a3521644a319d7b062e56044543d63a365cc11b487', nxrSymbol: 'USDC-USDC', token: SEPOLIA_TOKENS['USDC']!, symbol: 'USDC' },
   { name: 'USDT-USDC', feedId: '0xe2ca0626104d5e537a71218cb1524d5f02623014f122c80e479cfb2698aaaef9', nxrSymbol: 'USDT-USD', token: SEPOLIA_TOKENS['USDT']!, symbol: 'USDT' },
   { name: 'USDE-USDC', feedId: '0xb235eefe16249c453be2a3d8b17d2648b3800ded997b2462fa2c05a92bfab2b8', nxrSymbol: 'USDE-USD', token: SEPOLIA_TOKENS['USDE']!, symbol: 'USDE' },
   { name: 'USDS-USDC', feedId: '0xb6361eb741b2e26a6713df09d0733cb0496e036a722cc80ba3aec2428feaf2de', nxrSymbol: 'USDS-USD', token: SEPOLIA_TOKENS['USDS']!, symbol: 'USDS' },

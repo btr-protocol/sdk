@@ -6,6 +6,7 @@
 import { POOL_ABI } from '../abis/Pool.js';
 import { decodeFn, encodeFn } from '../eth/abi';
 import type { Address, Eip1193Provider, Hex } from '../eth/types';
+import type { Assert, AssetFields, FieldsMatch, SwapQuoteFields } from './structs.generated.js';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)
@@ -24,14 +25,14 @@ export interface Asset {
   liabilities: bigint;
   anchor: Address;
   minLiquidity: bigint;
-  liquidityIndex: bigint;
-  minDispersion: number;
+  liquidityIndexWad: bigint;
+  minDispersionPbps: number;
   /** Pricing-shape pointer into PoolStorage.curves (shared preset table). Never 0 on a listed leg:
    *  `PoolConfig.validatePresetAssign` refuses the assignment, so there is no curve-less quote. */
   presetId: number;
   minFeePbps: number;
-  vega: number;
-  haircutSuppressor: number;
+  vegaBps: number;
+  haircutSuppressorBps: number;
   decimals: number;
   deadSeedPow10: number;
   /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */
@@ -39,6 +40,9 @@ export interface Asset {
   /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). Was `RiskConfig.kappaCovBps`. */
   kappaCovBps: number;
 }
+
+/** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
+export type _AssetMatchesAbi = Assert<FieldsMatch<Asset, AssetFields>>;
 
 export interface SwapQuote {
   amountOut: bigint;
@@ -357,3 +361,6 @@ export async function withdraw(
     ],
   })) as Hex;
 }
+
+/** Same guard for the quote tuple; `routeHops`/`hopAmounts`/`hopPrices` are ABI fields too. */
+export type _SwapQuoteMatchesAbi = Assert<FieldsMatch<SwapQuote, SwapQuoteFields>>;
