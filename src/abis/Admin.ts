@@ -475,7 +475,7 @@ export const ADMIN_ABI = [
   },
   {
     type: 'function',
-    name: 'requestAddAsset',
+    name: 'requestOp',
     inputs: [
       {
         name: 'pool',
@@ -483,408 +483,19 @@ export const ADMIN_ABI = [
         internalType: 'address',
       },
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'oracleCfg',
-        type: 'tuple',
-        internalType: 'struct IPool.OracleConfig',
-        components: [
-          {
-            name: 'feedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'refFeedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'refBandBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'mode',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'quoteUnit',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'refPrimary',
-            type: 'address',
-            internalType: 'address',
-          },
-        ],
-      },
-      {
-        name: 'riskCfg',
-        type: 'tuple',
-        internalType: 'struct IPool.RiskConfig',
-        components: [
-          {
-            name: 'flags',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'kappaCovBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-        ],
-      },
-      {
-        name: 'presetId',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'minFeePbps',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'minDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-      {
-        name: 'vega',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestAnchorUpdate',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'anchor',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'cfg',
-        type: 'tuple',
-        internalType: 'struct IPool.OracleConfig',
-        components: [
-          {
-            name: 'feedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'refFeedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'refBandBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'mode',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'quoteUnit',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'refPrimary',
-            type: 'address',
-            internalType: 'address',
-          },
-        ],
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestBaseMigration',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'newBase',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestOracleUpdate',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'cfg',
-        type: 'tuple',
-        internalType: 'struct IPool.OracleConfig',
-        components: [
-          {
-            name: 'feedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'refFeedId',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
-          {
-            name: 'primary',
-            type: 'address',
-            internalType: 'address',
-          },
-          {
-            name: 'refBandBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'mode',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'quoteUnit',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'refPrimary',
-            type: 'address',
-            internalType: 'address',
-          },
-        ],
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestSetAssetHook',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'hook',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'flags',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestSetCurve',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'presetId',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'interior',
-        type: 'uint256[]',
-        internalType: 'uint256[]',
-      },
-      {
-        name: 'wQ',
-        type: 'int256[]',
-        internalType: 'int256[]',
-      },
-      {
-        name: 'dispRef',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'flags',
+        name: 'opType',
         type: 'uint8',
         internalType: 'uint8',
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestTreasuryUpdate',
-    inputs: [
       {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
+        name: 'subject',
+        type: 'bytes32',
+        internalType: 'bytes32',
       },
       {
-        name: 'newTreasury',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestUpdateFeeParams',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'params',
-        type: 'tuple',
-        internalType: 'struct IPool.FeeParams',
-        components: [
-          {
-            name: 'protoShare',
-            type: 'uint8',
-            internalType: 'uint8',
-          },
-          {
-            name: 'flashFeePbps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-        ],
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestUpdateProfile',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'presetId',
-        type: 'uint16',
-        internalType: 'uint16',
-      },
-      {
-        name: 'minDispersion',
-        type: 'uint32',
-        internalType: 'uint32',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'requestUpdateRiskConfig',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'cfg',
-        type: 'tuple',
-        internalType: 'struct IPool.RiskConfig',
-        components: [
-          {
-            name: 'flags',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-          {
-            name: 'kappaCovBps',
-            type: 'uint16',
-            internalType: 'uint16',
-          },
-        ],
+        name: 'payload',
+        type: 'bytes',
+        internalType: 'bytes',
       },
     ],
     outputs: [],
@@ -1714,6 +1325,11 @@ export const ADMIN_ABI = [
   },
   {
     type: 'error',
+    name: 'BadConfig',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'Expired',
     inputs: [],
   },
@@ -1736,6 +1352,22 @@ export const ADMIN_ABI = [
     type: 'error',
     name: 'NotCode',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotConfigured',
+    inputs: [
+      {
+        name: 'resource',
+        type: 'uint8',
+        internalType: 'enum Err.Resource',
+      },
+      {
+        name: 'target',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
   {
     type: 'error',
@@ -1771,11 +1403,6 @@ export const ADMIN_ABI = [
   {
     type: 'error',
     name: 'ZeroAddr',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'ZeroValue',
     inputs: [],
   },
 ];

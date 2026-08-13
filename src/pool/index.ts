@@ -34,6 +34,10 @@ export interface Asset {
   haircutSuppressor: number;
   decimals: number;
   deadSeedPow10: number;
+  /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */
+  flags: number;
+  /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). Was `RiskConfig.kappaCovBps`. */
+  kappaCovBps: number;
 }
 
 export interface SwapQuote {
