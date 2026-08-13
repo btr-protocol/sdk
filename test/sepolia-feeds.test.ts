@@ -1,7 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SEPOLIA_ORACLE_FEEDS, sepoliaFeedByName, sepoliaFeedId } from '../src/venues/sepolia';
+import {
+  SEPOLIA_BTR,
+  SEPOLIA_CHAIN_ID,
+  SEPOLIA_ORACLE_FEEDS,
+  SEPOLIA_STABLE_SYMBOLS,
+  SEPOLIA_TOKENS,
+  SEPOLIA_VOLATILE_SYMBOLS,
+  sepoliaFeedByName,
+  sepoliaFeedId,
+} from '../src/venues/sepolia';
+import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
 
 /**
  * The oracle feed table is a money-path identity map, and its ARRAY POSITION is the on-chain
@@ -68,5 +78,50 @@ describe('sepolia oracle feed table', () => {
         feedId: deploy[key]!.toLowerCase(),
       });
     }
+  });
+});
+
+/**
+ * `sepolia.ts` and `deployments.generated.ts` both carry the Sepolia addresses: the first is
+ * hand-authored because it also holds facts no deployment record has (NXR pair names, market
+ * sessions, ref marks) and the front imports it by name; the second is generated from the
+ * broadcast record and is what the chain-parameterised registry resolves. Two copies of an
+ * address set drift, and the drift is silent, so it is pinned here rather than trusted.
+ */
+describe('sepolia.ts agrees with the generated deployment record', () => {
+  const gen = DEPLOYED_VENUES[SEPOLIA_CHAIN_ID]!;
+  const same = (a: string | undefined, b: string | undefined) => a?.toLowerCase() === b?.toLowerCase();
+
+  test('the chain is in the generated record at all', () => {
+    expect(gen).toBeDefined();
+    expect(gen.chainId).toBe(SEPOLIA_CHAIN_ID);
+  });
+
+  test('every hand-authored token address matches the broadcast record', () => {
+    for (const [sym, addr] of Object.entries(SEPOLIA_TOKENS)) {
+      expect(same(addr, gen.tokens[sym]), `${sym}`).toBe(true);
+    }
+  });
+
+  test('every hand-authored feed id matches the broadcast record', () => {
+    for (const f of SEPOLIA_ORACLE_FEEDS) {
+      expect(same(f.feedId, gen.feedIds[f.name]), f.name).toBe(true);
+    }
+  });
+
+  test('the singletons the bots resolve match the broadcast record', () => {
+    for (const key of ['oracle', 'refOracle', 'poolFactory', 'flash', 'faucet'] as const) {
+      expect(same(SEPOLIA_BTR[key], gen.contracts[key]), key).toBe(true);
+    }
+  });
+
+  test('pool rosters match, and the undeployed FX core is in neither', () => {
+    const byTag = Object.fromEntries(gen.pools.map((p) => [p.tag, p]));
+    expect(same(SEPOLIA_BTR.stablePool, byTag['btr-stable']?.address)).toBe(true);
+    expect(same(SEPOLIA_BTR.volatilePool, byTag['btr-volatile']?.address)).toBe(true);
+    expect(byTag['btr-stable']!.symbols).toEqual([...SEPOLIA_STABLE_SYMBOLS]);
+    expect(byTag['btr-volatile']!.symbols).toEqual([...SEPOLIA_VOLATILE_SYMBOLS]);
+    expect(SEPOLIA_BTR.fxPool).toBeUndefined();
+    expect(byTag['btr-fx']).toBeUndefined();
   });
 });

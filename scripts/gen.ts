@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import {
   artifact,
   CONTRACTS,
+  EVM_ROOTS,
   CONSTANTS,
   ENUMS,
   constantValues,
@@ -41,8 +42,10 @@ function toTs(v: unknown, indent = 0): string {
   if (v && typeof v === 'object') {
     const entries = Object.entries(v as Record<string, unknown>);
     if (entries.length === 0) return '{}';
+    // `USDC-USD` and other non-identifier keys must stay quoted or the emitted file will not parse.
+    const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : `'${k}'`);
     return `{\n${entries
-      .map(([k, val]) => `${padInner}${k}: ${toTs(val, indent + 1)}`)
+      .map(([k, val]) => `${padInner}${key(k)}: ${toTs(val, indent + 1)}`)
       .join(',\n')},\n${pad}}`;
   }
   if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -217,6 +220,182 @@ ${poolScopedOps()
 `;
 }
 
+// ── deployed venues ──────────────────────────────────────────────────────────────────────────
+/**
+ * Per-chain venue facts, read from `dex/evm/deployments/` — the record of what was actually
+ * broadcast, not a re-derivation of what a script should have produced.
+ *
+ * A chain appears here only when it has BOTH a `<chainId>.deploy.json` (tokens + `feed_<SYM>`)
+ * and a `<chainId>.pools.json` (contracts + pool addresses). A predicted or dry-run record has
+ * neither filename, so a chain that has not really been deployed is ABSENT rather than present
+ * with plausible-looking addresses — which is what lets `registry.ts` refuse to resolve it
+ * instead of quoting a bot against a chain it is not running on.
+ *
+ * The consequence is deliberate: the day the Arc ceremony writes `5042002.{deploy,pools}.json`,
+ * `bun run gen` picks the chain up with no code edit anywhere in the SDK or the bots.
+ */
+interface RawVenue {
+  chainId: number;
+  contracts: Record<string, string>;
+  tokens: Record<string, string>;
+  feedIds: Record<string, string>;
+  pools: Array<{ tag: string; address: string; symbols: string[] }>;
+  refFeeds: string[];
+}
+
+const DEPLOYMENTS_DIR = resolve(EVM_ROOTS.dex, 'deployments');
+
+/** Contract addresses consumers resolve by name. Pool addresses come through `pools` instead. */
+const VENUE_CONTRACTS = [
+  'ac',
+  'admin',
+  'distributor',
+  'faucet',
+  'flash',
+  'govToken',
+  'opsTreasuryProxy',
+  'oracle',
+  'poolFactory',
+  'poolImpl',
+  'refOracle',
+  'staking',
+  'treasuryProxy',
+] as const;
+
+/** `<class>Pool` key in both the pools record and the risk params ⇒ the router tag it carries. */
+const POOL_CLASSES = [
+  ['stablePool', 'btr-stable'],
+  ['volatilePool', 'btr-volatile'],
+  ['fxPool', 'btr-fx'],
+] as const;
+
+const isAddress = (v: unknown): v is string =>
+  typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v) && !/^0x0{40}$/.test(v);
+
+function readJson(path: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** chainId ⇒ its `<name>-risk-params.json`, which is what names each pool's symbol roster. */
+function riskParamsByChain(): Map<number, Record<string, unknown>> {
+  const out = new Map<number, Record<string, unknown>>();
+  for (const name of ['sepolia', 'arc']) {
+    const rp = readJson(resolve(DEPLOYMENTS_DIR, `${name}-risk-params.json`));
+    if (rp && typeof rp.chainId === 'number') out.set(rp.chainId, rp);
+  }
+  return out;
+}
+
+function venues(): RawVenue[] {
+  const risks = riskParamsByChain();
+  const out: RawVenue[] = [];
+  for (const [chainId, risk] of risks) {
+    const deploy = readJson(resolve(DEPLOYMENTS_DIR, `${chainId}.deploy.json`));
+    const pools = readJson(resolve(DEPLOYMENTS_DIR, `${chainId}.pools.json`));
+    // Both halves or nothing: the token/feed record without the pool record describes an oracle
+    // with no venue to quote, and either one alone cannot route a swap.
+    if (!deploy || !pools) continue;
+    for (const [what, rec] of [['deploy', deploy], ['pools', pools]] as const) {
+      if (Number(rec.chainId) !== chainId) {
+        throw new Error(`${chainId}.${what}.json declares chainId ${String(rec.chainId)}`);
+      }
+    }
+
+    const symbols = (risk.symbols as string[] | undefined) ?? [];
+    const tokens: Record<string, string> = {};
+    const feedIds: Record<string, string> = {};
+    for (const sym of symbols) {
+      const tok = deploy[sym];
+      if (!isAddress(tok)) throw new Error(`${chainId}.deploy.json has no token for ${sym}`);
+      tokens[sym] = tok;
+      const feed = deploy[`feed_${sym}`];
+      // The base quotes off the signed USDC/USD reference, not a USDC/USDC identity feed.
+      const name = sym === symbols[0] ? `${sym}-USD` : `${sym}-${symbols[0]}`;
+      const id = sym === symbols[0] ? deploy[`feed_${sym}-USD`] : feed;
+      if (typeof id !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(id)) {
+        throw new Error(`${chainId}.deploy.json has no feed id for ${name}`);
+      }
+      feedIds[name] = id;
+    }
+
+    const contracts: Record<string, string> = {};
+    for (const key of VENUE_CONTRACTS) {
+      const a = pools[key] ?? deploy[key];
+      if (isAddress(a)) contracts[key] = a;
+    }
+
+    const venuePools: RawVenue['pools'] = [];
+    for (const [key, tag] of POOL_CLASSES) {
+      const addr = pools[key];
+      const roster = (risk[key] as string[] | undefined) ?? [];
+      // A pool class that is scripted but not yet broadcast serialises as zero or is absent.
+      // Emitting it would hand the router an address that reverts every quote.
+      if (!isAddress(addr) || roster.length === 0) continue;
+      const missing = roster.filter((s) => !tokens[s]);
+      if (missing.length) throw new Error(`${chainId} ${tag} lists untokened ${missing.join(',')}`);
+      venuePools.push({ tag, address: addr, symbols: roster });
+    }
+    if (venuePools.length === 0) throw new Error(`${chainId}.pools.json carries no deployed pool`);
+
+    out.push({
+      chainId,
+      contracts,
+      tokens,
+      feedIds,
+      pools: venuePools,
+      refFeeds: (pools.refFeeds as string[] | undefined) ?? [],
+    });
+  }
+  return out.sort((a, b) => a.chainId - b.chainId);
+}
+
+function venuesFile(): string {
+  const found = venues();
+  const entries = found
+    .map((v) => `  ${v.chainId}: ${toTs({ ...v }, 1)},`)
+    .join('\n');
+  return `${banner('bun scripts/gen.ts')}
+/**
+ * Deployed BTR venues, keyed by chain id
+ * @module @btr-protocol/sdk/venues
+ *
+ * Source: \`dex/evm/deployments/<chainId>.{deploy,pools}.json\` — the broadcast record — plus the
+ * pool rosters in \`<chain>-risk-params.json\`. A chain with no broadcast record is ABSENT, and
+ * \`registry.ts\` throws on an absent chain rather than falling back, so a bot pointed at a chain
+ * BTR is not deployed on cannot silently quote another chain's addresses.
+ *
+ * Feed NAMES are keys here; the on-chain \`feedIds[]\` ORDINAL is deliberately not, because the
+ * deployment record does not carry it (forge sorts the keys it serialises, and the ordering is
+ * split across two scripts). The only authority on an ordinal is the chain itself — see
+ * \`keepers/src/oracle/startup.rs\`, which reads \`feedIds(idx)\` and refuses to start on a mismatch.
+ */
+
+import type { Address, Hex } from '../eth/types.js';
+
+export interface ChainVenue {
+  chainId: number;
+  /** Singletons by name — \`oracle\`, \`refOracle\`, \`poolFactory\`, \`faucet\`, … */
+  contracts: Record<string, Address>;
+  /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
+  tokens: Record<string, Address>;
+  /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`. */
+  feedIds: Record<string, Hex>;
+  /** Deployed cores with the symbols each one lists. */
+  pools: Array<{ tag: string; address: Address; symbols: string[] }>;
+  /** Feed names mirrored onto the reference oracle. */
+  refFeeds: string[];
+}
+
+export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
+${entries}
+};
+`;
+}
+
 // ── emit ─────────────────────────────────────────────────────────────────────────────────────
 function banner(cmd: string): string {
   return `// Generated by \`${cmd}\` from the sibling dex/shared checkouts. Do not edit by hand —
@@ -274,6 +453,7 @@ ${[
 files.set(resolve(SRC, 'abis', 'solidity.generated.ts'), solidityFile());
 files.set(resolve(SRC, 'abis', 'structs.generated.ts'), structFieldsFile());
 files.set(resolve(SRC, 'pool', 'layout.generated.ts'), layoutFile());
+files.set(resolve(SRC, 'venues', 'deployments.generated.ts'), venuesFile());
 
 let drift = 0;
 for (const [path, raw] of files) {
