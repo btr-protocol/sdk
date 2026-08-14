@@ -32,11 +32,24 @@ export interface Call {
   allowFailure?: boolean;
 }
 
+/** Max calls per aggregate3. Keeps calldata + node response under typical eth_call limits. */
+export const MC3_CHUNK = 200;
+
 export async function multicall(
   p: Eip1193Provider,
   calls: Call[],
-  opt: { addr?: Address; chainId?: number; block?: string } = {}
-) {
+  opt: { addr?: Address; chainId?: number; block?: string; chunkSize?: number } = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
+  // 0. Split oversized batches; chunks run concurrently and are re-joined in order
+  const chunk = opt.chunkSize ?? MC3_CHUNK;
+  if (calls.length > chunk) {
+    const parts: Call[][] = [];
+    for (let i = 0; i < calls.length; i += chunk) parts.push(calls.slice(i, i + chunk));
+    const out = await Promise.all(parts.map(c => multicall(p, c, { ...opt, chunkSize: Infinity })));
+    return out.flat();
+  }
+
   // 1. Encode all calls
   const inputs = calls.map(c => ({
     t: c.address,
@@ -70,7 +83,7 @@ export async function multicall(
 export async function multicallStrict<T = any>(
   p: Eip1193Provider,
   calls: Call[],
-  opt?: { addr?: Address; chainId?: number; block?: string }
+  opt?: { addr?: Address; chainId?: number; block?: string; chunkSize?: number }
 ): Promise<T[]> {
   const res = await multicall(p, calls.map(c => ({ ...c, allowFailure: false })), opt);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

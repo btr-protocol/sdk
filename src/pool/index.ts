@@ -5,6 +5,7 @@
 
 import { POOL_ABI } from '../abis/Pool.js';
 import { decodeFn, encodeFn } from '../eth/abi';
+import { multicallStrict } from '../eth/multicall';
 import type { Address, Eip1193Provider, Hex } from '../eth/types';
 import type { Assert, AssetFields, FieldsMatch, SwapQuoteFields } from '../abis/structs.generated.js';
 
@@ -203,24 +204,28 @@ export async function getPoolData(
   tokens: Array<{ address: Address; symbol: string; name: string }>,
   poolName: string,
 ): Promise<PoolData> {
-  const assets: PoolAsset[] = [];
+  // One aggregate3 for all 2N reads. allowFailure=false, so a reverting leg reverts the whole
+  // eth_call and throws — same contract as the per-token loop this replaced.
+  const res = await multicallStrict<any>(
+    provider,
+    tokens.flatMap(t => [
+      { address: poolAddress, abi: POOL_ABI, functionName: 'getAsset', args: [t.address] },
+      { address: poolAddress, abi: POOL_ABI, functionName: 'getCoverageRatio', args: [t.address] },
+    ]),
+  );
 
-  for (const token of tokens) {
-    const [asset, coverage] = await Promise.all([
-      getAsset(provider, poolAddress, token.address),
-      getCoverageRatio(provider, poolAddress, token.address),
-    ]);
-
-    assets.push({
+  const assets: PoolAsset[] = tokens.map((token, i) => {
+    const asset = res[i * 2] as Asset;
+    return {
       token: token.address,
       symbol: token.symbol,
       name: token.name,
       decimals: Number(asset.decimals),
       reserves: asset.reserves,
       liabilities: asset.liabilities,
-      coverage,
-    });
-  }
+      coverage: res[i * 2 + 1] as bigint,
+    };
+  });
 
   return {
     address: poolAddress,
