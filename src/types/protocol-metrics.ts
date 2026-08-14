@@ -13,7 +13,7 @@ export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
 };
 export const DEFAULT_METRICS_WINDOW: MetricsWindow = '48h';
 export type MetricsGrain = '1m' | '5m' | '15m' | '1h' | '1d';
-export type MetricsSource = 'stub' | 'live' | 'empty';
+export type MetricsSource = 'live' | 'empty';
 
 /**
  * Grain per window, shared by the collector and the front so a bucket means one thing.
