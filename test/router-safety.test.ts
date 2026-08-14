@@ -220,16 +220,29 @@ describe('SEPOLIA_BTR.fxPool is declared-but-undeployed', () => {
  */
 describe('chain resolution refuses to guess', () => {
   test('an undeployed chain throws instead of falling back to a deployed one', () => {
+    const UNDEPLOYED = 1_337_999;
+    expect(deployedChainIds()).not.toContain(UNDEPLOYED);
+    expect(() => staticVenuePools(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
+    expect(() => activeUsdc(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
+    expect(() => activeOracle(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
+    expect(() => activeFeedId(UNDEPLOYED, 'USDC')).toThrow(/no BTR deployment for chain 1337999/);
+  });
+
+  // Arc's four-core ceremony broadcast three pools. The generator knew two pool classes when Arc
+  // landed, so `cryptoPool` was dropped WITHOUT a throw — a venue that still resolved, still
+  // quoted, and simply could not route WETH/WBTC/CBBTC/BNB/XAUT/PAXG. Pinned by tag and roster
+  // size so losing a class again fails here rather than downstream as an unroutable pair.
+  test('arc resolves all three broadcast pools, crypto core included', () => {
     const ARC = 5_042_002;
-    expect(deployedChainIds()).not.toContain(ARC);
-    expect(() => staticVenuePools(ARC)).toThrow(/no BTR deployment for chain 5042002/);
-    expect(() => activeUsdc(ARC)).toThrow(/no BTR deployment for chain 5042002/);
-    expect(() => activeOracle(ARC)).toThrow(/no BTR deployment for chain 5042002/);
-    expect(() => activeFeedId(ARC, 'USDC')).toThrow(/no BTR deployment for chain 5042002/);
+    expect(deployedChainIds()).toContain(ARC);
+    const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
+    expect(Object.keys(byTag).sort()).toEqual(['btr-crypto', 'btr-fx', 'btr-stable']);
+    expect(byTag['btr-crypto']!.tokens).toHaveLength(9);
+    expect(chainVenue(ARC).refFeeds).toContain('WETH-USDC');
   });
 
   test('the error names what IS deployed, so the operator sees the mismatch', () => {
-    expect(() => chainVenue(0)).toThrow(new RegExp(`deployed: \\[${SEPOLIA_CHAIN_ID}`));
+    expect(() => chainVenue(0)).toThrow(new RegExp(`deployed: \\[5042002, ${SEPOLIA_CHAIN_ID}\\]`));
   });
 
   test('every deployed chain resolves a base, an oracle and at least one pool', () => {
