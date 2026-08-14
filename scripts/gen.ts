@@ -267,7 +267,12 @@ const POOL_CLASSES = [
   ['stablePool', 'btr-stable'],
   ['volatilePool', 'btr-volatile'],
   ['fxPool', 'btr-fx'],
+  ['cryptoPool', 'btr-crypto'],
+  ['stocksPool', 'btr-stocks'],
 ] as const;
+
+/** Any `<class>Pool` key, so a class this table does not know is a throw and not a silent drop. */
+const POOL_KEY_RE = /^[a-z][A-Za-z0-9]*Pool$/;
 
 const isAddress = (v: unknown): v is string =>
   typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v) && !/^0x0{40}$/.test(v);
@@ -328,6 +333,20 @@ function venues(): RawVenue[] {
       if (isAddress(a)) contracts[key] = a;
     }
 
+    // A pool class neither record knows about must break the build here. Silently keeping only
+    // the classes this table lists is how Arc's 9-asset `cryptoPool` got dropped from a venue
+    // that still looked plausible with two pools in it, and no consumer can detect the absence.
+    const known = new Set<string>(POOL_CLASSES.map(([k]) => k));
+    for (const [what, rec] of [['pools', pools], ['risk-params', risk]] as const) {
+      for (const key of Object.keys(rec)) {
+        if (POOL_KEY_RE.test(key) && !known.has(key)) {
+          throw new Error(
+            `${chainId} ${what} declares unknown pool class '${key}' — add it to POOL_CLASSES in scripts/gen.ts with its router tag, or the pool ships absent from the SDK`,
+          );
+        }
+      }
+    }
+
     const venuePools: RawVenue['pools'] = [];
     for (const [key, tag] of POOL_CLASSES) {
       const addr = pools[key];
@@ -341,14 +360,22 @@ function venues(): RawVenue[] {
     }
     if (venuePools.length === 0) throw new Error(`${chainId}.pools.json carries no deployed pool`);
 
-    out.push({
-      chainId,
-      contracts,
-      tokens,
-      feedIds,
-      pools: venuePools,
-      refFeeds: (pools.refFeeds as string[] | undefined) ?? [],
-    });
+    // Sepolia records one flat `refFeeds`; Arc records one list per roster (`cryptoPoolRefFeeds`,
+    // …) and no flat key. Reading only the flat key gave Arc `refFeeds: []`, which reads as "the
+    // reference oracle mirrors nothing" — indistinguishable from a chain that truly mirrors none.
+    // Union both, first-seen order, deduped: a feed mirrored for two rosters is still one mirror.
+    const refFeeds = [
+      ...new Set(
+        [
+          ...((pools.refFeeds as string[] | undefined) ?? []),
+          ...POOL_CLASSES.flatMap(
+            ([key]) => (pools[`${key}RefFeeds`] as string[] | undefined) ?? [],
+          ),
+        ].filter((f) => typeof f === 'string'),
+      ),
+    ];
+
+    out.push({ chainId, contracts, tokens, feedIds, pools: venuePools, refFeeds });
   }
   return out.sort((a, b) => a.chainId - b.chainId);
 }

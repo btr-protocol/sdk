@@ -123,6 +123,7 @@ export {
   encodeAbiParameters,
   decodeAbiParameters,
   getEventSignature,
+  getFunctionSignature,
 } from './abi';
 
 // Token Standards

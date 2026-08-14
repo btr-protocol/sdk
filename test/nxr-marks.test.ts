@@ -31,10 +31,10 @@ describe('NXR mark sources', () => {
   // a mark exactly as attested, so every leg must be denominated in USDC. Pinned by name so a
   // silent roster edit in the sibling repo surfaces here rather than at `fetch-seed-marks` time,
   // mid-ceremony.
-  test('the arc roster is 17 symbols and maps to USDC-denominated pairs', () => {
+  test('the arc roster is 16 symbols and maps to USDC-denominated pairs', () => {
     const syms = roster('arc');
     if (!syms.length) return;
-    expect(syms).toHaveLength(17);
+    expect(syms).toHaveLength(16);
     const pair = (s: string) => {
       const p = nxrPair(s, s === 'USDC' ? 'USD' : 'USDC')!;
       return p.quoteVia ? `${p.nxrSymbol} x ${p.quoteVia}` : p.nxrSymbol;
@@ -49,7 +49,6 @@ describe('NXR mark sources', () => {
       USD1: 'USD1-USDT x USDT-USDC',
       PYUSD: 'PYUSD-USDT x USDT-USDC',
       PAXG: 'PAXG-USDT x USDT-USDC',
-      RLUSD: 'RLUSD-USDC',
       // Wrappers mark the underlying's own USDC cross, never their own — see below.
       EURC: 'EUR-USDC',
       QCAD: 'CAD-USDC',
@@ -74,6 +73,11 @@ describe('NXR mark sources', () => {
         `${held} must not claim a USDC source it cannot serve`,
       ).toBeNull();
     }
+    // RLUSD is held for a different reason and so asserts differently: its USDC row is well-formed
+    // and stays, but every basis (USDC/USDT/USD) went dark upstream of any one venue in a
+    // non-recovering resubscribe loop (dex 773cc31, 2026-08-14). Re-listing is a roster line.
+    expect(syms).not.toContain('RLUSD');
+    expect(nxrPair('RLUSD', 'USDC')).not.toBeNull();
     // The only mixed-case symbol in the Sepolia emit is renamed. `.` and case quirks are both
     // forbidden in a roster symbol: it is simultaneously the risk-params key, the seed-marks key,
     // the `feed_<SYM>` record key and the keeper feed name, and Foundry reads `.` as a JSONPath
