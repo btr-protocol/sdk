@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   SEPOLIA_BTR,
   SEPOLIA_CHAIN_ID,
+  SEPOLIA_FX_SYMBOLS,
   SEPOLIA_ORACLE_FEEDS,
   SEPOLIA_STABLE_SYMBOLS,
   SEPOLIA_TOKENS,
@@ -65,7 +66,11 @@ describe('sepolia oracle feed table', () => {
     expect(symsBody).not.toBeNull();
     const market = [...symsBody![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
     const fxNew = risk.fxPool.filter((s) => s !== 'USDC' && !market.includes(s));
-    const expected = [...market.map((s) => `${s}-USDC`), 'USDC-USD', ...fxNew.map((s) => `${s}-USDC`)];
+    const expected = [
+      ...market.map((s) => `${s}-USDC`),
+      'USDC-USD',
+      ...fxNew.map((s) => `${s}-USDC`),
+    ];
 
     expect(SEPOLIA_ORACLE_FEEDS.map((f) => f.name)).toEqual(expected);
 
@@ -82,46 +87,53 @@ describe('sepolia oracle feed table', () => {
 });
 
 /**
- * `sepolia.ts` and `deployments.generated.ts` both carry the Sepolia addresses: the first is
- * hand-authored because it also holds facts no deployment record has (NXR pair names, market
- * sessions, ref marks) and the front imports it by name; the second is generated from the
- * broadcast record and is what the chain-parameterised registry resolves. Two copies of an
- * address set drift, and the drift is silent, so it is pinned here rather than trusted.
+ * `sepolia.ts` READS `deployments.generated.ts`; it no longer restates any of it, so an address
+ * comparison between the two would compare a value with itself. What is still worth pinning is
+ * that the naming layer resolves completely: a roster symbol with no token or no feed, or a
+ * singleton the bots resolve that the record does not carry, would surface as `undefined` at a
+ * call site rather than as an error here.
  */
-describe('sepolia.ts agrees with the generated deployment record', () => {
+describe('sepolia.ts resolves completely against the generated record', () => {
   const gen = DEPLOYED_VENUES[SEPOLIA_CHAIN_ID]!;
-  const same = (a: string | undefined, b: string | undefined) => a?.toLowerCase() === b?.toLowerCase();
 
   test('the chain is in the generated record at all', () => {
     expect(gen).toBeDefined();
     expect(gen.chainId).toBe(SEPOLIA_CHAIN_ID);
   });
 
-  test('every hand-authored token address matches the broadcast record', () => {
-    for (const [sym, addr] of Object.entries(SEPOLIA_TOKENS)) {
-      expect(same(addr, gen.tokens[sym]), `${sym}`).toBe(true);
-    }
-  });
-
-  test('every hand-authored feed id matches the broadcast record', () => {
+  test('every feed resolves a token and a name of the documented shape', () => {
     for (const f of SEPOLIA_ORACLE_FEEDS) {
-      expect(same(f.feedId, gen.feedIds[f.name]), f.name).toBe(true);
+      expect(f.token, f.name).toBeDefined();
+      expect(f.name).toBe(f.symbol === 'USDC' ? 'USDC-USD' : `${f.symbol}-USDC`);
     }
   });
 
-  test('the singletons the bots resolve match the broadcast record', () => {
+  test('every scripted roster symbol has a token and a feed', () => {
+    const feeds = new Set(SEPOLIA_ORACLE_FEEDS.map((f) => f.symbol));
+    const roster = new Set([
+      ...SEPOLIA_STABLE_SYMBOLS,
+      ...SEPOLIA_VOLATILE_SYMBOLS,
+      ...SEPOLIA_FX_SYMBOLS,
+    ]);
+    expect(
+      [...roster].filter((s) => !SEPOLIA_TOKENS[s]),
+      'untokened',
+    ).toEqual([]);
+    expect(
+      [...roster].filter((s) => !feeds.has(s)),
+      'unmarked',
+    ).toEqual([]);
+  });
+
+  test('the singletons the bots resolve are all present', () => {
     for (const key of ['oracle', 'refOracle', 'poolFactory', 'flash', 'faucet'] as const) {
-      expect(same(SEPOLIA_BTR[key], gen.contracts[key]), key).toBe(true);
+      expect(SEPOLIA_BTR[key], key).toBeDefined();
     }
   });
 
-  test('pool rosters match, and the undeployed FX core is in neither', () => {
-    const byTag = Object.fromEntries(gen.pools.map((p) => [p.tag, p]));
-    expect(same(SEPOLIA_BTR.stablePool, byTag['btr-stable']?.address)).toBe(true);
-    expect(same(SEPOLIA_BTR.volatilePool, byTag['btr-volatile']?.address)).toBe(true);
-    expect(byTag['btr-stable']!.symbols).toEqual([...SEPOLIA_STABLE_SYMBOLS]);
-    expect(byTag['btr-volatile']!.symbols).toEqual([...SEPOLIA_VOLATILE_SYMBOLS]);
+  test('the FX core is scripted but not deployed, so it can never reach the router', () => {
+    expect(SEPOLIA_FX_SYMBOLS.length).toBeGreaterThan(0);
     expect(SEPOLIA_BTR.fxPool).toBeUndefined();
-    expect(byTag['btr-fx']).toBeUndefined();
+    expect(gen.pools.some((p) => p.tag === 'btr-fx')).toBe(false);
   });
 });

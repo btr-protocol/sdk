@@ -1,0 +1,199 @@
+{
+  "_generated": "bun scripts/gen.ts, from src/venues/nxr.ts NXR_MARKS. Do not edit by hand.",
+  "USDT": {
+    "usd": {
+      "symbol": "USDT-USD"
+    },
+    "usdc": {
+      "symbol": "USDT-USDC"
+    }
+  },
+  "USDE": {
+    "usd": {
+      "symbol": "USDE-USD"
+    }
+  },
+  "USDS": {
+    "usd": {
+      "symbol": "USDS-USD"
+    },
+    "usdc": {
+      "symbol": "USDS-USDT",
+      "quote_via": "USDT-USDC"
+    }
+  },
+  "DAI": {
+    "usd": {
+      "symbol": "DAI-USD"
+    }
+  },
+  "USD1": {
+    "usd": {
+      "symbol": "USD1-USD"
+    },
+    "usdc": {
+      "symbol": "USD1-USDT",
+      "quote_via": "USDT-USDC"
+    }
+  },
+  "USDG": {
+    "usd": {
+      "symbol": "USDG-USD"
+    }
+  },
+  "PYUSD": {
+    "usd": {
+      "symbol": "PYUSD-USD"
+    },
+    "usdc": {
+      "symbol": "PYUSD-USDT",
+      "quote_via": "USDT-USDC"
+    }
+  },
+  "RLUSD": {
+    "usd": {
+      "symbol": "RLUSD-USD"
+    },
+    "usdc": {
+      "symbol": "RLUSD-USDC"
+    }
+  },
+  "USDF": {
+    "usd": {
+      "symbol": "USDF-USD"
+    }
+  },
+  "U": {
+    "usd": {
+      "symbol": "U-USD"
+    }
+  },
+  "GHO": {
+    "usd": {
+      "symbol": "GHO-USD"
+    }
+  },
+  "TUSD": {
+    "usd": {
+      "symbol": "TUSD-USD"
+    }
+  },
+  "USDTB": {
+    "usd": {
+      "symbol": "USDTB-USD"
+    }
+  },
+  "FDUSD": {
+    "usd": {
+      "symbol": "FDUSD-USD"
+    }
+  },
+  "AUSD": {
+    "usd": {
+      "symbol": "AUSD-USD"
+    }
+  },
+  "USDC": {
+    "usd": {
+      "symbol": "USDC-USD"
+    }
+  },
+  "WETH": {
+    "usd": {
+      "symbol": "ETH-USDC"
+    },
+    "usdc": {
+      "symbol": "ETH-USDC"
+    }
+  },
+  "WBTC": {
+    "usd": {
+      "symbol": "BTC-USDC"
+    },
+    "usdc": {
+      "symbol": "BTC-USDC"
+    }
+  },
+  "CBBTC": {
+    "usd": {
+      "symbol": "BTC-USDC"
+    },
+    "usdc": {
+      "symbol": "BTC-USDC"
+    }
+  },
+  "BNB": {
+    "usd": {
+      "symbol": "BNB-USDC"
+    },
+    "usdc": {
+      "symbol": "BNB-USDC"
+    }
+  },
+  "XAUT": {
+    "usd": {
+      "symbol": "XAUT-USDC"
+    },
+    "usdc": {
+      "symbol": "XAUT-USDC"
+    }
+  },
+  "PAXG": {
+    "usd": {
+      "symbol": "PAXG-USD"
+    },
+    "usdc": {
+      "symbol": "PAXG-USDT",
+      "quote_via": "USDT-USDC"
+    }
+  },
+  "EURC": {
+    "usd": {
+      "symbol": "EUR-USD"
+    },
+    "usdc": {
+      "symbol": "EUR-USDC"
+    }
+  },
+  "QCAD": {
+    "usd": {
+      "symbol": "USD-CAD",
+      "invert": true
+    },
+    "usdc": {
+      "symbol": "CAD-USDC"
+    }
+  },
+  "AUDF": {
+    "usd": {
+      "symbol": "AUD-USD"
+    },
+    "usdc": {
+      "symbol": "AUD-USDC"
+    }
+  },
+  "BRLA": {
+    "usd": {
+      "symbol": "USD-BRL",
+      "invert": true
+    }
+  },
+  "JPYC": {
+    "usd": {
+      "symbol": "USD-JPY",
+      "invert": true
+    },
+    "usdc": {
+      "symbol": "JPY-USDC"
+    }
+  },
+  "KRW1": {
+    "usd": {
+      "symbol": "USD-KRW",
+      "invert": true
+    },
+    "usdc": {
+      "symbol": "KRW-USDC"
+    }
+  }
+}
