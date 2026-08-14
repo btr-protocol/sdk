@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { NXR_MARKS, closedUntil, nxrMark } from '../src/venues/nxr';
+import { NXR_MARKS, closedUntil, nxrMark, nxrPair } from '../src/venues/nxr';
 import { SEPOLIA_ORACLE_FEEDS } from '../src/venues/sepolia';
 
 /**
@@ -27,38 +27,53 @@ describe('NXR mark sources', () => {
     expect(missing, `add these to NXR_MARKS`).toEqual([]);
   });
 
-  // Arc is the roster the four-core ceremony deploys. Pinned by name so a silent roster edit in the
-  // sibling repo surfaces here rather than at `fetch-seed-marks` time, mid-ceremony.
-  test('the arc roster is 18 symbols and maps to the expected pairs', () => {
+  // Arc is the roster the four-core ceremony deploys, and its pools are quoteUnit 0 — they consume
+  // a mark exactly as attested, so every leg must be denominated in USDC. Pinned by name so a
+  // silent roster edit in the sibling repo surfaces here rather than at `fetch-seed-marks` time,
+  // mid-ceremony.
+  test('the arc roster is 17 symbols and maps to USDC-denominated pairs', () => {
     const syms = roster('arc');
     if (!syms.length) return;
-    expect(syms).toHaveLength(18);
-    expect(Object.fromEntries(syms.map((s) => [s, nxrMark(s)!.nxrSymbol]))).toEqual({
+    expect(syms).toHaveLength(17);
+    const pair = (s: string) => {
+      const p = nxrPair(s, s === 'USDC' ? 'USD' : 'USDC')!;
+      return p.quoteVia ? `${p.nxrSymbol} x ${p.quoteVia}` : p.nxrSymbol;
+    };
+    expect(Object.fromEntries(syms.map((s) => [s, pair(s)]))).toEqual({
+      // The base carries no market feed: no USDC/USDC identity, only the signed depeg reference,
+      // which is USD-quoted on purpose because a depeg is only observable against USD.
       USDC: 'USDC-USD',
-      USDT: 'USDT-USD',
-      USDE: 'USDE-USD',
-      USDS: 'USDS-USD',
-      USD1: 'USD1-USD',
-      PYUSD: 'PYUSD-USD',
-      EURC: 'EUR-USD',
-      QCAD: 'CAD-USD',
-      AUDF: 'AUD-USD',
-      BRLA: 'BRL-USD',
-      JPYC: 'JPY-USD',
-      KRW1: 'KRW-USD',
+      USDT: 'USDT-USDC',
+      // Only first-class tape is USDT-quoted, so the mark is bridged into USDC.
+      USDS: 'USDS-USDT x USDT-USDC',
+      USD1: 'USD1-USDT x USDT-USDC',
+      PYUSD: 'PYUSD-USDT x USDT-USDC',
+      PAXG: 'PAXG-USDT x USDT-USDC',
+      RLUSD: 'RLUSD-USDC',
+      // Wrappers mark the underlying's own USDC cross, never their own — see below.
+      EURC: 'EUR-USDC',
+      QCAD: 'CAD-USDC',
+      AUDF: 'AUD-USDC',
+      JPYC: 'JPY-USDC',
+      KRW1: 'KRW-USDC',
       WETH: 'ETH-USDC',
       WBTC: 'BTC-USDC',
       CBBTC: 'BTC-USDC',
       BNB: 'BNB-USDC',
       XAUT: 'XAUT-USDC',
-      PAXG: 'PAXG-USD',
     });
-    // Both are in the TOKENS registry and in the Sepolia fleet, and both keep their NXR_MARKS row
-    // so re-listing is a roster line and nothing more — but NXR serves neither pair today
-    // (/v1/price/RLUSD-USD and /v1/price/USDG-USD both 404, probed 2026-08-14), and a 404 fails the
-    // seed-marks fetch for the WHOLE roster, not just its own leg.
-    expect(syms).not.toContain('RLUSD');
-    expect(syms).not.toContain('USDG');
+    // Held out of the four-core roster but keeping their NXR_MARKS rows, so re-listing is a roster
+    // line and nothing more. Each is held for its own reason and none of them is USDC-seedable
+    // today: USDE-USDC probed `dead`, USDG-USDC `stale`, BRLA-USDC served an empty body
+    // (2026-08-14). One unseedable leg fails the fetch for the WHOLE roster, not just itself.
+    for (const held of ['USDE', 'USDG', 'BRLA']) {
+      expect(syms).not.toContain(held);
+      expect(nxrMark(held), held).not.toBeNull();
+      expect(
+        nxrPair(held, 'USDC'),
+        `${held} must not claim a USDC source it cannot serve`,
+      ).toBeNull();
+    }
     // The only mixed-case symbol in the Sepolia emit is renamed. `.` and case quirks are both
     // forbidden in a roster symbol: it is simultaneously the risk-params key, the seed-marks key,
     // the `feed_<SYM>` record key and the keeper feed name, and Foundry reads `.` as a JSONPath
@@ -66,6 +81,29 @@ describe('NXR mark sources', () => {
     for (const s of syms) expect(s, s).toMatch(/^[A-Z0-9]{1,16}$/);
     expect(syms).toContain('CBBTC');
     expect(syms).not.toContain('cbBTC');
+  });
+
+  // THE constraint on a quoteUnit-0 chain, stated once over whatever the roster happens to be: a
+  // USD mark under a USDC-quoted feed is off by the USD/USDC basis with no on-chain correction
+  // left, i.e. silently mispriced from the first swap. Neither the scale band nor the peg clamp
+  // can see it, so it has to be caught here.
+  test('every USDC-basis pair is denominated in USDC, directly or through a chaining bridge', () => {
+    for (const [sym, m] of Object.entries(NXR_MARKS)) {
+      const p = nxrPair(sym, 'USDC');
+      if (!p) continue; // no USDC source: correctly unlistable on such a chain
+      // A bridge only composes if the legs MEET: `USDS-USDT` x `USDT-USDC` is USDS-USDC, while
+      // `USDS-USDT` x `EUR-USDC` is a product of two unrelated rates.
+      if (p.quoteVia) {
+        expect(p.nxrSymbol.split('-')[1], sym).toBe(p.quoteVia.split('-')[0]);
+        expect(p.quoteVia.split('-')[1], sym).toBe('USDC');
+      } else {
+        expect(p.nxrSymbol.split('-')[1], sym).toBe('USDC');
+      }
+      // invert and bridge are different operations on different pairs; a row carrying both is
+      // ambiguous, and every USDC cross is served the right way up in any case.
+      expect(p.nxrQuote, `${sym} USDC row must not need inverting`).toBeUndefined();
+      expect(m.refUsd, sym).toBeDefined();
+    }
   });
 
   // A mark source is DECLARED, never inferred from the symbol. NXR's ticker parser is
@@ -109,6 +147,16 @@ describe('NXR mark sources', () => {
   test.each(Object.entries(WRAPPED_FX))('%s marks %s, not itself', (wrapper, ccy) => {
     const m = nxrMark(wrapper)!;
     expect(m.nxrSymbol).toBe(`${ccy}-USD`);
+    // The rule holds on the USDC basis too, and there it is forced rather than preferred: NXR
+    // serves `<WRAPPER>-USDC` as a compose-on-read re-badge (flags 128, ci and confidence
+    // hardcoded 0) with no live snapshot, and the signer resolves configured symbols against the
+    // snapshot map and never composes — so such a pair is permanently unsignable. The leg would be
+    // dropped from every blob, its sourceTs would never advance, and its ordinal would be burned.
+    const usdc = nxrPair(wrapper, 'USDC');
+    if (usdc) {
+      expect(usdc.nxrSymbol, wrapper).toBe(`${ccy}-USDC`);
+      expect(usdc.nxrSymbol, wrapper).not.toContain(wrapper);
+    }
     // The served pair may be the reciprocal; the DENOMINATION must not be. An inverted row yields
     // a plausible number upside down, which only the scale band catches — so it must have one.
     expect(m.nxrQuote === undefined || m.nxrQuote === `USD-${ccy}`, m.nxrQuote).toBe(true);
