@@ -23,6 +23,7 @@ import {
   poolScopedOps,
   resolveAbi,
 } from './manifest.js';
+import { NXR_MARKS, nxrPair } from '../src/venues/nxr.js';
 
 const SRC = resolve(import.meta.dir, '../src');
 const CHECK = process.argv.includes('--check');
@@ -64,7 +65,10 @@ function layoutFile(): string {
   const byShort: Record<string, Member[]> = {};
   for (const t of Object.values(storageLayout.types)) {
     if (!t.members) continue;
-    const short = t.label.replace(/^struct\s+/, '').split('.').pop();
+    const short = t.label
+      .replace(/^struct\s+/, '')
+      .split('.')
+      .pop();
     if (short) byShort[short] = t.members;
   }
   const ps = byShort.PoolStorage;
@@ -120,7 +124,10 @@ function structFieldsFile(): string {
     const n = node as Record<string, unknown>;
     const it = n.internalType;
     if (typeof it === 'string' && it.startsWith('struct ') && Array.isArray(n.components)) {
-      const short = it.replace(/^struct\s+/, '').split('.').pop()!;
+      const short = it
+        .replace(/^struct\s+/, '')
+        .split('.')
+        .pop()!;
       const fields = (n.components as Array<{ name: string }>).map((c) => c.name);
       const prev = found.get(short);
       // Two ABIs declaring one struct name with different members would make the union depend on
@@ -239,6 +246,7 @@ interface RawVenue {
   contracts: Record<string, string>;
   tokens: Record<string, string>;
   feedIds: Record<string, string>;
+  rosters: Record<string, string[]>;
   pools: Array<{ tag: string; address: string; symbols: string[] }>;
   refFeeds: string[];
 }
@@ -295,6 +303,54 @@ function riskParamsByChain(): Map<number, Record<string, unknown>> {
   return out;
 }
 
+/**
+ * Feed names in `feedIds[]` ORDINAL order — the index every NXR-signed record carries, and the
+ * reason no consumer may hand-list it: reordering re-binds a signed quote to the wrong feed.
+ *
+ * Arc's record states the order outright (`.feedOrder`, written by `FeedOrderLib.write` from a
+ * `getFeedIds()` re-read, so a later phase's feed lands with the ordinal the chain gave it).
+ * Sepolia's record predates that and does not, so the order is REPLAYED from the same inputs the
+ * deploy scripts consume: `<Chain>OracleDeploy._syms()` (every pooled symbol bar the base, minus
+ * the fx-only legs, in risk-params order), then the signed base reference added immediately after
+ * that loop, then `<Chain>PoolDeploy.addFxFeeds()` appending each fx leg no earlier phase seeded.
+ * The replay is rejected unless it yields exactly the feed set the record carries.
+ *
+ * The chain stays the only authority — `keepers/src/oracle/startup.rs` reads `feedIds(idx)` and
+ * refuses to start on a mismatch. This is what the SDK checks against, not a second hand-list.
+ */
+function feedOrder(
+  chainId: number,
+  base: string,
+  risk: Record<string, unknown>,
+  deploy: Record<string, unknown>,
+  names: string[],
+): string[] {
+  const ref = `${base}-USD`;
+  const roster = (key: string) => (risk[key] as string[] | undefined) ?? [];
+  const recorded = deploy.feedOrder as string[] | undefined;
+  const order = recorded
+    ? recorded.map((s) => (s === ref ? s : `${s}-${base}`))
+    : (() => {
+        const pooled = new Set(
+          POOL_CLASSES.filter(([k]) => k !== 'fxPool').flatMap(([k]) => roster(k)),
+        );
+        const market = ((risk.symbols as string[] | undefined) ?? [])
+          .slice(1)
+          .filter((s) => pooled.has(s));
+        const fxNew = roster('fxPool').filter((s) => s !== base && !market.includes(s));
+        return [...market.map((s) => `${s}-${base}`), ref, ...fxNew.map((s) => `${s}-${base}`)];
+      })();
+
+  const want = [...names].sort().join(',');
+  const got = [...order].sort().join(',');
+  if (want !== got) {
+    throw new Error(
+      `${chainId}: feed ordinals ${recorded ? 'recorded in .feedOrder' : 'replayed from the deploy scripts'} are [${order.join(', ')}], which is not the feed set the deployment records ([${names.join(', ')}]). An ordinal the record cannot name would bind a signed quote to the wrong feed.`,
+    );
+  }
+  return order;
+}
+
 function venues(): RawVenue[] {
   const risks = riskParamsByChain();
   const out: RawVenue[] = [];
@@ -304,7 +360,10 @@ function venues(): RawVenue[] {
     // Both halves or nothing: the token/feed record without the pool record describes an oracle
     // with no venue to quote, and either one alone cannot route a swap.
     if (!deploy || !pools) continue;
-    for (const [what, rec] of [['deploy', deploy], ['pools', pools]] as const) {
+    for (const [what, rec] of [
+      ['deploy', deploy],
+      ['pools', pools],
+    ] as const) {
       if (Number(rec.chainId) !== chainId) {
         throw new Error(`${chainId}.${what}.json declares chainId ${String(rec.chainId)}`);
       }
@@ -326,6 +385,13 @@ function venues(): RawVenue[] {
       }
       feedIds[name] = id;
     }
+    // Re-keyed in `feedIds[]` ORDINAL order, so the record states the index a signed quote carries
+    // and no consumer has to restate it. Object key order is the statement: these keys are never
+    // integer-like, so insertion order is preserved by every JS engine.
+    const ordered: Record<string, string> = {};
+    for (const name of feedOrder(chainId, symbols[0] ?? '', risk, deploy, Object.keys(feedIds))) {
+      ordered[name] = feedIds[name]!;
+    }
 
     const contracts: Record<string, string> = {};
     for (const key of VENUE_CONTRACTS) {
@@ -337,7 +403,10 @@ function venues(): RawVenue[] {
     // the classes this table lists is how Arc's 9-asset `cryptoPool` got dropped from a venue
     // that still looked plausible with two pools in it, and no consumer can detect the absence.
     const known = new Set<string>(POOL_CLASSES.map(([k]) => k));
-    for (const [what, rec] of [['pools', pools], ['risk-params', risk]] as const) {
+    for (const [what, rec] of [
+      ['pools', pools],
+      ['risk-params', risk],
+    ] as const) {
       for (const key of Object.keys(rec)) {
         if (POOL_KEY_RE.test(key) && !known.has(key)) {
           throw new Error(
@@ -347,16 +416,22 @@ function venues(): RawVenue[] {
       }
     }
 
+    // `rosters` is what each core is SCRIPTED to list, `pools` only what was broadcast. They are
+    // deliberately different sets: a scripted-but-undeployed core must never reach the router, but
+    // its roster is still the answer to "which assets does this chain intend to mark", which is
+    // what the feed-completeness checks read.
     const venuePools: RawVenue['pools'] = [];
+    const rosters: Record<string, string[]> = {};
     for (const [key, tag] of POOL_CLASSES) {
       const addr = pools[key];
       const roster = (risk[key] as string[] | undefined) ?? [];
-      // A pool class that is scripted but not yet broadcast serialises as zero or is absent.
-      // Emitting it would hand the router an address that reverts every quote.
-      if (!isAddress(addr) || roster.length === 0) continue;
+      if (roster.length === 0) continue;
       const missing = roster.filter((s) => !tokens[s]);
       if (missing.length) throw new Error(`${chainId} ${tag} lists untokened ${missing.join(',')}`);
-      venuePools.push({ tag, address: addr, symbols: roster });
+      rosters[tag] = roster;
+      // A pool class that is scripted but not yet broadcast serialises as zero or is absent.
+      // Emitting it would hand the router an address that reverts every quote.
+      if (isAddress(addr)) venuePools.push({ tag, address: addr, symbols: roster });
     }
     if (venuePools.length === 0) throw new Error(`${chainId}.pools.json carries no deployed pool`);
 
@@ -375,16 +450,22 @@ function venues(): RawVenue[] {
       ),
     ];
 
-    out.push({ chainId, contracts, tokens, feedIds, pools: venuePools, refFeeds });
+    out.push({
+      chainId,
+      contracts,
+      tokens,
+      feedIds: ordered,
+      rosters,
+      pools: venuePools,
+      refFeeds,
+    });
   }
   return out.sort((a, b) => a.chainId - b.chainId);
 }
 
 function venuesFile(): string {
   const found = venues();
-  const entries = found
-    .map((v) => `  ${v.chainId}: ${toTs({ ...v }, 1)},`)
-    .join('\n');
+  const entries = found.map((v) => `  ${v.chainId}: ${toTs({ ...v }, 1)},`).join('\n');
   return `${banner('bun scripts/gen.ts')}
 /**
  * Deployed BTR venues, keyed by chain id
@@ -395,10 +476,12 @@ function venuesFile(): string {
  * \`registry.ts\` throws on an absent chain rather than falling back, so a bot pointed at a chain
  * BTR is not deployed on cannot silently quote another chain's addresses.
  *
- * Feed NAMES are keys here; the on-chain \`feedIds[]\` ORDINAL is deliberately not, because the
- * deployment record does not carry it (forge sorts the keys it serialises, and the ordering is
- * split across two scripts). The only authority on an ordinal is the chain itself — see
- * \`keepers/src/oracle/startup.rs\`, which reads \`feedIds(idx)\` and refuses to start on a mismatch.
+ * \`feedIds\` is keyed by feed NAME and ORDERED by on-chain ordinal: entry \`n\` is \`feedIds[n]\`, the
+ * index every NXR-signed record carries. Arc's record states that order (\`.feedOrder\`); Sepolia's
+ * predates it, so \`scripts/gen.ts\` replays the deploy scripts against the same risk-params they
+ * consume and refuses any replay that does not reproduce the recorded feed set. The chain remains
+ * the authority — \`keepers/src/oracle/startup.rs\` reads \`feedIds(idx)\` and refuses to start on a
+ * mismatch — but nothing downstream hand-lists an ordinal any more.
  */
 
 import type { Address, Hex } from '../eth/types.js';
@@ -409,9 +492,11 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
   tokens: Record<string, Address>;
-  /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`. */
+  /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`, in \`feedIds[]\` ordinal order. */
   feedIds: Record<string, Hex>;
-  /** Deployed cores with the symbols each one lists. */
+  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
+  rosters: Record<string, string[]>;
+  /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names mirrored onto the reference oracle. */
   refFeeds: string[];
@@ -421,6 +506,46 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
 ${entries}
 };
 `;
+}
+
+// ── NXR mark routing, projected for the consumers that cannot import TS ──────────────────────
+/**
+ * `NXR_MARKS` re-expressed as JSON, resolved on both bases.
+ *
+ * Which NXR pair backs an asset, which way up NXR serves it, and which bridge leg composes it are
+ * facts about the ASSET, so they are declared once in `src/venues/nxr.ts` and everything else
+ * derives. `keepers/scripts/gen-sepolia-feeds.py` reads this file and states no pair of its own;
+ * its catalog keeps only what is genuinely per-feed and BTR-local (theta, heartbeat, freshness
+ * bound, the optional shield, the sigma overrides), none of which NX Rates has an opinion about.
+ *
+ * A third hand-maintained copy of the routing is what this replaces: the Python table and the TS
+ * table disagreeing is a mark relayed under the wrong asset's name, with nothing to detect it.
+ */
+function nxrMarksFile(): string {
+  const out: Record<string, unknown> = {
+    _generated: 'bun scripts/gen.ts, from src/venues/nxr.ts NXR_MARKS. Do not edit by hand.',
+  };
+  for (const symbol of Object.keys(NXR_MARKS)) {
+    const usd = nxrPair(symbol, 'USD')!;
+    const usdc = nxrPair(symbol, 'USDC');
+    out[symbol] = {
+      // The pair NXR actually SERVES plus the reciprocation to apply. Naming the denominated pair
+      // here instead would publish the rate upside down: a plausible number, which is the
+      // dangerous kind of wrong.
+      usd: { symbol: usd.nxrQuote ?? usd.nxrSymbol, ...(usd.nxrQuote ? { invert: true } : {}) },
+      // Absent = no USDC-denominated source. Consumers must fail on that, never fall back to the
+      // USD row: a quoteUnit-0 pool re-denominates nothing, so the basis error is unrecoverable.
+      ...(usdc
+        ? {
+            usdc: {
+              symbol: usdc.nxrSymbol,
+              ...(usdc.quoteVia ? { quote_via: usdc.quoteVia } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+  return `${JSON.stringify(out, null, 2)}\n`;
 }
 
 // ── emit ─────────────────────────────────────────────────────────────────────────────────────
@@ -473,7 +598,9 @@ ${[
   ...CONTRACTS.map((c) => `export * from './${c.file.replace(/\.ts$/, '.js')}';`),
   `export * from './solidity.generated.js';`,
   `export * from './structs.generated.js';`,
-].sort().join('\n')}
+]
+  .sort()
+  .join('\n')}
 `,
 );
 
@@ -481,10 +608,12 @@ files.set(resolve(SRC, 'abis', 'solidity.generated.ts'), solidityFile());
 files.set(resolve(SRC, 'abis', 'structs.generated.ts'), structFieldsFile());
 files.set(resolve(SRC, 'pool', 'layout.generated.ts'), layoutFile());
 files.set(resolve(SRC, 'venues', 'deployments.generated.ts'), venuesFile());
+files.set(resolve(SRC, 'venues', 'nxr-marks.generated.json'), nxrMarksFile());
 
 let drift = 0;
 for (const [path, raw] of files) {
-  const want = formatted(path, raw);
+  // JSON is emitted already formatted; biome's stdin formatter is wired for the TS output only.
+  const want = path.endsWith('.json') ? raw : formatted(path, raw);
   const have = (() => {
     try {
       return readFileSync(path, 'utf8');

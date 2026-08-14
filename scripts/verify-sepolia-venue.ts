@@ -7,13 +7,15 @@
  * SoT = dex/evm/deployments/11155111.deploy.json (tokens + feed_<SYM>)
  *     + dex/evm/deployments/11155111.pools.json  (contracts + refFeeds)
  *
- * Run this after every Sepolia redeploy. It checks everything derivable from the
- * deployment: chain id, every ERC20 address, every feed id, every contract address,
- * and that the stable/volatile symbol sets are feed-complete.
+ * Run this after every Sepolia redeploy. `sepolia.ts` reads the generated record rather than
+ * restating it, so what this proves is that the COMMITTED generation is current: it walks the
+ * deployment JSON directly and re-checks chain id, every ERC20, every feed id, every contract and
+ * that the pool rosters are feed-complete. `bun run gen:check` catches the same staleness, but
+ * only where the forge artifacts are present; this needs the two JSON files and nothing else.
  *
- * NOT checked, because it is not in the deployment: `nxrSymbol`. That is the NX Rates
- * pair name (stables→`X-USD` proxy, WETH→ETH-USDC, FX→`X-USD`), owned here on purpose —
- * the deploy JSON has no idea what NXR calls a pair. Edit it by hand; verify against NXR REST.
+ * NOT checked, because it is not in the deployment: `nxrSymbol`. That is the NX Rates pair name,
+ * declared once in `src/venues/nxr.ts NXR_MARKS` — the deploy JSON has no idea what NXR calls a
+ * pair. Verify that against NXR REST, with the EXPLICIT pair.
  */
 
 import { join } from 'node:path';
@@ -41,7 +43,10 @@ const eq = (what: string, got: string | undefined, want: string | undefined) => 
 const deploy = await Bun.file(join(DEPLOYMENTS, '11155111.deploy.json')).json();
 const pools = await Bun.file(join(DEPLOYMENTS, '11155111.pools.json')).json();
 
-for (const [name, d] of [['deploy', deploy], ['pools', pools]] as const) {
+for (const [name, d] of [
+  ['deploy', deploy],
+  ['pools', pools],
+] as const) {
   if (Number(d.chainId) !== SEPOLIA_CHAIN_ID) {
     fail(`${name}.json chainId ${d.chainId} != SEPOLIA_CHAIN_ID ${SEPOLIA_CHAIN_ID}`);
   }
@@ -50,9 +55,11 @@ for (const [name, d] of [['deploy', deploy], ['pools', pools]] as const) {
 // 1. ERC20s.
 for (const [sym, addr] of Object.entries(SEPOLIA_TOKENS)) eq(`token ${sym}`, addr, deploy[sym]);
 
-// 2. Contracts (pools.json is the superset; deploy.json repeats `oracle`).
+// 2. Contracts (pools.json is the superset; deploy.json repeats `oracle`). A key resolving to
+// undefined is a core that is scripted but not broadcast (`fxPool`), which is a state the venue
+// declares on purpose, not drift: there is nothing in the SoT to compare it against.
 for (const [key, addr] of Object.entries(SEPOLIA_BTR)) {
-  eq(`contract ${key}`, addr, pools[key] ?? deploy[key]);
+  if (addr !== undefined) eq(`contract ${key}`, addr, pools[key] ?? deploy[key]);
 }
 
 // 3. Feed ids + token cross-reference.
@@ -68,7 +75,11 @@ for (const f of SEPOLIA_ORACLE_FEEDS) {
 }
 
 // 4. Every pool asset must have a feed, or the AIMM cannot mark it.
-for (const sym of new Set([...SEPOLIA_STABLE_SYMBOLS, ...SEPOLIA_VOLATILE_SYMBOLS, ...SEPOLIA_FX_SYMBOLS])) {
+for (const sym of new Set([
+  ...SEPOLIA_STABLE_SYMBOLS,
+  ...SEPOLIA_VOLATILE_SYMBOLS,
+  ...SEPOLIA_FX_SYMBOLS,
+])) {
   if (!seen.has(sym)) fail(`pool asset ${sym}: no entry in SEPOLIA_ORACLE_FEEDS`);
   if (!SEPOLIA_TOKENS[sym]) fail(`pool asset ${sym}: no entry in SEPOLIA_TOKENS`);
 }

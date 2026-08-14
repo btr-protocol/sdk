@@ -10,10 +10,12 @@
  * `registry.ts` throws on an absent chain rather than falling back, so a bot pointed at a chain
  * BTR is not deployed on cannot silently quote another chain's addresses.
  *
- * Feed NAMES are keys here; the on-chain `feedIds[]` ORDINAL is deliberately not, because the
- * deployment record does not carry it (forge sorts the keys it serialises, and the ordering is
- * split across two scripts). The only authority on an ordinal is the chain itself — see
- * `keepers/src/oracle/startup.rs`, which reads `feedIds(idx)` and refuses to start on a mismatch.
+ * `feedIds` is keyed by feed NAME and ORDERED by on-chain ordinal: entry `n` is `feedIds[n]`, the
+ * index every NXR-signed record carries. Arc's record states that order (`.feedOrder`); Sepolia's
+ * predates it, so `scripts/gen.ts` replays the deploy scripts against the same risk-params they
+ * consume and refuses any replay that does not reproduce the recorded feed set. The chain remains
+ * the authority — `keepers/src/oracle/startup.rs` reads `feedIds(idx)` and refuses to start on a
+ * mismatch — but nothing downstream hand-lists an ordinal any more.
  */
 
 import type { Address, Hex } from '../eth/types.js';
@@ -24,9 +26,11 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
   tokens: Record<string, Address>;
-  /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ its `feedId`. */
+  /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ its `feedId`, in `feedIds[]` ordinal order. */
   feedIds: Record<string, Hex>;
-  /** Deployed cores with the symbols each one lists. */
+  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
+  rosters: Record<string, string[]>;
+  /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names mirrored onto the reference oracle. */
   refFeeds: string[];
@@ -64,7 +68,6 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       PAXG: '0x96f953bAC2FF3829B4a526cacd858A5a22327E03',
     },
     feedIds: {
-      'USDC-USD': '0x0189091eac3c33dc88b48c58f75a1d978253e7fb2d4a1711b5701172b083c487',
       'USDT-USDC': '0xfa722ae80d6181ca931f45c80582c173b9c19cd30c1632e864e8f48ea62a6548',
       'USDS-USDC': '0x4d9df04bbf62ab0e8418c56a2fea063a7956bc08674600862a95970c583f3be5',
       'USD1-USDC': '0x4c7fec22c40835f297ef183fc68a20f5a965997cddedf9fcf5bd18b3d0898d85',
@@ -80,6 +83,12 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'BNB-USDC': '0x5398b2b4caab86e6c562e30f6ecb15c4b87c20ed7595ad48b4048b62005b9888',
       'XAUT-USDC': '0xaf63e9c459822846879d75246ea10ee933d53a8f206c51c5150270aadd42625f',
       'PAXG-USDC': '0xb8b495d5826591b537a47841255ffbca7f1f0f56afff8f5e7bc565f1e20b338c',
+      'USDC-USD': '0x0189091eac3c33dc88b48c58f75a1d978253e7fb2d4a1711b5701172b083c487',
+    },
+    rosters: {
+      'btr-stable': ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD', 'EURC'],
+      'btr-fx': ['USDC', 'EURC', 'QCAD', 'AUDF', 'JPYC', 'KRW1'],
+      'btr-crypto': ['USDC', 'USDT', 'WETH', 'WBTC', 'CBBTC', 'BNB', 'XAUT', 'PAXG', 'EURC'],
     },
     pools: [
       {
@@ -164,7 +173,6 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       KRW1: '0xA21c7E8328EaA898a39946FeCA981C0143366cC6',
     },
     feedIds: {
-      'USDC-USD': '0xf097408cec312d10691ef8ff946389a6eab389bed1a574aa68222fdf45f1f1f2',
       'USDT-USDC': '0xe2ca0626104d5e537a71218cb1524d5f02623014f122c80e479cfb2698aaaef9',
       'USDE-USDC': '0xb235eefe16249c453be2a3d8b17d2648b3800ded997b2462fa2c05a92bfab2b8',
       'USDS-USDC': '0xb6361eb741b2e26a6713df09d0733cb0496e036a722cc80ba3aec2428feaf2de',
@@ -187,11 +195,34 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'XAUT-USDC': '0xfbd75bd57a7cda2e9e3b8409a6269cbf8fe7bf74d62f23822247ace2dafbe684',
       'PAXG-USDC': '0xb6e3605879a0b64f7984843b5fc9e3d5aafcbdf1874c08030d85e5e0d05dc5bb',
       'EURC-USDC': '0xc935b02202e468a1381f834951a37392b7c2b4ad80c8efe764f7ec9d5aca7504',
+      'USDC-USD': '0xf097408cec312d10691ef8ff946389a6eab389bed1a574aa68222fdf45f1f1f2',
       'QCAD-USDC': '0xfdcbda586491de458657b1ec84cf53b85add9adf3f7ff929ee6f811d1447b8ab',
       'AUDF-USDC': '0xdc34b9876032749a1047d2af4ac6c8dd93a65093a17be701fbeae07f558cd8b7',
       'BRLA-USDC': '0x18085d4edb9a77884122a7d83e60bf0ff1fc64a631020887eae17791ab4c94ba',
       'JPYC-USDC': '0xcc35076388f2fb7e3a00d8e8d0530753b80853e7333aa2a11ff7ca090d217515',
       'KRW1-USDC': '0xc6cba05bf7e0af179298ee4318bd6ae95c30b337542881623d60eb6a1ff25967',
+    },
+    rosters: {
+      'btr-stable': [
+        'USDC',
+        'USDT',
+        'USDE',
+        'USDS',
+        'DAI',
+        'USD1',
+        'USDG',
+        'PYUSD',
+        'RLUSD',
+        'USDF',
+        'U',
+        'GHO',
+        'TUSD',
+        'USDTB',
+        'FDUSD',
+        'AUSD',
+      ],
+      'btr-volatile': ['USDC', 'USDT', 'WETH', 'WBTC', 'cbBTC', 'BNB', 'XAUT', 'PAXG', 'EURC'],
+      'btr-fx': ['USDC', 'EURC', 'QCAD', 'AUDF', 'BRLA', 'JPYC', 'KRW1'],
     },
     pools: [
       {
