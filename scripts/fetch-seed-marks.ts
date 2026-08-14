@@ -35,7 +35,13 @@
  */
 
 import { join } from 'node:path';
-import { closedUntil, nxrMark, sessionOpenLabel } from '../src/venues/nxr.js';
+import {
+  type MarkBasis,
+  closedUntil,
+  nxrMark,
+  nxrPair,
+  sessionOpenLabel,
+} from '../src/venues/nxr.js';
 import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
@@ -45,9 +51,9 @@ import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
  *  the snapshot against the risk JSON, and `checkSeedBudget()` refuses a roster it cannot fund),
  *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
 const CHAINS = {
-  sepolia: { chainId: SEPOLIA_CHAIN_ID, risk: 'sepolia-risk-params.json' },
-  arc: { chainId: 5_042_002, risk: 'arc-risk-params.json' },
-} as const;
+  sepolia: { chainId: SEPOLIA_CHAIN_ID, risk: 'sepolia-risk-params.json', basis: 'USD' },
+  arc: { chainId: 5_042_002, risk: 'arc-risk-params.json', basis: 'USDC' },
+} as const satisfies Record<string, { chainId: number; risk: string; basis: MarkBasis }>;
 
 const chainArg = (process.argv[2] || process.env.CHAIN || 'sepolia').toLowerCase();
 const CHAIN = CHAINS[chainArg as keyof typeof CHAINS];
@@ -84,18 +90,32 @@ if (risk.chainId !== CHAIN.chainId) {
   process.exit(1);
 }
 
-// Roster = the chain's own listed assets, resolved through the single symbol→NXR mapping table.
+// Roster = the chain's own listed assets, resolved through the single symbol→NXR mapping table, on
+// the BASIS this chain's pools consume a mark in. `nxrPair` returns null rather than falling back
+// to the USD row: on a quoteUnit-0 chain that fallback is a mark off by the whole USD/USDC basis
+// with nothing left on-chain to correct it, which no band or peg clamp can see.
 const roster = (risk.symbols ?? []).map((symbol) => {
-  const m = nxrMark(symbol);
-  if (!m) {
+  // The BASE is exempt from the basis, and not as an exception to it: it carries no market feed
+  // (there is no USDC/USDC identity — Pricing._readBasePriceOrHalt discards the base read for
+  // quoting), only the signed depeg reference, which is deliberately USD-quoted because a
+  // depeg is only observable against USD. Its mark below is the identity 1 and never fetched.
+  const basis = symbol === risk.symbols[0] ? 'USD' : CHAIN.basis;
+  const m = nxrPair(symbol, basis);
+  const full = nxrMark(symbol);
+  if (!m || !full) {
     console.error(
-      `${RISK}: symbol ${symbol} has no NXR mark source — add a row to src/venues/nxr.ts NXR_MARKS.` +
-        ` Probe the EXPLICIT pair first (/v1/price/<TICKER>-USD): a delimiter-less near-miss answers` +
-        ` 200 with another asset's mid, so "it returns a price" is not evidence the pair exists.`,
+      `${RISK}: symbol ${symbol} has no ${basis}-basis NXR mark source — add it to` +
+        ` src/venues/nxr.ts NXR_MARKS${basis === 'USDC' ? ' (the `usdc` row)' : ''}.` +
+        ` Probe the EXPLICIT pair first: a delimiter-less near-miss answers 200 with another` +
+        ` asset's mid, so "it returns a price" is not evidence the pair exists. Confirm it also` +
+        ` answers flags 64 — a flags-128 compose-on-read cross has no snapshot and cannot be signed.`,
     );
     process.exit(1);
   }
-  return { symbol, ...m };
+  // nxrQuote/quoteVia are cleared before the basis pair is applied: a spread does not REMOVE a
+  // key the basis row omits, so `CAD-USDC` would silently inherit the USD row's
+  // `nxrQuote: 'USD-CAD'` and be seeded upside down.
+  return { symbol, ...full, nxrQuote: undefined, quoteVia: undefined, ...m };
 });
 if (!roster.length) {
   console.error(`${RISK}: empty symbols[] — nothing to seed`);
@@ -107,69 +127,75 @@ const marks: Record<string, { ticker: string; mid: number; mark1e18: string }> =
 const fetchedAt = new Date();
 const KEY = process.env.NXR_API_KEY?.trim();
 
+/** One live mid from NXR, or a reason it is not seedable. `shut` exempts a scheduled FX halt from
+ *  the age bound and from that alone: the mark is frozen because the market is, the keeper's first
+ *  push carries the same frozen mark, and failing here would block the ceremony every weekend.
+ *  `dead` is never exempt — it is NXR's own verdict that nothing is feeding the ticker. */
+async function fetchMid(pair: string, shut: boolean): Promise<{ mid: number } | { err: string }> {
+  let j: { mid?: number; age_ms?: number; status?: string };
+  try {
+    const r = await fetch(`${NXR}/v1/price/${encodeURIComponent(pair)}`, {
+      headers: KEY
+        ? { Accept: 'application/json', 'X-NXR-Key': KEY }
+        : { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!r.ok)
+      return { err: `${pair}: NXR ${r.status} — pair absent, do NOT substitute a variant` };
+    j = (await r.json()) as typeof j;
+  } catch (e) {
+    return { err: `${pair}: ${(e as Error).message}` };
+  }
+  // Freshness is per-mark and NXR reports it, but the band cannot see it: a dead ticker still
+  // returns a peg-plausible mid. USDG-USD served 0.99986 with `status: "dead", age_ms: 469991` on
+  // 2026-08-14. Seeding from that puts the first signed push a whole staleness window away from the
+  // seed it has to land beside, and dt=0 gives it only the bare maxDev floor to do it.
+  const age = j.age_ms;
+  if (j.status === 'dead')
+    return { err: `${pair}: NXR reports the ticker dead at age ${age ?? '?'}ms — not seedable` };
+  if (typeof age === 'number' && age > MAX_AGE_MS && !shut)
+    return {
+      err:
+        `${pair}: mark is ${Math.round(age / 1000)}s old (status ${j.status ?? '?'}),` +
+        ` bound is ${MAX_AGE_MS / 1000}s and the market is open`,
+    };
+  if (typeof j.mid !== 'number' || !(j.mid > 0)) return { err: `${pair}: no live mid from NXR` };
+  return { mid: j.mid };
+}
+
 for (const f of roster) {
   // USDC/USDC is an identity feed by construction — never fetched, never off 1.
   if (f.symbol === 'USDC') {
     marks[f.symbol] = { ticker: f.nxrSymbol, mid: 1, mark1e18: (10n ** 18n).toString() };
     continue;
   }
-  let mid: number | null = null;
   // /v1/price/{ticker} is the only endpoint serving a live px:
   // {ticker,mid,bid,ask,ci,confidence,flags,age_ms,status}. /v1/tickers/detail is a CATALOGUE and
   // carries no price at all. `nxrQuote` names the served ticker when NXR only carries the
-  // reciprocal of the pair the feed is denominated in; the mid is reciprocated back.
+  // reciprocal of the pair the feed is denominated in; the mid is reciprocated back. `quoteVia`
+  // names a BRIDGE leg instead, and the mark is the product — the two are mutually exclusive.
   const quoted = f.nxrQuote ?? f.nxrSymbol;
-  try {
-    const r = await fetch(`${NXR}/v1/price/${encodeURIComponent(quoted)}`, {
-      headers: KEY
-        ? { Accept: 'application/json', 'X-NXR-Key': KEY }
-        : { Accept: 'application/json' },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!r.ok) {
-      errs.push(
-        `${f.symbol} (${quoted}): NXR ${r.status} — pair absent, do NOT substitute a variant`,
-      );
-      continue;
-    }
-    const j = (await r.json()) as { mid?: number; age_ms?: number; status?: string };
-    // Freshness is per-mark and NXR reports it, but the band cannot see it: a dead ticker still
-    // returns a peg-plausible mid. USDG-USD served 0.99986 with `status: "dead", age_ms: 469991`
-    // on 2026-08-14. Seeding from that puts the first signed push a whole staleness window away
-    // from the seed it has to land beside, and dt=0 gives it only the bare maxDev floor to do it.
-    //
-    // A CLOSED market is exempt from the age bound and only from that: an FX mark frozen inside a
-    // scheduled halt is correct, the keeper's first push carries the same frozen mark, and failing
-    // here would block the ceremony every weekend. `dead` is never exempt — it is NXR's own verdict
-    // that nothing is feeding the ticker, which a scheduled close does not cause.
-    const age = j.age_ms;
-    const shut = closedUntil(f.symbol) !== null;
-    if (j.status === 'dead') {
-      errs.push(
-        `${f.symbol} (${quoted}): NXR reports the ticker dead at age ${age ?? '?'}ms — not seedable`,
-      );
-      continue;
-    }
-    if (typeof age === 'number' && age > MAX_AGE_MS && !shut) {
-      errs.push(
-        `${f.symbol} (${quoted}): mark is ${Math.round(age / 1000)}s old (status ${j.status ?? '?'}),` +
-          ` bound is ${MAX_AGE_MS / 1000}s and the market is open`,
-      );
-      continue;
-    }
-    if (shut)
-      console.warn(
-        `  ${f.symbol}: market closed until ${sessionOpenLabel(closedUntil(f.symbol)!)}, seeding the frozen mark`,
-      );
-    if (typeof j.mid === 'number' && j.mid > 0) mid = f.nxrQuote ? 1 / j.mid : j.mid;
-  } catch (e) {
-    errs.push(`${f.symbol} (${quoted}): ${(e as Error).message}`);
+  const shut = closedUntil(f.symbol) !== null;
+  if (shut)
+    console.warn(
+      `  ${f.symbol}: market closed until ${sessionOpenLabel(closedUntil(f.symbol)!)}, seeding the frozen mark`,
+    );
+
+  const got = await fetchMid(quoted, shut);
+  if ('err' in got) {
+    errs.push(`${f.symbol} (${got.err})`);
     continue;
   }
-  if (mid == null) {
-    errs.push(`${f.symbol} (${quoted}): no live mid from NXR`);
-    continue;
+  let mid = f.nxrQuote ? 1 / got.mid : got.mid;
+  if (f.quoteVia) {
+    const bridge = await fetchMid(f.quoteVia, shut);
+    if ('err' in bridge) {
+      errs.push(`${f.symbol} bridge (${bridge.err})`);
+      continue;
+    }
+    mid *= bridge.mid;
   }
+
   const [lo, hi] = f.band ?? PEG;
   if (mid < lo || mid > hi) {
     errs.push(
@@ -178,7 +204,9 @@ for (const f of roster) {
     continue;
   }
   marks[f.symbol] = {
-    ticker: f.nxrSymbol,
+    // The pair the mark IS, so the record states its own denomination: a bridged mark records the
+    // composition it came from, not just its first leg.
+    ticker: f.quoteVia ? `${f.nxrSymbol} x ${f.quoteVia}` : f.nxrSymbol,
     mid,
     // 1e18 fixed point, the unit both deploy scripts consume (M.encodeB64(x, 18)).
     mark1e18: BigInt(Math.round(mid * 1e18)).toString(),
