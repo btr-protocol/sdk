@@ -152,3 +152,36 @@ describe('parameter round-trips', () => {
     expect(out[0].b).toBe('0x0b9cca59cefde03ad8e41da272d946861fa7717f');
   });
 });
+
+describe('multi-output decode is positional', () => {
+  // A function with >1 output decodes as an inline tuple. The tuple decoder used
+  // to key EVERY member by `name || index` into a plain object, so unnamed
+  // outputs came back as `{0: .., 1: ..}` — which is not iterable, and
+  // `const [a] = await readContract(...)` threw "{} is not iterable" instead of
+  // reading the first return value. Live blob below is the Arc testnet
+  // btr-stable pool answering previewWithdraw(USDT, 1e6).
+  const LIVE_PREVIEW_WITHDRAW =
+    '0x00000000000000000000000000000000000000000000000000000000000f4263' +
+    '0000000000000000000000000000000000000000000000000000000000000000';
+
+  test('unnamed outputs destructure positionally (previewWithdraw)', () => {
+    const decoded = decodeFn({ abi: POOL_ABI, functionName: 'previewWithdraw', data: LIVE_PREVIEW_WITHDRAW });
+    const [amountOut, haircut] = decoded as [bigint, bigint];
+    expect(amountOut).toBe(1000035n);
+    expect(haircut).toBe(0n);
+  });
+
+  test('named outputs keep their names AND their positions', () => {
+    const abi = [{
+      name: 'f', type: 'function', stateMutability: 'view', inputs: [],
+      outputs: [{ name: 'lo', type: 'uint256' }, { name: 'hi', type: 'uint256' }],
+    }] as never;
+    const data = encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [3n, 9n]);
+    const decoded = decodeFn({ abi, functionName: 'f', data }) as Record<string, bigint> & [bigint, bigint];
+    const [lo, hi] = decoded;
+    expect(lo).toBe(3n);
+    expect(hi).toBe(9n);
+    expect(decoded.lo).toBe(3n);
+    expect(decoded.hi).toBe(9n);
+  });
+});
