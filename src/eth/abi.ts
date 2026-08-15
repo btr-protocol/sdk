@@ -215,13 +215,19 @@ export function decode(type: string, data: string, offset = 0, components?: any[
 
   // 2. Tuples
   if (type === 'tuple' && components) {
-    const obj: any = Array.isArray(components) ? {} : [];
+    // Positional FIRST, names aliased on top. A tuple IS ordered, and a
+    // multi-output function decodes through here, so `const [a, b] = read(...)`
+    // must work — the previous plain object keyed by `name || index` made an
+    // unnamed pair decode to `{0:.., 1:..}`, which is not iterable and threw
+    // "{} is not iterable" at the call site rather than returning a value.
+    const obj: any = [];
     let curr = offset;
     components.forEach((c, i) => {
       const isDyn = isDynamicType(c.type, c.components);
       const start = isDyn ? offset + (Number(readInt(curr)) * 2) : curr;
       const res = decode(c.type, d, start, c.components);
-      obj[c.name || i] = res.val;
+      obj[i] = res.val;
+      if (c.name) obj[c.name] = res.val;
       curr += isDyn ? 64 : res.read;
     });
     return { val: obj, read: curr - offset };
