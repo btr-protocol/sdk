@@ -86,7 +86,7 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'USDC-USD': '0x0189091eac3c33dc88b48c58f75a1d978253e7fb2d4a1711b5701172b083c487',
     },
     rosters: {
-      'btr-stable': ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD', 'EURC'],
+      'btr-stable': ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD'],
       'btr-fx': ['USDC', 'EURC', 'QCAD', 'AUDF', 'JPYC', 'KRW1'],
       'btr-crypto': ['USDC', 'USDT', 'WETH', 'WBTC', 'CBBTC', 'BNB', 'XAUT', 'PAXG', 'EURC'],
     },
@@ -94,7 +94,7 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       {
         tag: 'btr-stable',
         address: '0x8e33853c6c34F20c93385449afE9477029D45BFE',
-        symbols: ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD', 'EURC'],
+        symbols: ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD'],
       },
       {
         tag: 'btr-fx',
