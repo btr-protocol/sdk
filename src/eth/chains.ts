@@ -50,6 +50,11 @@ export interface ChainConfig {
   testnet?: boolean;
 }
 
+/** Testnet name markers. A testnet has no mark of its own, it wears its mainnet's, so the slug
+ *  drops these: "Polygon Amoy Testnet" → polygon. Applied only when `testnet` is set, so a
+ *  mainnet whose name happens to carry one of these words keeps its own slug. */
+const TESTNET_TOKENS = /\b(testnet|sepolia|amoy|fuji|chapel|holesky|goerli|mumbai)\b/gi;
+
 /**
  * Get chain icon path (auto-computed from name or overridden)
  */
@@ -61,7 +66,8 @@ export function getChainIcon(chainId: number): string {
   if (chain.icon) return chain.icon;
 
   // Auto-compute from name: "BNB Chain" → "/networks/bnb-chain.svg"
-  const slug = chain.name.toLowerCase().replace(/\s+/g, '-');
+  const name = chain.testnet ? chain.name.replace(TESTNET_TOKENS, ' ') : chain.name;
+  const slug = name.trim().toLowerCase().replace(/\s+/g, '-');
   return `/networks/${slug}.svg`;
 }
 
@@ -249,7 +255,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   324: {
     id: 324,
     name: 'zkSync Era',
-    icon: '/networks/zksync.svg',
     rpcUrls: [
       'https://mainnet.era.zksync.io',
       'https://zksync.drpc.org',
@@ -383,6 +388,30 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
+  196: {
+    id: 196,
+    name: 'X Layer',
+    // OKX's Polygon-CDK zkEVM. Gas is OKB, not ETH: quoting a fee in ETH here is a ~1e3 error.
+    rpcUrls: ['https://xlayerrpc.okx.com', 'https://rpc.xlayer.tech'],
+    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+    blockExplorerUrls: ['https://www.oklink.com/x-layer'],
+    wrappedNative: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
+    multicall3: MULTICALL3_ADDRESS,
+  },
+
+  4663: {
+    id: 4663,
+    name: 'Robinhood Chain',
+    // The slug would be `robinhood-chain`; the asset is `robinhood`.
+    icon: '/networks/robinhood.svg',
+    rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
+    // Arbitrum Orbit L2, ETH gas. No WETH predeploy at 0x42..06 (verified: no code), and no
+    // wrapped native is pinned until one is confirmed on-chain.
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://robinhoodchain.blockscout.com'],
+    multicall3: MULTICALL3_ADDRESS,
+  },
+
   // ═══════════════════════════════════════════════════════════
   // Testnets / Dev
   // ═══════════════════════════════════════════════════════════
@@ -416,8 +445,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   5042002: {
     id: 5042002,
     name: 'Arc Testnet',
-    // One asset covers both Arc networks; the slug would be `arc-testnet.svg`.
-    icon: '/networks/arc.svg',
     // Owner-authoritative list; these two hosts only. Both verified live 2026-08-10
     // (eth_chainId -> 0x4cef52). Earlier entries rpc.testnet.arc.io / rpc.drpc.testnet.arc.io
     // were invented by mechanical renaming — do not reintroduce them.
@@ -433,10 +460,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   11155111: {
     id: 11155111,
     name: 'Ethereum Sepolia Testnet',
-    // Without this the slug is `ethereum-sepolia-testnet`, and there is no such
-    // asset — the network icon 404s wherever Sepolia is shown. Testnets reuse
-    // their mainnet mark.
-    icon: '/networks/ethereum.svg',
     // publicnode first: tenderly 429s under any real load, and ankr answers
     // every request with "Unauthorized: you must authenticate with an API key",
     // so it was a guaranteed-dead second hop that starved every on-chain read.
@@ -468,8 +491,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   84532: {
     id: 84532,
     name: 'Base Sepolia Testnet',
-    // Reuse mainnet Base mark — no separate base-sepolia asset.
-    icon: '/networks/base.svg',
     rpcUrls: [
       'https://sepolia.base.org',
       'https://base-sepolia.public.blastapi.io',
@@ -498,7 +519,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   998: {
     id: 998,
     name: 'HyperEVM Testnet',
-    icon: '/networks/hyperevm.svg',
     rpcUrls: ['https://rpc.hyperliquid-testnet.xyz/evm'],
     nativeCurrency: { name: 'Test Hyperliquid', symbol: 'HYPE', decimals: 18 },
     blockExplorerUrls: ['https://testnet.hyperevmscan.io'],
@@ -521,10 +541,33 @@ export const CHAINS: Record<number, ChainConfig> = {
     testnet: true,
   },
 
+  1952: {
+    id: 1952,
+    // NOT 195 and NOT 196: `eth_chainId` on the OKX testrpc answers 0x7a0. 196 is X Layer
+    // MAINNET, and 195 was the retired Sepolia-era testnet.
+    name: 'X Layer Testnet',
+    rpcUrls: ['https://xlayertestrpc.okx.com', 'https://testrpc.xlayer.tech/terigon'],
+    nativeCurrency: { name: 'Test OKB', symbol: 'OKB', decimals: 18 },
+    blockExplorerUrls: ['https://www.oklink.com/x-layer-testnet'],
+    // No WOKB at the mainnet address here (verified: no code).
+    multicall3: MULTICALL3_ADDRESS,
+    testnet: true,
+  },
+
+  46630: {
+    id: 46630,
+    name: 'Robinhood Chain Testnet',
+    icon: '/networks/robinhood.svg',
+    rpcUrls: ['https://rpc.testnet.chain.robinhood.com'],
+    nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://explorer.testnet.chain.robinhood.com'],
+    multicall3: MULTICALL3_ADDRESS,
+    testnet: true,
+  },
+
   43113: {
     id: 43113,
     name: 'Avalanche Fuji Testnet',
-    icon: '/networks/avalanche.svg',
     rpcUrls: [
       'https://api.avax-test.network/ext/bc/C/rpc',
       'https://rpc.ankr.com/avalanche_fuji',
