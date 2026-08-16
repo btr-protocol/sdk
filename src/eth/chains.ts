@@ -445,10 +445,16 @@ export const CHAINS: Record<number, ChainConfig> = {
   5042002: {
     id: 5042002,
     name: 'Arc Testnet',
-    // Owner-authoritative list; these two hosts only. Both verified live 2026-08-10
-    // (eth_chainId -> 0x4cef52). Earlier entries rpc.testnet.arc.io / rpc.drpc.testnet.arc.io
-    // were invented by mechanical renaming — do not reintroduce them.
-    rpcUrls: ['https://rpc.testnet.arc.network', 'https://arc-testnet.drpc.org'],
+    // All verified live (eth_chainId -> 0x4cef52). Order is a batch/sub-request budget, not
+    // preference: drpc rejects batches over 3 and the arc.network host caps at ~16 sub-requests,
+    // so the two that take a full multicall lead and arc.network is the last resort.
+    // rpc.testnet.arc.io / rpc.drpc.testnet.arc.io were invented by mechanical renaming: never
+    // reintroduce them, and never put arc-testnet.drpc.org back in front.
+    rpcUrls: [
+      'https://rpc.blockdaemon.testnet.arc.network',
+      'https://5042002.rpc.thirdweb.com',
+      'https://rpc.testnet.arc.network',
+    ],
     // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
