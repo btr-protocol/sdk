@@ -42,7 +42,6 @@ bun install
 | `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
 | `@btr-protocol/sdk/pool` | Single-pool data + tx: `getAsset`, `getCoverageRatio`, `getLPBalance`, `getSwapQuote`, `getPoolData`, `swap`, `deposit`, `withdraw`, `NATIVE_TOKEN` (canonical `POOL_ABI`, `SwapQuote`, `PoolAsset`) |
 | `@btr-protocol/sdk/router` | `planToLegs(plan, opts)` + `buildSwapCalls(legs, opts)` + `totalValue(calls)` — route plan → ordered approve+swap calldata. No on-chain router (see below) |
-| `@btr-protocol/sdk/rewards` | Merkle proofs, earning/voting damping, distributor helpers |
 | `@btr-protocol/sdk/utils` | chains, tokens, constants, encoding, format, math, safe, typing, validation |
 | `@btr-protocol/sdk/utils/logger` | logger only |
 
