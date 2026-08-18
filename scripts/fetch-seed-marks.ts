@@ -63,8 +63,16 @@ if (!CHAIN) {
 }
 
 const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex');
-const RISK = join(DEX, `evm/deployments/${CHAIN.risk}`);
-const OUT = join(DEX, `evm/deployments/${CHAIN.chainId}.seed-marks.json`);
+// The Solidity halves (ArcPoolDeploy._riskPath/_marksPath) resolve RISK_PARAMS/SEED_MARKS against
+// the forge working directory dex/evm. Mirror them so one env override names the same file for the
+// fetcher and the deploy scripts, instead of two different defaults.
+const EVM = join(DEX, 'evm');
+const RISK = process.env.RISK_PARAMS
+  ? join(EVM, process.env.RISK_PARAMS)
+  : join(EVM, `deployments/${CHAIN.risk}`);
+const OUT = process.env.SEED_MARKS
+  ? join(EVM, process.env.SEED_MARKS)
+  : join(EVM, `deployments/${CHAIN.chainId}.seed-marks.json`);
 const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$/, '');
 
 /** Peg band for an asset that declares no scale band of its own; matches the Solidity [0.98,1.02]
@@ -76,12 +84,30 @@ const PEG = [0.98, 1.02] as const;
  *  a peg-plausible mid from a dead ticker is exactly what the band cannot see. */
 const MAX_AGE_MS = 5 * 60_000;
 
-const risk: { chainId: number; seedUsdPerLeg: number; symbols: string[] } =
-  await Bun.file(RISK).json();
+const risk: {
+  chainId: number;
+  seedUsdPerLeg: number;
+  unmintableSeedUsdPerLeg?: number;
+  symbols: string[];
+} = await Bun.file(RISK).json();
 const seedUsdPerLeg = risk.seedUsdPerLeg;
 if (!Number.isFinite(seedUsdPerLeg) || seedUsdPerLeg <= 0) {
   console.error(`${RISK}: seedUsdPerLeg absent or non-positive — nothing to size a seed from`);
   process.exit(1);
+}
+// The native (unmintable) legs read a SECOND depth target from the same SoT. OPTIONAL: Sepolia's
+// USDC is a TestnetERC20 mock (the bridged concept does not exist there), so sepolia-risk-params.json
+// carries no key and the snapshot must not either. Where the params file HAS the key (Arc) the
+// snapshot must carry it too, or ArcPoolDeploy._assertSeedMarksCfg sees a mismatch on a key this file
+// never wrote. A present-but-non-positive key is a hard error, never a silently zero-sized class.
+const unmintableSeedUsdPerLeg = risk.unmintableSeedUsdPerLeg;
+if (unmintableSeedUsdPerLeg !== undefined) {
+  if (!Number.isFinite(unmintableSeedUsdPerLeg) || unmintableSeedUsdPerLeg <= 0) {
+    console.error(
+      `${RISK}: unmintableSeedUsdPerLeg present but non-positive — nothing to size the native legs from`,
+    );
+    process.exit(1);
+  }
 }
 // The risk JSON is the SoT for the roster and the seed size; the chain arg only selects WHICH file.
 // A mismatch means the operator is seeding a different ceremony than they think.
@@ -221,21 +247,16 @@ if (errs.length) {
   process.exit(1);
 }
 
-await Bun.write(
-  OUT,
-  `${JSON.stringify(
-    {
-      chainId: CHAIN.chainId,
-      source: `${NXR}/v1/price`,
-      fetchedAt: fetchedAt.toISOString(),
-      maxAgeMs: MAX_AGE_MS,
-      seedUsdPerLeg,
-      marks,
-    },
-    null,
-    1,
-  )}\n`,
-);
+const snapshot = {
+  chainId: CHAIN.chainId,
+  source: `${NXR}/v1/price`,
+  fetchedAt: fetchedAt.toISOString(),
+  maxAgeMs: MAX_AGE_MS,
+  seedUsdPerLeg,
+  ...(unmintableSeedUsdPerLeg === undefined ? {} : { unmintableSeedUsdPerLeg }),
+  marks,
+};
+await Bun.write(OUT, `${JSON.stringify(snapshot, null, 1)}\n`);
 console.log(
   `${OUT}: ${chainArg} · ${Object.keys(marks).length} marks @ ${fetchedAt.toISOString()} ` +
     `(broadcast within ${MAX_AGE_MS / 60_000} min or re-run)`,
