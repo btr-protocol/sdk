@@ -48,22 +48,34 @@ function sign(digest: Hex, priv: Hex): Uint8Array {
   return out;
 }
 
-/** Build a 24-byte record big-endian: idx u16 | price u64 | sigmaPbps u32 | conf u16 | sourceTsMs u64. */
+/** Build a 22-byte record big-endian: tickerId u64 | price u64 | sigmaPbps u32 | conf u16. */
+function rec(tickerId: bigint, priceB64: bigint, sigmaPbps: number, conf: number): Uint8Array {
+  const b = new Uint8Array(22);
+  const dv = new DataView(b.buffer);
+  dv.setBigUint64(0, tickerId);
+  dv.setBigUint64(8, priceB64);
+  dv.setUint32(16, sigmaPbps);
+  dv.setUint16(20, conf);
+  return b;
+}
+
+/** header(8) = version u8 | sourceTsMs u48 | reserved u8, then the records verbatim. */
+function blobOf(sourceTsMs: bigint, ...records: Uint8Array[]): Uint8Array {
+  const h = new Uint8Array(8);
+  h[0] = 1;
+  for (let i = 0; i < 6; i++) h[1 + i] = Number((sourceTsMs >> BigInt(8 * (5 - i))) & 0xffn);
+  return new Uint8Array([...h, ...records.flatMap((r) => [...r])]);
+}
+
+/** A whole one-record blob: the common case in these tests. */
 function record(
-  idx: number,
+  tickerId: bigint,
   priceB64: bigint,
   sigmaPbps: number,
   conf: number,
   sourceTsMs: bigint,
 ): Uint8Array {
-  const b = new Uint8Array(24);
-  const dv = new DataView(b.buffer);
-  dv.setUint16(0, idx);
-  dv.setBigUint64(2, priceB64);
-  dv.setUint32(10, sigmaPbps);
-  dv.setUint16(14, conf);
-  dv.setBigUint64(16, sourceTsMs);
-  return b;
+  return blobOf(sourceTsMs, rec(tickerId, priceB64, sigmaPbps, conf));
 }
 
 /** Concatenate signatures sorted by recovered signer address ascending (the on-chain requirement). */
@@ -79,30 +91,59 @@ function quorumSigs(digest: Hex, privs: readonly Hex[]): Uint8Array {
 describe('decodeBlob', () => {
   it('extracts fields and 1e18 mark for a single record', () => {
     const priceB64 = encodeB64(123456n * 10n ** 8n, 8); // $123456 @ 8 decimals
-    const blob = record(3, priceB64, 4200, 15, 1_700_000_000_000n);
-    const [r] = decodeBlob(blob);
-    expect(r.idx).toBe(3);
+    const blob = record(3n, priceB64, 4200, 15, 1_700_000_000_000n);
+    const decoded = decodeBlob(blob);
+    expect(decoded.version).toBe(1);
+    expect(decoded.sourceTsMs).toBe(1_700_000_000_000n);
+    const [r] = decoded.records;
+    expect(r.tickerId).toBe(3n);
     expect(r.priceB64).toBe(priceB64);
     expect(r.mark1e18).toBe(decodeB64(priceB64, 18));
     expect(r.sigmaPbps).toBe(4200);
     expect(r.confidence).toBe(15);
-    expect(r.sourceTsMs).toBe(1_700_000_000_000n);
   });
 
-  it('decodes multi-record blobs and rejects misaligned length', () => {
-    const blob = new Uint8Array([
-      ...record(0, encodeB64(10n ** 18n, 18), 1, 2, 1n),
-      ...record(1, encodeB64(2n * 10n ** 18n, 18), 3, 4, 2n),
-    ]);
-    expect(decodeBlob(blob)).toHaveLength(2);
-    expect(() => decodeBlob(new Uint8Array(23))).toThrow();
+  it('decodes multi-record blobs and rejects a ragged or short one', () => {
+    const blob = blobOf(
+      2n,
+      rec(1n, encodeB64(10n ** 18n, 18), 1, 2),
+      rec(2n, encodeB64(2n * 10n ** 18n, 18), 3, 4),
+    );
+    expect(decodeBlob(blob).records).toHaveLength(2);
+    expect(() => decodeBlob(new Uint8Array([...blob, 0xff]))).toThrow();
+    expect(() => decodeBlob(new Uint8Array(8))).toThrow();
     expect(() => decodeBlob(new Uint8Array(0))).toThrow();
+  });
+
+  /**
+   * THE anti-misparse gate. 4 records at the retired 24-byte stride is 96 B, which is also a
+   * valid header + 4 new records: length cannot tell the formats apart, so only the version
+   * byte can. A real old blob's first byte is the high byte of an ordinal `idx` (< 256) = 0.
+   */
+  it('rejects a blob whose length is valid for the OLD 24-byte stride', () => {
+    const old24 = new Uint8Array(96);
+    const dv = new DataView(old24.buffer);
+    for (let i = 0; i < 4; i++) {
+      dv.setUint16(i * 24, i); // idx
+      dv.setBigUint64(i * 24 + 2, encodeB64(10n ** 18n, 18));
+      dv.setUint32(i * 24 + 10, 300);
+      dv.setUint16(i * 24 + 14, 25);
+      dv.setBigUint64(i * 24 + 16, 1_700_000_000_000n);
+    }
+    expect((old24.length - 8) % 22).toBe(0); // the collision this test exists for
+    expect(() => decodeBlob(old24)).toThrow(/blob version/);
+  });
+
+  it('rejects a non-zero reserved byte', () => {
+    const blob = record(1n, encodeB64(10n ** 18n, 18), 1, 2, 1n);
+    blob[7] = 1;
+    expect(() => decodeBlob(blob)).toThrow(/reserved/);
   });
 });
 
 describe('batchDigest', () => {
   it('is deterministic and domain-sensitive', () => {
-    const blob = record(0, encodeB64(10n ** 18n, 18), 1, 2, 1n);
+    const blob = record(1n, encodeB64(10n ** 18n, 18), 1, 2, 1n);
     const d1 = batchDigest(blob, DOMAIN);
     expect(d1).toBe(batchDigest(blob, DOMAIN));
     expect(d1).not.toBe(batchDigest(blob, { ...DOMAIN, chainId: 56 }));
@@ -112,7 +153,7 @@ describe('batchDigest', () => {
 
 describe('recoverSigners + verifyQuorum', () => {
   const signers = KEYS.map(addrOf);
-  const blob = record(0, encodeB64(10n ** 18n, 18), 100, 5, 42n);
+  const blob = record(1n, encodeB64(10n ** 18n, 18), 100, 5, 42n);
   const digest = batchDigest(blob, DOMAIN);
 
   it('recovers the exact signer addresses', () => {
@@ -154,7 +195,7 @@ describe('recoverSigners + verifyQuorum', () => {
 
   it('fails closed when the blob is tampered after signing', () => {
     const sigs = quorumSigs(digest, [KEYS[0], KEYS[1]]);
-    const tampered = record(0, encodeB64(2n * 10n ** 18n, 18), 100, 5, 42n); // different mark
+    const tampered = record(1n, encodeB64(2n * 10n ** 18n, 18), 100, 5, 42n); // different mark
     const q = verifyBatch({
       blob: tampered,
       sigs,
@@ -166,11 +207,11 @@ describe('recoverSigners + verifyQuorum', () => {
     expect(q.quorum.ok).toBe(false);
   });
 
-  it('verifyBatch returns decoded records + digest', () => {
+  it('verifyBatch returns the decoded blob + digest', () => {
     const sigs = quorumSigs(digest, [KEYS[0], KEYS[1]]);
     const res = verifyBatch({ blob, sigs, domain: DOMAIN, onchainSigners: signers, threshold: 2 });
     expect(res.digest).toBe(digest);
-    expect(res.records).toHaveLength(1);
+    expect(res.blob.records).toHaveLength(1);
     expect(res.quorum.ok).toBe(true);
   });
 });

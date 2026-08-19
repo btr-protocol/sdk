@@ -246,6 +246,7 @@ interface RawVenue {
   contracts: Record<string, string>;
   tokens: Record<string, string>;
   feedIds: Record<string, string>;
+  tickerIds: Record<string, string>;
   rosters: Record<string, string[]>;
   pools: Array<{ tag: string; address: string; symbols: string[] }>;
   refFeeds: string[];
@@ -393,6 +394,21 @@ function venues(): RawVenue[] {
       ordered[name] = feedIds[name]!;
     }
 
+    // MITCH ticker per feed, from the SAME ceremony snapshot the deploy scripts bind from
+    // (`.tickers`, `<Chain>OracleDeploy._tickerOf`). It is the record key on the signed path, so
+    // stating it here is what lets a consumer join a decoded record to a feed WITHOUT an ordinal.
+    // A pre-migration snapshot has no `.tickers`; the entry is then simply absent.
+    const marks = readJson(resolve(DEPLOYMENTS_DIR, `${chainId}.seed-marks.json`));
+    const snapshotTickers = (marks?.tickers ?? {}) as Record<string, unknown>;
+    const tickerIds: Record<string, string> = {};
+    for (const name of Object.keys(ordered)) {
+      const t = snapshotTickers[name];
+      if (t === undefined) continue;
+      const v = BigInt(t as string | number);
+      if (v === 0n) throw new Error(`${chainId}.seed-marks.json: zero tickerId for ${name}`);
+      tickerIds[name] = v.toString();
+    }
+
     const contracts: Record<string, string> = {};
     for (const key of VENUE_CONTRACTS) {
       const a = pools[key] ?? deploy[key];
@@ -455,6 +471,7 @@ function venues(): RawVenue[] {
       contracts,
       tokens,
       feedIds: ordered,
+      tickerIds,
       rosters,
       pools: venuePools,
       refFeeds,
@@ -494,6 +511,12 @@ export interface ChainVenue {
   tokens: Record<string, Address>;
   /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`, in \`feedIds[]\` ordinal order. */
   feedIds: Record<string, Hex>;
+  /**
+   * On-chain feed name ⇒ its MITCH \`tickerId\` (decimal string), the key every signed record
+   * carries. Content-derived, so it is the same on every chain — join a decoded record to a feed
+   * through this, never through an array position. Absent for a pre-migration deployment record.
+   */
+  tickerIds: Record<string, string>;
   /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
   rosters: Record<string, string[]>;
   /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */

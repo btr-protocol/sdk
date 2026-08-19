@@ -16,8 +16,15 @@ import { checksumAddress, keccak256, keccak256Input } from '../eth/index';
 import type { Address, Hex } from '../eth/types';
 import { concat, decodeB64, numberToHex, pad } from '../utils/encoding';
 
-const RECORD_BYTES = 24;
+const HEADER_BYTES = 8;
+const RECORD_BYTES = 22;
 const SIG_STRIDE = 65;
+/**
+ * Wire version, checked FIRST. 24 B and 22 B strides produce colliding blob lengths (4 old
+ * records = 96 B = header + 4 new records), so length can never discriminate the formats and a
+ * stride mismatch must be REFUSED rather than misparsed.
+ */
+const BLOB_VERSION = 1;
 
 /** keccak256("BatchQuote(bytes32 blobHash)") — the batch struct typehash. */
 export const BATCH_TYPEHASH = keccak256Input('BatchQuote(bytes32 blobHash)');
@@ -26,10 +33,13 @@ export const EIP712_DOMAIN_TYPEHASH = keccak256Input(
   'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)',
 );
 
-/** One decoded 24-byte quote record. Mark is exposed both as raw B64 and 1e18-scaled. */
+/** One decoded 22-byte quote record. Mark is exposed both as raw B64 and 1e18-scaled. */
 export interface QuoteRecord {
-  /** append-only index into `feedIds[]` (resolves to a bytes32 feedId on-chain). */
-  idx: number;
+  /**
+   * MITCH instrument id: content-derived from both assets plus the instrument type, so it is
+   * identical on every chain and deployment. Resolves on-chain via `feedIdOf(tickerId)`.
+   */
+  tickerId: bigint;
   /** raw B64-packed mark (uint64). */
   priceB64: bigint;
   /** mark scaled to 1e18 (== on-chain `b64To1e18(price)`). 0 is invalid on-chain. */
@@ -38,8 +48,18 @@ export interface QuoteRecord {
   sigmaPbps: number;
   /** mark confidence interval, bps. */
   confidence: number;
-  /** NXR-attested source timestamp, ms since epoch (strictly monotonic per feed). */
+}
+
+/** A decoded blob: one header source time plus its records. */
+export interface QuoteBlob {
+  /** wire version (always {@link BLOB_VERSION} for an accepted blob). */
+  version: number;
+  /**
+   * NXR-attested source timestamp, ms since epoch (u48 on the wire). BLOB-level: the contract
+   * already refused records with differing source times, so per-record copies were redundant.
+   */
   sourceTsMs: bigint;
+  records: QuoteRecord[];
 }
 
 export interface Eip712Domain {
@@ -75,28 +95,39 @@ function readUint(bytes: Uint8Array, off: number, len: number): bigint {
 }
 
 /**
- * Decode a packed batch blob into quote records. Mirrors the 24-byte big-endian record
- * (idx u16 | price u64 | sigmaPbps u32 | conf u16 | sourceTsMs u64) read by `batchPushSigned`.
+ * Decode a packed batch blob, byte-exact with `batchPushSigned`:
+ *   header(8) = version u8 | sourceTsMs u48 | reserved u8   (reserved MUST be 0)
+ *   record(22) = tickerId u64 | price u64 | sigmaPbps u32 | conf u16
+ * Fails closed on a wrong version, a non-zero reserved byte, or a ragged body.
  */
-export function decodeBlob(blob: Hex | Uint8Array): QuoteRecord[] {
+export function decodeBlob(blob: Hex | Uint8Array): QuoteBlob {
   const bytes = toBytes(blob);
-  if (bytes.length === 0 || bytes.length % RECORD_BYTES !== 0) {
-    throw new Error(`blob length ${bytes.length} not a positive multiple of ${RECORD_BYTES}`);
+  if (bytes.length < HEADER_BYTES + RECORD_BYTES) {
+    throw new Error(`blob length ${bytes.length} is shorter than a header plus one record`);
   }
-  const out: QuoteRecord[] = [];
-  for (let o = 0; o < bytes.length; o += RECORD_BYTES) {
-    const priceB64 = readUint(bytes, o + 2, 8);
-    out.push({
-      idx: Number(readUint(bytes, o, 2)),
+  // Version FIRST, before any record is read: the length collision above makes it the only
+  // thing that can tell a stride change from a valid blob.
+  if (bytes[0] !== BLOB_VERSION) {
+    throw new Error(`blob version ${bytes[0]} != ${BLOB_VERSION} (wrong wire format)`);
+  }
+  if (bytes[7] !== 0) throw new Error(`blob header reserved byte is ${bytes[7]}, not 0`);
+  const body = bytes.length - HEADER_BYTES;
+  if (body % RECORD_BYTES !== 0) {
+    throw new Error(`blob body ${body} not a whole number of ${RECORD_BYTES}-byte records`);
+  }
+  const records: QuoteRecord[] = [];
+  for (let o = HEADER_BYTES; o < bytes.length; o += RECORD_BYTES) {
+    const priceB64 = readUint(bytes, o + 8, 8);
+    records.push({
+      tickerId: readUint(bytes, o, 8),
       priceB64,
       // reuse the SDK B64 decoder (== on-chain b64To1e18) — do NOT reimplement.
       mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
-      sigmaPbps: Number(readUint(bytes, o + 10, 4)),
-      confidence: Number(readUint(bytes, o + 14, 2)),
-      sourceTsMs: readUint(bytes, o + 16, 8),
+      sigmaPbps: Number(readUint(bytes, o + 16, 4)),
+      confidence: Number(readUint(bytes, o + 20, 2)),
     });
   }
-  return out;
+  return { version: bytes[0], sourceTsMs: readUint(bytes, 1, 6), records };
 }
 
 /**
@@ -192,7 +223,7 @@ export interface VerifyBatchArgs {
 }
 
 export interface VerifiedBatch {
-  records: QuoteRecord[];
+  blob: QuoteBlob;
   digest: Hex;
   quorum: QuorumResult;
 }
@@ -207,7 +238,7 @@ export function verifyBatch({
 }: VerifyBatchArgs): VerifiedBatch {
   const digest = batchDigest(blob, domain);
   return {
-    records: decodeBlob(blob),
+    blob: decodeBlob(blob),
     digest,
     quorum: verifyQuorum(recoverSigners(digest, sigs), onchainSigners, threshold),
   };

@@ -105,6 +105,11 @@ export const EXTERNAL_ORACLE_ABI = [
     name: 'addFeed',
     inputs: [
       {
+        name: 'tickerId',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+      {
         name: 'base',
         type: 'address',
         internalType: 'address',
@@ -257,6 +262,25 @@ export const EXTERNAL_ORACLE_ABI = [
     inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'feedIdOf',
+    inputs: [
+      {
+        name: '',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -688,6 +712,12 @@ export const EXTERNAL_ORACLE_ABI = [
         internalType: 'address',
       },
       {
+        name: 'tickerId',
+        type: 'uint64',
+        indexed: false,
+        internalType: 'uint64',
+      },
+      {
         name: 'price',
         type: 'uint64',
         indexed: false,
@@ -934,6 +964,11 @@ export const EXTERNAL_ORACLE_ABI = [
   {
     type: 'error',
     name: 'AlreadyPending',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'BadBlobHeader',
     inputs: [],
   },
   {

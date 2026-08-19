@@ -28,6 +28,12 @@ export interface ChainVenue {
   tokens: Record<string, Address>;
   /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ its `feedId`, in `feedIds[]` ordinal order. */
   feedIds: Record<string, Hex>;
+  /**
+   * On-chain feed name ⇒ its MITCH `tickerId` (decimal string), the key every signed record
+   * carries. Content-derived, so it is the same on every chain — join a decoded record to a feed
+   * through this, never through an array position. Absent for a pre-migration deployment record.
+   */
+  tickerIds: Record<string, string>;
   /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
   rosters: Record<string, string[]>;
   /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */
@@ -84,6 +90,24 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'XAUT-USDC': '0xaf63e9c459822846879d75246ea10ee933d53a8f206c51c5150270aadd42625f',
       'PAXG-USDC': '0xb8b495d5826591b537a47841255ffbca7f1f0f56afff8f5e7bc565f1e20b338c',
       'USDC-USD': '0x0189091eac3c33dc88b48c58f75a1d978253e7fb2d4a1711b5701172b083c487',
+    },
+    tickerIds: {
+      'USDT-USDC': '451698500104617984',
+      'USDS-USDC': '448399965221289984',
+      'USD1-USDC': '442022797780189184',
+      'PYUSD-USDC': '445981039640182784',
+      'EURC-USDC': '439219043129360384',
+      'QCAD-USDC': '456096546615721984',
+      'AUDF-USDC': '456206497778499584',
+      'JPYC-USDC': '456426400104054784',
+      'KRW1-USDC': '456536351266832384',
+      'WETH-USDC': '438724262896861184',
+      'WBTC-USDC': '453457718709059584',
+      'CBBTC-USDC': '436635190804086784',
+      'BNB-USDC': '434436167548534784',
+      'XAUT-USDC': '454557230336835584',
+      'PAXG-USDC': '454447279174057984',
+      'USDC-USD': '452687840255410176',
     },
     rosters: {
       'btr-stable': ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD'],
@@ -201,6 +225,36 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'BRLA-USDC': '0x18085d4edb9a77884122a7d83e60bf0ff1fc64a631020887eae17791ab4c94ba',
       'JPYC-USDC': '0xcc35076388f2fb7e3a00d8e8d0530753b80853e7333aa2a11ff7ca090d217515',
       'KRW1-USDC': '0xc6cba05bf7e0af179298ee4318bd6ae95c30b337542881623d60eb6a1ff25967',
+    },
+    tickerIds: {
+      'USDT-USDC': '451698500104617984',
+      'USDE-USDC': '438284458245750784',
+      'USDS-USDC': '448399965221289984',
+      'DAI-USDC': '437624751269085184',
+      'USD1-USDC': '442022797780189184',
+      'USDG-USDC': '453897523360169984',
+      'PYUSD-USDC': '445981039640182784',
+      'RLUSD-USDC': '447520355919069184',
+      'USDF-USDC': '439383969873526784',
+      'U-USDC': '454887083825168384',
+      'GHO-USDC': '432566997781315584',
+      'TUSD-USDC': '452358207081283584',
+      'USDTB-USDC': '438394409408528384',
+      'FDUSD-USDC': '439603872199081984',
+      'AUSD-USDC': '432896851269648384',
+      'WETH-USDC': '438724262896861184',
+      'WBTC-USDC': '453457718709059584',
+      'cbBTC-USDC': '436635190804086784',
+      'BNB-USDC': '434436167548534784',
+      'XAUT-USDC': '454557230336835584',
+      'PAXG-USDC': '454447279174057984',
+      'EURC-USDC': '439219043129360384',
+      'USDC-USD': '452687840255410176',
+      'QCAD-USDC': '456096546615721984',
+      'AUDF-USDC': '456206497778499584',
+      'BRLA-USDC': '456316448941277184',
+      'JPYC-USDC': '456426400104054784',
+      'KRW1-USDC': '456536351266832384',
     },
     rosters: {
       'btr-stable': [
