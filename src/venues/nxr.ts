@@ -42,6 +42,14 @@ const FX_24X5: MarketSession = [[1260, 5 * DAY_MIN + 1320]];
 const BRL_SESSION: MarketSession = [1, 2, 3, 4, 5].map(
   (d) => [d * DAY_MIN + 720, d * DAY_MIN + 1260] as const,
 );
+/** US cash equities, Mon-Fri. 13:30-20:00 UTC on EDT, 14:30-21:00 on EST; declared as the UNION
+ *  13:30-21:00 so each edge errs OPEN, the same convention FX_24X5 documents: an hour we are
+ *  unsure about reads as a live market, so a dead feed still shows stale rather than being excused
+ *  as a scheduled close. Half-days and holidays are NOT modelled: they read open and therefore
+ *  stale, which is the safe direction. */
+const US_EQUITY: MarketSession = [1, 2, 3, 4, 5].map(
+  (d) => [d * DAY_MIN + 810, d * DAY_MIN + 1260] as const,
+);
 
 /** One resolved mark source: which pair to fetch and how to turn it into the feed's quantity. */
 export interface NxrPair {
@@ -123,6 +131,21 @@ export const NXR_MARKS: Record<string, NxrMark> = {
     refUsd: 4040,
   },
 
+  // ── US equities. Native USDC tape is compose-on-read (flags 192) and /v1/price composes it on
+  // demand, verified against each name's own `<SYM>-USD` (flags 96) on 2026-08-19: the two agree
+  // to ~0.015 %, which is exactly the USDC-USD basis. So no bridge and no reciprocal is needed,
+  // unlike the fiat wrappers below. refUsd is that observation, NOT an independently sourced price.
+
+  NVDA: { nxrSymbol: 'NVDA-USDC', session: US_EQUITY, band: [50, 1000], refUsd: 221 },
+  MSFT: { nxrSymbol: 'MSFT-USDC', session: US_EQUITY, band: [100, 2000], refUsd: 479 },
+  META: { nxrSymbol: 'META-USDC', session: US_EQUITY, band: [125, 2200], refUsd: 545 },
+  TSLA: { nxrSymbol: 'TSLA-USDC', session: US_EQUITY, band: [75, 1400], refUsd: 338 },
+  AVGO: { nxrSymbol: 'AVGO-USDC', session: US_EQUITY, band: [90, 1500], refUsd: 371 },
+  AMD: { nxrSymbol: 'AMD-USDC', session: US_EQUITY, band: [100, 2000], refUsd: 487 },
+  ORCL: { nxrSymbol: 'ORCL-USDC', session: US_EQUITY, band: [35, 600], refUsd: 142 },
+  INTC: { nxrSymbol: 'INTC-USDC', session: US_EQUITY, band: [20, 400], refUsd: 93 },
+  ASML: { nxrSymbol: 'ASML-USDC', session: US_EQUITY, band: [400, 7000], refUsd: 1757 },
+  SPCX: { nxrSymbol: 'SPCX-USDC', session: US_EQUITY, band: [35, 600], refUsd: 140 },
   // ── fiat-backed wrappers — mark the UNDERLYING CURRENCY, never the wrapper.
   // Owner rule, and on the USDC basis it is no longer merely a preference. A wrapper's own ticker
   // is an issuer claim on the currency: a thinner, more easily dark tape than the rate it tracks.
