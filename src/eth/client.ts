@@ -7,7 +7,7 @@ import type { Address, Hex, Eip1193Provider, TransactionRequest, TransactionRece
 import { ethCall, sendTransaction as rpcSendTransaction, getNonce, getChainId, estimateGas, getGasPrice } from './rpc';
 import { keccak256 } from './index';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
-import { secp256k1 } from '@noble/curves/secp256k1';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { rlpEncode } from './rlp';
 import { httpTransport, type TransportOpts } from './transport';
 
@@ -76,6 +76,22 @@ export function privateKeyToAddress(privateKey: Hex): Address {
 }
 
 /**
+ * Sign an already-keccak256'd 32-byte digest, returning the parsed r/s/recovery.
+ *
+ * `prehash: false` is load-bearing: noble-curves v2 sha256-hashes the message by default, so
+ * omitting it produces a well-formed signature that recovers to the WRONG address.
+ */
+export function signDigest(digest: Hex, privateKey: Hex) {
+  return secp256k1.Signature.fromBytes(
+    secp256k1.sign(hexToBytes(digest.slice(2)), hexToBytes(privateKey.slice(2)), {
+      prehash: false,
+      format: 'recovered',
+    }),
+    'recovered'
+  );
+}
+
+/**
  * Sign a transaction with private key
  */
 async function signTransaction(
@@ -110,7 +126,7 @@ async function signTransaction(
     const txHash = keccak256(new Uint8Array([0x02, ...rlpEncode(txData)]));
 
     // Sign
-    const signature = secp256k1.sign(hexToBytes(txHash.slice(2)), hexToBytes(privateKey.slice(2)));
+    const signature = signDigest(txHash, privateKey);
     const r = signature.r;
     const s = signature.s;
     // Type-2 txs carry yParity (0/1) instead of legacy EIP-155 v.
@@ -154,7 +170,7 @@ async function signTransaction(
   const txHash = keccak256(rlpEncode(txData));
 
   // Sign
-  const signature = secp256k1.sign(hexToBytes(txHash.slice(2)), hexToBytes(privateKey.slice(2)));
+  const signature = signDigest(txHash, privateKey);
   const r = signature.r;
   const s = signature.s;
   const v = BigInt(signature.recovery!) + BigInt(chainId) * 2n + 35n;

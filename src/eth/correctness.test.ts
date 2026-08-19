@@ -3,6 +3,10 @@ import { MC3_ADDR, multicall } from './multicall';
 import { rlpEncode } from './rlp';
 import { checksumAddress, keccak256Input } from './index';
 import { encodeEventTopics, getEventSignature } from './abi';
+import { privateKeyToAddress, signDigest } from './client';
+import { recoverDigestSigner } from '../oracle/verify';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
 describe('rlpEncode (hex string handling)', () => {
   test('odd-nibble hex does not throw', () => {
@@ -94,5 +98,46 @@ describe('multicall batching', () => {
     expect(blocks.length).toBe(3);
     expect(new Set(blocks).size).toBe(1);
     expect(blocks[0]).toBe('0x64');
+  });
+});
+
+describe('signDigest (noble-curves v2 prehash trap)', () => {
+  // Fixture derived independently with foundry:
+  //   cast keccak "btr signDigest prehash regression"
+  //   cast wallet address --private-key $KEY
+  //   cast wallet sign --no-hash --private-key $KEY $DIGEST
+  const KEY = '0x0000000000000000000000000000000000000000000000000000000000000a11';
+  const DIGEST = '0x964b7f3903c6b7863dd87656d1717b4e384571a73e552990d33870275e715941';
+  const ADDR = '0x563Bd9e11d18b6eA60c2f159F8D3062d30E8039e';
+  const SIG =
+    '0xe517d8d10419ebf3b430e58de50c1b68768494247de4a753e658d60c21e7acf77f11430b63162ee4a1698100eb5a2e87705b33924d4065fa6e6cf796c1aea5801c';
+
+  /** r||s||v(27|28), the 65-byte Ethereum layout. Noble's 'recovered' is recovery||r||s. */
+  const rsv = (sig: { toBytes: (f: string) => Uint8Array; recovery?: number }): Uint8Array => {
+    const out = new Uint8Array(65);
+    out.set(sig.toBytes('compact'), 0);
+    out[64] = 27 + (sig.recovery as number);
+    return out;
+  };
+
+  test('matches the foundry signature byte-for-byte', () => {
+    expect(`0x${bytesToHex(rsv(signDigest(DIGEST, KEY)))}`).toBe(SIG);
+  });
+
+  test('signature recovers to the signing address', () => {
+    expect(recoverDigestSigner(DIGEST, rsv(signDigest(DIGEST, KEY)))).toBe(ADDR);
+    expect(checksumAddress(privateKeyToAddress(KEY))).toBe(ADDR);
+  });
+
+  // Guard rail: without `prehash: false` noble v2 signs sha256(digest). The result is still a
+  // well-formed 65-byte signature, but it recovers to a DIFFERENT address, so every tx is invalid.
+  test('default (prehashing) signing recovers to the wrong address', () => {
+    const wrong = secp256k1.Signature.fromBytes(
+      secp256k1.sign(hexToBytes(DIGEST.slice(2)), hexToBytes(KEY.slice(2)), {
+        format: 'recovered',
+      }),
+      'recovered'
+    );
+    expect(recoverDigestSigner(DIGEST, rsv(wrong))).not.toBe(ADDR);
   });
 });
