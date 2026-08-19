@@ -5,7 +5,7 @@
 import type { Address, Hex } from './types';
 import { keccak256 } from './index';
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
-import { secp256k1 } from '@noble/curves/secp256k1';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 
 /**
  * Recover signer address from personal_sign signature
@@ -37,13 +37,14 @@ export function recoverAddress(signature: Hex, message: string): Address {
   const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${msgBytes.length}`);
   const msgHash = keccak256(new Uint8Array([...prefix, ...msgBytes]));
 
-  // Noble @noble/curves: Signature.fromCompact → addRecoveryBit → recoverPublicKey
-  // (same path as sdk/oracle/verify.recoverDigestSigner). Nested `.secp256k1.recoverPublicKey`
-  // is undefined on current noble and broke referrals SIWE verify.
-  const publicKey = secp256k1.Signature.fromCompact(new Uint8Array([...r, ...s]))
+  // Noble @noble/curves v2: Signature.fromBytes(…, 'compact') → addRecoveryBit → recoverPublicKey
+  // (same path as sdk/oracle/verify.recoverDigestSigner). The top-level
+  // `secp256k1.recoverPublicKey` takes a `recovery||r||s` blob and sha256-prehashes by default,
+  // so the Signature path is used instead: msgHash is already keccak256 and must not be re-hashed.
+  const publicKey = secp256k1.Signature.fromBytes(new Uint8Array([...r, ...s]), 'compact')
     .addRecoveryBit(recoveryId)
     .recoverPublicKey(hexToBytes(msgHash.slice(2)))
-    .toRawBytes(false); // uncompressed 65 bytes (0x04 || X || Y)
+    .toBytes(false); // uncompressed 65 bytes (0x04 || X || Y)
 
   // Derive address from public key (skip 0x04 prefix, hash, take last 20 bytes)
   const pubKeyHash = keccak256(`0x${bytesToHex(publicKey.slice(1))}`);

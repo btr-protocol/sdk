@@ -10,7 +10,7 @@
  * closed. Prices reuse the SDK B64 decoder (never reimplemented — one decoder, no parity drift).
  */
 
-import { secp256k1 } from '@noble/curves/secp256k1';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { checksumAddress, keccak256, keccak256Input } from '../eth/index';
 import type { Address, Hex } from '../eth/types';
@@ -161,10 +161,10 @@ export function recoverDigestSigner(digest: Hex, sig: Hex | Uint8Array): Address
   const v = s[64];
   const recovery = v >= 27 ? v - 27 : v;
   if (recovery !== 0 && recovery !== 1) throw new Error(`invalid recovery byte v=${v}`);
-  const pub = secp256k1.Signature.fromCompact(s.slice(0, 64))
+  const pub = secp256k1.Signature.fromBytes(s.slice(0, 64), 'compact')
     .addRecoveryBit(recovery)
-    .recoverPublicKey(hexToBytes(digest.slice(2)))
-    .toRawBytes(false); // uncompressed, 65 bytes (0x04 ++ X ++ Y)
+    .recoverPublicKey(hexToBytes(digest.slice(2))) // digest is already keccak256, never re-hashed
+    .toBytes(false); // uncompressed, 65 bytes (0x04 ++ X ++ Y)
   return checksumAddress(`0x${keccak256(`0x${bytesToHex(pub.slice(1))}`).slice(-40)}`);
 }
 

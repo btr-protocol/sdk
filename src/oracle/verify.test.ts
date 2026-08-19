@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { secp256k1 } from '@noble/curves/secp256k1';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { checksumAddress, keccak256 } from '../eth/index.js';
 import type { Address, Hex } from '../eth/types.js';
@@ -40,11 +40,21 @@ const addrOf = (priv: Hex): Address =>
     `0x${keccak256(`0x${bytesToHex(secp256k1.getPublicKey(hexToBytes(priv.slice(2)), false).slice(1))}`).slice(-40)}`,
   );
 
+/**
+ * `prehash: false` is mandatory: the digest is already keccak256 and noble-curves v2 sha256-hashes
+ * the message by default, which would sign the wrong preimage and recover the wrong address.
+ */
 function sign(digest: Hex, priv: Hex): Uint8Array {
-  const sig = secp256k1.sign(hexToBytes(digest.slice(2)), hexToBytes(priv.slice(2)));
+  const sig = secp256k1.Signature.fromBytes(
+    secp256k1.sign(hexToBytes(digest.slice(2)), hexToBytes(priv.slice(2)), {
+      prehash: false,
+      format: 'recovered',
+    }),
+    'recovered',
+  );
   const out = new Uint8Array(65);
-  out.set(sig.toCompactRawBytes(), 0);
-  out[64] = 27 + (sig as unknown as { recovery: number }).recovery;
+  out.set(sig.toBytes('compact'), 0);
+  out[64] = 27 + (sig.recovery as number);
   return out;
 }
 
