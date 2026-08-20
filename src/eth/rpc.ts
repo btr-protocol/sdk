@@ -89,6 +89,19 @@ export const rpcErrorCode = (e: unknown): number | undefined => {
   return typeof (e as { code?: number })?.code === 'number' ? (e as { code: number }).code : undefined;
 };
 
+/**
+ * Raw revert calldata dug out of the same wrapper nest as `rpcErrorCode`, e.g. MetaMask's
+ * `err.data.originalError.data`. This is the ABI-encoded custom error (`selector‖args`), still
+ * undecoded — decode it against the reverting contract's ABI to get a real reason.
+ */
+export const rpcErrorData = (e: unknown): string | undefined => {
+  for (let n: any = e, i = 0; n && typeof n === 'object' && i < 4; i++) {
+    if (typeof n.data === 'string' && n.data.startsWith('0x') && n.data.length >= 10) return n.data;
+    n = n.data?.originalError ?? n.data ?? n.cause ?? n.error;
+  }
+  return undefined;
+};
+
 /** True when the injected provider's port is dead (extension updated/reloaded under the page).
  *  Nothing the dapp sends can succeed until the page reloads and re-grabs `window.ethereum`. */
 export const isProviderDisconnected = (e: unknown): boolean =>
