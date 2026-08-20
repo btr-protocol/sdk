@@ -147,6 +147,86 @@
       "quote_via": "USDT-USDC"
     }
   },
+  "NVDA": {
+    "usd": {
+      "symbol": "NVDA-USDC"
+    },
+    "usdc": {
+      "symbol": "NVDA-USDC"
+    }
+  },
+  "MSFT": {
+    "usd": {
+      "symbol": "MSFT-USDC"
+    },
+    "usdc": {
+      "symbol": "MSFT-USDC"
+    }
+  },
+  "META": {
+    "usd": {
+      "symbol": "META-USDC"
+    },
+    "usdc": {
+      "symbol": "META-USDC"
+    }
+  },
+  "TSLA": {
+    "usd": {
+      "symbol": "TSLA-USDC"
+    },
+    "usdc": {
+      "symbol": "TSLA-USDC"
+    }
+  },
+  "AVGO": {
+    "usd": {
+      "symbol": "AVGO-USDC"
+    },
+    "usdc": {
+      "symbol": "AVGO-USDC"
+    }
+  },
+  "AMD": {
+    "usd": {
+      "symbol": "AMD-USDC"
+    },
+    "usdc": {
+      "symbol": "AMD-USDC"
+    }
+  },
+  "ORCL": {
+    "usd": {
+      "symbol": "ORCL-USDC"
+    },
+    "usdc": {
+      "symbol": "ORCL-USDC"
+    }
+  },
+  "INTC": {
+    "usd": {
+      "symbol": "INTC-USDC"
+    },
+    "usdc": {
+      "symbol": "INTC-USDC"
+    }
+  },
+  "ASML": {
+    "usd": {
+      "symbol": "ASML-USDC"
+    },
+    "usdc": {
+      "symbol": "ASML-USDC"
+    }
+  },
+  "SPCX": {
+    "usd": {
+      "symbol": "SPCX-USDC"
+    },
+    "usdc": {
+      "symbol": "SPCX-USDC"
+    }
+  },
   "EURC": {
     "usd": {
       "symbol": "EUR-USD"
