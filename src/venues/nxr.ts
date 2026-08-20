@@ -113,6 +113,17 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   AUSD: PEG_STABLE('AUSD-USD'),
   /** The base's own depeg reference. There is no USDC/USDC identity feed. */
   USDC: PEG_STABLE('USDC-USD'),
+  // ── Arc faucet twins. Pool legs that own NO FEED: each borrows an existing one on chain
+  // (dex arc-risk-params `noteFaucetTwins`). A row here is what gives the front a price symbol at
+  // all: `priceSymbolOf` reads `nxrSymbol`, so without one the stream key is the roster symbol
+  // itself (`EURCBUSDC`), which resolves to nothing and silently values the leg at `refUsd ?? 1`.
+  //
+  // EACH TWIN STATES ITS OWN IDENTITY, NOT THE FEED IT BORROWS. USDC.b is a USDC twin, so it
+  // mirrors USDC even though the pool currently marks it off USDT-USDC. That on-chain basis is a
+  // known defect, not the asset's identity, and naming USDT here would copy the defect into the
+  // one table the keeper also reads. `USDC-USDC` is not served, so this correctly falls through
+  // to refUsd 1 rather than inventing a cross.
+  USDCB: PEG_STABLE('USDC-USD'),
 
   // ── volatiles — native USDC CEX tape.
   WETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
@@ -167,6 +178,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // `nxrSymbol`. An inverted row is the DANGEROUS error (a plausible number, upside down), which is
   // what `band` exists to catch. The `-USDC` crosses are served the right way up and need neither.
   EURC: { nxrSymbol: 'EUR-USD', usdc: { nxrSymbol: 'EUR-USDC' }, band: [0.9, 1.3], refUsd: 1.14 },
+  // EURC.b twin: same currency, same tape, and here the borrowed feed IS the right basis.
+  EURCB: { nxrSymbol: 'EUR-USD', usdc: { nxrSymbol: 'EUR-USDC' }, band: [0.9, 1.3], refUsd: 1.14 },
   QCAD: {
     nxrSymbol: 'CAD-USD',
     nxrQuote: 'USD-CAD',
