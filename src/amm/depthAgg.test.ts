@@ -3,7 +3,7 @@ import { expect, test, describe } from 'bun:test';
 import { niceStep, stepLadder, aggregate, mergeAgg, aggregateDepthCurves, type Row } from './depthAgg';
 import { type NamedPool } from './router';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
-import { buildLeg, virtualMarketDepth, type PoolState } from './aimm';
+import { buildLeg, quoteExactIn, virtualMarketDepth, type PoolState } from './aimm';
 
 describe('niceStep', () => {
   test('snaps to 1/2/5 ladder (near)', () => {
@@ -135,6 +135,39 @@ describe('aggregateDepthCurves', () => {
     // Bids sit below the mid, asks above.
     expect(book!.bids[0].price).toBeLessThanOrEqual(book!.mid);
     expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
+  });
+
+  // Regression: a drained hub erased the whole cross ladder. `capBidTok` clipped the sell leg on
+  // `baseRes`, so with the crypto core's live hub (266e-6 USDC against 3262 of liabilities,
+  // coverage 8.15e-08) BNB/XAUT swept 6e-8 tokens and `aggregate` returned zero rungs: the touch
+  // still priced, so the tape drew four price lines over an empty book. On chain `_legScaleOut`
+  // clips the DELIVERING leg only (Pricing.sol:806-809) and a spoke→base→spoke swap never moves
+  // the hub balance, so the hub is a numeraire here and must not bound the book at all.
+  test('cross ladder ignores the hub balance (drained hub == full hub)', () => {
+    const mk = (baseRes: number): NamedPool => ({
+      tag: 'volatile',
+      state: {
+        base: 'USDC',
+        legs: {
+          BNB: buildLeg('BNB', 638, sigmaSeed('volatile'), 76.733824, 80.994363, baseRes, 18, VOLATILE_PROFILE),
+          XAUT: buildLeg('XAUT', 4_380, sigmaSeed('volatile'), 10.274214, 11.195566, baseRes, 18, VOLATILE_PROFILE),
+        },
+      },
+    });
+    const drained = aggregateDepthCurves([mk(266e-6)], 'BNB', 'XAUT');
+    const funded = aggregateDepthCurves([mk(50_000)], 'BNB', 'XAUT');
+    expect(drained).not.toBeNull();
+    expect(drained!.bids.length).toBeGreaterThan(0);
+    expect(drained!.asks.length).toBeGreaterThan(0);
+    expect(drained!.bids).toEqual(funded!.bids);
+    expect(drained!.asks).toEqual(funded!.asks);
+    // A cross quote is bounded by the BUY leg's reserve, never by the hub.
+    expect(quoteExactIn(mk(266e-6).state, 'BNB', 'XAUT', 1).amountOut).toBeGreaterThan(0.1);
+    // The hub still binds a DIRECT sell: there the base is the delivering leg.
+    const direct = aggregateDepthCurves([mk(266e-6)], 'USDC', 'BNB');
+    expect(direct!.bids.reduce((n, r) => n + r.size, 0)).toBeLessThan(
+      aggregateDepthCurves([mk(50_000)], 'USDC', 'BNB')!.bids.reduce((n, r) => n + r.size, 0),
+    );
   });
 
   // Regression: `netOutMul` returns EXACTLY 0 once the marginal coverage toll reaches 1
