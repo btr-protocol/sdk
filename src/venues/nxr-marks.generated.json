@@ -98,6 +98,11 @@
       "symbol": "USDC-USD"
     }
   },
+  "USDCB": {
+    "usd": {
+      "symbol": "USDC-USD"
+    }
+  },
   "WETH": {
     "usd": {
       "symbol": "ETH-USDC"
@@ -228,6 +233,14 @@
     }
   },
   "EURC": {
+    "usd": {
+      "symbol": "EUR-USD"
+    },
+    "usdc": {
+      "symbol": "EUR-USDC"
+    }
+  },
+  "EURCB": {
     "usd": {
       "symbol": "EUR-USD"
     },
