@@ -1227,6 +1227,13 @@ function withMarginal(
   netMid: number,
   side: 'bid' | 'ask',
 ): DepthLevel[] {
+  // `netOutMul` returns EXACTLY 0 once the marginal coverage toll reaches 1 (c <= κ/(κ+BPS)), so
+  // the caller's `mid / mul` is Infinity and its `mid * mul` is 0. Either way the wall refuses the
+  // whole fill at size 0: the side has no executable price and must be EMPTY, exactly as the
+  // hub-spoke path already does (`annotateNet` breaks on the same test). Publishing the degenerate
+  // number instead put a non-finite price on the ladder, and `aggregate`'s ask loop walks from
+  // Infinity with a break test that is NaN, i.e. forever.
+  if (!(netMid > 0) || !isFinite(netMid)) return [];
   const zero: DepthLevel = { price: mid, netPrice: netMid, cumTok: 0, cumBase: 0 };
   const out: DepthLevel[] = [zero];
   for (let i = 0; i < nodes.length; i++) {

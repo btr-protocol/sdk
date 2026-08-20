@@ -137,6 +137,29 @@ describe('aggregateDepthCurves', () => {
     expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
   });
 
+  // Regression: `netOutMul` returns EXACTLY 0 once the marginal coverage toll reaches 1
+  // (c <= κ/(κ+BPS); κ=5000 ⇒ c <= 1/3), so crossCurve's touch was `mid / 0` = Infinity. Rungs are
+  // priced off `netPrice`, and an Infinity price passes `> 0` and then makes `aggregate`'s break
+  // test `Inf >= Inf - 1e-12*Inf`, i.e. `Inf >= NaN`: the ask loop never terminates and the tab
+  // freezes. Asserted structurally, never by timing, so a regression fails instead of hanging.
+  test('a side past the coverage wall is empty, never a non-finite price', () => {
+    const weth = buildLeg('WETH', 1_880, sigmaSeed('volatile'), 500, 500, 940_000, 18, VOLATILE_PROFILE);
+    // res/liab = 0.2 < 1/3 with κ=5000: the wall refuses the whole fill at size 0.
+    const wbtc = buildLeg('WBTC', 63_500, sigmaSeed('volatile'), 3, 15, 952_500, 18, VOLATILE_PROFILE, 5_000);
+    const pool: NamedPool = { tag: 'volatile', state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } } };
+    for (const [from, to] of [['WETH', 'WBTC'], ['WBTC', 'WETH']] as const) {
+      const book = aggregateDepthCurves([pool], from, to);
+      if (!book) continue;
+      for (const v of [book.bid, book.ask, book.bidNet, book.askNet, book.mid, book.step]) {
+        expect(Number.isFinite(v)).toBe(true);
+      }
+      for (const r of [...book.bids, ...book.asks]) {
+        expect(Number.isFinite(r.price)).toBe(true);
+        expect(r.price).toBeGreaterThan(0);
+      }
+    }
+  });
+
   test('touch is the un-bucketed curve[0] of each side, not a ladder-snapped row', () => {
     const usdt = buildLeg('USDT', 1, sigmaSeed('stable'), 1_000_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
     const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };

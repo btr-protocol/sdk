@@ -111,7 +111,9 @@ export function aggregate(rows: Row[], step: number, side: 'bid' | 'ask', denom:
 
   const pts: { price: number; cum: number }[] = [];
   for (const r of rows) {
-    if (!(r.price > 0) || !(r.cum >= 0)) continue;
+    // `isFinite` is load-bearing, not decoration: an Infinity price passes `> 0`, and the loops
+    // below then never satisfy their break test (`Inf >= Inf - 1e-12*Inf` is `Inf >= NaN`).
+    if (!(r.price > 0) || !isFinite(r.price) || !(r.cum >= 0)) continue;
     const last = pts[pts.length - 1];
     if (last && Math.abs(last.price - r.price) < 1e-12 * Math.max(1, r.price)) {
       last.cum = Math.max(last.cum, r.cum);
@@ -205,10 +207,27 @@ export function mergeAgg(parts: AggRow[][], side: 'bid' | 'ask'): AggRow[] {
   return entries.map(([price, size]) => ({ price, size, cum: (cum += size) }));
 }
 
-/** DepthLevel[] → mid-outward Row polyline (includes cum=0 touch for densify). */
+/**
+ * DepthLevel[] → mid-outward Row polyline (includes cum=0 touch for densify), priced NET.
+ *
+ * The rung takes `netPrice`, its OWN executable price: half the path spread plus the coverage toll
+ * evaluated at that rung's own size (`annotateNet`, aimm.ts), never a flat offset off the skew
+ * curve. Where the toll binds the ladder therefore widens with depth, which is the truth: a deeper
+ * fill drains the out leg further and pays more for it.
+ *
+ * One basis on the price axis is the whole point. The touch a taker faces is `bidNet`/`askNet`, so
+ * a ladder priced on the skew curve sits INSIDE it and the book renders its depth through its own
+ * quote. Net rungs keep `max(bid rung) <= bidNet` and `min(ask rung) >= askNet` structurally: each
+ * pool's ladder opens strictly beyond that pool's own net touch, and the aggregate touch is the
+ * max / min over those same per-pool net touches.
+ *
+ * Sizes stay GROSS (`cumTok`): the haircut is taken in price, and `cumTok · m` is not monotone into
+ * the coverage wall (m collapses faster than cum grows), which would silently truncate the ladder
+ * exactly where depth matters most.
+ */
 export function depthLevelsToRows(levels: DepthLevel[]): Row[] {
   return levels.map((l, i) => ({
-    price: l.price,
+    price: l.netPrice,
     size: i === 0 ? l.cumTok : l.cumTok - levels[i - 1].cumTok,
     cum: l.cumTok,
   }));
@@ -242,21 +261,20 @@ export interface AggregatedDepthBook {
    *  way round (`ask <= mid <= bid`) rather than hiding the cross. */
   mid: number;
   spreadBps: number;
-  /** Touch: best SKEW-implied (pre-fee, pre-toll) price per side, `curve.bids[0]` / `curve.asks[0]`
-   *  pre-bucketing, taken as max over pools' bids and min over pools' asks (a taker routes to one
-   *  pool, the best one). 0 when a side is empty. The bucketed `bids`/`asks` below are snapped to
-   *  `step` and so cannot carry the true touch. This is the market data: it is what the book
-   *  prints. Pools differ by inventory skew, so pre-fee this touch can cross across pools: that is
-   *  cross-pool arbitrage, and the executable statement is `bidNet`/`askNet`. */
+  /** SKEW-implied touch (pre-fee, pre-toll), `curve.bids[0]` / `curve.asks[0]` pre-bucketing, taken
+   *  as max over pools' bids and min over pools' asks (a taker routes to one pool, the best one).
+   *  0 when a side is empty. Pre-fee this AMM's two sides meet at the skewed mid, so within one
+   *  pool these two are the SAME number and only inter-pool mid dispersion separates them: a
+   *  reference for the skew premium and for grossing sizes up, never a quote and never drawn. */
   bid: number;
   ask: number;
-  /** The same touch AFTER the fee and coverage toll: what a taker actually fills at. The gap
-   *  `bidNet`→`bid` / `ask`→`askNet` is the taker cost, disclosed on its own and never folded
-   *  into the printed rungs. Anything pricing a real crossing (OEV, limit seeding) uses these. */
+  /** The touch AFTER the fee and coverage toll: what a taker actually fills at, and therefore the
+   *  quote. This is the basis of `bids`/`asks` below, of the drawn bid/ask lines and of the OEV
+   *  gate: one basis on the price axis, so no rung can land inside the quote. */
   bidNet: number;
   askNet: number;
   step: number;
-  /** Token-denominated (for fill simulation). */
+  /** Token-denominated (for fill simulation). Prices are NET (`depthLevelsToRows`), sizes gross. */
   bids: AggRow[];
   asks: AggRow[];
   /** Display-denominated (token or quote notional). */
@@ -368,13 +386,20 @@ export function aggregateDepthCurves(
   else if (bid > 0) mid = Math.max(mid, bid);
   else if (ask > 0) mid = Math.min(mid, ask);
 
+  // Rung EXTENT per side (touch → far end), never the distance from mid. The step has to resolve
+  // the ladder, and the ladder's width is a property of the curve, not of how far the quote sits
+  // from the mid: measuring from mid folds the dead gap between mid and the touch into the span,
+  // so on a net-priced book the step came out ~5x too coarse and a 15-rung side collapsed to 4.
+  // Taken from each pool's own touch, so it is basis-independent and one-sided pools contribute 0.
   let below = 0;
   let above = 0;
   for (const p of parts) {
+    const bidNear = p.bids[0]?.price ?? mid;
+    const askNear = p.asks[0]?.price ?? mid;
     const bidFar = p.bids[p.bids.length - 1]?.price ?? mid;
     const askFar = p.asks[p.asks.length - 1]?.price ?? mid;
-    below = Math.max(below, mid - bidFar);
-    above = Math.max(above, askFar - mid);
+    below = Math.max(below, bidNear - bidFar);
+    above = Math.max(above, askFar - askNear);
   }
   const halfSpan = Math.max(below, above);
   const ladderOpts =
@@ -398,10 +423,12 @@ export function aggregateDepthCurves(
       ? opts.step
       : ladder.steps[Math.min(Math.max(0, idx), ladder.steps.length - 1)];
 
-  // No rung is priced through the touch: `aggregate` opens each pool's ladder strictly beyond that
-  // pool's own touch (bids floor below it, asks ceil above it), and the aggregated touch is the
-  // max / min over those same per-pool touches, so every merged bid rung < bid and every ask
-  // rung > ask. The old weighted-mean touch broke this: the tightest pool's rungs sat through it.
+  // No rung is priced through the touch: the rows are NET-priced, `aggregate` opens each pool's
+  // ladder strictly beyond that pool's own net touch (bids floor below it, asks ceil above it), and
+  // the aggregated touch is the max / min over those same per-pool net touches, so every merged bid
+  // rung < bidNet and every ask rung > askNet. Two things have broken this: a weighted-mean touch
+  // (the tightest pool's rungs sat through it) and skew-priced rungs under a net touch (the whole
+  // ladder sat inside the quote).
   const bidTok = mergeAgg(
     parts.map((p) => aggregate(p.bids, step, 'bid', 'base')),
     'bid',
@@ -410,6 +437,19 @@ export function aggregateDepthCurves(
     parts.map((p) => aggregate(p.asks, step, 'ask', 'base')),
     'ask',
   );
+  const bidNet = touch((p) => p.bidNet, 'bid');
+  const askNet = touch((p) => p.askNet, 'ask');
+
+  /**
+   * Quote notional is `size x price`, and the two sides are NOT symmetric under net pricing.
+   * A BID pays gross tokens in and receives base out, and `netPrice` already carries that haircut,
+   * so `size x netPrice` IS the base received: exact, nothing to do. An ASK pays base in for
+   * `m x size` tokens out at `price/m` each, so `size x netPrice` = `cumBase / m` double-counts the
+   * haircut (measured up to +11% where a coverage toll binds). Scale it back by the ask's own
+   * haircut: exact when no toll binds, an under-correction on deep tolled rungs, never above 1.
+   * The sizes themselves stay gross, so `bids`/`asks` and the fill markers keep one denomination.
+   */
+  const askQuoteMul = ask > 0 && askNet > 0 ? ask / askNet : 1;
   const useQuote = opts?.unit === 'base';
   const bidDisp = useQuote
     ? mergeAgg(
@@ -421,7 +461,7 @@ export function aggregateDepthCurves(
     ? mergeAgg(
         parts.map((p) => aggregate(p.asks, step, 'ask', 'quote')),
         'ask',
-      )
+      ).map((r) => ({ price: r.price, size: r.size * askQuoteMul, cum: r.cum * askQuoteMul }))
     : askTok;
 
   return {
@@ -430,8 +470,8 @@ export function aggregateDepthCurves(
     spreadBps,
     bid,
     ask,
-    bidNet: touch((p) => p.bidNet, 'bid'),
-    askNet: touch((p) => p.askNet, 'ask'),
+    bidNet,
+    askNet,
     step,
     bids: bidTok,
     asks: askTok,
