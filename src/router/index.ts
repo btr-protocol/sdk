@@ -169,12 +169,15 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
  *  `WNATIVE.deposit{value}` and then behaves as a plain ERC-20 leg; an `unwrapOut` leg is followed by
  *  `WNATIVE.withdraw(Σ minOut)`. Withdrawing minOut (not the quote) is the only amount guaranteed to
  *  exist: any positive slippage stays with the user as wrapped-native rather than reverting the batch.
- *  No EIP-2612 / Permit2 — plain ERC-20 `approve` only. */
-export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
-  const approvals: ExecCall[] = [];
-  const swaps: ExecCall[] = [];
-  const seen = new Set<string>();
-  const wnative = opts.wrappedNative?.toLowerCase();
+ *  No EIP-2612 / Permit2 — plain ERC-20 `approve` only.
+ *
+ *  `buildSwapCalls` bakes ONE `deadline` into every swap call, read at the moment it is invoked.
+ *  Fine for an atomic batch (one wallet prompt, sent together), but a non-atomic multi-tx flow that
+ *  approves and swaps as SEPARATE, sequentially-mined transactions can leave that deadline stale by
+ *  the time the swap call actually goes out (a first-time wallet often needs 1-2 approval txs mined
+ *  first). Split the two phases with `buildApprovalCalls` + `buildSwapExecCalls` and call the second
+ *  one right before the swap send, so its deadline is computed then, not at batch-build time. */
+function validateLegs(legs: ExecLeg[], wnative: string | undefined): { wrapValue: bigint; unwrapAmount: bigint } {
   let wrapValue = 0n;
   let unwrapAmount = 0n;
   for (const leg of legs) {
@@ -198,7 +201,14 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
       unwrapAmount += leg.minOut;
     }
   }
-  // Σ amountIn per (token,pool) so a split into the same pool gets one exact approve covering both legs.
+  return { wrapValue, unwrapAmount };
+}
+
+/** [wrap?, approvals…] — funds and clears allowance for the swap phase. No deadline involved: safe
+ *  to build and send well ahead of the swap calls. */
+export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
+  const wnative = opts.wrappedNative?.toLowerCase();
+  const { wrapValue } = validateLegs(legs, wnative);
   const exactByKey = new Map<string, bigint>();
   for (const leg of legs) {
     const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
@@ -206,8 +216,8 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   }
   const approveAmt = (key: string): bigint =>
     opts.approveMax ? MAX_UINT256 : (exactByKey.get(key) ?? 0n);
-  const deadline = opts.deadline ?? defaultDeadline();
-
+  const seen = new Set<string>();
+  const approvals: ExecCall[] = [];
   for (const leg of legs) {
     const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
     const amount = approveAmt(key);
@@ -224,15 +234,6 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
         value: 0n,
       });
     }
-    swaps.push({
-      to: leg.pool,
-      data: encodeFn({
-        abi: POOL_ABI,
-        functionName: 'swap',
-        args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
-      }),
-      value: 0n,
-    });
   }
   const wrap: ExecCall[] = wrapValue > 0n
     ? [{
@@ -241,6 +242,24 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
         value: wrapValue,
       }]
     : [];
+  return [...wrap, ...approvals];
+}
+
+/** [swaps…, unwrap?] — `opts.deadline ?? defaultDeadline()` is read HERE, at call time: call this
+ *  immediately before the send so a deadline built during an earlier approval wait cannot expire it. */
+export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
+  const wnative = opts.wrappedNative?.toLowerCase();
+  const { unwrapAmount } = validateLegs(legs, wnative);
+  const deadline = opts.deadline ?? defaultDeadline();
+  const swaps: ExecCall[] = legs.map((leg) => ({
+    to: leg.pool,
+    data: encodeFn({
+      abi: POOL_ABI,
+      functionName: 'swap',
+      args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
+    }),
+    value: 0n,
+  }));
   const unwrap: ExecCall[] = unwrapAmount > 0n
     ? [{
         to: opts.wrappedNative as Address,
@@ -248,8 +267,14 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
         value: 0n,
       }]
     : [];
-  // Wrap first (funds the approvals), approvals before the swaps that spend them, unwrap last.
-  return [...wrap, ...approvals, ...swaps, ...unwrap];
+  return [...swaps, ...unwrap];
+}
+
+/** Wrap first (funds the approvals), approvals before the swaps that spend them, unwrap last. One
+ *  shared deadline for the whole thing — correct for a single atomic batch (one wallet prompt), but
+ *  see `buildApprovalCalls`/`buildSwapExecCalls` for a non-atomic, multi-tx flow. */
+export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
+  return [...buildApprovalCalls(legs, opts), ...buildSwapExecCalls(legs, opts)];
 }
 
 /** Σ msg.value across the calls (native-in legs) — the total to attach to a batched send. */
