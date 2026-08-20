@@ -228,17 +228,47 @@ describe('chain resolution refuses to guess', () => {
     expect(() => activeFeedId(UNDEPLOYED, 'USDC')).toThrow(/no BTR deployment for chain 1337999/);
   });
 
-  // Arc's four-core ceremony broadcast three pools. The generator knew two pool classes when Arc
+  // Arc's four-core ceremony broadcast four pools. The generator knew two pool classes when Arc
   // landed, so `cryptoPool` was dropped WITHOUT a throw — a venue that still resolved, still
   // quoted, and simply could not route WETH/WBTC/CBBTC/BNB/XAUT/PAXG. Pinned by tag and roster
   // size so losing a class again fails here rather than downstream as an unroutable pair.
-  test('arc resolves all three broadcast pools, crypto core included', () => {
+  test('arc resolves all four broadcast pools, crypto and stocks cores included', () => {
     const ARC = 5_042_002;
     expect(deployedChainIds()).toContain(ARC);
     const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
-    expect(Object.keys(byTag).sort()).toEqual(['btr-crypto', 'btr-fx', 'btr-stable']);
-    expect(byTag['btr-crypto']!.tokens).toHaveLength(9);
+    expect(Object.keys(byTag).sort()).toEqual([
+      'btr-crypto',
+      'btr-fx',
+      'btr-stable',
+      'btr-stocks',
+    ]);
+    expect(byTag['btr-crypto']!.tokens).toHaveLength(11);
     expect(chainVenue(ARC).refFeeds).toContain('WETH-USDC');
+  });
+
+  // Faucet twins own no feed and are absent from `.symbols`, so they reach the router ONLY through
+  // the `.feedTwins` exemption. Every layer has to agree or the leg is half-present: a token with
+  // no pool never routes, a pool symbol with no token is dropped SILENTLY by `staticVenuePools`
+  // (`.filter(Boolean)`), and a missing feed alias sends the bot's `liveMarks` to a `?? 1` that is
+  // 14% wrong on EURC.b. This is the whole gate that kept the bot off the mintable legs.
+  test('arc faucet twins are routable, marked and off the ordinal roster', () => {
+    const ARC = 5_042_002;
+    const v = chainVenue(ARC);
+    const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
+    for (const [sym, feed, tags] of [
+      ['USDCB', 'USDT-USDC', ['btr-stable', 'btr-fx', 'btr-crypto', 'btr-stocks']],
+      ['EURCB', 'EURC-USDC', ['btr-fx', 'btr-crypto']],
+    ] as const) {
+      expect(v.tokens[sym]).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      // Borrowed, never minted: the alias must BE the shared feed's id, not a new one.
+      expect(activeFeedId(ARC, sym)).toBe(v.feedIds[feed]!);
+      for (const tag of tags) expect(byTag[tag]!.tokens).toContain(v.tokens[sym]!);
+      // A twin in `rosters` would make the feed-completeness checks demand a feed that must not
+      // exist, which is the break `noteFaucetTwins` exists to prevent.
+      for (const roster of Object.values(v.rosters)) expect(roster).not.toContain(sym);
+      // And it must never take an ordinal: the recorded order is the 26 real feeds.
+      expect(Object.keys(v.feedIds).indexOf(`${sym}-USDC`)).toBeGreaterThanOrEqual(26);
+    }
   });
 
   test('the error names what IS deployed, so the operator sees the mismatch', () => {

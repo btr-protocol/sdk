@@ -26,7 +26,13 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
   tokens: Record<string, Address>;
-  /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ its `feedId`, in `feedIds[]` ordinal order. */
+  /**
+   * On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ its `feedId`, in `feedIds[]` ordinal order.
+   *
+   * Faucet-twin aliases (`.feedTwins`) are APPENDED after the ordinal-carrying entries and share
+   * a borrowed id, so entry `n` still names ordinal `n` but the tail is not an ordinal at all.
+   * Read this by NAME. Anything that needs the order must stop at the recorded feed count.
+   */
   feedIds: Record<string, Hex>;
   /**
    * On-chain feed name ⇒ its MITCH `tickerId` (decimal string), the key every signed record
@@ -34,9 +40,13 @@ export interface ChainVenue {
    * through this, never through an array position. Absent for a pre-migration deployment record.
    */
   tickerIds: Record<string, string>;
-  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
+  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. Twins are absent. */
   rosters: Record<string, string[]>;
-  /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */
+  /**
+   * Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent.
+   * This is the ROUTABLE set and it is a superset of `rosters[tag]`: feedless faucet twins are
+   * listed legs and quote, so they belong here and nowhere else.
+   */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names mirrored onto the reference oracle. */
   refFeeds: string[];
@@ -82,6 +92,8 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       MSFT: '0x83E43A65ce9E5aE1872a2363eD74D67C5A30fdb5',
       ORCL: '0x56F81D0831b9352e023266b72F38b4657baA32E8',
       META: '0x2767f2e94a7cF7935d59DdD7A5A30138369846e2',
+      USDCB: '0x9A8Ea4AB461d0Db943ecB1B1e4CE0B68df9061CC',
+      EURCB: '0xd9016a91387db71fbD07Cde32E900E17061dE5A1',
     },
     feedIds: {
       'USDT-USDC': '0xfa722ae80d6181ca931f45c80582c173b9c19cd30c1632e864e8f48ea62a6548',
@@ -110,6 +122,8 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       'MSFT-USDC': '0x778b165de0bfe24e8806a0334dabd237c8f5844fb3d60a8d5b623d352120e784',
       'ORCL-USDC': '0x83c6210ed83e6bbd8db6d6dd43893d46cbc0a20efce89c30f6be2ce536ea74db',
       'META-USDC': '0x2d2201820627f4019b4ddd9d9742fc14a750d4df2f5413961e91c03e8af9581a',
+      'USDCB-USDC': '0xfa722ae80d6181ca931f45c80582c173b9c19cd30c1632e864e8f48ea62a6548',
+      'EURCB-USDC': '0x9af29d8ae5269a47d972f6e5a188878d8e45cb2c7f7ce637492bdaef05a980be',
     },
     tickerIds: {
       'USDT-USDC': '451698500104617984',
@@ -161,17 +175,29 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       {
         tag: 'btr-stable',
         address: '0x8e33853c6c34F20c93385449afE9477029D45BFE',
-        symbols: ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD'],
+        symbols: ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD', 'USDCB'],
       },
       {
         tag: 'btr-fx',
         address: '0xCbB809d5A5583301e7753D57D73A25C0d12EC232',
-        symbols: ['USDC', 'EURC', 'QCAD', 'AUDF', 'JPYC', 'KRW1'],
+        symbols: ['USDC', 'EURC', 'QCAD', 'AUDF', 'JPYC', 'KRW1', 'USDCB', 'EURCB'],
       },
       {
         tag: 'btr-crypto',
         address: '0xACe9a150cdc3ab8AdBbc3e7CC5d5ce92485624F5',
-        symbols: ['USDC', 'USDT', 'WETH', 'WBTC', 'CBBTC', 'BNB', 'XAUT', 'PAXG', 'EURC'],
+        symbols: [
+          'USDC',
+          'USDT',
+          'WETH',
+          'WBTC',
+          'CBBTC',
+          'BNB',
+          'XAUT',
+          'PAXG',
+          'EURC',
+          'USDCB',
+          'EURCB',
+        ],
       },
       {
         tag: 'btr-stocks',
@@ -188,6 +214,7 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
           'MSFT',
           'ORCL',
           'META',
+          'USDCB',
         ],
       },
     ],
