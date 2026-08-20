@@ -835,12 +835,13 @@ export function quoteExactIn(
     involved = [legIn, legOut];
     outLeg = legOut;
     route = [tokenIn, base, tokenOut];
-    // Same two walls as crossCurve: the sell leg's base drain AND the buy leg's token reserve.
-    // Capping on the sell leg alone advertised sizes the chain refuses outright, and this value
-    // is `Quote.maxIn` -> rankSwap order-splitting, so it sized real routes, not just a chart.
-    maxIn = Math.min(capBidTok(kIn, legIn), capAskBase(kOut, legOut) / kIn.mid);
+    // ONE wall, the buy leg's token reserve: `_legScaleOut` clips the delivering leg only, so the
+    // hub balance never bounds a cross (Pricing.sol:806-809). The sell leg still contributes its
+    // own depth exhaustion, hence `Infinity` rather than dropping the term. This value is
+    // `Quote.maxIn` -> rankSwap order-splitting, so it sizes real routes, not just a chart.
+    maxIn = Math.min(capBidTok(kIn, legIn, Infinity), capAskBase(kOut, legOut) / kIn.mid);
     if (amountIn > 0) {
-      const baseMid = Math.min(amountIn * traverse(kIn, amountIn, true), legIn.baseRes);
+      const baseMid = amountIn * traverse(kIn, amountIn, true);
       const exec = traverse(kOut, baseMid / kOut.mid, false);
       grossOut = Math.min(baseMid / exec, legOut.res);
     }
@@ -905,11 +906,19 @@ export function quoteExactIn(
   };
 }
 
-// Token capacity of the bid (sell) side: min(depth exhaustion, base-reserve drain). Monotone
-// cumBase(t) ⇒ bisect for the reserve clip.
-function capBidTok(k: LegKit, leg: PoolLeg): number {
+// Token capacity of the bid (sell) side: min(depth exhaustion, `limit`). Monotone cumBase(t) ⇒
+// bisect for the reserve clip.
+//
+// `limit` is the DELIVERING leg's balance, and only the delivering leg is clipped on chain
+// (`_legScaleOut` returns early unless `delivering`, Pricing.sol:806-809). On a direct sell the
+// base delivers, so its reserve binds and the default is right. On a CROSS the base delivers
+// nothing: spoke→base→spoke settles spokeIn against spokeOut and never touches the hub balance
+// (PoolIOLib.sol:138-147; pinned by `hub reserves never move on a 2-leg swap`,
+// AuditPatchRegressions.t.sol:1588). Cross callers therefore pass `Infinity`: passing `baseRes`
+// there mirrors a contract bug that was fixed on chain and collapses every cross in a pool whose
+// hub is drained.
+function capBidTok(k: LegKit, leg: PoolLeg, limit = leg.baseRes): number {
   const depthEdge = (k.center / BPS) * k.depth;
-  const limit = leg.baseRes;
   const cumBase = (t: number) => t * bandPrice(k, k.center, k.center - (t * BPS) / k.depth);
   if (cumBase(depthEdge) <= limit) return depthEdge;
   let lo = 0;
@@ -1149,15 +1158,16 @@ function crossCurve(
   const spread = q0.spreadBps * 100; // back to PBPS
   const N = 24;
   // token=`to` (received/sold), base=`from` (spent/received) → x is from-per-to (base-per-token).
-  // Each cross side hits TWO walls: the sell leg's base drain AND the buy leg's token reserve.
-  // Capping on the sell leg alone (both sides used capBidTok) advertised sizes the chain refuses
-  // outright — `_legScaleOut` clips the buy leg to its reserves and `_covToll` then blocks the
-  // whole fill. Buy-leg capacity is base-denominated, so divide by the sell leg's mid to reach
-  // input units.
+  // Each cross side hits the sell leg's own depth exhaustion and the BUY leg's token reserve:
+  // `_legScaleOut` clips the delivering leg only, so the hub balance is not a wall here
+  // (Pricing.sol:806-809) and `capBidTok` takes `Infinity` for its clip. Buy-leg capacity is
+  // base-denominated, so divide by the sell leg's mid to reach input units. Capping on the sell
+  // leg alone (both sides used the buy leg's reserve nowhere) advertised sizes the chain refuses
+  // outright — `_covToll` then blocks the whole fill.
   const kIn = legKit(legIn);
   const kOut = legKit(legOut);
-  const askMax = Math.min(capBidTok(kIn, legIn), capAskBase(kOut, legOut) / kIn.mid); // from-token
-  const bidMax = Math.min(capBidTok(kOut, legOut), capAskBase(kIn, legIn) / kOut.mid); // to-token
+  const askMax = Math.min(capBidTok(kIn, legIn, Infinity), capAskBase(kOut, legOut) / kIn.mid); // from-token
+  const bidMax = Math.min(capBidTok(kOut, legOut, Infinity), capAskBase(kIn, legIn) / kOut.mid); // to-token
   // `grossOut` is the skew-implied leg: pure curve impact plus the exact reserve clip, with the
   // toll and the half-spread applied strictly after it. It is what the book prints. `amountOut`
   // is what fills, and is the ONLY valid cliff test: `_covToll` returns the whole `grossOut`
