@@ -157,6 +157,7 @@ export {
   switchChain,
   addChain,
   rpcErrorCode,
+  rpcErrorData,
   isProviderDisconnected,
   waitForTransaction,
   onAccountsChanged,
