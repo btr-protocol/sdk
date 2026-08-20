@@ -409,6 +409,30 @@ function venues(): RawVenue[] {
       tickerIds[name] = v.toString();
     }
 
+    // FAUCET TWINS: pool legs that own NO FEED. They are deliberately absent from `.symbols` and
+    // from `.feedOrder` — both are the FEED roster, and a twin adds no feed — so the loops above
+    // cannot see them and the router shipped without legs the chain actually lists. The exemption
+    // is stated, never inferred: `.feedTwins` names the EXISTING feed each one quotes off, and
+    // `<class>PoolReceipts` names which cores list it. See arc-risk-params `noteFaucetTwins`.
+    //
+    // The alias keys are APPENDED after the ordinal-carrying entries, so `feedIds` entry `n` still
+    // names ordinal `n` for every consumer that reads the order (`venues/sepolia.ts`). They carry
+    // NO `tickerIds` row: the ticker is the signed record's key and it already belongs to the feed
+    // the twin borrows, so a second name for it would make the reverse join ambiguous.
+    const twins = (risk.feedTwins as Record<string, string> | undefined) ?? {};
+    for (const [sym, feed] of Object.entries(twins)) {
+      if (symbols.includes(sym)) {
+        throw new Error(`${chainId} .feedTwins ${sym} is also on .symbols — a twin owns no feed`);
+      }
+      const tok = deploy[sym];
+      if (!isAddress(tok)) throw new Error(`${chainId}.deploy.json has no token for twin ${sym}`);
+      const id = ordered[feed];
+      if (!id) throw new Error(`${chainId} .feedTwins ${sym} shares unknown feed '${feed}'`);
+      tokens[sym] = tok;
+      ordered[`${sym}-${symbols[0]}`] = id;
+    }
+    const twinSyms = new Set(Object.keys(twins));
+
     const contracts: Record<string, string> = {};
     for (const key of VENUE_CONTRACTS) {
       const a = pools[key] ?? deploy[key];
@@ -445,9 +469,17 @@ function venues(): RawVenue[] {
       const missing = roster.filter((s) => !tokens[s]);
       if (missing.length) throw new Error(`${chainId} ${tag} lists untokened ${missing.join(',')}`);
       rosters[tag] = roster;
+      // Twins join `pools` but NOT `rosters`: `rosters` answers "which assets does this chain
+      // intend to mark" and a twin is marked by the feed it borrows, so listing it there would
+      // make the feed-completeness checks demand a feed that must not exist.
+      const twinLegs = Object.keys(
+        (pools[`${key}Receipts`] as Record<string, unknown> | undefined) ?? {},
+      ).filter((s) => twinSyms.has(s));
       // A pool class that is scripted but not yet broadcast serialises as zero or is absent.
       // Emitting it would hand the router an address that reverts every quote.
-      if (isAddress(addr)) venuePools.push({ tag, address: addr, symbols: roster });
+      if (isAddress(addr)) {
+        venuePools.push({ tag, address: addr, symbols: [...roster, ...twinLegs] });
+      }
     }
     if (venuePools.length === 0) throw new Error(`${chainId}.pools.json carries no deployed pool`);
 
@@ -509,7 +541,13 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
   tokens: Record<string, Address>;
-  /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`, in \`feedIds[]\` ordinal order. */
+  /**
+   * On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ its \`feedId\`, in \`feedIds[]\` ordinal order.
+   *
+   * Faucet-twin aliases (\`.feedTwins\`) are APPENDED after the ordinal-carrying entries and share
+   * a borrowed id, so entry \`n\` still names ordinal \`n\` but the tail is not an ordinal at all.
+   * Read this by NAME. Anything that needs the order must stop at the recorded feed count.
+   */
   feedIds: Record<string, Hex>;
   /**
    * On-chain feed name ⇒ its MITCH \`tickerId\` (decimal string), the key every signed record
@@ -517,9 +555,13 @@ export interface ChainVenue {
    * through this, never through an array position. Absent for a pre-migration deployment record.
    */
   tickerIds: Record<string, string>;
-  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. */
+  /** Router tag ⇒ the symbols that core is SCRIPTED to list, deployed or not. Twins are absent. */
   rosters: Record<string, string[]>;
-  /** Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent. */
+  /**
+   * Deployed cores with the symbols each one lists. A scripted-but-unbroadcast core is absent.
+   * This is the ROUTABLE set and it is a superset of \`rosters[tag]\`: feedless faucet twins are
+   * listed legs and quote, so they belong here and nowhere else.
+   */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names mirrored onto the reference oracle. */
   refFeeds: string[];
