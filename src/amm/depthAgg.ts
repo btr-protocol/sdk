@@ -39,7 +39,9 @@ export function niceStep(x: number, dir: 'up' | 'down' | 'near' = 'near'): numbe
   const rungs = [1, 2, 5, 10];
   if (dir === 'up') return base * rungs.find((s) => s >= m - 1e-9)!;
   if (dir === 'down') return base * [...rungs].reverse().find((s) => s <= m + 1e-9)!;
-  return base * rungs.reduce((best, s) => (Math.abs(s - m) < Math.abs(best - m) ? s : best), rungs[0]);
+  return (
+    base * rungs.reduce((best, s) => (Math.abs(s - m) < Math.abs(best - m) ? s : best), rungs[0])
+  );
 }
 
 const rungAt = (i: number) => SEQ[((i % 3) + 3) % 3] * 10 ** Math.floor(i / 3);
@@ -106,7 +108,12 @@ function cumAt(pts: { price: number; cum: number }[], price: number, side: 'bid'
  * Resample a mid-outward cumulative depth polyline onto price buckets of width `step`.
  * `denom='quote'` scales token→quote (size·price).
  */
-export function aggregate(rows: Row[], step: number, side: 'bid' | 'ask', denom: 'base' | 'quote'): AggRow[] {
+export function aggregate(
+  rows: Row[],
+  step: number,
+  side: 'bid' | 'ask',
+  denom: 'base' | 'quote',
+): AggRow[] {
   if (!rows.length) return [];
 
   const pts: { price: number; cum: number }[] = [];
@@ -116,6 +123,13 @@ export function aggregate(rows: Row[], step: number, side: 'bid' | 'ask', denom:
     if (!(r.price > 0) || !isFinite(r.price) || !(r.cum >= 0)) continue;
     const last = pts[pts.length - 1];
     if (last && Math.abs(last.price - r.price) < 1e-12 * Math.max(1, r.price)) {
+      // Never absorb the touch anchor into a same-price vertex: the bucketed walks below seed
+      // prevCum at pts[0].cum, so swallowing the cum=0 head undercounts EVERY bucket by it
+      // (a composed route with a flat pegged head hit exactly this).
+      if (last.cum === 0 && r.cum > 0) {
+        pts.push({ price: r.price, cum: r.cum });
+        continue;
+      }
       last.cum = Math.max(last.cum, r.cum);
       continue;
     }
@@ -131,6 +145,14 @@ export function aggregate(rows: Row[], step: number, side: 'bid' | 'ask', denom:
   const scale = (size: number, price: number) => (denom === 'quote' ? size * price : size);
   const eps = 1e-15;
 
+  // A fully FLAT ladder — every vertex at one price, e.g. a pegged leg capping a composed hop —
+  // collapses here to a single vertex whose cum carries the whole side. The bucketed walks below
+  // seed prevCum at that same cum and would emit nothing; the honest book is one limit rung.
+  if (pts.length === 1) {
+    const v = pts[0];
+    const total = scale(v.cum, v.price);
+    return total > eps ? [{ price: v.price, size: total, cum: total }] : [];
+  }
   if (!(step > 0)) {
     const out: AggRow[] = [];
     let prev = 0;
@@ -202,7 +224,9 @@ export function mergeAgg(parts: AggRow[][], side: 'bid' | 'ask'): AggRow[] {
   for (const rows of parts) {
     for (const r of rows) buckets.set(r.price, (buckets.get(r.price) ?? 0) + r.size);
   }
-  const entries = [...buckets.entries()].sort((a, b) => (side === 'bid' ? b[0] - a[0] : a[0] - b[0]));
+  const entries = [...buckets.entries()].sort((a, b) =>
+    side === 'bid' ? b[0] - a[0] : a[0] - b[0],
+  );
   let cum = 0;
   return entries.map(([price, size]) => ({ price, size, cum: (cum += size) }));
 }
@@ -285,10 +309,6 @@ export interface AggregatedDepthBook {
   poolCount: number;
 }
 
-/**
- * Aggregate virtual depth across every pool that holds (from, to).
- * Per-pool densify onto `step`, then mergeAgg. N-pool ready (stable + volatile + future).
- */
 /** One contributor's densified book half — a pool or a composed route, same shape either way. */
 export interface BookPart {
   mark: number;
@@ -333,7 +353,10 @@ export function bookPartFromCurve(curve: DepthCurve): BookPart | null {
  * aggregate on that step → mergeAgg mid-outward → AggregatedDepthBook. Null when no part carries
  * depth. This is aggregateDepthCurves' tail verbatim, so direct-pool books are byte-identical.
  */
-export function assembleAggBook(parts: BookPart[], opts?: AggregateDepthOpts): AggregatedDepthBook | null {
+export function assembleAggBook(
+  parts: BookPart[],
+  opts?: AggregateDepthOpts,
+): AggregatedDepthBook | null {
   // Allow one-sided books (skewed reserves clip the thin side — e.g. BTCB hub drain).
   // Reject only when BOTH sides are empty across all contributing pools.
   const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
@@ -404,8 +427,7 @@ export function assembleAggBook(parts: BookPart[], opts?: AggregateDepthOpts): A
   }
   const halfSpan = Math.max(below, above);
   const ladderOpts =
-    opts?.ladder ??
-    (halfSpan > 0 ? { targetFrac: (halfSpan * 2) / 28 / mid } : undefined);
+    opts?.ladder ?? (halfSpan > 0 ? { targetFrac: (halfSpan * 2) / 28 / mid } : undefined);
   let ladder = stepLadder(mid, ladderOpts);
   const minUseful = halfSpan > 0 ? halfSpan / MAX_AGG_LEVELS : 0;
   if (minUseful > 0) {
@@ -483,6 +505,10 @@ export function assembleAggBook(parts: BookPart[], opts?: AggregateDepthOpts): A
   };
 }
 
+/**
+ * Aggregate virtual depth across every pool that holds (from, to).
+ * Per-pool densify onto `step`, then mergeAgg. N-pool ready (stable + volatile + future).
+ */
 export function aggregateDepthCurves(
   pools: DepthPool[],
   from: string,
@@ -500,4 +526,3 @@ export function aggregateDepthCurves(
   }
   return assembleAggBook(parts, opts);
 }
-

@@ -11,8 +11,26 @@ import { buildLeg, quoteExactIn, type PoolState } from './aimm';
  * joined by the shared USDC hub — the live-demo shape that rendered "pool data unavailable".
  */
 function crossFleet(): NamedPool[] {
-  const audf = buildLeg('AUDF', 1, sigmaSeed('stable'), 1_000_000, 1_000_000, 1_000_000, 18, STABLE_PROFILE);
-  const wbtc = buildLeg('WBTC', 60_000, sigmaSeed('volatile'), 50, 50, 200_000, 8, VOLATILE_PROFILE);
+  const audf = buildLeg(
+    'AUDF',
+    1,
+    sigmaSeed('stable'),
+    1_000_000,
+    1_000_000,
+    1_000_000,
+    18,
+    STABLE_PROFILE,
+  );
+  const wbtc = buildLeg(
+    'WBTC',
+    60_000,
+    sigmaSeed('volatile'),
+    50,
+    50,
+    200_000,
+    8,
+    VOLATILE_PROFILE,
+  );
   const fx: PoolState = { base: 'USDC', legs: { AUDF: audf } };
   const crypto: PoolState = { base: 'USDC', legs: { WBTC: wbtc } };
   return [
@@ -48,7 +66,10 @@ describe('aggregateRouteDepthCurves', () => {
     const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
     const q = rankSwap(pools, 'AUDF', 'WBTC', 10)!;
     // Router exec (WBTC per AUDF) vs the book's size-0 mid (AUDF per WBTC): same number reciprocated.
-    expect(1 / book.mid).toBeCloseTo(q.singles[0].fills[0].amountOut > 0 ? q.best.amountOut / 10 : 0, 1);
+    expect(1 / book.mid).toBeCloseTo(
+      q.singles[0].fills[0].amountOut > 0 ? q.best.amountOut / 10 : 0,
+      1,
+    );
   });
 
   test('reciprocal orientation mirrors the book', () => {
@@ -90,5 +111,110 @@ describe('aggregatePairDepth', () => {
     expect(book.asks[book.asks.length - 1].cum).toBeLessThanOrEqual(
       directWbtc.asks[directWbtc.asks.length - 1].cum * 1.0001,
     );
+  });
+});
+
+// ── cross-validator pins: router-quote ↔ book-depth consistency (one math, two views) ──
+
+describe('router quote vs composed book consistency', () => {
+  // Book convention (crossCurve): ASKS carry 'to' bought by paying 'from'; BIDS carry 'to' sold
+  // for 'from'. Both sides quote from-per-to. Chain both directions off quoteExactIn exactly as
+  // quoteRoute fills them (leg N spends leg N-1's net output).
+  function routeQuote(
+    pools: NamedPool[],
+    legs: { poolTag: string; tokenIn: string; tokenOut: string }[],
+    x: number,
+  ): number {
+    let amt = x;
+    for (const leg of legs) {
+      const p = pools.find((q) => q.tag === leg.poolTag)!;
+      amt = quoteExactIn(p.state, leg.tokenIn, leg.tokenOut, amt).amountOut;
+      if (!(amt > 0)) return 0;
+    }
+    return amt;
+  }
+  /** Binary-search the input knee: smallest input whose output sits on the saturation plateau. */
+  function routeKnee(
+    pools: NamedPool[],
+    legs: { poolTag: string; tokenIn: string; tokenOut: string }[],
+    hint: number,
+  ): number {
+    const plateau = routeQuote(pools, legs, hint);
+    const flat = (x: number) => routeQuote(pools, legs, x) >= plateau * (1 - 1e-9);
+    let lo = hint * 1e-6; // not flat
+    let hi = hint; // flat
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (flat(mid)) hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  }
+  const FWD_LEGS = [
+    { poolTag: 'fx', tokenIn: 'AUDF', tokenOut: 'USDC' },
+    { poolTag: 'crypto', tokenIn: 'USDC', tokenOut: 'WBTC' },
+  ];
+  const REV_LEGS = [
+    { poolTag: 'crypto', tokenIn: 'WBTC', tokenOut: 'USDC' },
+    { poolTag: 'fx', tokenIn: 'USDC', tokenOut: 'AUDF' },
+  ];
+
+  test('capacity clips at the MIN of the chained leg caps (quote knee)', () => {
+    const pools = crossFleet();
+    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
+    // Bids sell WBTC back down the route; the crypto hub's baseRes (200k USDC) caps that sell at
+    // ~3.35 WBTC while the fx leg could absorb far more — the hop binds, and the book must show it.
+    const knee = routeKnee(pools, REV_LEGS, 10);
+    expect(knee).toBeGreaterThan(2);
+    expect(knee).toBeLessThan(3.35 * 1.001); // the hub drain, not the fx band
+    expect(book.bids[book.bids.length - 1].cum).toBeGreaterThan(knee * 0.95);
+    expect(book.bids[book.bids.length - 1].cum).toBeLessThanOrEqual(knee * 1.05);
+  });
+
+  test('book VWAP equals the router quote at every size (integral consistency)', () => {
+    const pools = crossFleet();
+    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
+    // Selling s WBTC consumes bids; Σ size × price over rungs up to cum s must reproduce the
+    // router's AUDF out — same primitives, zero re-implementation.
+    for (const s of [0.01, 0.25, 1, 2.5]) {
+      const expected = routeQuote(pools, REV_LEGS, s);
+      let filled = 0;
+      let out = 0;
+      for (const r of book.bids) {
+        if (r.cum <= s) {
+          out += r.size * r.price;
+          filled = r.cum;
+        } else {
+          out += ((s - filled) / (r.cum - filled)) * r.size * r.price;
+          break;
+        }
+      }
+      // Rung prices sit on bucket edges (≤ one step of discretization), so 2% is generous for a
+      // correct composition and hopeless for a wrong-band or wrong-capacity one.
+      expect(Math.abs(out / expected - 1)).toBeLessThan(0.02);
+    }
+  });
+
+  test('a pegged tiny-capacity hop still prints its one limit rung (flat-side regression)', () => {
+    const audf = buildLeg('AUDF', 1, sigmaSeed('stable'), 1_000, 1_000, 1_000, 18, STABLE_PROFILE);
+    const wbtc = buildLeg(
+      'WBTC',
+      60_000,
+      sigmaSeed('volatile'),
+      1e9,
+      1e9,
+      1e11,
+      8,
+      VOLATILE_PROFILE,
+    );
+    const pools: NamedPool[] = [
+      { tag: 'fx', state: { base: 'USDC', legs: { AUDF: audf } } },
+      { tag: 'crypto', state: { base: 'USDC', legs: { WBTC: wbtc } } },
+    ];
+    const book = aggregateRouteDepthCurves(pools, 'WBTC', 'AUDF')!;
+    // Selling WBTC back through a ~666-AUDF-deep fx leg moves the marginal less than the
+    // aggregator's dedup tolerance across the WHOLE side: it must still print its rung.
+    expect(book.bids.length).toBeGreaterThan(0);
+    expect(book.bids[book.bids.length - 1].cum).toBeGreaterThan(0);
   });
 });
