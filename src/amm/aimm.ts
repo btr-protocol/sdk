@@ -420,9 +420,11 @@ export function computeSkew(res: number, liab: number): number {
 }
 
 /** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it, up to the PROTOCOL ceiling
- *  `MAX_DISPERSION_PBPS` (Pricing `_calculateDispersion`) — there is no per-asset ceiling. */
+ *  `MAX_DISPERSION_PBPS` (Pricing `_calculateDispersion`) — there is no per-asset ceiling.
+ *  vega=10000 ⇒ dispersion tracks σ 1:1. (2026-08-21: dropped the historic σ/1000 damping that
+ *  pinned dispersion at the floor — books never widened with vol.) */
 export function dispersion(sigma: number, p: AimmProfile): number {
-  return clamp(p.minDisp + (sigma * p.vega) / (1000 * BPS), p.minDisp, MAX_DISPERSION_PBPS);
+  return clamp(p.minDisp + (sigma * p.vega) / BPS, p.minDisp, MAX_DISPERSION_PBPS);
 }
 
 const U16_MAX = 65535;
