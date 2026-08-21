@@ -49,5 +49,12 @@ export function poolStateFrom(
       f.kappaCovBps ?? 0,
     );
   }
-  return { base, legs };
+  const hub = baseAsset
+    ? {
+        res: baseRes,
+        liab: toFloat(baseAsset.liabilities, baseAsset.decimals),
+        kappaCovBps: feedOf(base)?.kappaCovBps ?? 0,
+      }
+    : undefined;
+  return { base, legs, hub };
 }
