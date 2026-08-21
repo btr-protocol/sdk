@@ -85,7 +85,8 @@ export function enumerateRoutes(pools: NamedPool[], tokenIn: string, tokenOut: s
     }
   }
 
-  // Cross-pool 2-hop: tokenIn in pool A, tokenOut in pool B (A≠B), joined by a token they both hold.
+  // Cross-pool 2-hop: tokenIn in pool A, tokenOut in pool B (A≠B), joined by a token they both hold
+  // (live fleet: USDC.b on every core).
   for (const a of pools) {
     if (!poolHas(a.state, tokenIn)) continue;
     for (const b of pools) {
@@ -100,6 +101,37 @@ export function enumerateRoutes(pools: NamedPool[], tokenIn: string, tokenOut: s
           tokens: [tokenIn, mid, tokenOut],
           hops: 2,
         });
+      }
+    }
+  }
+
+  // 3-hop via a bridging pool when A and B share no token: A --x--> M --y--> B.
+  // Live Arc roster always shares USDC.b so this is unused today; rankSwap still
+  // picks the best of whatever is enumerated (and may split disjoint routes).
+  if (!routes.some((r) => r.hops === 2)) {
+    for (const a of pools) {
+      if (!poolHas(a.state, tokenIn)) continue;
+      for (const b of pools) {
+        if (b.tag === a.tag || !poolHas(b.state, tokenOut)) continue;
+        for (const m of pools) {
+          if (m.tag === a.tag || m.tag === b.tag) continue;
+          const xs = sharedTokens(a.state, m.state).filter((t) => t !== tokenIn);
+          const ys = sharedTokens(m.state, b.state).filter((t) => t !== tokenOut);
+          for (const x of xs) {
+            for (const y of ys) {
+              if (x === y) continue;
+              routes.push({
+                legs: [
+                  { poolTag: a.tag, poolAddr: a.addr, tokenIn, tokenOut: x },
+                  { poolTag: m.tag, poolAddr: m.addr, tokenIn: x, tokenOut: y },
+                  { poolTag: b.tag, poolAddr: b.addr, tokenIn: y, tokenOut },
+                ],
+                tokens: [tokenIn, x, y, tokenOut],
+                hops: 3,
+              });
+            }
+          }
+        }
       }
     }
   }

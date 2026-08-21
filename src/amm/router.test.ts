@@ -76,6 +76,31 @@ describe('enumerateRoutes', () => {
   test('same token in/out yields no routes', () => {
     expect(enumerateRoutes(pools(), BASE, BASE)).toEqual([]);
   });
+
+  test('3-hop when two pools share no token, via a bridge pool', () => {
+    const aLeg = buildLeg('AAA', 1, sigmaSeed('stable'), 1e6, 1e6, 1e6, 18, STABLE_PROFILE);
+    const xLegA = buildLeg('XXX', 1, sigmaSeed('stable'), 1e6, 1e6, 1e6, 18, STABLE_PROFILE);
+    const xLegM = buildLeg('XXX', 1, sigmaSeed('stable'), 1e6, 1e6, 1e6, 18, STABLE_PROFILE);
+    const yLegM = buildLeg('YYY', 1, sigmaSeed('stable'), 1e6, 1e6, 1e6, 18, STABLE_PROFILE);
+    const yLegB = buildLeg('YYY', 1, sigmaSeed('volatile'), 1e6, 1e6, 1e6, 18, VOLATILE_PROFILE);
+    const bLeg = buildLeg('BBB', 1, sigmaSeed('volatile'), 1e6, 1e6, 1e6, 18, VOLATILE_PROFILE);
+    const three: NamedPool[] = [
+      { tag: 'pA', state: { base: 'AAA', legs: { XXX: xLegA } } },
+      { tag: 'pM', state: { base: 'XXX', legs: { YYY: yLegM } } },
+      { tag: 'pB', state: { base: 'BBB', legs: { YYY: yLegB } } },
+    ];
+    // silence unused
+    void aLeg;
+    void xLegM;
+    void bLeg;
+    const rs = enumerateRoutes(three, 'AAA', 'BBB');
+    expect(rs.some((r) => r.hops === 1)).toBe(false);
+    expect(rs.some((r) => r.hops === 2)).toBe(false);
+    const hop3 = rs.filter((r) => r.hops === 3);
+    expect(hop3.length).toBeGreaterThanOrEqual(1);
+    expect(hop3[0].tokens[0]).toBe('AAA');
+    expect(hop3[0].tokens[3]).toBe('BBB');
+  });
 });
 
 describe('quoteRoute', () => {
