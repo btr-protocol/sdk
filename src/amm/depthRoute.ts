@@ -168,11 +168,21 @@ const slope0 = (p: ChainPoly | null, key: 'gross' | 'net'): number => {
 /** Composed polylines -> DepthLevel rows in crossCurve convention: asks carry tokens RECEIVED,
  *  bids tokens SOLD; prices are from-per-to marginals; vertex 0 pinned to the zero-size touch so
  *  the touch definition matches a direct book (an average over the grid is not a price). */
-function chainToLevels(poly: ChainPoly | null, mid: number, touch: number, side: 'bid' | 'ask'): DepthLevel[] {
+function chainToLevels(
+  poly: ChainPoly | null,
+  mid: number,
+  touch: number,
+  side: 'bid' | 'ask',
+): DepthLevel[] {
   if (!poly || !(mid > 0)) return [];
-  const out: DepthLevel[] = [{ price: mid, netPrice: touch > 0 ? touch : mid, cumTok: 0, cumBase: 0 }];
+  const out: DepthLevel[] = [
+    { price: mid, netPrice: touch > 0 ? touch : mid, cumTok: 0, cumBase: 0 },
+  ];
   for (let i = 0; i < poly.xs.length; i++) {
-    const p = i === 0 ? { x: 0, g: 0, n: 0 } : { x: poly.xs[i - 1], g: poly.gross[i - 1], n: poly.net[i - 1] };
+    const p =
+      i === 0
+        ? { x: 0, g: 0, n: 0 }
+        : { x: poly.xs[i - 1], g: poly.gross[i - 1], n: poly.net[i - 1] };
     const dX = poly.xs[i] - p.x;
     const dG = poly.gross[i] - p.g;
     const dN = poly.net[i] - p.n;
@@ -203,7 +213,12 @@ interface RouteCurve {
 }
 
 /** Compose one route's synthetic DepthCurve, quoted from-per-to like aimm's cross pairs. */
-function composeRouteCurve(pools: NamedPool[], route: Route, from: string, to: string): RouteCurve | null {
+function composeRouteCurve(
+  pools: NamedPool[],
+  route: Route,
+  from: string,
+  to: string,
+): RouteCurve | null {
   const poolByTag = (tag: string) => pools.find((p) => p.tag === tag);
 
   // Asks fold left-to-right (leg 2 spends leg 1's output); bids fold right-to-left (selling the
@@ -286,12 +301,18 @@ export function aggregateRouteDepthCurves(
 ): AggregatedDepthBook | null {
   if (from === to) return null;
   const parts: BookPart[] = [];
+  // Routes sharing a pool draw the SAME reserves; merging them sums one pool's depth twice (the
+  // same double-count rankSwap's split viability refuses). Greedy keep-first in enumeration order.
+  const usedPools = new Set<string>();
   for (const route of enumerateRoutes(pools, from, to)) {
     if (route.hops < 2) continue; // direct legs belong to aggregateDepthCurves
+    if (route.legs.some((l) => usedPools.has(l.poolTag))) continue;
     const composed = composeRouteCurve(pools, route, from, to);
     if (!composed) continue;
     const part = bookPartFromCurve(composed.curve);
-    if (part) parts.push(part);
+    if (!part) continue;
+    parts.push(part);
+    for (const l of route.legs) usedPools.add(l.poolTag);
   }
   return assembleAggBook(parts, opts);
 }
@@ -310,6 +331,7 @@ export function aggregatePairDepth(
 ): AggregatedDepthBook | null {
   const directPools = direct ?? pools;
   return (
-    aggregateDepthCurves(directPools, from, to, opts) ?? aggregateRouteDepthCurves(pools, from, to, opts)
+    aggregateDepthCurves(directPools, from, to, opts) ??
+    aggregateRouteDepthCurves(pools, from, to, opts)
   );
 }
