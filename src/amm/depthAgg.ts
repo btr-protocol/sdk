@@ -289,50 +289,51 @@ export interface AggregatedDepthBook {
  * Aggregate virtual depth across every pool that holds (from, to).
  * Per-pool densify onto `step`, then mergeAgg. N-pool ready (stable + volatile + future).
  */
-export function aggregateDepthCurves(
-  pools: DepthPool[],
-  from: string,
-  to: string,
-  opts?: AggregateDepthOpts,
-): AggregatedDepthBook | null {
-  const eligible = pools.filter((p) => poolHas(p.state, from) && poolHas(p.state, to));
-  if (!eligible.length) return null;
+/** One contributor's densified book half — a pool or a composed route, same shape either way. */
+export interface BookPart {
+  mark: number;
+  mid: number;
+  spreadBps: number;
+  bid: number;
+  ask: number;
+  bidNet: number;
+  askNet: number;
+  asks: Row[];
+  bids: Row[];
+  /** Total row size; weights mark/mid/spread averages across parts. */
+  w: number;
+}
 
-  type Part = {
-    mark: number;
-    mid: number;
-    spreadBps: number;
-    bid: number;
-    ask: number;
-    bidNet: number;
-    askNet: number;
-    asks: Row[];
-    bids: Row[];
-    w: number;
+/**
+ * DepthCurve → BookPart (densified NET-priced rows + touch scalars). Null when the curve has no
+ * mid or no depth. Shared by every book source so pools and composed routes merge identically.
+ */
+export function bookPartFromCurve(curve: DepthCurve): BookPart | null {
+  if (!(curve.mid > 0) || (!curve.asks.length && !curve.bids.length)) return null;
+  const asks = depthLevelsToRows(curve.asks);
+  const bids = depthLevelsToRows(curve.bids);
+  const w = asks.reduce((s, r) => s + r.size, 0) + bids.reduce((s, r) => s + r.size, 0);
+  if (!(w > 0)) return null;
+  return {
+    mark: curve.mark,
+    mid: curve.mid,
+    spreadBps: curve.spreadBps,
+    bid: curve.bids[0]?.price ?? 0,
+    ask: curve.asks[0]?.price ?? 0,
+    bidNet: curve.bids[0]?.netPrice ?? 0,
+    askNet: curve.asks[0]?.netPrice ?? 0,
+    asks,
+    bids,
+    w,
   };
-  const parts: Part[] = [];
-  for (const p of eligible) {
-    const raw = curveForPool(p.state, from, to);
-    const curve = opts?.invert ? invertDepthCurve(raw) : raw;
-    if (!(curve.mid > 0) || (!curve.asks.length && !curve.bids.length)) continue;
-    const asks = depthLevelsToRows(curve.asks);
-    const bids = depthLevelsToRows(curve.bids);
-    const w = asks.reduce((s, r) => s + r.size, 0) + bids.reduce((s, r) => s + r.size, 0);
-    if (!(w > 0)) continue;
-    parts.push({
-      mark: curve.mark,
-      mid: curve.mid,
-      spreadBps: curve.spreadBps,
-      bid: curve.bids[0]?.price ?? 0,
-      ask: curve.asks[0]?.price ?? 0,
-      bidNet: curve.bids[0]?.netPrice ?? 0,
-      askNet: curve.asks[0]?.netPrice ?? 0,
-      asks,
-      bids,
-      w,
-    });
-  }
-  if (!parts.length) return null;
+}
+
+/**
+ * Ladder assembly shared by all book sources: densified parts → auto step from span → per-part
+ * aggregate on that step → mergeAgg mid-outward → AggregatedDepthBook. Null when no part carries
+ * depth. This is aggregateDepthCurves' tail verbatim, so direct-pool books are byte-identical.
+ */
+export function assembleAggBook(parts: BookPart[], opts?: AggregateDepthOpts): AggregatedDepthBook | null {
   // Allow one-sided books (skewed reserves clip the thin side — e.g. BTCB hub drain).
   // Reject only when BOTH sides are empty across all contributing pools.
   const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
@@ -360,7 +361,7 @@ export function aggregateDepthCurves(
    * Weighting stays where it belongs: the ladder behind the touch, where sizes add.
    * A one-sided pool must not drag the touch: only pools actually quoting that side contribute.
    */
-  const touch = (pick: (p: Part) => number, side: 'bid' | 'ask'): number => {
+  const touch = (pick: (p: BookPart) => number, side: 'bid' | 'ask'): number => {
     let best = 0;
     for (const p of parts) {
       const px = pick(p);
@@ -481,3 +482,22 @@ export function aggregateDepthCurves(
     poolCount: parts.length,
   };
 }
+
+export function aggregateDepthCurves(
+  pools: DepthPool[],
+  from: string,
+  to: string,
+  opts?: AggregateDepthOpts,
+): AggregatedDepthBook | null {
+  const eligible = pools.filter((p) => poolHas(p.state, from) && poolHas(p.state, to));
+  if (!eligible.length) return null;
+
+  const parts: BookPart[] = [];
+  for (const p of eligible) {
+    const raw = curveForPool(p.state, from, to);
+    const part = bookPartFromCurve(opts?.invert ? invertDepthCurve(raw) : raw);
+    if (part) parts.push(part);
+  }
+  return assembleAggBook(parts, opts);
+}
+
