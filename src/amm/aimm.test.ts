@@ -564,10 +564,9 @@ describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
     expect(covQ(2)).toBeLessThan(0);
   });
 
-  // Wiring: quoteExactIn only tolls the DRAINED (output) leg — never a DIRECT SELL (output=base),
-  // since the base numeraire can never carry kappaCovBps (protocol invariant) — matches
-  // Pricing.sol's cacheOut = tokenOut, and test_base_kappa_rejected_at_addAsset on-chain.
-  test('DIRECT SELL (token→base) never tolls, even if the leg carries κ>0', () => {
+  // Wiring: quoteExactIn tolls the DRAINED output book. Spoke κ does not apply on DIRECT SELL
+  // (output=base). Hub κ on `state.hub` does — matches Pricing.sol cacheOut = tokenOut.
+  test('DIRECT SELL (token→base) does not toll from the spoke κ', () => {
     const leg = buildLeg(
       'BTCB',
       62_000,
@@ -582,6 +581,26 @@ describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
     const state: PoolState = { base: BASE, legs: { BTCB: leg } };
     const q = quoteExactIn(state, 'BTCB', BASE, 1);
     expect(q.covTollBps).toBe(0);
+  });
+  test('DIRECT SELL tolls when the hub book is under-covered with κ>0', () => {
+    const leg = buildLeg(
+      'BTCB',
+      62_000,
+      sigmaSeed('volatile'),
+      9.4,
+      9.4,
+      100,
+      18,
+      VOLATILE_PROFILE,
+    );
+    const state: PoolState = {
+      base: BASE,
+      legs: { BTCB: leg },
+      hub: { res: 100, liab: 1000, kappaCovBps: 15_000 },
+    };
+    const q = quoteExactIn(state, 'BTCB', BASE, 0.01);
+    expect(q.covTollBps).toBeGreaterThan(0);
+    expect(q.amountOut).toBeLessThan(q.grossOut);
   });
   test('DIRECT BUY (base→token) tolls the token leg when under-covered with κ>0, reducing amountOut', () => {
     const under = buildLeg(

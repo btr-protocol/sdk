@@ -296,9 +296,8 @@ export interface PoolLeg {
   baseRes: number; // base (USDC) backing available to pay a sell
   decimals: number;
   profile: AimmProfile;
-  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol) — the
-  // BASE numeraire can never carry this (protocol invariant, enforced at addAsset), so it only ever
-  // matters on a spoke leg's OUTPUT side (buying the spoke, or a cross trade's second leg).
+  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol) —
+  // output-only: fires when this token leaves the pool. The hub book is `PoolState.hub`.
   kappaCovBps: number;
   /** Feed 1σ CI in BPS (ExternalOracle.confidence). Widens path spread. */
   confidence?: number;
@@ -306,10 +305,18 @@ export interface PoolLeg {
   staleExcess?: number;
 }
 
-/** Depth-1 star: `base` is the hub numeraire (no leg); spokes keyed by symbol. */
+/** Depth-1 star: `base` is the hub numeraire (no spoke leg); spokes keyed by symbol.
+ *  `hub` is the base's own book so a DIRECT SELL (token→base) can toll when the hub carries κ. */
+export interface HubBook {
+  res: number;
+  liab: number;
+  kappaCovBps: number;
+}
+
 export interface PoolState {
   base: string;
   legs: Record<string, PoolLeg>;
+  hub?: HubBook;
 }
 
 export interface Quote {
@@ -792,10 +799,10 @@ export function quoteExactIn(
   let involved: PoolLeg[] = [];
   let route: string[];
   let maxIn = 0;
-  // The leg whose reserves the trade actually DRAINS (the output side) — coverage toll applies here
-  // (GATE-07). Never the base numeraire: it can't carry kappaCovBps (protocol invariant), so a DIRECT
-  // SELL (output=base) leaves this undefined and tolls 0, matching Pricing.sol's cacheOut = tokenOut.
+  // The book whose reserves the trade actually DRAINS (the output side) — GATE-07.
+  // DIRECT SELL (output=base) uses `state.hub` when present; κ=0 or missing hub ⇒ toll 0.
   let outLeg: PoolLeg | undefined;
+  let hubOut: HubBook | undefined;
 
   if (!inBase && outBase) {
     // DIRECT SELL: token → base.
@@ -807,6 +814,7 @@ export function quoteExactIn(
     involved = [leg];
     route = [tokenIn, tokenOut];
     maxIn = capBidTok(k, leg); // token capacity before base drains / depth exhausts
+    hubOut = state.hub;
     if (amountIn > 0) grossOut = Math.min(amountIn * traverse(k, amountIn, true), leg.baseRes);
   } else if (inBase && !outBase) {
     // DIRECT BUY: base → token (one-step fixed point — replicate, don't solve).
@@ -883,7 +891,11 @@ export function quoteExactIn(
   }
   // GATE-07: coverage-wall toll charged on the drained output leg, BEFORE the spread/fee haircut —
   // mirrors Pricing.sol (`acc.currentAmount -= _covToll(...)` precedes the fee-out computation).
-  const toll = outLeg ? covToll(outLeg.res, outLeg.liab, outLeg.kappaCovBps, grossOut) : 0;
+  const toll = outLeg
+    ? covToll(outLeg.res, outLeg.liab, outLeg.kappaCovBps, grossOut)
+    : hubOut
+      ? covToll(hubOut.res, hubOut.liab, hubOut.kappaCovBps, grossOut)
+      : 0;
   const netGross = grossOut - toll;
   const amountOut = netGross * (1 - spread / 2 / PBPS); // half-spread on output (path model)
   const avgPrice = amountOut / amountIn;
