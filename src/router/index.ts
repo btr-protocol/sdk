@@ -276,3 +276,147 @@ export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
 export function totalValue(calls: ExecCall[]): bigint {
   return calls.reduce((a, c) => a + c.value, 0n);
 }
+
+// ── LP dual-route batches (spec §2.3/§2.4) ──────────────────────────────────────
+//
+// The LP routes compose the SAME primitives as a swap — plain calls from the user's account, one
+// shared deadline per atomic batch, no on-chain router. Approval logic is REUSED
+// (buildApprovalCalls), never duplicated.
+
+export interface MarketMintArgs {
+  /** 'market': Route A — [approve?, swap(X→target)…, deposit(target)]. */
+  mode: 'market';
+  /** Market legs ending in `depositToken` (planToLegs output). */
+  legs: ExecLeg[];
+  depositToken: Address;
+  /** Deposit size: pass Σ per-part minOut (the guaranteed floor); anything above it stays with
+   *  the user as target tokens. Deposits mint at index by design — no price guard exists. */
+  depositAmount: bigint;
+}
+export interface TransferMintArgs {
+  /** 'transfer': Route B — [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
+   *  needs no allowance. Non-batchable for fresh deposits (anti-JIT) — see lpRoutes gating. */
+  mode: 'transfer';
+  token: Address; // X — deposited, then its liability swapped in the same batch
+  amount: bigint;
+  targetToken: Address;
+  /** Shares the deposit mints for THIS sender (post-dead-seed estimate: amt·WAD/idx − dead). */
+  lpAmountIn: bigint;
+  minLpAmountOut: bigint;
+}
+
+export function buildDepositCalls(
+  pool: Address,
+  args: MarketMintArgs | TransferMintArgs,
+  opts: BuildOpts,
+): ExecCall[] {
+  if (args.mode === 'market') {
+    const swaps = buildSwapExecCalls(args.legs, opts);
+    return [
+      ...buildApprovalCalls(args.legs, opts),
+      ...swaps,
+      {
+        to: pool,
+        data: encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [args.depositToken, args.depositAmount] }),
+        value: 0n,
+      },
+    ];
+  }
+  const deadline = opts.deadline ?? defaultDeadline();
+  return [
+    ...buildApprovalCalls(
+      [
+        {
+          pool,
+          tokenIn: args.token,
+          tokenOut: args.targetToken,
+          amountIn: args.amount,
+          minOut: 0n,
+        },
+      ],
+      opts,
+    ),
+    {
+      to: pool,
+      data: encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [args.token, args.amount] }),
+      value: 0n,
+    },
+    {
+      to: pool,
+      data: encodeFn({
+        abi: POOL_ABI,
+        functionName: 'swapLiability',
+        args: [args.token, args.targetToken, args.lpAmountIn, args.minLpAmountOut, deadline],
+      }),
+      value: 0n,
+    },
+  ];
+}
+
+export interface CrossRedeemArgs {
+  /** 'cross': Route A' — [withdrawTo]. Single call, no approvals. */
+  mode: 'cross';
+  tokenFrom: Address;
+  tokenTo: Address;
+  lpAmount: bigint;
+  minAmountOut: bigint;
+}
+export interface TransferRedeemArgs {
+  /** 'transfer': Route B' — [swapLiability, withdraw]. No approvals. Same anti-JIT caveat as
+   *  Route B: the tail withdraw burns just-minted shares, so this runs sequentially after the
+   *  cooldown, not atomically. */
+  mode: 'transfer';
+  tokenFrom: Address;
+  tokenTo: Address;
+  /** Shares burned by the swapLiability leg (the user's seasoned target-LP). */
+  lpAmountIn: bigint;
+  minLpAmountOut: bigint;
+  /** Estimated target-leg shares the swapLiability mints — burned by the tail withdraw. The
+   *  exact number is only known post-execution; pass a conservative floor (≥ minLpAmountOut). */
+  lpWithdraw: bigint;
+  minAmountOut: bigint;
+}
+
+export function buildRedeemCalls(
+  pool: Address,
+  args: CrossRedeemArgs | TransferRedeemArgs,
+  opts: BuildOpts,
+): ExecCall[] {
+  const deadline = opts.deadline ?? defaultDeadline();
+  if (args.mode === 'cross') {
+    return [
+      {
+        to: pool,
+        data: encodeFn({
+          abi: POOL_ABI,
+          functionName: 'withdrawTo',
+          args: [args.tokenFrom, args.tokenTo, args.lpAmount, args.minAmountOut, deadline],
+        }),
+        value: 0n,
+      },
+    ];
+  }
+  return [
+    {
+      to: pool,
+      data: encodeFn({
+        abi: POOL_ABI,
+        functionName: 'swapLiability',
+        args: [args.tokenFrom, args.tokenTo, args.lpAmountIn, args.minLpAmountOut, deadline],
+      }),
+      value: 0n,
+    },
+    {
+      to: pool,
+      data: encodeFn({
+        abi: POOL_ABI,
+        functionName: 'withdraw',
+        args: [args.tokenTo, args.lpWithdraw, args.minAmountOut, deadline],
+      }),
+      value: 0n,
+    },
+  ];
+}
+
+// Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
+export * from './lpRoutes.js';
