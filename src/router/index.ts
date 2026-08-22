@@ -14,6 +14,8 @@ import { ERC20_ABI } from '../eth/erc20.js';
 import type { Abi } from '../eth/abi.js';
 import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
+import { applySlip } from '../utils/maths.js';
+export { applySlip };
 
 /** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
  *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
@@ -99,13 +101,6 @@ const toUnits = (v: number, decimals: number): bigint => {
   const n = BigInt(digits);
   return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
 };
-
-const SLIP_SCALE = 1_000_000n; // 1e-6 granularity: finer than any venue's fee tick
-
-/** Haircut integer units by `slip` in BIGINT space. Doing `amountOut * (1 - slip)` in float
- *  first loses precision on large amounts before the value is ever widened. Rounds DOWN. */
-const applySlip = (units: bigint, slip: number): bigint =>
-  (units * (SLIP_SCALE - BigInt(Math.round(slip * Number(SLIP_SCALE))))) / SLIP_SCALE;
 
 /** Map a router plan (amm/router rankSwap `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs

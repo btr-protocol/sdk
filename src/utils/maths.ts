@@ -224,3 +224,14 @@ export function niceScale(
 
   return { min: niceMin, max: niceMax, tickSpacing };
 }
+
+// ─────────────────────────────────────────────────────────────
+// Bigint slippage floors
+// ─────────────────────────────────────────────────────────────
+
+const SLIP_SCALE = 1_000_000n; // 1e-6 granularity: finer than any venue's fee tick
+
+/** Haircut integer units by `slip` in BIGINT space. Doing `amountOut * (1 - slip)` in float
+ *  first loses precision on large amounts before the value is widened. Rounds DOWN. */
+export const applySlip = (units: bigint, slip: number): bigint =>
+  (units * (SLIP_SCALE - BigInt(Math.round(slip * Number(SLIP_SCALE))))) / SLIP_SCALE;

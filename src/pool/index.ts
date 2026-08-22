@@ -127,6 +127,20 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
+export type {
+  LiabLeg,
+  SwapLiabilityQuote,
+} from './liability.js';
+export {
+  HAIRCUT_SUPPRESSOR_FULL_BPS,
+  LIABILITY_SWAP_ENABLED_BIT,
+  WAD as WAD_F,
+  haircutFace,
+  liabilitySwapEnabled,
+  minLpAmountOut,
+  quoteSwapLiability,
+  quoteSwapLiabilityCore,
+} from './liability.js';
 export type { YieldHookKind } from './hooks.js';
 export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
 export type { HookSlot, OracleConfig, RiskConfig } from './storage.js';
