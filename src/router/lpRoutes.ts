@@ -277,6 +277,33 @@ export function rankDeposit(
   opts: LpRouteOpts = {},
 ): RankedLpPlan {
   if (!(amountIn > 0)) return { best: null, routes: [] };
+  // Same-asset default (spec §3): X -> X-LP is a DIRECT deposit — mints face 1:1 at the current
+  // index, no swap leg, no price guard. Enumerating the dual routes here would quote a
+  // self-conversion; there is nothing to rank.
+  if (xToken === targetSym) {
+    const holder = poolHolding(pools, xToken, xToken);
+    if (!holder) return { best: null, routes: [] };
+    const direct: RankedLpRoute = {
+      id: 'market-first',
+      label: 'direct deposit',
+      feasible: true,
+      out: amountIn,
+      hops: 1,
+      steps: [
+        {
+          kind: 'deposit',
+          poolTag: holder.tag,
+          poolAddr: holder.addr,
+          tokenIn: xToken,
+          tokenOut: xToken,
+          amountIn,
+          amountOut: amountIn,
+          minOut: 0,
+        },
+      ],
+    };
+    return { best: direct, routes: [direct] };
+  }
   const market = marketMint(pools, xToken, targetSym, amountIn, opts);
   const transfer = transferMint(pools, xToken, targetSym, amountIn, opts);
   const routes = rankRoutes([market, transfer].filter((r): r is RankedLpRoute => r !== null));
@@ -419,6 +446,46 @@ export function rankRedeem(
   opts: LpRouteOpts = {},
 ): RankedLpPlan {
   if (!(lpFaceIn > 0)) return { best: null, routes: [] };
+  // Same-asset exit (spec §2.1 B' tail): T-LP -> T is a DIRECT withdraw — haircut only, no
+  // spread/proto fee, one call. The cross-exit pipeline quotes a self-conversion (out = 0), so
+  // short-circuit before enumeration.
+  if (targetSym === outToken) {
+    const holder = poolHolding(pools, targetSym, targetSym);
+    const leg = holder && liabLeg(holder, targetSym, opts);
+    if (!holder || !leg) return { best: null, routes: [] };
+    const shell: RouteShell = {
+      id: 'cross-exit',
+      label: 'same-asset withdraw',
+      out: 0,
+      hops: 1,
+      steps: [
+        {
+          kind: 'withdraw',
+          poolTag: holder.tag,
+          poolAddr: holder.addr,
+          tokenIn: targetSym,
+          tokenOut: outToken,
+          amountIn: lpFaceIn,
+          amountOut: 0,
+          minOut: 0,
+        },
+      ],
+    };
+    // Burns target-LP like every exit: capacity + season folded (maxRedeem mirror).
+    const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
+    if (!gated.feasible) return { best: null, routes: [gated] };
+    const slip = opts.slippageFrac ?? DEFAULT_SLIP;
+    const { actual } = haircutFace(
+      lpFaceIn,
+      leg.reserves,
+      leg.liabilities,
+      leg.haircutSuppressorBps,
+    );
+    gated.steps[0].amountOut = actual;
+    gated.steps[0].minOut = actual * (1 - slip);
+    gated.out = actual;
+    return { best: gated, routes: [gated] };
+  }
   const cross = crossExit(pools, targetSym, outToken, lpFaceIn, opts);
   const transfer = transferExit(pools, targetSym, outToken, lpFaceIn, opts);
   const routes = rankRoutes([cross, transfer].filter((r): r is RankedLpRoute => r !== null));

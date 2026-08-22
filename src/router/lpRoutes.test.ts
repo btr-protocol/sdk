@@ -236,3 +236,99 @@ describe('buildRedeemCalls', () => {
     expect(calls.every((c) => c.value === 0n)).toBe(true);
   });
 });
+
+// ── same-asset direct paths ─────────────────────────────────────────────────────
+// Spec §3: the deposit tab DEFAULTS to pay-leg receipt (X → X-LP); §2.1 B' tail names the
+// same-asset exit. Neither is a dual-route problem — both short-circuit to one call.
+
+/** Minimal pool with arbitrary legs, for edge fixtures below. */
+function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>): NamedPool {
+  return {
+    tag,
+    state: {
+      base: 'USDC',
+      legs,
+      hub: { res: 3_000_000, liab: 2_000_000, kappaCovBps: 0 },
+    },
+  };
+}
+
+const leg = (sym: string, res = 1_000_000, liab = 1_000_000) =>
+  buildLeg(sym, 1, SIG, res, liab, 3_000_000, 6, P);
+
+describe('same-asset direct paths', () => {
+  test('rankDeposit(X, X): single direct-deposit route, face 1:1, no price guard', () => {
+    const { best, routes } = rankDeposit([healthyPool()], 'AUDF', 'AUDF', 5_000);
+    expect(routes.length).toBe(1);
+    expect(best?.label).toBe('direct deposit');
+    expect(best?.feasible).toBe(true);
+    expect(best?.out).toBe(5_000);
+    expect(best?.steps.length).toBe(1);
+    const step = best?.steps[0];
+    expect(step?.kind).toBe('deposit');
+    expect(step?.amountIn).toBe(5_000);
+    expect(step?.amountOut).toBe(5_000); // mints at index — face 1:1
+    expect(step?.minOut).toBe(0); // deposits carry NO price guard (spec §4)
+  });
+
+  test('rankDeposit(X, X) with no pool listing X: nothing routable', () => {
+    const { best, routes } = rankDeposit(
+      [mkPool('other', { JPYC: leg('JPYC') })],
+      'AUDF',
+      'AUDF',
+      5_000,
+    );
+    expect(best).toBeNull();
+    expect(routes.length).toBe(0);
+  });
+
+  test('rankRedeem(T, T): one-call withdraw, haircut only', () => {
+    // Covered leg: full face out.
+    const ok = rankRedeem([healthyPool()], 'AUDF', 'AUDF', 5_000);
+    expect(ok.routes.length).toBe(1);
+    expect(ok.best?.steps[0].kind).toBe('withdraw');
+    expect(ok.best?.steps[0].amountOut).toBe(5_000);
+    // Under-covered leg (50% covered): the deficit is the only cost — no spread/proto fee.
+    const cut = rankRedeem([pool('core', { audfRes: 500_000 })], 'AUDF', 'AUDF', 5_000);
+    expect(cut.best?.out).toBeGreaterThan(0);
+    expect(cut.best?.out).toBeLessThan(5_000);
+    expect(cut.best?.steps[0].minOut).toBeLessThanOrEqual(cut.best?.steps[0].amountOut ?? 0);
+  });
+
+  test('rankRedeem(T, T) still honors the season gate (it burns LP like every exit)', () => {
+    const gated = rankRedeem([healthyPool()], 'AUDF', 'AUDF', 5_000, { maxRedeem: () => 4_999 });
+    expect(gated.best).toBeNull();
+    expect(gated.routes[0]?.reason).toBe('cooldown');
+  });
+});
+
+describe('missing liability liquidity / single-pool scope edges', () => {
+  test('in-leg liabilities exhausted: transfer route is no-route, market capacity-clamped, best null', () => {
+    const pools = [mkPool('core', { AUDF: leg('AUDF', 1_000_000, 0), NZDF: leg('NZDF') })];
+    const { best, routes } = rankDeposit(pools, 'AUDF', 'NZDF', 5_000);
+    const b = routes.find((r) => r.id === 'deposit-first');
+    expect(b?.feasible).toBe(false);
+    expect(b?.reason).toBe('no-route'); // liabIn > L_in would revert on-chain
+    const a = routes.find((r) => r.id === 'market-first');
+    expect(a?.feasible).toBe(false);
+    expect(a?.reason).toBe('capacity'); // selling into a leg with L=0 has no depth either
+    expect(best).toBeNull();
+  });
+
+  test('no SINGLE pool holds both legs: redeem enumerates nothing (cross-pool out of scope v1)', () => {
+    const pools = [mkPool('a', { AUDF: leg('AUDF') }), mkPool('b', { JPYC: leg('JPYC') })];
+    const { best, routes } = rankRedeem(pools, 'AUDF', 'JPYC', 5_000);
+    expect(best).toBeNull();
+    expect(routes.length).toBe(0);
+  });
+});
+
+describe('capacity clamp boundary', () => {
+  test('maxRedeem exactly equal to the burned face passes the gate on both sides', () => {
+    const cap = { maxRedeem: () => 5_000 };
+    const dep = rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, cap);
+    expect(dep.routes.find((r) => r.id === 'deposit-first')?.feasible).toBe(true);
+    const red = rankRedeem([healthyPool()], 'NZDF', 'AUDF', 5_000, cap);
+    for (const r of red.routes) expect(r.feasible).toBe(true);
+  });
+});
