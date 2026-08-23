@@ -62,6 +62,12 @@ describe('haircutFace (applyHaircut mirror)', () => {
     const tiny = haircutFace(1_000, 0, 1_000, 19_999);
     expect(tiny.haircut).toBe(1); // ceil(1000 · 0.00005)
   });
+
+  test('out-of-range suppressor fails closed instead of increasing the payout', () => {
+    for (const bad of [-1, HAIRCUT_SUPPRESSOR_FULL_BPS + 1]) {
+      expect(() => haircutFace(1_000, 0, 1_000, bad)).toThrow(RangeError);
+    }
+  });
 });
 
 describe('liabilitySwapEnabled (flag bit gate)', () => {

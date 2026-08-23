@@ -332,3 +332,25 @@ describe('capacity clamp boundary', () => {
     for (const r of red.routes) expect(r.feasible).toBe(true);
   });
 });
+
+describe('audit regressions', () => {
+  test('market-mint deposit floor uses the terminal quote, not summed hop floors', () => {
+    const pools = [mkPool('a', { AUDF: leg('AUDF') }), mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') })];
+    const { best } = rankDeposit(pools, 'AUDF', 'NZDF', 10_000);
+    expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
+    const [finalHop, deposit] = best?.steps ?? [];
+    expect(deposit?.amountIn).toBeCloseTo(finalHop?.amountOut ?? 0, 8);
+    expect(finalHop?.minOut).toBeLessThan(deposit?.amountIn ?? 0);
+  });
+
+  test('liability routes convert shares to face at accrued liquidity indexes', () => {
+    const pools = [healthyPool()];
+    const indexes = { AUDF: 1.2e18, NZDF: 1.5e18 };
+    const indexed = rankRedeem(pools, 'AUDF', 'NZDF', 5_000, {
+      liquidityIndexWad: (sym) => indexes[sym as keyof typeof indexes] ?? 1e18,
+    });
+    expect(indexed.best?.steps[0].kind).toBe('withdrawTo');
+    expect(indexed.best?.steps[0].amountIn).toBeCloseTo(5_000, 6);
+    expect(indexed.best?.out).toBeCloseTo(5_999.610_006_6, 6);
+  });
+});

@@ -50,6 +50,9 @@ export function haircutFace(
   liabilities: number,
   haircutSuppressorBps: number,
 ): { actual: number; haircut: number } {
+  if (!(haircutSuppressorBps >= 0 && haircutSuppressorBps <= HAIRCUT_SUPPRESSOR_FULL_BPS)) {
+    throw new RangeError('haircutSuppressorBps outside [0, HAIRCUT_SUPPRESSOR_FULL_BPS]');
+  }
   if (!(liabilities > 0) || reserves >= liabilities) return { actual: amount, haircut: 0 };
   // deficit ∈ [0,1], factor ∈ [0,1] (full suppressor = no haircut), ratio capped at 100%.
   const deficit = (liabilities - reserves) / liabilities;

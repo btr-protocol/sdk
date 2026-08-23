@@ -34,6 +34,9 @@ export interface LpRouteOpts {
   maxRedeem?: (symbol: string) => number;
   /** haircutSuppressorBps per symbol (default 0 — full haircut applies). */
   haircutSuppressorBps?: (symbol: string) => number;
+  /** Asset.liquidityIndexWad per symbol (default 1e18). Required once indexes accrue; quoting
+   *  every leg at 1 makes face/share conversions and route ranking drift from chain. */
+  liquidityIndexWad?: (symbol: string) => number;
 }
 
 const DEFAULT_SLIP = 0.005;
@@ -42,6 +45,7 @@ const DEFAULT_SLIP = 0.005;
 function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | null {
   const s = pool.state;
   const suppressor = opts.haircutSuppressorBps?.(symbol) ?? 0;
+  const indexWad = opts.liquidityIndexWad?.(symbol) || WAD;
   if (symbol === s.base) {
     if (!s.hub) return null;
     return {
@@ -49,7 +53,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       reserves: s.hub.res,
       liabilities: s.hub.liab,
       haircutSuppressorBps: suppressor,
-      indexWad: WAD,
+      indexWad,
     };
   }
   const leg = s.legs[symbol];
@@ -59,7 +63,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     reserves: leg.res,
     liabilities: leg.liab,
     haircutSuppressorBps: suppressor,
-    indexWad: WAD,
+    indexWad,
   };
 }
 
@@ -184,17 +188,19 @@ function marketMint(
       reason: 'capacity',
     };
   }
-  // Deposits carry NO price guard (mint at current index); the amount sent is the guaranteed
-  // floor Σ per-part minOut — anything above stays with the user as target tokens (usable
-  // holdings, spec §2.4).
+  // Deposits carry NO price guard (they mint at the current index), but a batched market-first
+  // deposit must not ask for the sum of every hop's independent floor as its input floor.
+  // The terminal target-token amount actually deposited is the final leg quote net of that
+  // leg's own slippage; any excess remains with the user as usable holdings.
   const first = steps[0];
+  const depositAmountIn = steps.reduce((sum, step) => sum + step.amountOut, 0);
   steps.push({
     kind: 'deposit',
     poolTag: first?.poolTag ?? '',
     poolAddr: first?.poolAddr,
     tokenIn: targetSym,
     tokenOut: targetSym,
-    amountIn: steps.reduce((a, s) => a + s.minOut, 0),
+    amountIn: depositAmountIn,
     amountOut: depositExpected,
     minOut: 0,
   });
@@ -326,11 +332,13 @@ function crossExit(
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
 
-  // Mirror of _quoteWithdrawCross (PoolLiquidity.sol:335-369): from-haircut → anchor-path
-  // conversion (fees embedded) → Lemma B mark cap → out-haircut. Reserve sufficiency and the
-  // liquid floor stay on-chain; the gate below mirrors maxRedeem's fold.
+  // Mirror of _quoteWithdrawCross (PoolLiquidity.sol:335-369): shares → face at the source
+  // index, then from-haircut → anchor-path conversion (fees embedded) → Lemma B mark cap →
+  // out-haircut. Reserve sufficiency and the liquid floor stay on-chain; the gate below
+  // mirrors maxRedeem's fold.
+  const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   const { actual: fair } = haircutFace(
-    lpFaceIn,
+    withdrawValue,
     fromLeg.reserves,
     fromLeg.liabilities,
     fromLeg.haircutSuppressorBps,
