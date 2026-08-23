@@ -119,5 +119,9 @@ export function sepoliaFeedByName(name: string): SepoliaFeed | null {
  * stated once there and any chain's roster narrows it (`registry.ts activeRefMarksUsd`).
  */
 export const SEPOLIA_REF_MARKS_USD: Record<string, number> = Object.fromEntries(
-  SEPOLIA_ORACLE_FEEDS.map((f) => [f.symbol, nxrMark(f.symbol)!.refUsd!]),
+  SEPOLIA_ORACLE_FEEDS.map((f) => {
+    const m = nxrMark(f.symbol);
+    if (m?.refUsd == null) throw new Error(`missing refUsd for ${f.symbol}`);
+    return [f.symbol, m.refUsd] as const;
+  }),
 );
