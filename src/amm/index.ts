@@ -1,11 +1,15 @@
-// Off-chain AIMM model: pricer (aimm.ts — exact-integer NUQuartic curve mirror + f64 plumbing,
-// mirrors dex/evm Pricing.sol/NUQuartic.sol) + routing brain (router.ts) + the on-chain seam
-// below (bigint pool reads → PoolState floats).
+// AIMM — lean: types + pure helpers stay, heavy pricer (aimm.ts 1297L float replica) deprecated.
+// Use Rust `btr-quote` via `quoteExactInAsync` / `routeAsync` — bit-exact integer, same as chain.
+// Docs: POST https://api.btr.markets/v1/quote  and  POST https://api.btr.markets/v1/route
+// Old `quoteExactIn`/`rankSwap` kept for back-compat (will be removed), new code uses async fetch.
 
 export * from './aimm.js';
 export * from './depthAgg.js';
 export * from './depthRoute.js';
 export * from './router.js';
+
+import { btrFetch } from '../api.js';
+import type { Route } from './router.js';
 
 import type { PoolAsset } from '../pool/index.js';
 import { formatUnits } from '../utils/format.js';
@@ -58,4 +62,33 @@ export function poolStateFrom(
       }
     : undefined;
   return { base, legs, hub };
+}
+
+/** Lean: delegate quoting to Rust btr-quote — POST /v1/quote (integer exact) */
+export async function quoteExactInAsync(
+  poolState: PoolState,
+  tokenIn: string,
+  tokenOut: string,
+  amountIn: bigint,
+): Promise<{ amountOut: bigint; leg: string }> {
+  const res = await btrFetch<{ amountOut: string; leg: string }>('/v1/quote', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ poolState, tokenIn, tokenOut, amountIn: `0x${amountIn.toString(16)}` }),
+  });
+  return { amountOut: BigInt(res.amountOut), leg: res.leg };
+}
+
+/** Lean: delegate routing to Rust — POST /v1/route */
+export async function routeAsync(params: {
+  pools: PoolState[];
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: bigint;
+}): Promise<Route> {
+  return btrFetch<Route>('/v1/route', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...params, amountIn: `0x${params.amountIn.toString(16)}` }),
+  });
 }
