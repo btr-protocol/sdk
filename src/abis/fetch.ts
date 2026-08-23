@@ -18,6 +18,13 @@ export async function fetchAbi(name: string): Promise<Abi> {
   coldSet(`abi:${k}`, abi);
   return abi;
 }
+/** Test-only: drop hot + cold cache so a test re-fetches the live ABI (never a stale shape). */
+export function resetFetchAbiCacheForTest(): void {
+  hot.clear();
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('btr:cache:abi:pool');
+  } catch {}
+}
 export function getAbiUrl(name: string) {
   return `${getApiRoot()}/abis/${name}`;
 }
