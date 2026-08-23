@@ -1,17 +1,28 @@
 # @btr-protocol/sdk
 
-Protocol-internal TypeScript SDK for the BTR stack. Single source of truth for ABIs, EVM RPC client, chain registry, token list, and shared helpers — consumed by **front**, **back**, and contract tooling.
+TypeScript SDK for the BTR stack — a **thin proxy over the backend**, not a second source of truth.
 
-Version pinned in `package.json` (`version` field).
+## Single source of truth: the backend
+
+ABIs, quoting, routing and chain/venue config are owned by the **backend** (`btr-quote`, served at
+`quote.btr.markets`). The SDK does NOT hard-code a parallel copy. It is a thin wrapper on that API:
+
+- **ABIs** — `fetchAbi('Pool')` → `GET {api}/abis/{name}` (hot + cold cached). Never bundled; the
+  wire contract is whatever the backend serves. Mirror on GitHub: `github.com/btr-protocol/abis`.
+- **Venues / chains / addresses** — `fetchVenues()` → `GET {api}/venues`. Not hard-coded.
+- **Quoting / routing / pricing** — `quoteExactInAsync` / `routeAsync` → `POST {api}/quote` ·
+  `POST {api}/route`. The bit-exact integer pricer (`btr-core`) runs on the backend.
+- Root URL overridable via `setApiRoot()` so any integrator can point at their own backend.
+
+**We deliberately do NOT maintain a frontend library for quoting/routing/pricing.** One behaviour
+change should touch one place (the backend), never a TypeScript port and a Rust mirror that drift.
+The `./amm` / `./router` modules here are a LEGACY offline compute surface kept for integrators who
+need local quotes without a network; the recommended + maintained path is the backend API.
 
 ## Purpose
 
 - Framework-agnostic EVM JSON-RPC client (`./eth`) — no `ethers`, no `viem` dep.
-- Canonical ABIs (`./abis`) for every deployed BTR DEX contract: AccessControl, Admin, ExternalOracle, Flash, IPoolHooks, LPToken, Pool, PoolFactory. Generated from the dex/shared forge artifacts by `bun run gen` — never hand-edited.
-- Pool helpers: data fetch + swap quoting, single-pool, caller supplies the pool address (`./pool`).
-- Off-chain AIMM pricer + route-finding: `quoteExactIn`, `enumerateRoutes`, `quoteRoute`, `rankSwap` (best plan incl. order splitting), `aggregateDepth`, plus the `poolStateFrom` on-chain seam (`./amm`).
-- Off-chain swap-execution call builder: `planToLegs` maps a `rankSwap` plan to executable legs; `buildSwapCalls` turns legs into a deduplicated, ordered `approve`+`swap` calldata sequence (`./router`).
-- Rewards: `./rewards`.
+- Lazy ABI + venue fetch (`./abis/fetch`, `./venues/fetch`) — thin, cached, backend-served.
 - Shared utils: encoding, validation, math, formatting, logger, constants, chains, tokens (`./utils`).
 
 ## Install (workspace `file:` example)
