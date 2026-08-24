@@ -12,22 +12,25 @@ export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
   '30d': 30 * 24 * 3600_000,
 };
 export const DEFAULT_METRICS_WINDOW: MetricsWindow = '48h';
-export type MetricsGrain = '1m' | '5m' | '15m' | '1h' | '1d';
+export type MetricsGrain = '1m' | '2m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
 export type MetricsSource = 'live' | 'empty';
 
 /**
  * Grain per window, shared by the collector and the front so a bucket means one thing.
- * Every table underneath is minute-floored ⇒ 1m is the floor. Sized to 60..720 points: the
- * widest live query costs 1436ms at 1m against 536ms at 1h, so points are also latency.
+ * Every table underneath is minute-floored ⇒ 1m is the floor (60 buckets is the practical
+ * minimum for a 1h view). Everything else lands near ~200 buckets per full view: points
+ * are latency AND cache lifetime — a coarse bucket can be served from the edge cache far
+ * longer than a fresh one. A finer view is a zoom away: narrow `from..to` and the span
+ * picks the finer grain itself.
  */
 export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>> = {
-  '1h': '1m', // 60 pts
-  '6h': '1m', // 360
+  '1h': '1m', // 60 pts — table floor, cannot go finer
+  '6h': '2m', // 180
   '12h': '5m', // 144
   '24h': '5m', // 288
-  '48h': '5m', // 576
-  '7d': '15m', // 672
-  '30d': '1h', // 720
+  '48h': '15m', // 192
+  '7d': '30m', // 336
+  '30d': '4h', // 180
 };
 
 /** Grain for a free-form from..to span. Requires METRICS_WINDOWS to stay ascending. */
