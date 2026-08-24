@@ -1,10 +1,12 @@
-/** Lean SDK — backend root, overridable per integrator. `quote.btr.markets` = the cohesive Rust
- *  backend (quote + route + abis + venues). Override with `setApiRoot()` for your own backend. */
+/** Lean SDK — backend root, overridable per integrator. Canonical `api.btr.markets`
+ *  (gateway proxies to btr-quote for pricing/ABIs at `/v1/*`). `quote.btr.markets` stays
+ *  as direct fallback (alias) but `api` is single source of truth. Override with `setApiRoot()`. */
 export const BTR_API: string =
   // @ts-ignore Vite injects import.meta.env, TS sees it as unknown in SDK build
   (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_BTR_API) ||
+  (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API) ||
   (typeof process !== 'undefined' && (process.env as Record<string, string>).BTR_API_URL) ||
-  'https://quote.btr.markets';
+  'https://api.btr.markets';
 
 let _api = BTR_API;
 export function setApiRoot(url: string) {
