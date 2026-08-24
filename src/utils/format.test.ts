@@ -30,6 +30,14 @@ describe('trailing-zero strip never eats integer digits', () => {
 });
 
 // Small values are the reason the strip exists: they must keep their precision.
+test('sub-unit percents fold long leading-zero runs into the subscript form', () => {
+  expect(formatPercentSig(0.000000002)).toBe('0.0₈2%');
+  expect(formatPercentSig(-0.000000002)).toBe('-0.0₈2%');
+  expect(formatPercentSig(0.0001)).toBe('0.0₃1%');
+  // Two zeros stay plain: the run is short enough to read.
+  expect(formatPercentSig(0.024)).toBe('0.024%');
+});
+
 test('sub-unit percents keep significant figures', () => {
   expect(formatPercentSig(0.024)).toBe('0.024%');
   expect(formatPercentSig(1.23)).toBe('1.2%');
@@ -128,7 +136,7 @@ describe('formatYield rounds to significant figures', () => {
     [12, '12%'],
     [100, '100%'],
     [0.5, '0.5%'],
-    [0.00012, '0.00012%'],
+    [0.00012, '0.0₃12%'], // ≥3 leading zeros fold, same as prices
     [-4.55, '-4.55%'],
     [0, '0%'],
   ])('formatYield(%p) = %p', (input, want) => {

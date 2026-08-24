@@ -269,7 +269,10 @@ export function formatPercentSig(n: number | null | undefined, sig = 2, signed =
   if (n == null || !isFinite(n) || n === 0) return '0%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
-  const s = trimZeros(abs, decimals);
+  // Fold a leading-zero run of three or more into the subscript form (0.0000002% ->
+  // 0.0₆2%), exactly what formatPrice does for sub-1 prices: ten literal zeros are the
+  // unreadable part, not the digits after them.
+  const s = subscriptZeros(trimZeros(abs, decimals));
   return `${n < 0 ? '-' : signed ? '+' : ''}${s}%`;
 }
 
