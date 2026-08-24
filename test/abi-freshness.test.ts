@@ -64,7 +64,7 @@ function canonical(v: unknown): string {
   return JSON.stringify(v);
 }
 
-describe('ABI freshness vs dex/evm + shared/evm sources', () => {
+describe('ABI freshness vs dex-evm/evm + shared/evm sources', () => {
   // `forge build` output is gitignored and the siblings are separate repos, so an sdk-only checkout
   // has nothing to compare against. Each case then SKIPS WITH A REASON rather than vanishing — a
   // suite that quietly drops its only drift detector reports green on stale ABIs. CI checks the

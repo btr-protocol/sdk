@@ -23,13 +23,13 @@ const ARTIFACT = resolve(EVM_ROOTS.dex, 'out/Pool.sol/Pool.json');
 describe('Pool ABI vs compiled storageLayout', () => {
   const absent = !existsSync(ARTIFACT);
   if (absent && process.env.SDK_REQUIRE_ARTIFACTS === '1') {
-    test('dex/evm artifacts present', () => {
-      throw new Error(`${ARTIFACT} missing — run (cd ../dex/evm && forge build)`);
+    test('dex-evm/evm artifacts present', () => {
+      throw new Error(`${ARTIFACT} missing — run (cd ../dex-evm/evm && forge build)`);
     });
     return;
   }
   if (absent) {
-    test.skip('SKIPPED: dex/evm/out absent — run (cd ../dex/evm && forge build)', () => {});
+    test.skip('SKIPPED: dex-evm/evm/out absent — run (cd ../dex-evm/evm && forge build)', () => {});
     return;
   }
 
