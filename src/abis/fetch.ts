@@ -13,7 +13,7 @@ export async function fetchAbi(name: string): Promise<Abi> {
     hot.set(k, ck);
     return ck;
   }
-  const abi = await btrFetch<Abi>(`/abis/${name}`);
+  const abi = await btrFetch<Abi>(`/v1/abis/${name}`);
   hot.set(k, abi);
   coldSet(`abi:${k}`, abi);
   return abi;
@@ -26,7 +26,7 @@ export function resetFetchAbiCacheForTest(): void {
   } catch {}
 }
 export function getAbiUrl(name: string) {
-  return `${getApiRoot()}/abis/${name}`;
+  return `${getApiRoot()}/v1/abis/${name}`;
 }
 // GitHub mirror for docs: https://github.com/btr-protocol/abis/blob/main/${name}.json
 export function getAbiGithubUrl(name: string) {

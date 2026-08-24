@@ -11,7 +11,7 @@ export async function fetchVenues(): Promise<Record<number, ChainVenue>> {
     hot = cold;
     return cold;
   }
-  const res = await btrFetch<Record<number, ChainVenue>>('/venues');
+  const res = await btrFetch<Record<number, ChainVenue>>('/v1/venues');
   hot = res;
   coldSet('venues', res);
   return res;
@@ -21,5 +21,5 @@ export async function fetchVenue(chainId: number): Promise<ChainVenue | undefine
   return all[chainId];
 }
 export function getVenuesUrl() {
-  return `${getApiRoot()}/venues`;
+  return `${getApiRoot()}/v1/venues`;
 }
