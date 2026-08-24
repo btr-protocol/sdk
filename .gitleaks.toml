@@ -1,0 +1,42 @@
+# Allowlist: BTR books/configs are full of PUBLIC contract addresses (0x…40-hex),
+# which trip generic-api-key. Real secrets are never 40-hex addresses.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''0x[a-fA-F0-9]{40}''',
+]
+
+[[allowlists]]
+description = "Public contract addresses & deployment records"
+paths = [
+  '''(^|/)deployments/''',
+  '''\.env\.example$''',
+  '''(risk|liquidity|oracle|fleet)\.[a-z0-9.]+\.toml$''',
+]
+[[allowlists]]
+description = "Upstream vendored solady test fixtures (canonical example tokens)"
+paths = [
+  '(^|/)\.deps/solady/test/',
+  '(^|/)contracts/lib/solady/test/',
+]
+[[allowlists]]
+description = "Well-known anvil/hardhat deterministic test keys"
+regexes = [
+  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+  '''0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d''',
+  '''0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a''',
+]
+
+[[rules]]
+id = "generic-jwt"
+regex = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIi'
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIi',
+]
