@@ -42,14 +42,16 @@ test('sub-unit percents keep significant figures', () => {
   expect(formatPercentSig(0.024)).toBe('0.024%');
   expect(formatPercentSig(1.23)).toBe('1.2%');
   expect(formatPercentSig(5.5)).toBe('5.5%');
-  expect(formatPercentSig(0)).toBe('0%');
+  expect(formatPercentSig(0)).toBe('0.00%');
 });
 
-test('formatNumber keeps grouping and trims only fractional zeros', () => {
+test('formatNumber keeps grouping and at least two fraction digits', () => {
   expect(formatNumber(1500.7, 0)).toBe('1,501');
-  expect(formatNumber(1.5)).toBe('1.5');
-  expect(formatNumber(2.0)).toBe('2');
-  expect(formatNumber(0)).toBe('0');
+  expect(formatNumber(1.5)).toBe('1.50');
+  expect(formatNumber(2.0)).toBe('2.00');
+  expect(formatNumber(10)).toBe('10.00');
+  expect(formatNumber(2000)).toBe('2,000.00');
+  expect(formatNumber(0)).toBe('0.00');
 });
 
 // A 1e-5 ladder printed at the default 4 decimals collapsed eight consecutive ask rows

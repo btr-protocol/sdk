@@ -90,21 +90,21 @@ export function parseEther(value: string): bigint {
 // Numbers
 // ─────────────────────────────────────────────────────────────
 
-/** Format number with auto-precision */
+/** Token/share amounts. Always at least two fraction digits: 10 → "10.00", 2,000 → "2,000.00".
+ *  Pass `maxDecimals === 0` only for explicit integers (inventory skew). Dust (<0.01) uses
+ *  `formatPrice` so it does not collapse to "0.00". */
 export function formatNumber(n: number | null | undefined, maxDecimals?: number): string {
-  if (n == null || !isFinite(n)) return '0';
-
-  const decimals = maxDecimals ?? precision(n);
-  const rounded = round(n, decimals);
-
-  if (Math.abs(rounded) >= 1000) {
-    return rounded.toLocaleString('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: decimals,
-    });
+  if (n == null || !isFinite(n)) return '0.00';
+  if (maxDecimals === 0) {
+    return round(n, 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
-
-  return trimZeros(rounded, decimals) || '0';
+  const abs = Math.abs(n);
+  if (abs > 0 && abs < 0.01) return formatPrice(n);
+  const max = Math.max(2, maxDecimals ?? 2);
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: max,
+  });
 }
 
 /**
@@ -250,11 +250,12 @@ export function formatAxisLabel(n: number | null | undefined): string {
 
 /** Format percentage value */
 export function formatPercent(n: number | null | undefined, decimals = 2, signed = false): string {
-  if (n == null || !isFinite(n)) return '0%';
+  if (n == null || !isFinite(n)) return '0.00%';
   const sign = n > 0 && signed ? '+' : '';
   // Handle multipliers (>200% shown as Nx)
   if (Math.abs(n) >= 200) return `${sign}${round(n / 100, 1)}x`;
-  return `${sign}${round(n, decimals)}%`;
+  const d = Math.max(2, decimals);
+  return `${sign}${round(n, d).toFixed(d)}%`;
 }
 
 /**
@@ -266,7 +267,7 @@ export function formatPercent(n: number | null | undefined, decimals = 2, signed
  * what `formatYield` is for.
  */
 export function formatPercentSig(n: number | null | undefined, sig = 2, signed = false): string {
-  if (n == null || !isFinite(n) || n === 0) return '0%';
+  if (n == null || !isFinite(n) || n === 0) return '0.00%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
   // Fold a leading-zero run of three or more into the subscript form (0.0000002% ->
