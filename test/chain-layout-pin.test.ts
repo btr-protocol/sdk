@@ -2,7 +2,7 @@
  * Chain-truth pin: `src/abis/Pool.ts` + `src/pool/storage.ts` vs the pool that is actually DEPLOYED.
  *
  * `test/abi-freshness.test.ts` and `test/storage-layout.test.ts` both compare the SDK against
- * `dex-evm/evm/out`, i.e. against the SOURCE. Neither can see a pool whose bytecode predates that
+ * `dex-evm/out`, i.e. against the SOURCE. Neither can see a pool whose bytecode predates that
  * source, and on 2026-08-12 exactly that shipped: the SDK was regenerated against the repacked
  * `IPool` (Asset 13 fields, mappings 4..11) while Sepolia still runs the pre-repack impl
  * (Asset 19 fields, mappings 3..13). Every reader returned garbage, `readCurve` returned null and
@@ -10,7 +10,7 @@
  * with the SDK. Only the chain disagreed.
  *
  * So this asserts the same two tables against `eth_call` / `eth_getStorageAt` on the live pool.
- * Deliberately independent of `dex-evm/evm/out`: an artifact cannot witness what is deployed.
+ * Deliberately independent of `dex-evm/out`: an artifact cannot witness what is deployed.
  *
  * Gated twice, and both gates SKIP rather than fail: without `ORACLE_RPC_URL`
  * (`source ~/Work/btr/keepers/.env.sepolia`), and when `SEPOLIA_BTR.volatilePool` carries no code

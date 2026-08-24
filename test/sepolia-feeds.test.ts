@@ -22,7 +22,7 @@ import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
  * So the order is not asserted against a copy of itself — it is re-derived from dex's own deploy
  * inputs (`sepolia-risk-params.json`) in the same way the deploy scripts consume them.
  */
-const DEX_EVM = resolve(import.meta.dir, '../../dex-evm/evm');
+const DEX_EVM = resolve(import.meta.dir, '../../dex-evm');
 const RISK = resolve(DEX_EVM, 'deployments/sepolia-risk-params.json');
 const DEPLOY = resolve(DEX_EVM, 'deployments/11155111.deploy.json');
 

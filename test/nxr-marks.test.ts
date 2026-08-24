@@ -13,7 +13,7 @@ import { SEPOLIA_ORACLE_FEEDS } from '../src/venues/sepolia';
  * serve, a pair resolved by shape rather than declaration, an inverted FX row, and a wrapper marked
  * against its own thin ticker instead of the currency it tracks.
  */
-const DEX = resolve(import.meta.dir, '../../dex-evm/evm/deployments');
+const DEX = resolve(import.meta.dir, '../../dex-evm/deployments');
 const roster = (chain: string): string[] => {
   const p = resolve(DEX, `${chain}-risk-params.json`);
   return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')).symbols as string[]) : [];
