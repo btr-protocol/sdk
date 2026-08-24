@@ -87,7 +87,7 @@ written by hand. `scripts/manifest.ts` is the one table saying which artifact ba
 | `src/pool/structs.generated.ts` | Per-struct field-name unions + the `Assert`/`FieldsMatch` conformance types |
 
 ```bash
-cd ../dex/evm && forge build && cd ../../shared/evm && forge build   # artifacts first
+cd ../dex-evm && forge build && cd ../shared/evm && forge build   # artifacts first
 bun run gen          # regenerate
 bun run gen:check    # verify only — non-zero exit on drift
 ```
@@ -142,3 +142,12 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 - `keepers/` — `btr-keeper` bots via `file:../../sdk`
 
 Repo: https://github.com/btr-protocol/sdk
+
+## Sibling repos
+
+One repo per concern under `~/Work/btr/` (GitHub: `btr-protocol/*`):
+
+- `core` - btr-core SSoT (Rust); `src/amm` here is its TS fallback mirror.
+- `dex-evm` - Solidity surface; storage-layout tests read its forge output.
+- `front` - primary consumer via `@sdk/*`.
+- `back`, `keepers`, `research`, `docs` - services, bots, studies, docs corpus.
