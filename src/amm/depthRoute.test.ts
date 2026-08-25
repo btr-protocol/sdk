@@ -6,6 +6,12 @@ import { aggregateDepthCurves } from './depthAgg';
 import { aggregatePairDepth, aggregateRouteDepthCurves } from './depthRoute';
 import { type NamedPool, rankSwap } from './router';
 
+/** Narrow-or-throw stand-in for `!` (noNonNullAssertion): fails the test loudly on null. */
+function must<T>(value: T | null | undefined): T {
+  if (value == null) throw new Error('expected non-null result');
+  return value;
+}
+
 /**
  * Synthetic 2-pool 2-hop fleet: AUDF lives only in the fx core, WBTC only in the crypto core,
  * joined by the shared USDC hub — the live-demo shape that rendered "pool data unavailable".
@@ -45,26 +51,25 @@ describe('aggregateRouteDepthCurves', () => {
   });
 
   test('composes a 2-hop book with the right mark, touch and span', () => {
-    const book = aggregateRouteDepthCurves(crossFleet(), 'AUDF', 'WBTC');
-    expect(book).not.toBeNull();
+    const book = must(aggregateRouteDepthCurves(crossFleet(), 'AUDF', 'WBTC'));
     // Oracle mark composes multiplicatively: AUDF-per-WBTC = (USDC/WBTC) / (USDC/AUDF) = 60_000.
-    expect(book!.mark).toBeCloseTo(60_000, -1);
-    expect(book!.mid / book!.mark).toBeCloseTo(1, 2); // skewed mid within 1% of mark
-    expect(book!.bids.length).toBeGreaterThan(0);
-    expect(book!.asks.length).toBeGreaterThan(0);
+    expect(book.mark).toBeCloseTo(60_000, -1);
+    expect(book.mid / book.mark).toBeCloseTo(1, 2); // skewed mid within 1% of mark
+    expect(book.bids.length).toBeGreaterThan(0);
+    expect(book.asks.length).toBeGreaterThan(0);
     // Span: both sides carry real outward depth.
-    expect(book!.asks[0].cum).toBeGreaterThan(0);
-    expect(book!.bids[book!.bids.length - 1].cum).toBeGreaterThan(0);
+    expect(book.asks[0].cum).toBeGreaterThan(0);
+    expect(book.bids[book.bids.length - 1].cum).toBeGreaterThan(0);
     // One route = one net touch per side; pre-fee the sides meet at the skewed mid.
-    expect(book!.bidNet).toBeLessThan(book!.mid);
-    expect(book!.askNet).toBeGreaterThan(book!.mid);
-    expect(book!.bid).toBeCloseTo(book!.ask, -6);
+    expect(book.bidNet).toBeLessThan(book.mid);
+    expect(book.askNet).toBeGreaterThan(book.mid);
+    expect(book.bid).toBeCloseTo(book.ask, -6);
   });
 
   test('composed touch agrees with the router quote at small size', () => {
     const pools = crossFleet();
-    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
-    const q = rankSwap(pools, 'AUDF', 'WBTC', 10)!;
+    const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
+    const q = must(rankSwap(pools, 'AUDF', 'WBTC', 10));
     // Router exec (WBTC per AUDF) vs the book's size-0 mid (AUDF per WBTC): same number reciprocated.
     expect(1 / book.mid).toBeCloseTo(
       q.singles[0].fills[0].amountOut > 0 ? q.best.amountOut / 10 : 0,
@@ -74,8 +79,8 @@ describe('aggregateRouteDepthCurves', () => {
 
   test('reciprocal orientation mirrors the book', () => {
     const pools = crossFleet();
-    const fwd = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
-    const rev = aggregateRouteDepthCurves(pools, 'WBTC', 'AUDF', { invert: false })!;
+    const fwd = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
+    const rev = must(aggregateRouteDepthCurves(pools, 'WBTC', 'AUDF', { invert: false }));
     expect(rev.mark).toBeCloseTo(1 / fwd.mark, 6);
     expect(rev.mid).toBeCloseTo(1 / fwd.mid, 6);
     expect(rev.bids.length).toBeGreaterThan(0);
@@ -86,28 +91,26 @@ describe('aggregatePairDepth', () => {
   test('dispatches direct pairs to the untouched single-pool aggregator', () => {
     const pools = crossFleet();
     const direct: NamedPool[] = [pools[0]];
-    const a = aggregateDepthCurves(direct, 'USDC', 'AUDF', { step: 0.001 });
-    const b = aggregatePairDepth(pools, 'USDC', 'AUDF', { step: 0.001 }, direct);
-    expect(b).not.toBeNull();
-    expect(b!.poolCount).toBe(1);
-    expect(b!.mid).toBe(a!.mid);
-    expect(b!.bids).toEqual(a!.bids);
+    const a = must(aggregateDepthCurves(direct, 'USDC', 'AUDF', { step: 0.001 }));
+    const b = must(aggregatePairDepth(pools, 'USDC', 'AUDF', { step: 0.001 }, direct));
+    expect(b.poolCount).toBe(1);
+    expect(b.mid).toBe(a.mid);
+    expect(b.bids).toEqual(a.bids);
   });
 
   test('falls back to the composed book when no pool holds both tokens', () => {
-    const book = aggregatePairDepth(crossFleet(), 'AUDF', 'WBTC');
-    expect(book).not.toBeNull();
-    expect(book!.asks.length).toBeGreaterThan(0);
+    const book = must(aggregatePairDepth(crossFleet(), 'AUDF', 'WBTC'));
+    expect(book.asks.length).toBeGreaterThan(0);
   });
 
   test('composed sizes are re-denominated: ask rungs sum to the route capacity in WBTC', () => {
     const pools = crossFleet();
-    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
+    const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
     // The route cannot deliver more WBTC than the crypto leg's reserve clip; the composed ask
     // ladder must end at or below the leg's own virtual depth.
     const leg = quoteExactIn(pools[1].state, 'USDC', 'WBTC', 0);
     void leg;
-    const directWbtc = aggregateDepthCurves([pools[1]], 'USDC', 'WBTC')!;
+    const directWbtc = must(aggregateDepthCurves([pools[1]], 'USDC', 'WBTC'));
     expect(book.asks[book.asks.length - 1].cum).toBeLessThanOrEqual(
       directWbtc.asks[directWbtc.asks.length - 1].cum * 1.0001,
     );
@@ -127,7 +130,8 @@ describe('router quote vs composed book consistency', () => {
   ): number {
     let amt = x;
     for (const leg of legs) {
-      const p = pools.find((q) => q.tag === leg.poolTag)!;
+      const p = pools.find((q) => q.tag === leg.poolTag);
+      if (!p) throw new Error(`missing pool ${leg.poolTag}`);
       amt = quoteExactIn(p.state, leg.tokenIn, leg.tokenOut, amt).amountOut;
       if (!(amt > 0)) return 0;
     }
@@ -150,10 +154,6 @@ describe('router quote vs composed book consistency', () => {
     }
     return hi;
   }
-  const FWD_LEGS = [
-    { poolTag: 'fx', tokenIn: 'AUDF', tokenOut: 'USDC' },
-    { poolTag: 'crypto', tokenIn: 'USDC', tokenOut: 'WBTC' },
-  ];
   const REV_LEGS = [
     { poolTag: 'crypto', tokenIn: 'WBTC', tokenOut: 'USDC' },
     { poolTag: 'fx', tokenIn: 'USDC', tokenOut: 'AUDF' },
@@ -161,7 +161,7 @@ describe('router quote vs composed book consistency', () => {
 
   test('capacity clips at the MIN of the chained leg caps (quote knee)', () => {
     const pools = crossFleet();
-    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
+    const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
     // Bids sell WBTC back down the route; the crypto hub's baseRes (200k USDC) caps that sell at
     // ~3.35 WBTC while the fx leg could absorb far more — the hop binds, and the book must show it.
     const knee = routeKnee(pools, REV_LEGS, 10);
@@ -173,7 +173,7 @@ describe('router quote vs composed book consistency', () => {
 
   test('book VWAP equals the router quote at every size (integral consistency)', () => {
     const pools = crossFleet();
-    const book = aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC')!;
+    const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
     // Selling s WBTC consumes bids; Σ size × price over rungs up to cum s must reproduce the
     // router's AUDF out — same primitives, zero re-implementation.
     for (const s of [0.01, 0.25, 1, 2.5]) {
@@ -211,7 +211,7 @@ describe('router quote vs composed book consistency', () => {
       { tag: 'fx', state: { base: 'USDC', legs: { AUDF: audf } } },
       { tag: 'crypto', state: { base: 'USDC', legs: { WBTC: wbtc } } },
     ];
-    const book = aggregateRouteDepthCurves(pools, 'WBTC', 'AUDF')!;
+    const book = must(aggregateRouteDepthCurves(pools, 'WBTC', 'AUDF'));
     // Selling WBTC back through a ~666-AUDF-deep fx leg moves the marginal less than the
     // aggregator's dedup tolerance across the WHOLE side: it must still print its rung.
     expect(book.bids.length).toBeGreaterThan(0);

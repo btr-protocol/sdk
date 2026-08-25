@@ -6,31 +6,51 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-// Mock fetch. `handler(url, body)` returns either a JSON-RPC response object,
-// or a Response-like { status, body }. Records every call.
-function mock(handler: (url: string, body: any) => any) {
-  const calls: { url: string; body: any }[] = [];
-  globalThis.fetch = (async (url: string, init: any) => {
-    const body = JSON.parse(init.body);
-    calls.push({ url, body });
-    const out = handler(url, body);
+// JSON-RPC request as sent over the wire (plus mock escape hatches `__override`/`__status`).
+interface MockRequest {
+  id?: number;
+  method?: string;
+  params?: unknown[];
+  __override?: unknown;
+  __status?: number;
+  json?: unknown;
+}
+type MockBody = MockRequest | MockRequest[];
+
+// bun-types' fetch carries an extra required member (preconnect); every mock below matches the
+// real call surface, so one typed install point bridges them onto globalThis.fetch.
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+const useFetch = (mockFetch: FetchLike): void => {
+  globalThis.fetch = mockFetch as FetchLike & typeof fetch;
+};
+
+// Mock fetch. `handler(url, body)` returns a { __status, json } raw response or undefined
+// (default echo). Returns real Response objects, so it types as a plain fetch replacement.
+function mock(
+  handler: (url: string, body: MockBody) => { __status: number; json?: unknown } | undefined,
+) {
+  const calls: { url: string; body: MockBody }[] = [];
+  useFetch(async (url, init) => {
+    const body = JSON.parse(String(init?.body)) as MockBody;
+    calls.push({ url: String(url), body });
+    const out = handler(String(url), body);
     if (out?.__status)
-      return {
-        ok: out.__status < 400,
+      return new Response(JSON.stringify(out.json ?? null), {
         status: out.__status,
         statusText: 'x',
-        json: async () => out.json,
-      };
+      });
     // default: echo per-request result = 0x<method>
-    const respond = (r: any) =>
+    const respond = (r: MockRequest) =>
       r.__override ?? { jsonrpc: '2.0', id: r.id, result: `0x${r.method}` };
     const json = Array.isArray(body)
       ? body.map(respond)
-      : (handler(url, body)?.json ?? respond(body));
-    return { ok: true, status: 200, statusText: 'OK', json: async () => json };
-  }) as any;
+      : (handler(String(url), body)?.json ?? respond(body));
+    return new Response(JSON.stringify(json), { status: 200, statusText: 'OK' });
+  });
   return calls;
 }
+
+const jsonBody = (init?: RequestInit): MockBody => JSON.parse(String(init?.body)) as MockBody;
 
 describe('httpTransport batching', () => {
   test('coalesces same-tick requests into one HTTP batch', async () => {
@@ -42,7 +62,7 @@ describe('httpTransport batching', () => {
     ]);
     expect(calls.length).toBe(1); // one round-trip for two calls
     expect(Array.isArray(calls[0].body)).toBe(true);
-    expect(calls[0].body.length).toBe(2);
+    expect((calls[0].body as MockRequest[]).length).toBe(2);
     expect(a).toBe('0xeth_call');
     expect(b).toBe('0xeth_call');
   });
@@ -57,7 +77,7 @@ describe('httpTransport batching', () => {
     ]);
     expect(calls.length).toBe(1);
     expect(Array.isArray(calls[0].body)).toBe(false); // deduped to a single request
-    expect(calls[0].body.method).toBe('eth_call');
+    expect((calls[0].body as MockRequest).method).toBe('eth_call');
     expect(a).toBe(b);
   });
 });
@@ -65,16 +85,14 @@ describe('httpTransport batching', () => {
 describe('httpTransport resilience', () => {
   test('fails over to next endpoint on network error', async () => {
     let hits = 0;
-    globalThis.fetch = (async (url: string, init: any) => {
+    useFetch(async (url, init) => {
       hits++;
-      if (url.includes('bad')) throw new TypeError('boom');
-      const body = JSON.parse(init.body);
-      return {
-        ok: true,
+      if (String(url).includes('bad')) throw new TypeError('boom');
+      const body = jsonBody(init) as MockRequest;
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0xok' }), {
         status: 200,
-        json: async () => ({ jsonrpc: '2.0', id: body.id, result: '0xok' }),
-      };
-    }) as any;
+      });
+    });
     const p = httpTransport(['http://bad', 'http://good'], { retryDelay: 1 });
     const r = await p.request({ method: 'eth_call', params: [] });
     expect(r).toBe('0xok');
@@ -83,15 +101,13 @@ describe('httpTransport resilience', () => {
 
   test('retries on 429 rate limit', async () => {
     let n = 0;
-    globalThis.fetch = (async (_url: string, init: any) => {
-      const body = JSON.parse(init.body);
-      if (n++ === 0) return { ok: false, status: 429, statusText: 'Too Many' };
-      return {
-        ok: true,
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (n++ === 0) return new Response(null, { status: 429, statusText: 'Too Many' });
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0xok' }), {
         status: 200,
-        json: async () => ({ jsonrpc: '2.0', id: body.id, result: '0xok' }),
-      };
-    }) as any;
+      });
+    });
     const p = httpTransport('http://rpc', { retryDelay: 1 });
     expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
     expect(n).toBe(2);
@@ -99,19 +115,18 @@ describe('httpTransport resilience', () => {
 
   test('surfaces revert as RpcRevertError (not retried)', async () => {
     let n = 0;
-    globalThis.fetch = (async (_url: string, init: any) => {
+    useFetch(async (_url, init) => {
       n++;
-      const body = JSON.parse(init.body);
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
+      const body = jsonBody(init) as MockRequest;
+      return new Response(
+        JSON.stringify({
           jsonrpc: '2.0',
           id: body.id,
           error: { code: 3, message: 'execution reverted' },
         }),
-      };
-    }) as any;
+        { status: 200 },
+      );
+    });
     const p = httpTransport('http://rpc', { retryDelay: 1 });
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcRevertError,
@@ -120,14 +135,13 @@ describe('httpTransport resilience', () => {
   });
 
   test('times out and rejects with RpcTimeoutError', async () => {
-    globalThis.fetch = ((_url: string, init: any) =>
-      new Promise((_res, rej) => {
-        init.signal.addEventListener('abort', () => {
-          const e: any = new Error('aborted');
-          e.name = 'AbortError';
-          rej(e);
+    useFetch((_url, init) => {
+      return new Promise<Response>((_res, rej) => {
+        init?.signal?.addEventListener('abort', () => {
+          rej(Object.assign(new Error('aborted'), { name: 'AbortError' }));
         });
-      })) as any;
+      });
+    });
     const p = httpTransport('http://rpc', { timeout: 5, retries: 0 });
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcTimeoutError,
@@ -135,7 +149,7 @@ describe('httpTransport resilience', () => {
   });
 
   test('non-ok HTTP surfaces RpcNetworkError after retries', async () => {
-    globalThis.fetch = (async () => ({ ok: false, status: 500, statusText: 'ISE' })) as any;
+    useFetch(async () => new Response(null, { status: 500, statusText: 'ISE' }));
     const p = httpTransport('http://rpc', { retries: 1, retryDelay: 1 });
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcNetworkError,

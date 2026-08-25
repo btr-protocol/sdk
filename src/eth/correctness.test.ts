@@ -2,11 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { recoverDigestSigner } from '../oracle/verify';
-import { encodeEventTopics, getEventSignature } from './abi';
+import { type AbiEvent, type AbiFunction, encodeEventTopics, getEventSignature } from './abi';
 import { privateKeyToAddress, signDigest } from './client';
 import { checksumAddress, keccak256Input } from './index';
-import { MC3_ADDR, multicall } from './multicall';
+import { type Call, MC3_ADDR, multicall } from './multicall';
 import { rlpEncode } from './rlp';
+import type { Eip1193Provider } from './types';
 
 describe('rlpEncode (hex string handling)', () => {
   test('odd-nibble hex does not throw', () => {
@@ -18,24 +19,32 @@ describe('rlpEncode (hex string handling)', () => {
 
 describe('encodeEventTopics (indexed dynamic types)', () => {
   test('indexed string topic = keccak256(utf8)', () => {
-    const ev = { type: 'event', name: 'E', inputs: [{ name: 's', type: 'string', indexed: true }] };
-    const [t] = encodeEventTopics(ev as any, { s: 'hello' });
+    const ev: AbiEvent = {
+      type: 'event',
+      name: 'E',
+      inputs: [{ name: 's', type: 'string', indexed: true }],
+    };
+    const [t] = encodeEventTopics(ev, { s: 'hello' });
     expect(t).toBe(keccak256Input('hello'));
   });
 
   test('indexed address topic = padded value (not hashed)', () => {
-    const ev = {
+    const ev: AbiEvent = {
       type: 'event',
       name: 'E',
       inputs: [{ name: 'a', type: 'address', indexed: true }],
     };
-    const [t] = encodeEventTopics(ev as any, { a: '0x0b9cca59cefde03ad8e41da272d946861fa7717f' });
+    const [t] = encodeEventTopics(ev, { a: '0x0b9cca59cefde03ad8e41da272d946861fa7717f' });
     expect(t).toBe('0x0000000000000000000000000b9cca59cefde03ad8e41da272d946861fa7717f');
   });
 
   test('event signature helper stays stable', () => {
-    const ev = { type: 'event', name: 'E', inputs: [{ name: 's', type: 'string', indexed: true }] };
-    expect(getEventSignature(ev as any)).toBe('E(string)');
+    const ev: AbiEvent = {
+      type: 'event',
+      name: 'E',
+      inputs: [{ name: 's', type: 'string', indexed: true }],
+    };
+    expect(getEventSignature(ev)).toBe('E(string)');
   });
 });
 
@@ -47,24 +56,27 @@ describe('checksumAddress (EIP-55)', () => {
   });
 });
 
-const PROBE_ABI = [
+const PROBE_ABI: AbiFunction[] = [
   { type: 'function', name: 'getBlockNumber', inputs: [], outputs: [{ type: 'uint256' }] },
-] as any;
+];
 
 describe('multicall batching', () => {
-  const counting = () => {
-    const seen: Array<{ method: string; params: any }> = [];
+  const counting = (): {
+    seen: Array<{ method: string; params?: unknown[] }>;
+    provider: Eip1193Provider;
+  } => {
+    const seen: Array<{ method: string; params?: unknown[] }> = [];
     return {
       seen,
       provider: {
-        request: async ({ method, params }: { method: string; params?: any }) => {
+        request: async ({ method, params }: { method: string; params?: unknown[] }) => {
           seen.push({ method, params });
           if (method === 'eth_blockNumber') return '0x64';
           // aggregate3 returning an empty Result[] — the request COUNT and the
           // block each chunk pins are what these cases assert.
-          return '0x' + '20'.padStart(64, '0') + '0'.repeat(64);
+          return `0x${'20'.padStart(64, '0')}${'0'.repeat(64)}`;
         },
-      } as any,
+      },
     };
   };
 
@@ -76,8 +88,8 @@ describe('multicall batching', () => {
 
   test('chunkSize 0 does not hang', async () => {
     const { provider } = counting();
-    const calls = Array.from({ length: 3 }, () => ({
-      address: MC3_ADDR as any,
+    const calls: Call[] = Array.from({ length: 3 }, () => ({
+      address: MC3_ADDR,
       abi: PROBE_ABI,
       functionName: 'getBlockNumber',
     }));
@@ -90,14 +102,14 @@ describe('multicall batching', () => {
 
   test('chunks pin one block so a split batch cannot tear', async () => {
     const { seen, provider } = counting();
-    const calls = Array.from({ length: 5 }, () => ({
-      address: MC3_ADDR as any,
+    const calls: Call[] = Array.from({ length: 5 }, () => ({
+      address: MC3_ADDR,
       abi: PROBE_ABI,
       functionName: 'getBlockNumber',
     }));
     await multicall(provider, calls, { chunkSize: 2 });
     expect(seen.filter((s) => s.method === 'eth_blockNumber').length).toBe(1);
-    const blocks = seen.filter((s) => s.method === 'eth_call').map((s) => s.params[1]);
+    const blocks = seen.filter((s) => s.method === 'eth_call').map((s) => s.params?.[1]);
     expect(blocks.length).toBe(3);
     expect(new Set(blocks).size).toBe(1);
     expect(blocks[0]).toBe('0x64');

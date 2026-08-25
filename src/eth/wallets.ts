@@ -5,13 +5,22 @@
 
 import type { Eip1193Provider } from './types';
 
-// Declare window for environments where it may not exist (Node.js)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const window: any;
-
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
+
+/** An EIP-1193 provider plus whatever capability flags the wallet injected on it
+ *  (isMetaMask, isRabby, providers, ...) — accessed dynamically, so kept as unknowns. */
+type InjectedProvider = Eip1193Provider & Partial<Record<string, unknown>>;
+
+/** The slice of `window` legacy detection probes directly. Everything else goes through
+ *  getPath's dynamic walk, so only the named globals are typed here. */
+interface WalletWindow {
+  ethereum?: InjectedProvider;
+  rabby?: InjectedProvider;
+  phantom?: { ethereum?: InjectedProvider };
+  coinbaseWalletExtension?: InjectedProvider;
+}
 
 export interface WalletInfo {
   id: string;
@@ -300,7 +309,12 @@ export const WALLETS: WalletDef[] = [
 
 // Build lookup maps from WALLETS array
 const byId = new Map(WALLETS.map((w) => [w.id, w]));
-const byRdns = new Map(WALLETS.filter((w) => w.rdns).map((w) => [w.rdns!, w.id]));
+const byRdns = new Map(
+  WALLETS.filter((w): w is WalletDef & { rdns: string } => w.rdns !== undefined).map((w) => [
+    w.rdns,
+    w.id,
+  ]),
+);
 
 // Curated lists derived from WALLETS
 export const WC_ICONS = WALLETS.filter((w) => w.wc).map((w) => w.id);
@@ -311,24 +325,27 @@ export const DISCOVER_DESKTOP = WALLETS.filter((w) => w.discoverDesktop).map((w)
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const win = (): any => (typeof window !== 'undefined' ? window : null);
+const win = (): WalletWindow | null =>
+  typeof window !== 'undefined' ? (window as WalletWindow) : null;
 
 function getPath(path: string): Eip1193Provider | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let obj: any = win();
-    for (const p of path.split('.')) obj = obj?.[p];
-    return obj?.request ? obj : null;
+    let obj: unknown = win();
+    for (const p of path.split('.')) {
+      obj =
+        obj !== null && typeof obj === 'object' ? (obj as Record<string, unknown>)[p] : undefined;
+    }
+    const request =
+      obj !== null && typeof obj === 'object' ? (obj as { request?: unknown }).request : undefined;
+    return request ? (obj as Eip1193Provider) : null;
   } catch {
     return null;
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function hasFlag(p: any, f: string): boolean {
+function hasFlag(p: unknown, f: string): boolean {
   try {
-    return !!p?.[f];
+    return Boolean((p as Partial<Record<string, unknown>> | undefined)?.[f]);
   } catch {
     return false;
   }
@@ -336,8 +353,7 @@ function hasFlag(p: any, f: string): boolean {
 
 function multiProviders(): Eip1193Provider[] {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p: any = win()?.ethereum?.providers;
+    const p = win()?.ethereum?.providers;
     return Array.isArray(p) ? p : [];
   } catch {
     return [];
@@ -367,22 +383,22 @@ export function detectLegacy(): WalletInfo[] {
   const seen = new Set<string>();
 
   for (const def of WALLETS) {
-    if (!def.path && !def.flag) continue; // No legacy detection possible
+    const { path, flag } = def;
+    if (!path && !flag) continue; // No legacy detection possible
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let provider: any = null;
+    let provider: Eip1193Provider | null = null;
 
     // 1. Check dedicated global
-    if (def.path) provider = getPath(def.path);
+    if (path) provider = getPath(path);
 
     // 2. Check multi-provider array
-    if (!provider && def.flag) provider = multi.find((p) => hasFlag(p, def.flag!));
+    if (!provider && flag) provider = multi.find((p) => hasFlag(p, flag)) ?? null;
 
     // 3. Check window.ethereum
-    if (!provider && def.flag && hasFlag(w.ethereum, def.flag)) provider = w.ethereum;
+    if (!provider && flag && hasFlag(w.ethereum, flag)) provider = w.ethereum ?? null;
 
     // Special: MetaMask shouldn't be Rabby
-    if (def.id === 'metamask' && provider?.isRabby) continue;
+    if (def.id === 'metamask' && hasFlag(provider, 'isRabby')) continue;
 
     if (provider && !seen.has(def.id)) {
       seen.add(def.id);
@@ -417,9 +433,8 @@ export function detectLegacy(): WalletInfo[] {
 export const eip6963Providers: Eip6963Detail[] = [];
 
 if (typeof window !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  window.addEventListener('eip6963:announceProvider', (e: any) => {
-    const detail: Eip6963Detail = e.detail;
+  window.addEventListener('eip6963:announceProvider', (e: Event) => {
+    const detail: Eip6963Detail = (e as CustomEvent<Eip6963Detail>).detail;
     if (!eip6963Providers.some((p) => p.info.uuid === detail.info.uuid)) {
       eip6963Providers.push(detail);
     }
@@ -463,35 +478,37 @@ export function mergeWallets(eip6963: Eip6963Detail[], legacy: WalletInfo[]): Wa
 export function getMetaMask(): Eip1193Provider | null {
   const w = win();
   if (!w) return null;
+  const eth = w.ethereum;
   const multi = multiProviders().find(
     (p) => hasFlag(p, 'isMetaMask') && !hasFlag(p, 'isBraveWallet'),
   );
   if (multi) return multi;
-  return w.ethereum?.isMetaMask && !w.ethereum?.isBraveWallet ? w.ethereum : null;
+  return eth?.isMetaMask && !eth.isBraveWallet ? eth : null;
 }
 
 export function getBaseWallet(): Eip1193Provider | null {
   const w = win();
   if (!w) return null;
-  if (w.coinbaseWalletExtension?.request) return w.coinbaseWalletExtension;
+  const cb = w.coinbaseWalletExtension;
+  if (cb?.request) return cb;
   const multi = multiProviders().find((p) => hasFlag(p, 'isCoinbaseWallet'));
   return multi || (w.ethereum?.isCoinbaseWallet ? w.ethereum : null);
 }
 
 export function getRabby(): Eip1193Provider | null {
   const w = win();
-  return w?.rabby?.request ? w.rabby : w?.ethereum?.isRabby ? w.ethereum : null;
+  if (!w) return null;
+  return w.rabby?.request ? w.rabby : w.ethereum?.isRabby ? w.ethereum : null;
 }
 
 export function getPhantom(): Eip1193Provider | null {
   const w = win();
-  return w?.phantom?.ethereum?.request
-    ? w.phantom.ethereum
-    : w?.ethereum?.isPhantom
-      ? w.ethereum
-      : null;
+  if (!w) return null;
+  const ph = w.phantom?.ethereum;
+  return ph?.request ? ph : w.ethereum?.isPhantom ? w.ethereum : null;
 }
 
 export function getInjected(): Eip1193Provider | null {
-  return win()?.ethereum?.request ? win().ethereum : null;
+  const eth = win()?.ethereum;
+  return eth?.request ? eth : null;
 }

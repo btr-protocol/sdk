@@ -110,27 +110,27 @@ async function signTransaction(
   privateKey: Hex,
 ): Promise<Hex> {
   const chainId = await getChainId(provider);
-  const nonce = tx.nonce ?? (await getNonce(provider, tx.from!));
+  const nonce = tx.nonce ?? (await getNonce(provider, tx.from as Address));
   const gasLimit = tx.gas ?? (await estimateGas(provider, tx));
 
   // Quantity fields arrive as JSON-RPC hex strings (often odd-nibble like 0x0 / 0x5).
   // Normalize to bigint at the tx boundary so RLP scalar encoding is canonical.
   const q = (v: Hex | bigint | number | undefined, fallback: bigint) =>
-    v === undefined ? fallback : BigInt(v as any);
+    v === undefined ? fallback : BigInt(v);
   const q0 = (v: Hex | bigint | number | undefined) => q(v, 0n);
 
   // EIP-1559 (Type 2)
   if (tx.maxFeePerGas && tx.maxPriorityFeePerGas) {
     const txData = [
       chainId,
-      q(nonce as any, 0n),
-      q(tx.maxPriorityFeePerGas as any, 0n),
-      q(tx.maxFeePerGas as any, 0n),
-      q(gasLimit as any, 0n),
+      q(nonce, 0n),
+      q(tx.maxPriorityFeePerGas, 0n),
+      q(tx.maxFeePerGas, 0n),
+      q(gasLimit, 0n),
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      [], // accessList (empty)
+      '0x', // accessList (empty)
     ];
 
     // Hash the transaction
@@ -141,19 +141,19 @@ async function signTransaction(
     const r = signature.r;
     const s = signature.s;
     // Type-2 txs carry yParity (0/1) instead of legacy EIP-155 v.
-    const yParity = BigInt(signature.recovery!);
+    const yParity = BigInt(signature.recovery as number);
 
     // Encode signed transaction
     const signedTx = [
       chainId,
-      q(nonce as any, 0n),
-      q(tx.maxPriorityFeePerGas as any, 0n),
-      q(tx.maxFeePerGas as any, 0n),
-      q(gasLimit as any, 0n),
+      q(nonce, 0n),
+      q(tx.maxPriorityFeePerGas, 0n),
+      q(tx.maxFeePerGas, 0n),
+      q(gasLimit, 0n),
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      [],
+      '0x', // accessList (empty)
       yParity,
       r,
       s,
@@ -166,9 +166,9 @@ async function signTransaction(
   const gasPrice = tx.gasPrice ?? (await getGasPrice(provider));
 
   const txData = [
-    q(nonce as any, 0n),
-    q(gasPrice as any, 0n),
-    q(gasLimit as any, 0n),
+    q(nonce, 0n),
+    q(gasPrice, 0n),
+    q(gasLimit, 0n),
     tx.to || '0x',
     q0(tx.value),
     tx.data || '0x',
@@ -184,13 +184,13 @@ async function signTransaction(
   const signature = signDigest(txHash, privateKey);
   const r = signature.r;
   const s = signature.s;
-  const v = BigInt(signature.recovery!) + BigInt(chainId) * 2n + 35n;
+  const v = BigInt(signature.recovery as number) + BigInt(chainId) * 2n + 35n;
 
   // Encode signed transaction
   const signedTx = [
-    q(nonce as any, 0n),
-    q(gasPrice as any, 0n),
-    q(gasLimit as any, 0n),
+    q(nonce, 0n),
+    q(gasPrice, 0n),
+    q(gasLimit, 0n),
     tx.to || '0x',
     q0(tx.value),
     tx.data || '0x',

@@ -20,7 +20,7 @@ const cmd = <T>(p: Eip1193Provider, method: string, params: unknown[] = []): Pro
   p.request({ method, params }) as Promise<T>;
 
 const toHex = (n: number | bigint): Hex => `0x${n.toString(16)}`;
-const toInt = (h: string) => parseInt(h, 16);
+const toInt = (h: string) => Number.parseInt(h, 16);
 const toBig = BigInt;
 
 // ─────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ export const getNonce = (p: Eip1193Provider, addr: Address) => getTransactionCou
 // Contracts & Tx
 // ─────────────────────────────────────────────────────────────
 
-export const ethCall = (p: Eip1193Provider, to: Address, data: Hex, block: string = 'latest') =>
+export const ethCall = (p: Eip1193Provider, to: Address, data: Hex, block = 'latest') =>
   cmd<Hex>(p, 'eth_call', [{ to, data }, block]);
 
 export const estimateGas = (p: Eip1193Provider, tx: Partial<TransactionRequest>) =>
@@ -86,6 +86,25 @@ export const signTypedData = (p: Eip1193Provider, address: Address, data: TypedD
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Walk MetaMask-style wrapper nests (`data.originalError` / `cause` / `error`) up to 4 levels
+ * deep, yielding each node. Shared by `rpcErrorCode` and `rpcErrorData`.
+ */
+function* rpcErrorNodes(e: unknown): Generator<Record<string, unknown>> {
+  let n: unknown = e;
+  for (let i = 0; n && typeof n === 'object' && i < 4; i++) {
+    const node = n as Record<string, unknown>;
+    yield node;
+    const data = node.data as { originalError?: unknown } | string | null | undefined;
+    // -32603-style wrappers bury the real payload; keep digging for what they wrap.
+    n =
+      (typeof data === 'object' && data ? data.originalError : undefined) ??
+      node.data ??
+      node.cause ??
+      node.error;
+  }
+}
+
+/**
  * EIP-1193 error code, dug out of the wrappers wallets bury it under.
  *
  * MetaMask does not always surface `wallet_switchEthereumChain`'s 4902 at the top level: it
@@ -94,11 +113,10 @@ export const signTypedData = (p: Eip1193Provider, address: Address, data: TypedD
  * back to `wallet_addEthereumChain` and the wallet silently stays where it was.
  */
 export const rpcErrorCode = (e: unknown): number | undefined => {
-  for (let n: any = e, i = 0; n && typeof n === 'object' && i < 4; i++) {
-    const c = typeof n.code === 'string' ? Number(n.code) : n.code;
-    // -32603 is the wrapper itself; keep digging for the code it wraps.
+  for (const node of rpcErrorNodes(e)) {
+    const raw = node.code;
+    const c = typeof raw === 'string' ? Number(raw) : raw;
     if (typeof c === 'number' && Number.isFinite(c) && c !== -32603) return c;
-    n = n.data?.originalError ?? n.data ?? n.cause ?? n.error;
   }
   return typeof (e as { code?: number })?.code === 'number'
     ? (e as { code: number }).code
@@ -111,9 +129,9 @@ export const rpcErrorCode = (e: unknown): number | undefined => {
  * undecoded — decode it against the reverting contract's ABI to get a real reason.
  */
 export const rpcErrorData = (e: unknown): string | undefined => {
-  for (let n: any = e, i = 0; n && typeof n === 'object' && i < 4; i++) {
-    if (typeof n.data === 'string' && n.data.startsWith('0x') && n.data.length >= 10) return n.data;
-    n = n.data?.originalError ?? n.data ?? n.cause ?? n.error;
+  for (const node of rpcErrorNodes(e)) {
+    const d = node.data;
+    if (typeof d === 'string' && d.startsWith('0x') && d.length >= 10) return d;
   }
   return undefined;
 };

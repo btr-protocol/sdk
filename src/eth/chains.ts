@@ -710,9 +710,7 @@ export function isTestOrLocalChain(chainId: number): boolean {
  * Detect forked chain ID from Anvil RPC
  * Anvil can be queried for the forked chain ID via eth_chainId on the fork
  */
-export async function detectAnvilFork(
-  rpcUrl: string = 'http://localhost:8545',
-): Promise<number | null> {
+export async function detectAnvilFork(rpcUrl = 'http://localhost:8545'): Promise<number | null> {
   try {
     const response = await fetch(rpcUrl, {
       method: 'POST',
@@ -726,8 +724,7 @@ export async function detectAnvilFork(
     });
 
     if (response.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await response.json();
+      const data = (await response.json()) as { result?: { forkChainId?: unknown } };
       // Anvil metadata returns fork info
       return data.result?.forkChainId ? Number(data.result.forkChainId) : null;
     }
@@ -745,9 +742,8 @@ export async function detectAnvilFork(
     });
 
     if (chainIdResponse.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const chainIdData: any = await chainIdResponse.json();
-      const chainId = parseInt(chainIdData.result, 16);
+      const chainIdData = (await chainIdResponse.json()) as { result?: string };
+      const chainId = Number.parseInt(chainIdData.result ?? '', 16);
       // If it's not 31337, it might be a fork
       return chainId !== 31337 ? chainId : null;
     }
@@ -762,9 +758,7 @@ export async function detectAnvilFork(
  * Get chain config for Anvil, with fork detection
  * If Anvil is forking a chain, returns the forked chain's metadata
  */
-export async function getAnvilChainConfig(
-  rpcUrl: string = 'http://localhost:8545',
-): Promise<ChainConfig> {
+export async function getAnvilChainConfig(rpcUrl = 'http://localhost:8545'): Promise<ChainConfig> {
   const forkedChainId = await detectAnvilFork(rpcUrl);
 
   if (forkedChainId && CHAINS[forkedChainId]) {

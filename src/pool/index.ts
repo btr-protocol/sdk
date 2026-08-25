@@ -225,7 +225,7 @@ export async function getPoolData(
 ): Promise<PoolData> {
   // One aggregate3 for all 2N reads. allowFailure=false, so a reverting leg reverts the whole
   // eth_call and throws — same contract as the per-token loop this replaced.
-  const res = await multicallStrict<any>(
+  const res = await multicallStrict<Asset | bigint>(
     provider,
     tokens.flatMap((t) => [
       { address: poolAddress, abi: POOL_ABI, functionName: 'getAsset', args: [t.address] },

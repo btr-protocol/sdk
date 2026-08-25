@@ -64,23 +64,23 @@ export function calcPercentChange(oldValue: number, newValue: number): number {
 // ─────────────────────────────────────────────────────────────
 
 export function round(n: number | undefined | null, scale = 5): number {
-  if (n == null || !isFinite(n)) return 0;
-  const multiplier = Math.pow(10, scale);
+  if (n == null || !Number.isFinite(n)) return 0;
+  const multiplier = 10 ** scale;
   return Math.round((n + Number.EPSILON) * multiplier) / multiplier;
 }
 
 export function ceil(n: number, scale: number): number {
-  const multiplier = Math.pow(10, scale);
+  const multiplier = 10 ** scale;
   return Math.ceil((n + Number.EPSILON) * multiplier) / multiplier;
 }
 
 export function floor(n: number, scale: number): number {
-  const multiplier = Math.pow(10, scale);
+  const multiplier = 10 ** scale;
   return Math.floor((n + Number.EPSILON) * multiplier) / multiplier;
 }
 
 export function roundAutoPrecision(n: number | undefined | null): number {
-  if (n == null || !isFinite(n)) return 0;
+  if (n == null || !Number.isFinite(n)) return 0;
   return round(n, precision(n));
 }
 
@@ -100,7 +100,7 @@ export function getTrailingZeros(s: string): number {
 }
 
 export function getScale(n: number, maxPrecision = 16): number {
-  if (!isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return 0;
   const digits = Math.round(Math.abs(n)).toString().length;
   const roundingScale = Math.max(maxPrecision - digits, 1);
   const s = round(n, roundingScale).toFixed(roundingScale);
@@ -121,15 +121,14 @@ export function getScale(n: number, maxPrecision = 16): number {
  */
 export function getMagnitude(n: number): number {
   if (n === 0) return 1;
-  n = Math.abs(n);
-  if (n >= 1) {
-    const digits = Math.floor(Math.log10(n));
-    return Math.pow(10, digits);
-  } else {
-    // Count leading zeros after decimal
-    const leadingZeros = Math.floor(-Math.log10(n));
-    return Math.pow(10, -(leadingZeros + 1));
+  const abs = Math.abs(n);
+  if (abs >= 1) {
+    const digits = Math.floor(Math.log10(abs));
+    return 10 ** digits;
   }
+  // Count leading zeros after decimal
+  const leadingZeros = Math.floor(-Math.log10(abs));
+  return 10 ** -(leadingZeros + 1);
 }
 
 /**
@@ -191,7 +190,7 @@ export function remap(
  */
 export function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
-  const fraction = range / Math.pow(10, exponent);
+  const fraction = range / 10 ** exponent;
 
   let niceFraction: number;
   if (round) {
@@ -206,7 +205,7 @@ export function niceNum(range: number, round: boolean): number {
     else niceFraction = 10;
   }
 
-  return niceFraction * Math.pow(10, exponent);
+  return niceFraction * 10 ** exponent;
 }
 
 /**

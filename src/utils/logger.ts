@@ -18,11 +18,6 @@ let notifyFn: ((type: 'info' | 'success' | 'warning' | 'error', message: string)
 let defaultContext: string | undefined;
 let minLevel: LogLevel = 'info';
 
-function isBrowser(): boolean {
-  // Use globalThis to avoid TypeScript errors in non-DOM environments
-  return typeof globalThis !== 'undefined' && 'window' in globalThis && 'document' in globalThis;
-}
-
 function formatLog(entry: LogEntry): string {
   const ctx = entry.context ? `[${entry.context}] ` : '';
   return `${ctx}${entry.message}`;

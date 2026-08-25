@@ -39,7 +39,14 @@ export type AbiParameter = {
   indexed?: boolean;
 };
 
-export type Abi = readonly (AbiFunction | AbiEvent | AbiError | any)[];
+/**
+ * ABI entries the coder does not interpret. Generated artifact ABIs also carry
+ * `constructor` / `receive` / `fallback` entries plus extra JSON fields
+ * (`stateMutability`, `internalType`) — those ride along untouched.
+ */
+export type AbiOther = { type?: string } & Record<string, unknown>;
+
+export type Abi = readonly (AbiFunction | AbiEvent | AbiError | AbiOther)[];
 
 // ─────────────────────────────────────────────────────────────
 // Utils & Constants
@@ -97,12 +104,16 @@ function isDynamicType(type: string, components?: AbiParameter[]): boolean {
 
 const TYPE_RX = /^([a-z]+)(\d+)?(\[\d*\])?$/;
 
-export function encode(type: string, val: any, components?: any[]): { h: string; t: string } {
+export function encode(
+  type: string,
+  val: unknown,
+  components?: AbiParameter[],
+): { h: string; t: string } {
   // 1. Handle Arrays ([] or [N])
   const arrayMatch = type.match(/(\[\d*\])$/);
   if (arrayMatch) {
     const base = type.slice(0, -arrayMatch[1].length);
-    const arr = val as any[];
+    const arr = val as readonly unknown[];
     const isStatic = arrayMatch[1] !== '[]'; // [N] is static, [] is dynamic
     const res = processList(
       arr.map((v) => encode(base, v, components)),
@@ -120,7 +131,8 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
       components.map((c, i) =>
         encode(
           c.type,
-          (val as any)[c.name || i] ?? (Array.isArray(val) ? val[i] : undefined),
+          (val as Record<string, unknown>)[c.name || i] ??
+            (Array.isArray(val) ? val[i] : undefined),
           c.components,
         ),
       ),
@@ -133,18 +145,20 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
   }
 
   // 3. Handle Primitives
-  const [, base, sizeStr] = type.match(TYPE_RX) || [];
+  const m = TYPE_RX.exec(type);
+  const base = m?.[1];
+  const sizeStr = m?.[2];
 
   // 3a. Dynamic Bytes/String
   if (base === 'bytes' && !sizeStr) {
-    const hex = typeof val === 'string' ? clean(val) : val;
+    const hex = typeof val === 'string' ? clean(val) : (val as string);
     const len = Math.ceil(hex.length / 2);
     return { h: '', t: pad(numToHex(len)) + hex.padEnd(Math.ceil(len / 32) * 64, '0') };
   }
   if (base === 'string') {
     return encode(
       'bytes',
-      Array.from(utf8.encode(val))
+      Array.from(utf8.encode(val as string))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join(''),
     );
@@ -152,13 +166,13 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
 
   // 3b. Static Types
   let hex = '';
-  if (base === 'address') hex = clean(val);
+  if (base === 'address') hex = clean(val as string);
   else if (base === 'bool') hex = val ? '1' : '0';
   else if (base === 'bytes')
-    hex = clean(val).padEnd(64, '0'); // bytesN
+    hex = clean(val as string).padEnd(64, '0'); // bytesN
   else {
     // uint/int
-    const n = BN(val);
+    const n = BN(val as string | number | bigint | boolean);
     hex = numToHex(n < 0n ? n + (1n << BN(sizeStr || 256)) : n);
   }
 
@@ -171,9 +185,9 @@ const processList = (
   isDynamic: boolean,
   _staticLen?: number,
 ) => {
-  let head = '',
-    tail = '',
-    offset = items.length * 32;
+  let head = '';
+  let tail = '';
+  let offset = items.length * 32;
   const result = { h: '', t: '' };
 
   // If dynamic array, prefix with length. Static arrays don't include length.
@@ -205,11 +219,11 @@ export function decode(
   type: string,
   data: string,
   offset = 0,
-  components?: any[],
-): { val: any; read: number } {
+  components?: AbiParameter[],
+): { val: unknown; read: number } {
   const d = clean(data);
   const readWord = (off: number) => d.slice(off, off + 64);
-  const readInt = (off: number) => BN('0x' + readWord(off));
+  const readInt = (off: number) => BN(`0x${readWord(off)}`);
 
   // 1. Arrays ([] or [N])
   const arrayMatch = type.match(/(\[\d*\])$/);
@@ -251,21 +265,24 @@ export function decode(
     // must work — the previous plain object keyed by `name || index` made an
     // unnamed pair decode to `{0:.., 1:..}`, which is not iterable and threw
     // "{} is not iterable" at the call site rather than returning a value.
-    const obj: any = [];
+    const vals: unknown[] = [];
     let curr = offset;
     components.forEach((c, i) => {
       const isDyn = isDynamicType(c.type, c.components);
       const start = isDyn ? offset + Number(readInt(curr)) * 2 : curr;
       const res = decode(c.type, d, start, c.components);
-      obj[i] = res.val;
-      if (c.name) obj[c.name] = res.val;
+      vals[i] = res.val;
+      // Named alias on top of the positional entry (same array object).
+      if (c.name) Object.assign(vals, { [c.name]: res.val });
       curr += isDyn ? 64 : res.read;
     });
-    return { val: obj, read: curr - offset };
+    return { val: vals, read: curr - offset };
   }
 
   // 3. Primitives
-  const [, base, sizeStr] = type.match(TYPE_RX) || [];
+  const m = TYPE_RX.exec(type);
+  const base = m?.[1];
+  const sizeStr = m?.[2];
 
   if (base === 'bytes' && !sizeStr) {
     // Dynamic bytes — offset points at length word
@@ -276,10 +293,7 @@ export function decode(
   if (base === 'string') {
     const b = decode('bytes', d, offset);
     const bytes = new Uint8Array(
-      b.val
-        .slice(2)
-        .match(/.{1,2}/g)!
-        .map((b: string) => parseInt(b, 16)),
+      ((b.val as string).slice(2).match(/.{1,2}/g) ?? []).map((h) => Number.parseInt(h, 16)),
     );
     return { val: decUtf8.decode(bytes), read: 64 };
   }
@@ -294,7 +308,7 @@ export function decode(
     return { val: val >= mask ? val - (1n << bits) : val, read: 64 };
   }
   if (base === 'bytes')
-    return { val: `0x${readWord(offset).slice(0, parseInt(sizeStr!) * 2)}`, read: 64 };
+    return { val: `0x${readWord(offset).slice(0, Number.parseInt(sizeStr ?? '') * 2)}`, read: 64 };
 
   return { val, read: 64 }; // uint
 }
@@ -306,9 +320,9 @@ export function decode(
 // Compiled per-function plan: resolves the ABI entry + selector once and caches
 // it, so hot read paths skip the linear abi.find + signature rebuild + keccak
 // on every call. Keyed by (abi ref, functionName); abi arrays are module consts.
-type FnPlan = { fn: any; selector: Hex };
+type FnPlan = { fn: AbiFunction; selector: Hex };
 const PLANS = new WeakMap<object, Map<string, FnPlan>>();
-export function getPlan(abi: any, functionName: string): FnPlan {
+export function getPlan(abi: Abi, functionName: string): FnPlan {
   let m = PLANS.get(abi);
   if (!m) {
     m = new Map();
@@ -316,7 +330,9 @@ export function getPlan(abi: any, functionName: string): FnPlan {
   }
   let p = m.get(functionName);
   if (!p) {
-    const fn = abi.find((i: any) => i.name === functionName);
+    // Only function-shaped entries are callable; events/errors/generator extras
+    // either miss on name or are cast away — same as the previous untyped lookup.
+    const fn = abi.find((i) => i.name === functionName) as AbiFunction | undefined;
     if (!fn) throw new Error(`Fn not found: ${functionName}`);
     p = { fn, selector: getSelector(getFunctionSignature(fn)) };
     m.set(functionName, p);
@@ -324,25 +340,44 @@ export function getPlan(abi: any, functionName: string): FnPlan {
   return p;
 }
 
-export function encodeFn({ abi, functionName, args = [] }: any): Hex {
+export function encodeFn({
+  abi,
+  functionName,
+  args = [],
+}: {
+  abi: Abi;
+  functionName: string;
+  args?: readonly unknown[];
+}): Hex {
   const { fn, selector } = getPlan(abi, functionName);
+  const inputs = fn.inputs as AbiParameter[];
   const argsEncoded = processList(
-    fn.inputs.map((i: any, idx: number) => encode(i.type, args[idx], i.components)),
+    inputs.map((i, idx) => encode(i.type, args[idx], i.components)),
     false,
   );
   return `${selector}${argsEncoded.h}${argsEncoded.t}`;
 }
 
-export function decodeFn({ abi, functionName, data }: any): any {
+/**
+ * Decode a function call's return data. The decoded shape follows the ABI entry
+ * the caller named, so the value comes back through the generic `T` — assert it
+ * at the call site (`decodeFn<Asset>(...)`, like `Contract.read<T>`).
+ */
+export function decodeFn<T = never>({
+  abi,
+  functionName,
+  data,
+}: { abi: Abi; functionName: string; data: string }): T {
   const { fn } = getPlan(abi, functionName);
-  if (!fn.outputs.length) return undefined;
+  const outputs = fn.outputs as AbiParameter[];
+  if (!outputs.length) return undefined as T;
   // Multiple outputs decode as an inline tuple (return data IS the tuple
   // content). A single dynamic output is referenced via a head pointer.
-  if (fn.outputs.length > 1) return decode('tuple', data, 0, fn.outputs).val;
-  const o = fn.outputs[0];
+  if (outputs.length > 1) return decode('tuple', data, 0, outputs).val as T;
+  const o = outputs[0];
   const d = clean(data);
   const start = isDynamicType(o.type, o.components) ? Number(BN(`0x${d.slice(0, 64)}`)) * 2 : 0;
-  return decode(o.type, d, start, o.components).val;
+  return decode(o.type, d, start, o.components).val as T;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -353,7 +388,7 @@ export function decodeFn({ abi, functionName, data }: any): any {
  * Encode parameters to hex string
  * @example encodeAbiParameters([{type: 'address'}, {type: 'uint256'}], ['0x...', 123n])
  */
-export function encodeAbiParameters(params: AbiParameter[], values: any[]): Hex {
+export function encodeAbiParameters(params: AbiParameter[], values: unknown[]): Hex {
   const encoded = processList(
     params.map((p, i) => encode(p.type, values[i], p.components)),
     false,
@@ -365,9 +400,9 @@ export function encodeAbiParameters(params: AbiParameter[], values: any[]): Hex 
  * Decode parameters from hex string
  * @example decodeAbiParameters([{type: 'address'}, {type: 'uint256'}], '0x...')
  */
-export function decodeAbiParameters(params: AbiParameter[], data: string): any[] {
+export function decodeAbiParameters(params: AbiParameter[], data: string): unknown[] {
   const d = clean(data);
-  const result: any[] = [];
+  const result: unknown[] = [];
   let offset = 0;
 
   for (const param of params) {
@@ -408,7 +443,7 @@ export function getEventSignature(event: AbiEvent): string {
  * Encode event indexed parameters (for log filtering with external keccak256)
  * @note: Topic[0] is the event signature hash - compute it separately with keccak256(toBytes(getEventSignature(event)))
  */
-export function encodeEventTopics(event: AbiEvent, args: Record<string, any>): (Hex | null)[] {
+export function encodeEventTopics(event: AbiEvent, args: Record<string, unknown>): (Hex | null)[] {
   const topics: (Hex | null)[] = [];
 
   for (const input of event.inputs || []) {
@@ -448,7 +483,7 @@ export function getErrorSignature(error: AbiError): string {
 /**
  * Encode error parameters (for custom errors)
  */
-export function encodeErrorResult(error: AbiError, args: any[]): Hex {
+export function encodeErrorResult(error: AbiError, args: unknown[]): Hex {
   const sig = getErrorSignature(error);
   const selector = getSelector(sig);
   const encoded = processList(
@@ -464,13 +499,14 @@ export function encodeErrorResult(error: AbiError, args: any[]): Hex {
 export function decodeErrorResult(
   abi: Abi,
   data: string,
-): { name: string; args: any[] } | undefined {
+): { name: string; args: unknown[] } | undefined {
   if (!data.startsWith('0x') || data.length < 10) return undefined;
 
   const selector = data.slice(0, 10);
-  const error = abi.find(
-    (item: any) => item.type === 'error' && getSelector(getErrorSignature(item)) === selector,
-  );
+  const error = abi.find((item): item is AbiError => {
+    if (item.type !== 'error') return false;
+    return getSelector(getErrorSignature(item as AbiError)) === selector;
+  });
 
   if (!error) return undefined;
 

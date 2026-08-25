@@ -88,8 +88,16 @@ export function httpTransport(
   const inflight = new Map<string, Pending>();
   let scheduled = false;
 
+  // One JSON-RPC 2.0 response (or a batch element). `result` and `error` are mutually exclusive;
+  // both stay unknown here - callers narrow via rpcErr() or their own result types.
+  interface RpcResponse {
+    id?: string | number;
+    result?: unknown;
+    error?: { code?: number; message?: string; data?: unknown };
+  }
+
   // Single fetch attempt: timeout + typed transport errors.
-  async function fetchRpc(url: string, body: unknown): Promise<any> {
+  async function fetchRpc(url: string, body: unknown): Promise<RpcResponse> {
     const ctrl = new AbortController();
     // The abort must stay armed across the body read: headers can arrive and the body
     // then stall forever (backgrounded tab, throttling proxy). A settled `post` is what
@@ -104,18 +112,19 @@ export function httpTransport(
       });
       if (res.status === 429) throw new RpcRateLimitError('rate limited', 429);
       if (!res.ok) throw new RpcNetworkError(`HTTP ${res.status}: ${res.statusText}`, res.status);
-      return await res.json();
-    } catch (e: any) {
+      return (await res.json()) as RpcResponse;
+    } catch (e) {
       if (e instanceof RpcError) throw e;
-      if (e?.name === 'AbortError') throw new RpcTimeoutError(`RPC timeout after ${timeout}ms`);
-      throw new RpcNetworkError(e?.message ?? 'network error');
+      const err = e as { name?: string; message?: string } | undefined;
+      if (err?.name === 'AbortError') throw new RpcTimeoutError(`RPC timeout after ${timeout}ms`);
+      throw new RpcNetworkError(err?.message ?? 'network error');
     } finally {
       clearTimeout(t);
     }
   }
 
   // Failover across endpoints + capped exponential backoff.
-  async function post(body: unknown): Promise<any> {
+  async function post(body: unknown): Promise<RpcResponse> {
     let last: unknown;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -134,7 +143,7 @@ export function httpTransport(
     p.reject(e);
     for (const w of p.waiters) w.reject(e);
   };
-  const done = (p: Pending, r: any) => {
+  const done = (p: Pending, r: RpcResponse | undefined) => {
     if (p.key) inflight.delete(p.key);
     if (r?.error) {
       const e = rpcErr(r.error);
@@ -156,7 +165,7 @@ export function httpTransport(
     try {
       const json = await post(chunk.length === 1 ? reqs[0] : reqs);
       const arr = Array.isArray(json) ? json : [json];
-      const byId = new Map(arr.map((r: any) => [r.id, r]));
+      const byId = new Map(arr.map((r) => [r.id, r]));
       chunk.forEach((p, k) => done(p, byId.get(reqs[k].id) ?? arr[k]));
     } catch (e) {
       for (const p of chunk) fail(p, e);
@@ -180,7 +189,7 @@ export function httpTransport(
     params = [],
   }: { method: string; params?: unknown[] }): Promise<unknown> => {
     if (!batchOn) {
-      return post({ jsonrpc: '2.0', id: ++id, method, params }).then((j: any) => {
+      return post({ jsonrpc: '2.0', id: ++id, method, params }).then((j: RpcResponse) => {
         if (j?.error) throw rpcErr(j.error);
         return j?.result;
       });

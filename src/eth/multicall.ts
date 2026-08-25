@@ -3,7 +3,7 @@
  * Zero dependencies, works with optimized ABI coder
  */
 
-import { decodeFn, encodeFn } from './abi';
+import { type Abi, decodeFn, encodeFn } from './abi';
 import { getMulticall3 } from './chains';
 import { ethCall, getBlockNumber } from './rpc';
 import type { Address, Eip1193Provider } from './types';
@@ -38,10 +38,17 @@ const MC3_ABI = [
 
 export interface Call {
   address: Address;
-  abi: any;
+  abi: Abi;
   functionName: string;
-  args?: any[];
+  args?: unknown[];
   allowFailure?: boolean;
+}
+
+/** One aggregate3 leg outcome: `result` when success, `error` otherwise. */
+export interface MulticallResult {
+  success: boolean;
+  result?: unknown;
+  error?: unknown;
 }
 
 /** Max calls per aggregate3. Keeps calldata + node response under typical eth_call limits. */
@@ -51,8 +58,7 @@ export async function multicall(
   p: Eip1193Provider,
   calls: Call[],
   opt: { addr?: Address; chainId?: number; block?: string; chunkSize?: number } = {},
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any[]> {
+): Promise<MulticallResult[]> {
   // 0. Nothing to ask: the old per-item callers made zero requests for an empty
   // list, and an aggregate3([]) round-trip would be a regression, not a batch.
   if (!calls.length) return [];
@@ -68,7 +74,7 @@ export async function multicall(
     const parts: Call[][] = [];
     for (let i = 0; i < calls.length; i += chunk) parts.push(calls.slice(i, i + chunk));
     const out = await Promise.all(
-      parts.map((c) => multicall(p, c, { ...opt, block, chunkSize: Infinity })),
+      parts.map((c) => multicall(p, c, { ...opt, block, chunkSize: Number.POSITIVE_INFINITY })),
     );
     return out.flat();
   }
@@ -90,11 +96,13 @@ export async function multicall(
   // 3. Decode results
   // decodeFn returns the single output value directly: an array of
   // component-named objects [{s: bool, r: bytes}, ...]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results = decodeFn({ abi: MC3_ABI, functionName: 'aggregate3', data: raw }) as any[];
+  const results = decodeFn<{ s: unknown; r: string }[]>({
+    abi: MC3_ABI,
+    functionName: 'aggregate3',
+    data: raw,
+  });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return results.map((res: any, i: number): any => {
+  return results.map((res, i): MulticallResult => {
     if (!res.s) return { success: false, error: new Error('Call failed') };
     try {
       return { success: true, result: decodeFn({ ...calls[i], data: res.r }) };
@@ -104,7 +112,7 @@ export async function multicall(
   });
 }
 
-export async function multicallStrict<T = any>(
+export async function multicallStrict<T = unknown>(
   p: Eip1193Provider,
   calls: Call[],
   opt?: { addr?: Address; chainId?: number; block?: string; chunkSize?: number },
@@ -114,9 +122,7 @@ export async function multicallStrict<T = any>(
     calls.map((c) => ({ ...c, allowFailure: false })),
     opt,
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const err = res.find((r: any) => !r.success);
-  if (err) throw new Error(`Multicall error: ${(err as any).error}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.map((r: any) => r.result);
+  const err = res.find((r) => !r.success);
+  if (err) throw new Error(`Multicall error: ${err.error}`);
+  return res.map((r) => r.result as T);
 }

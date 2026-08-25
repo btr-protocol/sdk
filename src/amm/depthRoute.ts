@@ -213,12 +213,7 @@ interface RouteCurve {
 }
 
 /** Compose one route's synthetic DepthCurve, quoted from-per-to like aimm's cross pairs. */
-function composeRouteCurve(
-  pools: NamedPool[],
-  route: Route,
-  from: string,
-  to: string,
-): RouteCurve | null {
+function composeRouteCurve(pools: NamedPool[], route: Route): RouteCurve | null {
   const poolByTag = (tag: string) => pools.find((p) => p.tag === tag);
 
   // Asks fold left-to-right (leg 2 spends leg 1's output); bids fold right-to-left (selling the
@@ -269,7 +264,7 @@ function composeRouteCurve(
   const mid = midAsk > 0 && midBid > 0 ? (midAsk + midBid) / 2 : Math.max(midAsk, midBid);
   if (!(mid > 0)) return null;
   const mark = markRatio > 0 ? 1 / markRatio : 0;
-  if (!(mark > 0) || !isFinite(mark)) return null;
+  if (!(mark > 0) || !Number.isFinite(mark)) return null;
 
   const asks = chainToLevels(ask, mid, askNetSlope > 0 ? 1 / askNetSlope : 0, 'ask');
   const bids = chainToLevels(bid, mid, bidNetSlope, 'bid');
@@ -307,7 +302,7 @@ export function aggregateRouteDepthCurves(
   for (const route of enumerateRoutes(pools, from, to)) {
     if (route.hops < 2) continue; // direct legs belong to aggregateDepthCurves
     if (route.legs.some((l) => usedPools.has(l.poolTag))) continue;
-    const composed = composeRouteCurve(pools, route, from, to);
+    const composed = composeRouteCurve(pools, route);
     if (!composed) continue;
     const part = bookPartFromCurve(composed.curve);
     if (!part) continue;
