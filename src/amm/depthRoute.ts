@@ -9,7 +9,13 @@
 // composed curves merge mid-outward through the same assembler the direct books use, so chart
 // bands, spread zone and DepthPanel consume an identical payload shape. No parallel pricing model.
 
-import { type DepthCurve, type DepthLevel, type PoolState, depthCurve } from './aimm.js';
+import {
+  type DepthCurve,
+  type DepthLevel,
+  type PoolState,
+  depthCurve,
+  invertDepthCurve,
+} from './aimm.js';
 import {
   type AggregateDepthOpts,
   type AggregatedDepthBook,
@@ -304,7 +310,13 @@ export function aggregateRouteDepthCurves(
     if (route.legs.some((l) => usedPools.has(l.poolTag))) continue;
     const composed = composeRouteCurve(pools, route);
     if (!composed) continue;
-    const part = bookPartFromCurve(composed.curve);
+    // Honour opts.invert on the ROUTE path too, same as aggregateDepthCurves does per pool: the
+    // composed curve is quoted from-per-to (composeRouteCurve doc), so an inverted view pair must
+    // reciprocate it BEFORE bucketing - skipping this left cross-pool books in raw from-per-to
+    // units (e.g. CBBTC per USD1 ≈ 1e-5) while the panel's display layer assumed the flip.
+    const part = bookPartFromCurve(
+      opts?.invert ? invertDepthCurve(composed.curve) : composed.curve,
+    );
     if (!part) continue;
     parts.push(part);
     for (const l of route.legs) usedPools.add(l.poolTag);

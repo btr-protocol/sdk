@@ -12,8 +12,9 @@ import {
   ZERO_ADDRESS,
   encodeFn,
 } from '../eth/index.js';
-import { POOL_ABI, defaultDeadline, getSwapQuote } from '../pool/index.js';
-import { type VenueKind, type VenuePool, eqAddr, hasToken, staticVenuePools } from './registry.js';
+import { type MulticallResult, multicall } from '../eth/multicall.js';
+import { POOL_ABI, type SwapQuote, defaultDeadline } from '../pool/index.js';
+import { type VenueKind, eqAddr, hasToken, staticVenuePools } from './registry.js';
 
 export interface VenueExecCall {
   to: Address;
@@ -98,58 +99,19 @@ function classifySkip(e: unknown, pool: Address, tag: string): VenueSkip {
   return { kind: 'transport', pool, tag, reason: e instanceof Error ? e.message : String(e) };
 }
 
-async function safeRead<T>(
-  fn: () => Promise<T>,
-  pool: Address,
-  tag: string,
-  onSkip: (skip: VenueSkip) => void,
-): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    onSkip(classifySkip(e, pool, tag));
-    return null;
-  }
+// ── Per-venue single-hop quoter — batched: ONE aggregate3 for the whole candidate set ──
+
+/** Rebuild the error a failed aggregate3 leg would have thrown on its own: revert data rides
+ *  `returnData`, so a deliberate halt keeps its decodable name instead of reading as noise. */
+function legFailure(r: MulticallResult | undefined): unknown {
+  if (!r) return new Error('multicall returned fewer rows than calls');
+  if (r.returnData && r.returnData !== '0x')
+    return new RpcRevertError('execution reverted', 3, r.returnData);
+  return r.error ?? new Error('multicall leg failed');
 }
 
-// ── Per-venue single-hop quoters ──────────────────────────────────────────────
-
-async function quoteBtr(
-  provider: Eip1193Provider,
-  pool: VenuePool,
-  tokenIn: Address,
-  tokenOut: Address,
-  amountIn: bigint,
-  recipient: Address,
-  minOut: bigint,
-  onSkip: (skip: VenueSkip) => void,
-): Promise<VenueLegQuote | null> {
-  if (pool.tokens && (!hasToken(pool.tokens, tokenIn) || !hasToken(pool.tokens, tokenOut)))
-    return null;
-  const q = await safeRead(
-    () => getSwapQuote(provider, pool.address, tokenIn, tokenOut, amountIn),
-    pool.address,
-    pool.tag,
-    onSkip,
-  );
-  if (!q || q.amountOut <= 0n) return null;
-  return {
-    venue: 'btr',
-    pool: pool.address,
-    tag: pool.tag,
-    tokenIn,
-    tokenOut,
-    amountIn,
-    amountOut: q.amountOut,
-    calldata: encodeFn({
-      abi: POOL_ABI,
-      functionName: 'swap',
-      args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
-    }),
-  };
-}
-
-/** Quote every single-hop candidate for (tokenIn → tokenOut). */
+/** Quote every single-hop candidate for (tokenIn → tokenOut).
+ *  ONE Multicall3 aggregate3 for all candidate pools - never one eth_call per venue. */
 export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuote[]> {
   const { chainId, tokenIn, tokenOut, amountIn, provider, recipient, minOut } = opts;
   if (eqAddr(tokenIn, tokenOut) || amountIn <= 0n) return [];
@@ -163,12 +125,56 @@ export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuot
   if (minOut < 0n) throw new Error('quoteAllExactIn: minOut must be >= 0');
 
   const onSkip = opts.onSkip ?? defaultOnSkip;
-  const settled = await Promise.all(
-    staticVenuePools(chainId).map((pool) =>
-      quoteBtr(provider, pool, tokenIn, tokenOut, amountIn, recipient, minOut, onSkip),
-    ),
+  // The per-pool token filter quoteBtr used to apply before its read.
+  const candidates = staticVenuePools(chainId).filter(
+    (pool) => !pool.tokens || (hasToken(pool.tokens, tokenIn) && hasToken(pool.tokens, tokenOut)),
   );
-  return settled.filter((q): q is VenueLegQuote => q != null && q.amountOut > 0n);
+  if (!candidates.length) return [];
+  let res: MulticallResult[];
+  try {
+    res = await multicall(
+      provider,
+      candidates.map((pool) => ({
+        address: pool.address,
+        abi: POOL_ABI,
+        functionName: 'getSwapQuote',
+        args: [tokenIn, tokenOut, amountIn],
+        allowFailure: true,
+      })),
+    );
+  } catch (e) {
+    // Batch-level failure (RPC down / rate-limited): every candidate skips as transport, same
+    // as the per-pool read did when the provider was unreachable. Never a silent empty quote.
+    for (const pool of candidates) onSkip(classifySkip(e, pool.address, pool.tag));
+    return [];
+  }
+  return candidates.flatMap((pool, i): VenueLegQuote[] => {
+    const r = res[i];
+    if (!r?.success) {
+      // Same classification the per-pool safeRead applied: a leg that reverted with data is the
+      // pool refusing (halt - decoded custom error); anything else is transport noise.
+      onSkip(classifySkip(legFailure(r), pool.address, pool.tag));
+      return [];
+    }
+    const q = r.result as SwapQuote | undefined;
+    if (!q || q.amountOut <= 0n) return [];
+    return [
+      {
+        venue: 'btr',
+        pool: pool.address,
+        tag: pool.tag,
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut: q.amountOut,
+        calldata: encodeFn({
+          abi: POOL_ABI,
+          functionName: 'swap',
+          args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
+        }),
+      },
+    ];
+  });
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;

@@ -161,6 +161,9 @@ export function addressAt(word: Hex, offset: number): Address {
   return `0x${bytesToHex(b.slice(i, i + 20))}` as Address;
 }
 
+/** `NUQuartic.Curve.segs` is a fixed uint256[28] block (m ≤ 14 → 2m live words). */
+export const CURVE_SEG_SLOTS = 28;
+
 /** Mapping entry base slot for a uint16 key (curves preset table). */
 export function mappingBaseU16(key: number, mappingSlot: bigint): bigint {
   const encoded = encodeAbiParameters(
@@ -207,7 +210,17 @@ export async function readCurve(
   presetId: number,
 ): Promise<QuarticCurve | null> {
   const base = mappingBaseU16(presetId, POOL_STORAGE.curves);
-  const header = BigInt(await getStorageAt(provider, pool, base));
+  // ONE transport round-trip: the segment block is a FIXED uint256[28] slot run (m ≤ 14), so the
+  // header and every possible segment word are fetched speculatively together. The transport's
+  // tick-batch coalesces these into a single JSON-RPC POST; per-slot eth_getStorageAt cannot ride
+  // Multicall3 aggregate3 (raw storage, no view getter by policy - see module header). The old
+  // header-first read cost two sequential round-trips per curve.
+  const words = await Promise.all(
+    Array.from({ length: 1 + CURVE_SEG_SLOTS }, (_, i) =>
+      getStorageAt(provider, pool, base + BigInt(i)),
+    ),
+  );
+  const header = BigInt(words[0]);
   if (header === 0n) return null;
   const m = Number(header & 0xffn);
   // The directory holds the m-1 INTERIOR boundaries only; the last right edge is the BPS constant,
@@ -220,13 +233,10 @@ export async function readCurve(
   boundaries.push(BPS);
   const dispRef = Number((header >> 232n) & 0xffffn);
   const flags = Number((header >> 248n) & 0xffn);
-  const words = await Promise.all(
-    Array.from({ length: 2 * m }, (_, i) => getStorageAt(provider, pool, base + 1n + BigInt(i))),
-  );
   const segs: QuarticSeg[] = [];
   for (let i = 0; i < m; i++) {
-    const a = BigInt(words[2 * i]);
-    const b = BigInt(words[2 * i + 1]);
+    const a = BigInt(words[1 + 2 * i]);
+    const b = BigInt(words[2 + 2 * i]);
     const sRaw = (b >> 64n) & ((1n << 128n) - 1n);
     segs.push({
       c0: i64AtBits(a, 0),

@@ -20,7 +20,7 @@
 import { describe, expect, test } from 'bun:test';
 import { areaQ, evalQ } from '../src/amm/aimm';
 import type { Address, Eip1193Provider, Hex } from '../src/eth/types';
-import { readCurve } from '../src/pool/storage';
+import { CURVE_SEG_SLOTS, readCurve } from '../src/pool/storage';
 import FIXTURE from './fixtures/curve-storage.json';
 
 const POOL = '0x00000000000000000000000000000000000000aa' as Address;
@@ -101,13 +101,17 @@ describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
     expect(`${evalQ(c, 10_000)}`).toBe(`${last - shift}`);
   });
 
-  test('reads exactly the header + 2m live segment words, and no more', async () => {
+  test('one speculative sweep of header + the fixed 28-slot block - one round trip, no more', async () => {
     const p = wordProvider();
     const c = (await readCurve(p, POOL, PRESET_ID)) as NonNullable<
       Awaited<ReturnType<typeof readCurve>>
     >;
-    // The fixed uint256[28] block is 28 words wide; only the live 2m may be paid for.
-    expect(p.reads.length).toBe(1 + 2 * c.m);
+    // eth_getStorageAt cannot ride Multicall3 aggregate3 (raw storage, no view getter by
+    // policy), so batching means ONE coalesced JSON-RPC batch: header + the whole fixed
+    // uint256[28] segment block fetched speculatively - never a second dependent round trip.
+    expect(p.reads.length).toBe(1 + CURVE_SEG_SLOTS);
+    // Only the live 2m words are decoded; the speculative tail is ignored.
+    expect(c.m).toBeGreaterThan(0);
   });
 
   test('an unset preset (header 0) reads as null, not as an m=0 curve', async () => {

@@ -85,6 +85,22 @@ describe('aggregateRouteDepthCurves', () => {
     expect(rev.mid).toBeCloseTo(1 / fwd.mid, 6);
     expect(rev.bids.length).toBeGreaterThan(0);
   });
+
+  test('invert: true reciprocates the composed book (regression: DepthPanel display pair)', () => {
+    // DepthPanel requests the SAME (from, to) with { invert: true } whenever the display base is
+    // the other leg. The route path used to drop the flag, leaving the book in raw from-per-to
+    // units - a CBBTC.b/USD1.b-style cross pair printed ~1e-5 prices on one orientation.
+    const pools = crossFleet();
+    const fwd = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
+    const inv = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC', { invert: true }));
+    expect(inv.mark).toBeCloseTo(1 / fwd.mark, 6);
+    expect(inv.mid).toBeCloseTo(1 / fwd.mid, 6);
+    // Bids and asks swap sides with the reciprocation.
+    expect(inv.bid).toBeCloseTo(1 / fwd.ask, 4);
+    expect(inv.ask).toBeCloseTo(1 / fwd.bid, 4);
+    expect(inv.bidNet).toBeLessThan(inv.mid);
+    expect(inv.askNet).toBeGreaterThan(inv.mid);
+  });
 });
 
 describe('aggregatePairDepth', () => {

@@ -4,7 +4,8 @@
  * - retry w/ capped exponential backoff + jitter
  * - multi-RPC failover
  * - typed errors (revert vs network vs rate-limit vs timeout)
- * - tick-batched request coalescing + in-flight dedupe (N round-trips -> 1)
+ * - prepared-batch request coalescing + in-flight dedupe: queued requests share ONE round-trip,
+ *   flushed by whichever comes first - the wait window, the per-request cap or the byte cap
  * Zero deps beyond fetch.
  */
 
@@ -62,8 +63,12 @@ export interface TransportOpts {
   timeout?: number; // per-request ms (default 10000)
   retries?: number; // extra attempts after the first (default 3)
   retryDelay?: number; // base backoff ms (default 150)
-  // batch:false disables coalescing; {wait} in ms (default 0 = microtask), {max} chunk size
-  batch?: boolean | { wait?: number; max?: number };
+  // batch:false disables coalescing; otherwise the prepared batch flushes on whichever fires
+  // first: {wait} ms since the first enqueue (default 0 = same tick / microtask), {max}
+  // requests per round-trip (default 100), or {maxBytes} approx serialized request bytes
+  // (default unlimited). A larger window amortizes better but adds latency to every read -
+  // keep it small (tens of ms) unless the caller is itself burst-shaped.
+  batch?: boolean | { wait?: number; max?: number; maxBytes?: number };
 }
 
 type Waiter = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
@@ -80,11 +85,15 @@ export function httpTransport(
   const retries = opts.retries ?? 3;
   const baseDelay = opts.retryDelay ?? 150;
   const batchOn = opts.batch !== false;
-  const wait = typeof opts.batch === 'object' ? (opts.batch.wait ?? 0) : 0;
-  const maxBatch = typeof opts.batch === 'object' ? (opts.batch.max ?? 100) : 100;
+  const batch = typeof opts.batch === 'object' ? opts.batch : undefined;
+  const wait = batch?.wait ?? 0;
+  const maxBatch = batch?.max ?? 100;
+  const maxBytes = batch?.maxBytes ?? Number.POSITIVE_INFINITY;
 
   let id = 0;
   let queue: Pending[] = [];
+  let queuedBytes = 0;
+  let timerId: ReturnType<typeof setTimeout> | null = null;
   const inflight = new Map<string, Pending>();
   let scheduled = false;
 
@@ -174,6 +183,8 @@ export function httpTransport(
 
   function flush() {
     scheduled = false;
+    timerId = null;
+    queuedBytes = 0;
     const batch = queue;
     queue = [];
     for (let i = 0; i < batch.length; i += maxBatch) sendChunk(batch.slice(i, i + maxBatch));
@@ -181,7 +192,24 @@ export function httpTransport(
   const schedule = () => {
     if (scheduled) return;
     scheduled = true;
-    wait > 0 ? setTimeout(flush, wait) : queueMicrotask(flush);
+    if (wait > 0) {
+      timerId = setTimeout(() => {
+        timerId = null;
+        flush();
+      }, wait);
+    } else {
+      queueMicrotask(flush);
+    }
+  };
+  // The prepared batch hit a capacity limit (count or bytes): it must not sit out the rest of
+  // the window - cancel the pending timer and send now.
+  const flushNow = () => {
+    if (!scheduled) return flush();
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    flush();
   };
 
   const request = ({
@@ -215,7 +243,10 @@ export function httpTransport(
       } else {
         queue.push({ method, params: params as unknown[], resolve, reject, waiters: [] });
       }
-      schedule();
+      // Approximate serialized size without re-stringifying the whole batch: params dominate,
+      // so method + params length + a fixed envelope allowance is exact enough for a threshold.
+      queuedBytes += method.length + JSON.stringify(params ?? []).length + 80;
+      queue.length >= maxBatch || queuedBytes >= maxBytes ? flushNow() : schedule();
     });
   };
 
