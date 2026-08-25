@@ -48,12 +48,12 @@ export function formatCurrencyCompact(n: number | null | undefined, currency = '
   const sign = n < 0 ? '-' : signed ? '+' : '';
   const symbol = CURRENCY_SYMBOLS[currency] ?? '$';
 
-  if (absN >= 1_000_000_000_000) return `${sign}${symbol}${round(absN / 1_000_000_000_000, 2)}T`;
-  if (absN >= 1_000_000_000) return `${sign}${symbol}${round(absN / 1_000_000_000, 2)}B`;
-  if (absN >= 1_000_000) return `${sign}${symbol}${round(absN / 1_000_000, 2)}M`;
-  if (absN >= 1_000) return `${sign}${symbol}${round(absN / 1_000, 2)}K`;
+  if (absN >= 1_000_000_000_000) return `${sign}${symbol}${(absN / 1_000_000_000_000).toFixed(2)}T`;
+  if (absN >= 1_000_000_000) return `${sign}${symbol}${(absN / 1_000_000_000).toFixed(2)}B`;
+  if (absN >= 1_000_000) return `${sign}${symbol}${(absN / 1_000_000).toFixed(2)}M`;
+  if (absN >= 1_000) return `${sign}${symbol}${(absN / 1_000).toFixed(2)}K`;
 
-  return `${sign}${symbol}${round(absN, 2)}`;
+  return `${sign}${symbol}${round(absN, 2).toFixed(2)}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -166,10 +166,10 @@ export function formatCompact(n: number | null | undefined, signed = false): str
   const absN = Math.abs(n);
   const sign = n < 0 ? '-' : signed ? '+' : '';
 
-  if (absN >= 1_000_000_000_000) return `${sign}${round(absN / 1_000_000_000_000, 2)}T`;
-  if (absN >= 1_000_000_000) return `${sign}${round(absN / 1_000_000_000, 2)}B`;
-  if (absN >= 1_000_000) return `${sign}${round(absN / 1_000_000, 2)}M`;
-  if (absN >= 1_000) return `${sign}${round(absN / 1_000, 2)}K`;
+  if (absN >= 1_000_000_000_000) return `${sign}${(absN / 1_000_000_000_000).toFixed(2)}T`;
+  if (absN >= 1_000_000_000) return `${sign}${(absN / 1_000_000_000).toFixed(2)}B`;
+  if (absN >= 1_000_000) return `${sign}${(absN / 1_000_000).toFixed(2)}M`;
+  if (absN >= 1_000) return `${sign}${(absN / 1_000).toFixed(2)}K`;
 
   return sign + formatNumber(absN);
 }
