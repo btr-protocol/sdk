@@ -32,6 +32,15 @@ const MC3_ABI = [
         ],
       },
     ],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 's', type: 'bool' }, // success
+          { name: 'r', type: 'bytes' }, // returnData
+        ],
+      },
+    ],
   },
 ];
 

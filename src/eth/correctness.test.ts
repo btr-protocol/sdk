@@ -5,9 +5,9 @@ import { recoverDigestSigner } from '../oracle/verify';
 import { type AbiEvent, type AbiFunction, encodeEventTopics, getEventSignature } from './abi';
 import { privateKeyToAddress, signDigest } from './client';
 import { checksumAddress, keccak256Input } from './index';
-import { type Call, MC3_ADDR, multicall } from './multicall';
+import { type Call, MC3_ADDR, multicall, multicallStrict } from './multicall';
 import { rlpEncode } from './rlp';
-import type { Eip1193Provider } from './types';
+import type { Address, Eip1193Provider } from './types';
 
 describe('rlpEncode (hex string handling)', () => {
   test('odd-nibble hex does not throw', () => {
@@ -113,6 +113,75 @@ describe('multicall batching', () => {
     expect(blocks.length).toBe(3);
     expect(new Set(blocks).size).toBe(1);
     expect(blocks[0]).toBe('0x64');
+  });
+
+  // Encode an aggregate3 return for `n` legs (leg `failIndex` marked reverted) — top-level
+  // dynamic return: [offset 0x20][array len][elem offsets][elems], each elem {bool,bytes}.
+  const encResults = (n: number, failIndex = -1): string => {
+    const w = (v: bigint) => v.toString(16).padStart(64, '0');
+    const ES = 0x80n;
+    const base = BigInt(n) * 32n;
+    let out = w(0x20n) + w(BigInt(n));
+    for (let i = 0; i < n; i++) out += w(base + BigInt(i) * ES);
+    for (let i = 0; i < n; i++)
+      out +=
+        w(i === failIndex ? 0n : 1n) + w(0x40n) + w(1n) + (i === failIndex ? '08' : '01').padEnd(64, '0');
+    return '0x' + out;
+  };
+  /** Provider answering one Result per aggregate3 leg, counting wire requests. */
+  const mc3Provider = (): { seen: string[]; provider: Eip1193Provider } => {
+    const seen: string[] = [];
+    const provider: Eip1193Provider = {
+      request: async ({ method, params }: { method: string; params?: unknown[] }) => {
+        seen.push(method);
+        if (method === 'eth_blockNumber') return '0x64';
+        const cd = (params as [{ data: string }, string])[0].data;
+        const legs = parseInt(cd.slice(10 + 64, 10 + 128), 16);
+        return encResults(legs);
+      },
+    } as unknown as Eip1193Provider;
+    return { seen, provider };
+  };
+
+  test('two concurrent multicall() calls share ONE aggregate3', async () => {
+    const { seen, provider } = mc3Provider();
+    const mk = (to: string): Call => ({
+      address: to as Address,
+      abi: PROBE_ABI,
+      functionName: 'getBlockNumber',
+    });
+    const [a, b] = await Promise.all([
+      multicall(provider, [mk('0x1'), mk('0x2')]), // component A batches its two reads
+      multicall(provider, [mk('0x3'), mk('0x4'), mk('0x5')]), // component B, same tick
+    ]);
+    expect(seen.filter((m) => m === 'eth_call').length).toBe(1);
+    // Positional fan-out: each caller gets exactly its own legs back, decoded normally.
+    expect(a.length).toBe(2);
+    expect(b.length).toBe(3);
+    expect(a.every((r) => r.success && r.result === 1n)).toBe(true);
+    expect(b.every((r) => r.success && r.result === 1n)).toBe(true);
+  });
+
+  test("a strict caller's failing leg does not abort a lenient one sharing the batch", async () => {
+    // Merged batch = [lenient leg @0, strict leg @1]; the mock reverts exactly index 1.
+    const provider: Eip1193Provider = {
+      request: async ({ params }: { method?: string; params?: unknown[] }) => {
+        const cd = (params as [{ data: string }, string])[0].data;
+        return encResults(parseInt(cd.slice(10 + 64, 10 + 128), 16), 1);
+      },
+    } as unknown as Eip1193Provider;
+    const mk = (to: string): Call => ({
+      address: to as Address,
+      abi: PROBE_ABI,
+      functionName: 'getBlockNumber',
+    });
+    // Same tick -> one merged aggregate3; the lenient caller keeps its result even though the
+    // strict caller's leg reverted (allowFailure=false would have nuked the whole batch).
+    const lenientP = multicall(provider, [mk('0xok')]);
+    const strictP = multicallStrict(provider, [mk('0xbad')]);
+    const lenient = await lenientP;
+    await expect(strictP).rejects.toThrow(/Multicall error/);
+    expect(lenient[0].success).toBe(true);
   });
 });
 
