@@ -1,7 +1,7 @@
 // Pure BTR AIMM pricer — the ONE model shared by useSwapQuote (the form) and the
 // depth chart, so a quote and its rendered book can never disagree (spec D3).
 //
-// Mirrors the on-chain dex/evm/src/libraries/{Pricing,NUQuartic}.sol. The pricing shape is a
+// Mirrors the on-chain pricing libraries. The pricing shape is a
 // clamped quartic I-spline on non-uniform knots (NUQuartic.Curve, shared preset table keyed by
 // Asset.presetId). evalQ/areaQ/buildCurve below are EXACT BigInt mirrors of the Solidity integer
 // math (truncating division included) so front depth charts match on-chain quotes bit-for-bit at
@@ -9,7 +9,7 @@
 //
 // SEAMS (the only deferrals): σ (sigmaSeed → live feed.sigmaPbps on deploy), reserves/L
 // (usePoolData stub → on-chain), and each leg's kappaCovBps (defaults 0 = off, matching the
-// current testnet risk config — dex/evm/deploy/testnet-asset-params.json sharedRiskConfig; wire
+// current testnet risk config; wire
 // per-asset RiskConfig.kappaCovBps via Pool once a risk-config view fn exists on-chain). Everything
 // else is built fully, including the convex coverage-wall toll (GATE-07; Pricing.sol `_covToll`).
 
@@ -18,7 +18,7 @@ import { STALE_Z } from '../abis/solidity.generated.js';
 export const BPS = 1e4; // 0.01%
 export const PBPS = 1e6; // 0.0001% (fee/offset/dispersion unit)
 
-// ── NUQuartic mirror (dex/evm/src/libraries/NUQuartic.sol) ──────────────────────
+// ── NUQuartic mirror ────────────────────────────────────────────────────────────
 // Curve y(x): x ∈ [0, BPS] cumulative-depth bps, y in pbps·Q fixed point (Q = 1e9).
 // Quotes scale y by dispersion/dispRef (Pricing._scaleY), then drop the Q fixed point.
 

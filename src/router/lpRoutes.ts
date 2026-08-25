@@ -1,4 +1,4 @@
-// Dual-route LP mint/redeem ranking (sdk/docs/lp-routing-spec.md §2).
+// Dual-route LP mint/redeem ranking.
 //
 // Every pool entry composes into one of two terminating instruments, and the routes are directly
 // comparable because both end in the SAME receipt:

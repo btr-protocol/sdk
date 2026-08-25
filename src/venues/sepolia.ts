@@ -1,11 +1,9 @@
 // Sepolia (chainId 11155111) BTR DEX venue.
 //
 // Nothing here is a table. Every address, feed id, roster and ordinal is READ from
-// `deployments.generated.ts` — the broadcast record of `dex/evm/deployments/11155111.{deploy,
-// pools}.json` plus `sepolia-risk-params.json` — and every mark source is read from `NXR_MARKS`.
-// This module is the chain-specific NAMING of those two, kept because the front and the ceremony
-// scripts import Sepolia by name; it is not a second copy of either, and a redeploy reaches it
-// through `bun run gen` alone.
+// `deployments.generated.ts`, the recorded deployment facts for this chain, and every mark source
+// is read from `NXR_MARKS`. This module is the chain-specific NAMING of those two, kept because
+// the front and the ceremony scripts import Sepolia by name; it is not a second copy of either.
 
 import type { Address } from '../eth/types.js';
 import { DEPLOYED_VENUES } from './deployments.generated.js';
@@ -50,11 +48,9 @@ export const SEPOLIA_BTR = {
   stablePool: need(poolAt('btr-stable'), 'deployed btr-stable pool'),
   volatilePool: need(poolAt('btr-volatile'), 'deployed btr-volatile pool'),
   /**
-   * FX core: DECLARED BUT NOT DEPLOYED. `sepolia-risk-params.json` scripts the roster
-   * (`SEPOLIA_FX_SYMBOLS`) and `SepoliaPoolDeploy.s.sol deployFxPool()` can build it, but
-   * `11155111.pools.json` carries no `fxPool`, so the generated record has no `btr-fx` pool and
-   * this resolves to `undefined`. An older broadcast holds 0x18c7376A4F9B3C3fb8A0A33fAf3c55aD225CB229;
-   * that is a stale artifact of a superseded run and must NOT be pinned here, because pointing the
+   * FX core: DECLARED BUT NOT DEPLOYED. No current deployment record carries an `fxPool`, so
+   * this resolves to `undefined`. An older deployment held 0x18c7376A4F9B3C3fb8A0A33fAf3c55aD225CB229;
+   * that is a stale address of a superseded run and must NOT be pinned here, because pointing the
    * router at a pool the current fleet does not own is worse than having no FX route.
    *
    * Typed `Address | undefined` rather than omitted so consumers get "not deployed yet, handle it"
@@ -78,8 +74,7 @@ export interface SepoliaFeed {
  * ARRAY POSITION IS THE ON-CHAIN `feedIds[]` INDEX — the idx every NXR-signed record carries.
  *
  * Neither the order nor the ids are stated here: `deployments.generated.ts` keys `feedIds` by name
- * in ordinal order, which `scripts/gen.ts` derives by replaying the deploy scripts against dex's
- * own risk-params and refuses to emit unless the replay reproduces the recorded feed set. The NXR
+ * in ordinal order, matching the on-chain records. The NXR
  * pair, its served reciprocal and its market session come from `NXR_MARKS`, so an asset's mark
  * source is stated once and a symbol with no row there is a hard error at module load.
  */

@@ -70,12 +70,10 @@
   "files": ["src", "README.md"],
   "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle"],
   "scripts": {
-    "build": "bun run gen:check && bun build ./src/index.ts --outdir ./dist --target node",
-    "check": "bun run gen:check && bun run typecheck && bun test",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "check": "bun run typecheck && bun test",
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
     "format": "bunx biome format --write src",
-    "gen": "bun scripts/gen.ts",
-    "gen:check": "bun scripts/gen.ts --check",
     "lint": "bunx biome check src",
     "test": "bun test",
     "typecheck": "bunx tsgo -p tsconfig.json --noEmit"

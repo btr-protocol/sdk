@@ -257,7 +257,7 @@ export async function getPoolData(
 // Transaction Functions
 // ─────────────────────────────────────────────────────────────
 
-/** EIP-7528 native-asset sentinel (shared/evm `Constants.NATIVE`). Pool wraps to wnative on pull. */
+/** EIP-7528 native-asset sentinel (on-chain `Constants.NATIVE`). Pool wraps to wnative on pull. */
 export const NATIVE_TOKEN: Address = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 const txValue = (token: Address, amount: bigint): Hex =>

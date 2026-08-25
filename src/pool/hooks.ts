@@ -8,7 +8,7 @@
  * they proved to be exact aliases of the CompoundV2 / ERC4626 adapters — the venue
  * label survives for UI/APR attribution, the adapter is reused.
  *
- * kind → on-chain YieldHook adapter (dex/evm/src/hooks/*):
+ * kind → on-chain YieldHook adapter:
  *   idle        → (none)               buffer-only, no hook installed
  *   aave-v3     → AaveV3YieldHook
  *   aave-v4     → AaveV4YieldHook      experimental (reserveId ABI)

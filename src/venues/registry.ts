@@ -6,8 +6,8 @@
 // available, because nothing reverts and nothing logs. There is deliberately no default chain and
 // no fallback: a caller that cannot name its chain has no business building swap calldata.
 //
-// Facts come from `./deployments.generated.ts`, which is generated from the broadcast records in
-// `dex/evm/deployments/`. A chain with no record is simply absent, so an undeployed chain fails
+// Facts come from `./deployments.generated.ts`, the recorded deployment facts per chain.
+// A chain with no record is simply absent, so an undeployed chain fails
 // at the first lookup instead of resolving to plausible-looking addresses.
 
 import type { Address, Hex } from '../eth/index.js';
@@ -46,7 +46,7 @@ export function chainVenue(chainId: number): ChainVenue {
   const v = DEPLOYED_VENUES[chainId];
   if (!v) {
     throw new Error(
-      `no BTR deployment for chain ${chainId} — deployed: [${deployedChainIds().join(', ')}]. Run the deploy ceremony, then \`bun run gen\` in sdk/ to pick up dex/evm/deployments/${chainId}.{deploy,pools}.json.`,
+      `no BTR deployment for chain ${chainId} — deployed: [${deployedChainIds().join(', ')}]. No SDK record exists for it yet.`,
     );
   }
   return v;

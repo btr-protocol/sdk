@@ -1,4 +1,4 @@
-// Pure mirror of PoolLiquidity.swapLiability (dex/evm/src/libraries/PoolLiquidity.sol:411-484).
+// Pure mirror of the on-chain Pool liability-swap path.
 // Same style as front/src/lib/lpMath.ts: f64 in, f64 out, no chain reads. State inputs come from
 // getAsset (sdk/pool/index.ts) and the intra-pool conversion from amm/aimm.quoteExactIn, which
 // already mirrors Pricing.anchorPathQuoteLp.

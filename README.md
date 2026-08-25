@@ -1,33 +1,24 @@
 # @btr-protocol/sdk
 
-TypeScript SDK for the BTR stack — a **thin proxy over the backend**, not a second source of truth.
+TypeScript SDK for BTR — a thin client over the BTR backend.
 
-## Single source of truth: the backend
+**The BTR stack is currently closed source.** There is no public contract repository. The SDK
+ships no contract source and no build pipeline for one: it talks to the deployed protocol through
+the backend API and standard EVM JSON-RPC.
 
-ABIs, quoting, routing and chain/venue config are owned by the **backend** (`btr-quote`, served at
-`quote.btr.markets`). The SDK does NOT hard-code a parallel copy. It is a thin wrapper on that API:
+## ABIs come from the backend
 
-- **ABIs** — `fetchAbi('Pool')` → `GET {api}/abis/{name}` (hot + cold cached). Never bundled; the
-  wire contract is whatever the backend serves. Mirror on GitHub: `github.com/btr-protocol/abis`.
-- **Venues / chains / addresses** — `fetchVenues()` → `GET {api}/venues`. Not hard-coded.
-- **Quoting / routing / pricing** — `quoteExactInAsync` / `routeAsync` → `POST {api}/quote` ·
-  `POST {api}/route`. The bit-exact integer pricer (`btr-core`) runs on the backend.
-- Root URL overridable via `setApiRoot()` so any integrator can point at their own backend.
+ABIs are **fetched at runtime from the backend**, not bundled as a source of truth:
 
-**We deliberately do NOT maintain a frontend library for quoting/routing/pricing.** One behaviour
-change should touch one place (the backend), never a TypeScript port and a Rust mirror that drift.
-The `./amm` / `./router` modules here are a LEGACY offline compute surface kept for integrators who
-need local quotes without a network; the recommended + maintained path is the backend API.
+- `fetchAbi('Pool')` → `GET {api}/v1/abis/{name}` (hot + cold cached).
+- `fetchVenues()` → `GET {api}/v1/venues` for chains and deployed addresses.
+- Quoting / routing → `POST {api}/quote` · `POST {api}/route`.
+- Point at your own deployment with `setApiRoot()`.
 
-## Purpose
+Static copies of the interfaces under `@btr-protocol/sdk/abis` exist only for offline typing;
+the wire contract is whatever the backend serves.
 
-- Framework-agnostic EVM JSON-RPC client (`./eth`) — no `ethers`, no `viem` dep.
-- Lazy ABI + venue fetch (`./abis/fetch`, `./venues/fetch`) — thin, cached, backend-served.
-- Shared utils: encoding, validation, math, formatting, logger, constants, chains, tokens (`./utils`).
-
-## Install (workspace `file:` example)
-
-In a consumer `package.json`:
+## Install
 
 ```jsonc
 {
@@ -37,72 +28,22 @@ In a consumer `package.json`:
 }
 ```
 
-Then:
-
-```bash
-bun install
-```
-
 ## Exports
 
 | Subpath | Purpose |
 |---|---|
-| `@btr-protocol/sdk` | Curated root re-export (utils, pool incl. `POOL_ABI`, router, amm, eth) — the other ABIs are `@btr-protocol/sdk/abis`-only, not re-exported at root |
-| `@btr-protocol/sdk/abis` | Raw ABIs: `ACCESS_CONTROL_ABI`, `ADMIN_ABI`, `EXTERNAL_ORACLE_ABI`, `FLASH_ABI`, `LP_TOKEN_ABI`, `POOL_ABI`, `POOL_FACTORY_ABI`, `POOL_HOOKS_ABI` |
-| `@btr-protocol/sdk/amm` | Off-chain AIMM pricer (`buildLeg`, `quoteExactIn`, `depthCurve`) + route-finding (`enumerateRoutes`, `quoteRoute`, `rankSwap`, `aggregateDepth`) + `poolStateFrom` seam (see below) |
-| `@btr-protocol/sdk/eth` | EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
-| `@btr-protocol/sdk/pool` | Single-pool data + tx: `getAsset`, `getCoverageRatio`, `getLPBalance`, `getSwapQuote`, `getPoolData`, `swap`, `deposit`, `withdraw`, `NATIVE_TOKEN` (canonical `POOL_ABI`, `SwapQuote`, `PoolAsset`) |
-| `@btr-protocol/sdk/router` | `planToLegs(plan, opts)` + `buildSwapCalls(legs, opts)` + `totalValue(calls)` — route plan → ordered approve+swap calldata. No on-chain router (see below) |
-| `@btr-protocol/sdk/utils` | chains, tokens, constants, encoding, format, math, safe, typing, validation |
-| `@btr-protocol/sdk/utils/logger` | logger only |
-
-### Multi-pool routing
-
-Routing is deliberately off-chain: there is no on-chain `Router` contract. Route-finding lives in `./amm`: `enumerateRoutes` (direct + 2-hop shared-anchor), `quoteRoute`, `rankSwap` (best plan, greedy order-splitting across routes when that beats the best single route net of gas), `aggregateDepth`; `poolStateFrom(assets, base, feedOf)` converts on-chain `getPoolData()` reads + per-spoke `LegFeed`s (mark, σ, profile, κ) into the pricer's `PoolState`. `./router` executes: `planToLegs` maps a `rankSwap` plan to `ExecLeg[]` (largest part first, per-leg slippage floors, EIP-7528 native sentinel → `ExecLeg.native`); `buildSwapCalls` emits deduplicated `[approvals…, swaps…]`. Submit atomically via EIP-5792 `wallet_sendCalls` where supported, else sequentially (`Pool.swap` pulls from `msg.sender`, so Multicall3 can't execute the batch); `totalValue` sums the `msg.value` to attach.
-
-## Toolchain
-
-- Runtime/bundler: `bun`
-- Type checker: `tsgo` (via `@typescript/native-preview`)
-- Lint + format: `@biomejs/biome`
-
-```bash
-bun install
-bun run typecheck
-bun run build
-bun run test
-bun run lint
-```
-
-## Generated code (single source of truth)
-
-Everything the SDK knows about the contracts is derived from the sibling forge artifacts, never
-written by hand. `scripts/manifest.ts` is the one table saying which artifact backs which export;
-`scripts/gen.ts` writes from it:
-
-| Generated | Contents |
-|---|---|
-| `src/abis/*.ts` + `index.ts` | Contract ABIs, with library-thrown events/errors merged into `POOL_ABI` |
-| `src/pool/layout.generated.ts` | `POOL_STORAGE` / `POOL_MAPPINGS` / `POOL_STRUCTS` from solc's `storageLayout` |
-| `src/pool/structs.generated.ts` | Per-struct field-name unions + the `Assert`/`FieldsMatch` conformance types |
-
-```bash
-cd ../dex-evm && forge build && cd ../shared/evm && forge build   # artifacts first
-bun run gen          # regenerate
-bun run gen:check    # verify only — non-zero exit on drift
-```
-
-`gen:check` runs as the first step of `bun run build` and `bun run check`, so a contract change that
-skips regeneration fails the build instead of shipping a stale wire format. Hand-editing any file
-above is always wrong: it is overwritten wholesale and `gen:check` will fail on it.
-
-**Consumers (`back`, `front`, `keepers`) must not keep their own selector or ABI maps.** Import from
-`@btr-protocol/sdk/abis` and derive selectors/topic0s at runtime from those ABIs. Four independent
-hand-maintained copies of this data have drifted from the contracts and caused real bugs.
+| `.` | Curated root re-export (utils, pool, router, amm, eth) |
+| `/abis` | Static interface snapshots (`POOL_ABI`, `POOL_FACTORY_ABI`, …) |
+| `/amm` | Off-chain AIMM pricer + route-finding (fallback compute; the backend is authoritative) |
+| `/eth` | Dependency-free EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
+| `/pool` | Single-pool reads + tx builders (`getSwapQuote`, `swap`, `deposit`, `withdraw`) |
+| `/router` | Route plan → ordered approve+swap calldata (`planToLegs`, `buildSwapCalls`) |
+| `/venues` | Chain / venue registry, backend-fetched with static fallback |
+| `/utils` | encoding, validation, math, formatting, logger, constants |
 
 ## Usage
 
-Single pool — you already know which `Pool` holds the pair:
+Single pool:
 
 ```ts
 import { createHttpProvider } from '@btr-protocol/sdk/eth';
@@ -135,19 +76,18 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 // calls = deduplicated [...approvals, ...swaps] — EIP-5792 wallet_sendCalls (value: totalValue(calls)) or sequential
 ```
 
-## Consumers
+## Toolchain
 
-- `front/` — `@btr-protocol/front` (Preact SPA) via `file:../sdk`
-- `back/` — `@btr-protocol/back` Bun monorepo (collector, data, docs, referrals) via `file:../sdk`
-- `keepers/` — `btr-keeper` bots via `file:../../sdk`
+Runtime/bundler is [bun](https://bun.sh), type checker is `tsgo`, lint/format is biome.
+
+```bash
+bun install
+bun run typecheck
+bun run test
+```
 
 Repo: https://github.com/btr-protocol/sdk
 
-## Sibling repos
+## License
 
-One repo per concern under `~/Work/btr/` (GitHub: `btr-protocol/*`):
-
-- `core` - btr-core SSoT (Rust); `src/amm` here is its TS fallback mirror.
-- `dex-evm` - Solidity surface; storage-layout tests read its forge output.
-- `front` - primary consumer via `@sdk/*`.
-- `back`, `keepers`, `research`, `docs` - services, bots, studies, docs corpus.
+MIT

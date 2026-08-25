@@ -22,7 +22,7 @@ const roster = (chain: string): string[] => {
 describe('NXR mark sources', () => {
   test.each(['sepolia', 'arc'])('every %s roster symbol has a declared mark source', (chain) => {
     const syms = roster(chain);
-    if (!syms.length) return; // sdk-only checkout: dex is a sibling repo
+    if (!syms.length) return; // sdk-only checkout: contract repo is closed source
     const missing = syms.filter((s) => !nxrMark(s));
     expect(missing, `add these to NXR_MARKS`).toEqual([]);
   });

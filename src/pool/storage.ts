@@ -9,7 +9,6 @@
  * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
- * Policy: dex/evm/README.md § "Off-chain reads (no storage getters)".
  */
 
 import { BPS, type QuarticCurve, type QuarticSeg } from '../amm/aimm.js';
@@ -27,7 +26,7 @@ function isNativeKey(token: Address): boolean {
 }
 
 /**
- * Slot and packing tables, generated from dex/evm's compiled `storageLayout` — solc's own numbers,
+ * Slot and packing tables mirroring solc.s own `storageLayout` numbers,
  * so a repack cannot silently desync them. Re-exported here because every decoder below reads them
  * and callers import them from this module.
  */

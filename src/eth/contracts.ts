@@ -7,8 +7,8 @@
  * PLACEHOLDER REGISTRY. This is not the source of truth for deployed addresses and nothing
  * should be wired to it: there is no 11155111 key, so CONTRACTS[11155111] is undefined on the
  * only chain BTR is deployed to, and every DEX address on the chains listed below is
- * ZERO_ADDRESS. The real SoT is dex/evm/deployments/<chainId>.{deploy,pools}.json, which the
- * front end consumes via the btr-deployment vite plugin (front/src/config/deployment.ts).
+ * ZERO_ADDRESS. The real source of truth for deployed addresses is the backend venues API
+ * (`GET {api}/v1/venues`), which the front end consumes directly.
  *
  * There is no CREATE3 anywhere in the stack. Pool proxies are ERC-1967 beacon proxies pointing at
  * `PoolFactory` itself (the factory IS the beacon), deployed at a salt that includes block.chainid

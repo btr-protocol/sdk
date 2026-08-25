@@ -1,5 +1,5 @@
 {
-  "_generated": "bun scripts/gen.ts, from src/venues/nxr.ts NXR_MARKS. Do not edit by hand.",
+  "_generated": "Derived from src/venues/nxr.ts NXR_MARKS. Do not edit by hand.",
   "USDT": {
     "usd": {
       "symbol": "USDT-USD"

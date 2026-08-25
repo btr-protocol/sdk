@@ -4,7 +4,7 @@
  *
  * `AccessControl.GOV_DELAYS()` returns ONE `uint256` holding the whole fleet's delay schedule:
  * `Tier` count x uint32 seconds, least-significant tier first. Unpacking it is contract logic
- * (`shared/evm/src/Constants.sol` `delayOf`), so it lives here rather than in each caller.
+ * so it lives here rather than in each caller.
  */
 
 import { Tier } from '../abis/solidity.generated.js';

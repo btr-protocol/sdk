@@ -3,7 +3,7 @@ import { Tier } from '../abis/solidity.generated.js';
 import { delayOf, govDelays, hasZeroDelay } from './index.js';
 
 const DAY = 86_400n;
-/** `SC.PROD_DELAYS` (shared/evm/src/Constants.sol), packed here the way a deploy script packs it. */
+/** `SC.PROD_DELAYS`, packed here the way a deploy script packs it. */
 const PROD =
   (7n * DAY) |
   ((3n * DAY) << 32n) |

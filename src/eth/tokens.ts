@@ -682,8 +682,7 @@ const TOKEN_KEY_BY_UPPER = new Map(Object.keys(TOKENS).map((k) => [k.toUpperCase
  *
  * Two normalisations, and only two:
  *  - the trailing `.b` FAUCET SUFFIX is dropped. Testnet mocks carry it in their ERC-20 `name()`
- *    and `symbol()` and nowhere else (`dex/evm/deployments/arc-risk-params.json`
- *    `.noteSymbolConvention`), so `USDT.b` is the token `USDT`.
+ *    and `symbol()` and nowhere else, so `USDT.b` is the token `USDT`.
  *  - case is folded. 18 of the registry's keys are mixed-case (`stETH`, `wstETH`, `cbETH`, …), so
  *    an upper-case-only lookup misses every one of them.
  *

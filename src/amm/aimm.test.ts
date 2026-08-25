@@ -232,14 +232,13 @@ describe('path risk composes over legs, never maxes', () => {
 });
 
 // ── NUQuartic mirror: exact-integer parity vs the on-chain vectors ──────────────
-// Same fixture the Solidity suite (dex/evm/test/unit/NUQuartic.t.sol) certifies against; the
-// vectors' yQ/aQ were emitted by the float fitter, so parity carries the SAME tolerances as the
-// Sol test (eval ≤ 200 pbps·1e-9 units; area ≤ 1e-6 rel + 0.1 pbps·x abs). BigInt evalQ/areaQ
+// Same fixture the on-chain Solidity suite certifies against; parity carries the same
+// tolerances as that suite (eval ≤ 200 pbps·1e-9 units; area ≤ 1e-6 rel + 0.1 pbps·x abs). BigInt evalQ/areaQ
 // reproduce Solidity truncation exactly, so agreeing within those bands ⇒ on-chain agreement.
 const VECTORS_PATH = resolve(
   new URL('.', import.meta.url).pathname,
   '../../..',
-  'dex/evm/test/proto/quartic_vectors.json',
+  'dex-evm/test/proto/quartic_vectors.json',
 );
 interface ParityVec {
   interior: number[];
@@ -248,10 +247,9 @@ interface ParityVec {
   yQ: number[];
   areas: { x1: number; x2: number; aQ: number }[];
 }
-// The vectors are tracked in the dex repo and stay there: they are the SSoT the Solidity suite
-// certifies against, and a second copy here would be free to drift. An sdk-only checkout has no
-// sibling to read, so this describe's cases skip WITH A REASON rather than taking the whole file
-// down with a module-load ENOENT (which is what silently cost this file all 44 of its tests).
+// The vectors live in the closed-source contract repo and stay there: a second copy here would
+// be free to drift. An sdk-only checkout has none to read, so this describe's cases skip WITH A
+// REASON rather than dying at module load.
 const hasVectors = existsSync(VECTORS_PATH);
 const vectors = hasVectors
   ? (JSON.parse(readFileSync(VECTORS_PATH, 'utf8')) as Record<string, ParityVec>)
@@ -259,10 +257,10 @@ const vectors = hasVectors
 const parityTest = hasVectors
   ? test
   : (name: string, _fn: () => void) =>
-      test.skip(`${name} — SKIPPED: ${VECTORS_PATH} absent (needs a sibling dex checkout)`, () => {});
+      test.skip(`${name} — SKIPPED: ${VECTORS_PATH} absent (vectors unavailable)`, () => {});
 
 /** `NUQuartic._centre` shift the WRITE applies but the vectors (uncentred fitter snapshots) do not.
- *  Truncating `/` mirrors NUQuartic.t.sol's own reference centre; the ≤1-unit gap against the
+ *  Truncating `/` mirrors the on-chain reference centre; the ≤1-unit gap against the
  *  library's floor `>>1` sits inside the parity band. */
 const refCentre = (wQ: number[]): bigint => (BigInt(wQ[0]) + BigInt(wQ[wQ.length - 1])) / 2n;
 
@@ -282,7 +280,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
         }
       }
     }
-    // Report the worst |Δ| (pbps·1e-9 units) — mirrors NUQuartic.t.sol's assertLe(worst, 200).
+    // Report the worst |Δ| (pbps·1e-9 units) — mirrors the on-chain assertLe(worst, 200).
     console.log(`evalQ parity worst |Δ| = ${worst} (pbps·1e-9) at ${worstAt}`);
     expect(worst).toBeLessThanOrEqual(200n);
   });
@@ -534,8 +532,8 @@ describe('fees == actual haircut (no double-count)', () => {
   });
 });
 
-// GATE-07: covToll/covQ port faithfulness — mirrors the Lemma-C properties machine-checked in
-// dex/evm/test/unit/CoverageProofs.t.sol (Pricing._covToll fuzz suite) as deterministic examples.
+// GATE-07: covToll/covQ port faithfulness — deterministic examples for the Lemma-C properties
+// machine-checked in the on-chain Pricing fuzz suite.
 describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
   test('κ=0 must be free regardless of drain size', () => {
     expect(covToll(1000, 1000, 0, 500)).toBe(0);
