@@ -11,7 +11,7 @@
 // at the first lookup instead of resolving to plausible-looking addresses.
 
 import type { Address, Hex } from '../eth/index.js';
-import { DEPLOYED_VENUES, type ChainVenue } from './deployments.generated.js';
+import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { nxrMark } from './nxr.js';
 
 export type VenueKind = 'btr';

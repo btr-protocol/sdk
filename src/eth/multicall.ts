@@ -3,26 +3,38 @@
  * Zero dependencies, works with optimized ABI coder
  */
 
-import { ethCall, getBlockNumber } from './rpc';
-import { encodeFn, decodeFn } from './abi';
+import { decodeFn, encodeFn } from './abi';
 import { getMulticall3 } from './chains';
+import { ethCall, getBlockNumber } from './rpc';
 import type { Address, Eip1193Provider } from './types';
 
 export const MC3_ADDR = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
 // Minimal ABI definition with short keys to save space
-const MC3_ABI = [{
-  name: 'aggregate3',
-  inputs: [{ type: 'tuple[]', components: [
-    { name: 't', type: 'address' }, // target
-    { name: 'f', type: 'bool' },    // failureAllowed
-    { name: 'd', type: 'bytes' }    // callData
-  ]}],
-  outputs: [{ type: 'tuple[]', components: [
-    { name: 's', type: 'bool' },    // success
-    { name: 'r', type: 'bytes' }    // returnData
-  ]}]
-}];
+const MC3_ABI = [
+  {
+    name: 'aggregate3',
+    inputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 't', type: 'address' }, // target
+          { name: 'f', type: 'bool' }, // failureAllowed
+          { name: 'd', type: 'bytes' }, // callData
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 's', type: 'bool' }, // success
+          { name: 'r', type: 'bytes' }, // returnData
+        ],
+      },
+    ],
+  },
+];
 
 export interface Call {
   address: Address;
@@ -38,7 +50,7 @@ export const MC3_CHUNK = 200;
 export async function multicall(
   p: Eip1193Provider,
   calls: Call[],
-  opt: { addr?: Address; chainId?: number; block?: string; chunkSize?: number } = {}
+  opt: { addr?: Address; chainId?: number; block?: string; chunkSize?: number } = {},
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> {
   // 0. Nothing to ask: the old per-item callers made zero requests for an empty
@@ -56,22 +68,23 @@ export async function multicall(
     const parts: Call[][] = [];
     for (let i = 0; i < calls.length; i += chunk) parts.push(calls.slice(i, i + chunk));
     const out = await Promise.all(
-      parts.map(c => multicall(p, c, { ...opt, block, chunkSize: Infinity }))
+      parts.map((c) => multicall(p, c, { ...opt, block, chunkSize: Infinity })),
     );
     return out.flat();
   }
 
   // 1. Encode all calls
-  const inputs = calls.map(c => ({
+  const inputs = calls.map((c) => ({
     t: c.address,
     f: c.allowFailure ?? true,
-    d: encodeFn(c) // Re-uses Call interface directly for encodeFn
+    d: encodeFn(c), // Re-uses Call interface directly for encodeFn
   }));
 
   // 2. Execute aggregate3
   const data = encodeFn({ abi: MC3_ABI, functionName: 'aggregate3', args: [inputs] });
   // Use explicit addr > chainId override > default
-  const multicallAddr = opt.addr || (opt.chainId !== undefined ? getMulticall3(opt.chainId) : MC3_ADDR);
+  const multicallAddr =
+    opt.addr || (opt.chainId !== undefined ? getMulticall3(opt.chainId) : MC3_ADDR);
   const raw = await ethCall(p, multicallAddr, data, opt.block);
 
   // 3. Decode results
@@ -94,9 +107,13 @@ export async function multicall(
 export async function multicallStrict<T = any>(
   p: Eip1193Provider,
   calls: Call[],
-  opt?: { addr?: Address; chainId?: number; block?: string; chunkSize?: number }
+  opt?: { addr?: Address; chainId?: number; block?: string; chunkSize?: number },
 ): Promise<T[]> {
-  const res = await multicall(p, calls.map(c => ({ ...c, allowFailure: false })), opt);
+  const res = await multicall(
+    p,
+    calls.map((c) => ({ ...c, allowFailure: false })),
+    opt,
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const err = res.find((r: any) => !r.success);
   if (err) throw new Error(`Multicall error: ${(err as any).error}`);

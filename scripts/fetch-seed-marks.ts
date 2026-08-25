@@ -62,7 +62,7 @@ if (!CHAIN) {
   process.exit(1);
 }
 
-const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex');
+const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
 // The Solidity halves (ArcPoolDeploy._riskPath/_marksPath) resolve RISK_PARAMS/SEED_MARKS against
 // the forge working directory dex/evm. Mirror them so one env override names the same file for the
 // fetcher and the deploy scripts, instead of two different defaults.

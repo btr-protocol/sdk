@@ -9,11 +9,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-/** Sibling repo holding `evm/out`. Periphery singletons live in `shared`, the DEX in `dex`. */
+/** Sibling repo holding `out`. Periphery singletons live in `shared`, the DEX in `dex-evm`. */
 export type Root = 'dex' | 'shared';
 
 export const EVM_ROOTS: Record<Root, string> = {
-  dex: resolve(import.meta.dir, '../../dex/evm'),
+  dex: resolve(import.meta.dir, '../../dex-evm'),
   shared: resolve(import.meta.dir, '../../shared/evm'),
 };
 
@@ -65,13 +65,7 @@ export const CONTRACTS: ContractSpec[] = [
     blurb:
       'Flat pool surface: swap/deposit/withdraw/view, the per-asset yield-hook surface, and the pool-scoped `admin*` entrypoints the Admin singleton calls into. Events and errors of the pool libraries are merged in so revert data decodes against this one ABI.',
     mergeEventsFrom: ['IPool', 'Pricing', 'PoolLiquidity'],
-    mergeErrorsFrom: [
-      'Errors.sol/ErrLib',
-      'PoolConfig',
-      'Pricing',
-      'PoolLiquidity',
-      'NUQuartic',
-    ],
+    mergeErrorsFrom: ['Errors.sol/ErrLib', 'PoolConfig', 'Pricing', 'PoolLiquidity', 'NUQuartic'],
   },
   {
     contract: 'IPoolHooks',
@@ -176,7 +170,7 @@ export function enumMembers(spec: EnumSpec): string[] {
   const src = readFileSync(resolve(EVM_ROOTS[spec.root], spec.path), 'utf8');
   const name = spec.solName ?? spec.name;
   const m = new RegExp(`enum\\s+${name}\\s*\\{([^}]*)\\}`).exec(src);
-  if (!m?.[1]) throw new Error(`enum ${name} not found in ${spec.root}/evm/${spec.path}`);
+  if (!m?.[1]) throw new Error(`enum ${name} not found in ${EVM_ROOTS[spec.root]}/${spec.path}`);
   const members = m[1]
     .replace(/\/\/[^\n]*/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -263,7 +257,10 @@ interface Artifact {
     storage: Array<{ label: string; slot: string; offset: number; type: string }>;
     types: Record<
       string,
-      { label: string; members?: Array<{ label: string; slot: string; offset: number; type: string }> }
+      {
+        label: string;
+        members?: Array<{ label: string; slot: string; offset: number; type: string }>;
+      }
     >;
   };
 }

@@ -4,10 +4,15 @@
  */
 
 import { POOL_ABI } from '../abis/Pool.js';
+import type {
+  Assert,
+  AssetFields,
+  FieldsMatch,
+  SwapQuoteFields,
+} from '../abis/structs.generated.js';
 import { decodeFn, encodeFn } from '../eth/abi';
 import { multicallStrict } from '../eth/multicall';
 import type { Address, Eip1193Provider, Hex } from '../eth/types';
-import type { Assert, AssetFields, FieldsMatch, SwapQuoteFields } from '../abis/structs.generated.js';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)
@@ -222,7 +227,7 @@ export async function getPoolData(
   // eth_call and throws — same contract as the per-token loop this replaced.
   const res = await multicallStrict<any>(
     provider,
-    tokens.flatMap(t => [
+    tokens.flatMap((t) => [
       { address: poolAddress, abi: POOL_ABI, functionName: 'getAsset', args: [t.address] },
       { address: poolAddress, abi: POOL_ABI, functionName: 'getCoverageRatio', args: [t.address] },
     ]),
@@ -268,7 +273,8 @@ export const NO_DEADLINE: bigint = 0xffffffffn;
 /** Default tx validity window (seconds) when no deadline is supplied. */
 export const DEFAULT_DEADLINE_S = 600;
 /** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now. */
-export const defaultDeadline = (): bigint => BigInt(Math.floor(Date.now() / 1000) + DEFAULT_DEADLINE_S);
+export const defaultDeadline = (): bigint =>
+  BigInt(Math.floor(Date.now() / 1000) + DEFAULT_DEADLINE_S);
 
 export interface SwapParams {
   tokenIn: Address;
@@ -366,7 +372,12 @@ export async function withdraw(
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'withdraw',
-    args: [params.token, params.lpAmount, params.minAmountOut, params.deadline ?? defaultDeadline()],
+    args: [
+      params.token,
+      params.lpAmount,
+      params.minAmountOut,
+      params.deadline ?? defaultDeadline(),
+    ],
   });
 
   return (await provider.request({

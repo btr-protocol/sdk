@@ -29,7 +29,7 @@ import {
   SEPOLIA_VOLATILE_SYMBOLS,
 } from '../src/venues/sepolia.js';
 
-const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex');
+const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
 const DEPLOYMENTS = join(DEX, 'evm/deployments');
 
 const errs: string[] = [];

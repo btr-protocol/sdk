@@ -10,9 +10,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { POOL_ABI } from '../src/abis/Pool';
+import { type AbiError, encodeErrorResult } from '../src/eth/abi';
+import { RpcRevertError } from '../src/eth/transport';
+import type { Address, Eip1193Provider } from '../src/eth/types';
 import { planToLegs } from '../src/router/index';
-import { quoteAllExactIn } from '../src/venues/router';
-import { SEPOLIA_BTR, SEPOLIA_CHAIN_ID, SEPOLIA_TOKENS } from '../src/venues/sepolia';
 import {
   activeFeedId,
   activeOracle,
@@ -21,10 +23,8 @@ import {
   deployedChainIds,
   staticVenuePools,
 } from '../src/venues/registry';
-import { RpcRevertError } from '../src/eth/transport';
-import { encodeErrorResult, type AbiError } from '../src/eth/abi';
-import { POOL_ABI } from '../src/abis/Pool';
-import type { Address, Eip1193Provider } from '../src/eth/types';
+import { quoteAllExactIn } from '../src/venues/router';
+import { SEPOLIA_BTR, SEPOLIA_CHAIN_ID, SEPOLIA_TOKENS } from '../src/venues/sepolia';
 
 /** Encode a real Pool custom error exactly as the node would return it in `error.data`. */
 const revertData = (name: string, args: unknown[]) => {
@@ -76,7 +76,11 @@ describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
     // @ts-expect-error recipient is mandatory: there is no safe default for it.
     const _a: Parameters<typeof quoteAllExactIn>[0] = { ...base, minOut: 0n };
     // @ts-expect-error minOut is mandatory: a defaulted 0 is zero slippage protection.
-    const _b: Parameters<typeof quoteAllExactIn>[0] = { ...base, recipient: ALICE, minOut: undefined };
+    const _b: Parameters<typeof quoteAllExactIn>[0] = {
+      ...base,
+      recipient: ALICE,
+      minOut: undefined,
+    };
     expect(true).toBe(true);
   });
 });
@@ -117,7 +121,13 @@ describe('quoteAllExactIn separates a protocol halt from a transport failure', (
   });
 
   test('a deliberate depeg halt is named, not collapsed into a null quote', async () => {
-    const skips = await runWith(new RpcRevertError('execution reverted', 3, revertData('BaseDepegged', [990000000000000000n, 1000n])));
+    const skips = await runWith(
+      new RpcRevertError(
+        'execution reverted',
+        3,
+        revertData('BaseDepegged', [990000000000000000n, 1000n]),
+      ),
+    );
     expect(skips.filter((s) => s.kind === 'halt').map((s) => s.reason)).toContain('BaseDepegged');
   });
 
@@ -164,7 +174,9 @@ const directPlan = (amountIn: number, amountOut: number) =>
 describe('planToLegs validates slippage and derives minOut in bigint space', () => {
   test('slippageFrac >= 1 throws instead of yielding minOut = 0', () => {
     // The pre-fix path computed amountOut * (1 - 1) = 0 and shipped a batch with no floor.
-    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: 1, tokenOf })).toThrow(/\[0, 1\)/);
+    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: 1, tokenOf })).toThrow(
+      /\[0, 1\)/,
+    );
     expect(() => planToLegs(directPlan(100, 100), { slippageFrac: 1.5, tokenOf })).toThrow();
   });
 
@@ -236,12 +248,7 @@ describe('chain resolution refuses to guess', () => {
     const ARC = 5_042_002;
     expect(deployedChainIds()).toContain(ARC);
     const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
-    expect(Object.keys(byTag).sort()).toEqual([
-      'btr-crypto',
-      'btr-fx',
-      'btr-stable',
-      'btr-stocks',
-    ]);
+    expect(Object.keys(byTag).sort()).toEqual(['btr-crypto', 'btr-fx', 'btr-stable', 'btr-stocks']);
     expect(byTag['btr-crypto']!.tokens).toHaveLength(11);
     expect(chainVenue(ARC).refFeeds).toContain('WETH-USDC');
   });

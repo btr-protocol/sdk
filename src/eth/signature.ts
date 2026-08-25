@@ -2,10 +2,10 @@
  * Ethereum signature verification for personal_sign format
  */
 
-import type { Address, Hex } from './types';
-import { keccak256 } from './index';
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { keccak256 } from './index';
+import type { Address, Hex } from './types';
 
 /**
  * Recover signer address from personal_sign signature

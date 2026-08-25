@@ -15,20 +15,25 @@ import type { Eip1193Provider } from './types';
 // ─────────────────────────────────────────────────────────────
 
 export class RpcError extends Error {
-  constructor(message: string, readonly code?: number, readonly data?: unknown) {
+  constructor(
+    message: string,
+    readonly code?: number,
+    readonly data?: unknown,
+  ) {
     super(message);
     this.name = new.target.name; // subclass name
   }
 }
-export class RpcRevertError extends RpcError {}     // execution reverted — NOT retryable
-export class RpcRateLimitError extends RpcError {}  // 429 / -32005 — retryable
-export class RpcTimeoutError extends RpcError {}    // AbortController fired — retryable
-export class RpcNetworkError extends RpcError {}    // fetch fail / non-ok HTTP — retryable
+export class RpcRevertError extends RpcError {} // execution reverted — NOT retryable
+export class RpcRateLimitError extends RpcError {} // 429 / -32005 — retryable
+export class RpcTimeoutError extends RpcError {} // AbortController fired — retryable
+export class RpcNetworkError extends RpcError {} // fetch fail / non-ok HTTP — retryable
 
 // Classify a JSON-RPC error object into a typed error.
 function rpcErr(e: { code?: number; message?: string; data?: unknown }): RpcError {
   const msg = e.message ?? 'RPC error';
-  if (e.code === 3 || /execution reverted|revert/i.test(msg)) return new RpcRevertError(msg, e.code, e.data);
+  if (e.code === 3 || /execution reverted|revert/i.test(msg))
+    return new RpcRevertError(msg, e.code, e.data);
   if (e.code === -32005 || e.code === -32016 || /rate.?limit|too many|limit exceeded/i.test(msg))
     return new RpcRateLimitError(msg, e.code, e.data);
   return new RpcError(msg, e.code, e.data);
@@ -40,14 +45,22 @@ function rpcErr(e: { code?: number; message?: string; data?: unknown }): RpcErro
 
 // Idempotent reads safe to dedupe within a coalescing window.
 const DEDUPE = new Set([
-  'eth_call', 'eth_getBalance', 'eth_chainId', 'eth_blockNumber', 'eth_getCode',
-  'eth_getStorageAt', 'eth_gasPrice', 'eth_getBlockByNumber', 'eth_getTransactionReceipt',
-  'eth_getTransactionCount', 'eth_estimateGas',
+  'eth_call',
+  'eth_getBalance',
+  'eth_chainId',
+  'eth_blockNumber',
+  'eth_getCode',
+  'eth_getStorageAt',
+  'eth_gasPrice',
+  'eth_getBlockByNumber',
+  'eth_getTransactionReceipt',
+  'eth_getTransactionCount',
+  'eth_estimateGas',
 ]);
 
 export interface TransportOpts {
-  timeout?: number;   // per-request ms (default 10000)
-  retries?: number;   // extra attempts after the first (default 3)
+  timeout?: number; // per-request ms (default 10000)
+  retries?: number; // extra attempts after the first (default 3)
   retryDelay?: number; // base backoff ms (default 150)
   // batch:false disables coalescing; {wait} in ms (default 0 = microtask), {max} chunk size
   batch?: boolean | { wait?: number; max?: number };
@@ -56,9 +69,12 @@ export interface TransportOpts {
 type Waiter = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 type Pending = Waiter & { method: string; params: unknown[]; key?: string; waiters: Waiter[] };
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function httpTransport(urls: string | readonly string[], opts: TransportOpts = {}): Eip1193Provider {
+export function httpTransport(
+  urls: string | readonly string[],
+  opts: TransportOpts = {},
+): Eip1193Provider {
   const endpoints = (Array.isArray(urls) ? urls : [urls]) as string[];
   const timeout = opts.timeout ?? 10_000;
   const retries = opts.retries ?? 3;
@@ -106,7 +122,8 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
         return await fetchRpc(endpoints[attempt % endpoints.length], body);
       } catch (e) {
         last = e;
-        if (attempt < retries) await sleep(Math.min(4000, baseDelay * 2 ** attempt) + Math.random() * baseDelay);
+        if (attempt < retries)
+          await sleep(Math.min(4000, baseDelay * 2 ** attempt) + Math.random() * baseDelay);
       }
     }
     throw last;
@@ -119,12 +136,23 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
   };
   const done = (p: Pending, r: any) => {
     if (p.key) inflight.delete(p.key);
-    if (r?.error) { const e = rpcErr(r.error); p.reject(e); for (const w of p.waiters) w.reject(e); }
-    else { p.resolve(r?.result); for (const w of p.waiters) w.resolve(r?.result); }
+    if (r?.error) {
+      const e = rpcErr(r.error);
+      p.reject(e);
+      for (const w of p.waiters) w.reject(e);
+    } else {
+      p.resolve(r?.result);
+      for (const w of p.waiters) w.resolve(r?.result);
+    }
   };
 
   async function sendChunk(chunk: Pending[]) {
-    const reqs = chunk.map(p => ({ jsonrpc: '2.0', id: ++id, method: p.method, params: p.params }));
+    const reqs = chunk.map((p) => ({
+      jsonrpc: '2.0',
+      id: ++id,
+      method: p.method,
+      params: p.params,
+    }));
     try {
       const json = await post(chunk.length === 1 ? reqs[0] : reqs);
       const arr = Array.isArray(json) ? json : [json];
@@ -137,7 +165,8 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
 
   function flush() {
     scheduled = false;
-    const batch = queue; queue = [];
+    const batch = queue;
+    queue = [];
     for (let i = 0; i < batch.length; i += maxBatch) sendChunk(batch.slice(i, i + maxBatch));
   }
   const schedule = () => {
@@ -146,7 +175,10 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
     wait > 0 ? setTimeout(flush, wait) : queueMicrotask(flush);
   };
 
-  const request = ({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> => {
+  const request = ({
+    method,
+    params = [],
+  }: { method: string; params?: unknown[] }): Promise<unknown> => {
     if (!batchOn) {
       return post({ jsonrpc: '2.0', id: ++id, method, params }).then((j: any) => {
         if (j?.error) throw rpcErr(j.error);
@@ -157,9 +189,20 @@ export function httpTransport(urls: string | readonly string[], opts: TransportO
       if (DEDUPE.has(method)) {
         const key = method + JSON.stringify(params);
         const lead = inflight.get(key);
-        if (lead) { lead.waiters.push({ resolve, reject }); return; }
-        const p: Pending = { method, params: params as unknown[], resolve, reject, key, waiters: [] };
-        inflight.set(key, p); queue.push(p);
+        if (lead) {
+          lead.waiters.push({ resolve, reject });
+          return;
+        }
+        const p: Pending = {
+          method,
+          params: params as unknown[],
+          resolve,
+          reject,
+          key,
+          waiters: [],
+        };
+        inflight.set(key, p);
+        queue.push(p);
       } else {
         queue.push({ method, params: params as unknown[], resolve, reject, waiters: [] });
       }

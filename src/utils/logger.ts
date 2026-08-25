@@ -13,15 +13,14 @@ interface LogEntry {
   data?: unknown;
 }
 
-let notifyFn: ((type: 'info' | 'success' | 'warning' | 'error', message: string) => void) | null = null;
+let notifyFn: ((type: 'info' | 'success' | 'warning' | 'error', message: string) => void) | null =
+  null;
 let defaultContext: string | undefined;
 let minLevel: LogLevel = 'info';
 
 function isBrowser(): boolean {
   // Use globalThis to avoid TypeScript errors in non-DOM environments
-  return typeof globalThis !== 'undefined' &&
-    'window' in globalThis &&
-    'document' in globalThis;
+  return typeof globalThis !== 'undefined' && 'window' in globalThis && 'document' in globalThis;
 }
 
 function formatLog(entry: LogEntry): string {
@@ -31,10 +30,14 @@ function formatLog(entry: LogEntry): string {
 
 function consoleMethod(level: LogLevel): (...args: unknown[]) => void {
   switch (level) {
-    case 'debug': return console.debug;
-    case 'info': return console.info;
-    case 'warn': return console.warn;
-    case 'error': return console.error;
+    case 'debug':
+      return console.debug;
+    case 'info':
+      return console.info;
+    case 'warn':
+      return console.warn;
+    case 'error':
+      return console.error;
   }
 }
 
@@ -46,9 +49,12 @@ function shouldLog(level: LogLevel): boolean {
 function levelToNotificationType(level: LogLevel): 'info' | 'success' | 'warning' | 'error' {
   switch (level) {
     case 'debug':
-    case 'info': return 'info';
-    case 'warn': return 'warning';
-    case 'error': return 'error';
+    case 'info':
+      return 'info';
+    case 'warn':
+      return 'warning';
+    case 'error':
+      return 'error';
   }
 }
 
@@ -75,7 +81,7 @@ function log(level: LogLevel, message: string, data?: unknown, context?: string)
  * Set the notification handler for frontend integration
  */
 export function setNotificationHandler(
-  fn: (type: 'info' | 'success' | 'warning' | 'error', message: string) => void
+  fn: (type: 'info' | 'success' | 'warning' | 'error', message: string) => void,
 ): void {
   notifyFn = fn;
 }

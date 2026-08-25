@@ -1,20 +1,29 @@
 // bun test — numeric display formatting.
-import { expect, test, describe } from 'bun:test';
-import { formatNumber, formatPercentSig, formatPrice, formatYield, subscriptZeros, toInputValue } from './format';
+import { describe, expect, test } from 'bun:test';
+import {
+  formatNumber,
+  formatPercentSig,
+  formatPrice,
+  formatYield,
+  subscriptZeros,
+  toInputValue,
+} from './format';
 
-// A bare /\.?0+$/ strip on a toFixed(0) string has no decimal point to anchor on,
-// so it eats integer zeros: 19.8% rendered as "2%" on price impact and LP fee.
-describe('trailing-zero strip never eats integer digits', () => {
+// App-wide percent law: THREE significant digits at every magnitude, trailing zeros trimmed.
+// Exactly zero renders unsigned "0.00%"; a bare "0%" is never emitted.
+describe('formatPercentSig keeps three significant figures at every magnitude', () => {
   test.each([
     [10, '10%'],
-    [10.4, '10%'],
-    [19.8, '20%'],
+    [10.4, '10.4%'],
+    [19.8, '19.8%'],
     [20, '20%'],
     [50, '50%'],
     [100, '100%'],
     [110, '110%'],
     [300, '300%'],
-    [-19.8, '-20%'],
+    [281, '281%'],
+    [14.8, '14.8%'],
+    [-19.8, '-19.8%'],
   ])('formatPercentSig(%p) = %p', (input, want) => {
     expect(formatPercentSig(input)).toBe(want);
   });
@@ -34,14 +43,17 @@ test('sub-unit percents fold long leading-zero runs into the subscript form', ()
   expect(formatPercentSig(0.000000002)).toBe('0.0₈2%');
   expect(formatPercentSig(-0.000000002)).toBe('-0.0₈2%');
   expect(formatPercentSig(0.0001)).toBe('0.0₃1%');
+  expect(formatPercentSig(0.0000123)).toBe('0.0₄123%');
   // Two zeros stay plain: the run is short enough to read.
   expect(formatPercentSig(0.024)).toBe('0.024%');
 });
 
-test('sub-unit percents keep significant figures', () => {
-  expect(formatPercentSig(0.024)).toBe('0.024%');
-  expect(formatPercentSig(1.23)).toBe('1.2%');
+test('sub-unit percents keep three significant figures', () => {
+  expect(formatPercentSig(0.42)).toBe('0.42%');
+  expect(formatPercentSig(0.0412)).toBe('0.0412%');
+  expect(formatPercentSig(1.23)).toBe('1.23%');
   expect(formatPercentSig(5.5)).toBe('5.5%');
+  // Exactly zero: unsigned 0.00%, never a fabricated value for missing input upstream.
   expect(formatPercentSig(0)).toBe('0.00%');
 });
 
@@ -127,28 +139,30 @@ test('toInputValue stays plain ASCII and parses back', () => {
   expect(toInputValue(null)).toBe('');
 });
 
-// Yields: 3 significant figures at or above 1%, 2 below. A yield off a finite fee sample is not
-// accurate to four digits, and a flat 3sf spends them all on leading zeros down at 0.0987%.
+// Yields: three significant figures at EVERY magnitude (the owner's app-wide percent law).
+// A yield off a finite fee sample still rounds to three figures - 2222 → "2220%", never four
+// digits of false accuracy - but small rates keep their digits instead of collapsing to "0%":
+// that step down to 2sf below 1% is what once printed a real hook rate as a bare zero.
 describe('formatYield rounds to significant figures', () => {
   test.each([
     [2222, '2220%'],
     [17.456, '17.5%'],
-    [0.0987, '0.099%'],
+    [0.0987, '0.0987%'],
     [3.68, '3.68%'],
     [12, '12%'],
     [100, '100%'],
     [0.5, '0.5%'],
     [0.00012, '0.0₃12%'], // ≥3 leading zeros fold, same as prices
     [-4.55, '-4.55%'],
-    [0, '0%'],
+    [0, '0.00%'],
   ])('formatYield(%p) = %p', (input, want) => {
     expect(formatYield(input)).toBe(want);
   });
 
-  test('the boundary at 1% is where the figure count steps down', () => {
-    expect(formatYield(1.234)).toBe('1.23%');   // >= 1 -> 3sf
-    expect(formatYield(0.1234)).toBe('0.12%');  // <  1 -> 2sf
-    expect(formatYield(0.01234)).toBe('0.012%');
+  test('three significant digits survive at every magnitude', () => {
+    expect(formatYield(1.234)).toBe('1.23%');
+    expect(formatYield(0.1234)).toBe('0.123%');
+    expect(formatYield(0.01234)).toBe('0.0123%');
   });
 
   test('null and non-finite never invent a zero', () => {

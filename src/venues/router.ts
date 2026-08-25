@@ -2,18 +2,18 @@
 // Winner-take-all: best single-hop, else simple USDC-hub 2-hop.
 // Does NOT replace the off-chain AIMM router (../router) — on-chain quotes only.
 
+import { decodeErrorResult } from '../eth/abi.js';
 import {
-  encodeFn,
-  ERC20_ABI,
-  RpcRevertError,
-  ZERO_ADDRESS,
   type Address,
+  ERC20_ABI,
   type Eip1193Provider,
   type Hex,
+  RpcRevertError,
+  ZERO_ADDRESS,
+  encodeFn,
 } from '../eth/index.js';
-import { decodeErrorResult } from '../eth/abi.js';
-import { getSwapQuote, defaultDeadline, POOL_ABI } from '../pool/index.js';
-import { eqAddr, hasToken, staticVenuePools, type VenueKind, type VenuePool } from './registry.js';
+import { POOL_ABI, defaultDeadline, getSwapQuote } from '../pool/index.js';
+import { type VenueKind, type VenuePool, eqAddr, hasToken, staticVenuePools } from './registry.js';
 
 export interface VenueExecCall {
   to: Address;
@@ -124,7 +124,8 @@ async function quoteBtr(
   minOut: bigint,
   onSkip: (skip: VenueSkip) => void,
 ): Promise<VenueLegQuote | null> {
-  if (pool.tokens && (!hasToken(pool.tokens, tokenIn) || !hasToken(pool.tokens, tokenOut))) return null;
+  if (pool.tokens && (!hasToken(pool.tokens, tokenIn) || !hasToken(pool.tokens, tokenOut)))
+    return null;
   const q = await safeRead(
     () => getSwapQuote(provider, pool.address, tokenIn, tokenOut, amountIn),
     pool.address,
@@ -185,7 +186,10 @@ function approveCall(token: Address, spender: Address, amount: bigint): VenueExe
  */
 export function buildVenueExecCalls(
   quote: BestVenueQuote,
-  opts: { approveMax?: boolean; needsApproval?: (token: Address, spender: Address) => boolean } = {},
+  opts: {
+    approveMax?: boolean;
+    needsApproval?: (token: Address, spender: Address) => boolean;
+  } = {},
 ): VenueExecCall[] {
   const legs: VenueLegQuote[] =
     quote.legs && quote.legs.length

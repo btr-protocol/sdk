@@ -2,8 +2,8 @@
  * Business logic utilities - DeFi operations, pricing, slippage
  */
 
-import { formatUnits, parseUnits } from './format.js';
 import { BPS_PRECISION, PRECISION_1E18 } from './constants.js';
+import { formatUnits, parseUnits } from './format.js';
 
 // ─────────────────────────────────────────────────────────────
 // Divergence & Price Impact

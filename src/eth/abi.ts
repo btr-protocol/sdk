@@ -46,7 +46,7 @@ export type Abi = readonly (AbiFunction | AbiEvent | AbiError | any)[];
 // ─────────────────────────────────────────────────────────────
 
 const BN = BigInt;
-const clean = (s: string) => s.startsWith('0x') ? s.slice(2) : s;
+const clean = (s: string) => (s.startsWith('0x') ? s.slice(2) : s);
 const pad = (s: string, len = 64) => s.padStart(len, '0');
 const numToHex = (n: bigint | number | boolean) => BN(n).toString(16);
 const utf8 = new TextEncoder();
@@ -87,7 +87,7 @@ function isDynamicType(type: string, components?: AbiParameter[]): boolean {
     if (arrayMatch[1] === '[]') return true;
     return isDynamicType(type.slice(0, -arrayMatch[1].length), components);
   }
-  if (type === 'tuple') return (components || []).some(c => isDynamicType(c.type, c.components));
+  if (type === 'tuple') return (components || []).some((c) => isDynamicType(c.type, c.components));
   return false;
 }
 
@@ -104,7 +104,11 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
     const base = type.slice(0, -arrayMatch[1].length);
     const arr = val as any[];
     const isStatic = arrayMatch[1] !== '[]'; // [N] is static, [] is dynamic
-    const res = processList(arr.map(v => encode(base, v, components)), !isStatic, isStatic ? arr.length : undefined);
+    const res = processList(
+      arr.map((v) => encode(base, v, components)),
+      !isStatic,
+      isStatic ? arr.length : undefined,
+    );
     // Fixed-size array of dynamic elements is itself dynamic (tail-encoded).
     if (isStatic && isDynamicType(base, components)) return { h: '', t: res.h };
     return res;
@@ -112,9 +116,16 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
 
   // 2. Handle Tuples (tuple)
   if (type === 'tuple' && components) {
-    const res = processList(components.map((c, i) =>
-      encode(c.type, (val as any)[c.name || i] ?? (Array.isArray(val) ? val[i] : undefined), c.components)
-    ), false);
+    const res = processList(
+      components.map((c, i) =>
+        encode(
+          c.type,
+          (val as any)[c.name || i] ?? (Array.isArray(val) ? val[i] : undefined),
+          c.components,
+        ),
+      ),
+      false,
+    );
     // A tuple containing dynamic members is itself dynamic: its content must
     // live in the tail so parents (e.g. tuple[] like multicall aggregate3)
     // reference it via offset instead of inlining it.
@@ -123,44 +134,59 @@ export function encode(type: string, val: any, components?: any[]): { h: string;
 
   // 3. Handle Primitives
   const [, base, sizeStr] = type.match(TYPE_RX) || [];
-  
+
   // 3a. Dynamic Bytes/String
   if (base === 'bytes' && !sizeStr) {
-    const hex = typeof val === 'string' ? clean(val) : val; 
+    const hex = typeof val === 'string' ? clean(val) : val;
     const len = Math.ceil(hex.length / 2);
     return { h: '', t: pad(numToHex(len)) + hex.padEnd(Math.ceil(len / 32) * 64, '0') };
   }
   if (base === 'string') {
-    return encode('bytes', Array.from(utf8.encode(val)).map(b => b.toString(16).padStart(2,'0')).join(''));
+    return encode(
+      'bytes',
+      Array.from(utf8.encode(val))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(''),
+    );
   }
 
   // 3b. Static Types
   let hex = '';
   if (base === 'address') hex = clean(val);
   else if (base === 'bool') hex = val ? '1' : '0';
-  else if (base === 'bytes') hex = clean(val).padEnd(64, '0'); // bytesN
-  else { // uint/int
+  else if (base === 'bytes')
+    hex = clean(val).padEnd(64, '0'); // bytesN
+  else {
+    // uint/int
     const n = BN(val);
     hex = numToHex(n < 0n ? n + (1n << BN(sizeStr || 256)) : n);
   }
-  
+
   return { h: pad(hex), t: '' };
 }
 
 // Helper to join list of encoded items (Used by Arrays & Tuples)
-const processList = (items: { h: string; t: string }[], isDynamic: boolean, _staticLen?: number) => {
-  let head = '', tail = '', offset = items.length * 32;
+const processList = (
+  items: { h: string; t: string }[],
+  isDynamic: boolean,
+  _staticLen?: number,
+) => {
+  let head = '',
+    tail = '',
+    offset = items.length * 32;
   const result = { h: '', t: '' };
 
   // If dynamic array, prefix with length. Static arrays don't include length.
   if (isDynamic) result.t += pad(numToHex(items.length));
 
   for (const item of items) {
-    if (item.t) { // Is Dynamic
+    if (item.t) {
+      // Is Dynamic
       head += pad(numToHex(offset));
       tail += item.h + item.t; // Dynamic item content goes to tail
       offset += (item.h + item.t).length / 2;
-    } else { // Is Static
+    } else {
+      // Is Static
       head += item.h;
     }
   }
@@ -175,7 +201,12 @@ const processList = (items: { h: string; t: string }[], isDynamic: boolean, _sta
 // Decoder
 // ─────────────────────────────────────────────────────────────
 
-export function decode(type: string, data: string, offset = 0, components?: any[]): { val: any; read: number } {
+export function decode(
+  type: string,
+  data: string,
+  offset = 0,
+  components?: any[],
+): { val: any; read: number } {
   const d = clean(data);
   const readWord = (off: number) => d.slice(off, off + 64);
   const readInt = (off: number) => BN('0x' + readWord(off));
@@ -204,7 +235,7 @@ export function decode(type: string, data: string, offset = 0, components?: any[
       // If dynamic child (incl. tuples w/ dynamic members), read pointer.
       // Else read data directly.
       const isDyn = isDynamicType(base, components);
-      const start = isDyn ? ptr + (Number(readInt(childOff)) * 2) : childOff;
+      const start = isDyn ? ptr + Number(readInt(childOff)) * 2 : childOff;
       const res = decode(base, d, start, components);
       arr.push(res.val);
       childOff += isDyn ? 64 : res.read;
@@ -224,7 +255,7 @@ export function decode(type: string, data: string, offset = 0, components?: any[
     let curr = offset;
     components.forEach((c, i) => {
       const isDyn = isDynamicType(c.type, c.components);
-      const start = isDyn ? offset + (Number(readInt(curr)) * 2) : curr;
+      const start = isDyn ? offset + Number(readInt(curr)) * 2 : curr;
       const res = decode(c.type, d, start, c.components);
       obj[i] = res.val;
       if (c.name) obj[c.name] = res.val;
@@ -236,14 +267,20 @@ export function decode(type: string, data: string, offset = 0, components?: any[
   // 3. Primitives
   const [, base, sizeStr] = type.match(TYPE_RX) || [];
 
-  if (base === 'bytes' && !sizeStr) { // Dynamic bytes — offset points at length word
+  if (base === 'bytes' && !sizeStr) {
+    // Dynamic bytes — offset points at length word
     const len = Number(readInt(offset));
     return { val: `0x${d.slice(offset + 64, offset + 64 + len * 2)}`, read: 64 };
   }
-  
+
   if (base === 'string') {
     const b = decode('bytes', d, offset);
-    const bytes = new Uint8Array(b.val.slice(2).match(/.{1,2}/g)!.map((b: string) => parseInt(b, 16)));
+    const bytes = new Uint8Array(
+      b.val
+        .slice(2)
+        .match(/.{1,2}/g)!
+        .map((b: string) => parseInt(b, 16)),
+    );
     return { val: decUtf8.decode(bytes), read: 64 };
   }
 
@@ -256,7 +293,8 @@ export function decode(type: string, data: string, offset = 0, components?: any[
     const mask = 1n << (bits - 1n);
     return { val: val >= mask ? val - (1n << bits) : val, read: 64 };
   }
-  if (base === 'bytes') return { val: `0x${readWord(offset).slice(0, parseInt(sizeStr!) * 2)}`, read: 64 };
+  if (base === 'bytes')
+    return { val: `0x${readWord(offset).slice(0, parseInt(sizeStr!) * 2)}`, read: 64 };
 
   return { val, read: 64 }; // uint
 }
@@ -272,7 +310,10 @@ type FnPlan = { fn: any; selector: Hex };
 const PLANS = new WeakMap<object, Map<string, FnPlan>>();
 export function getPlan(abi: any, functionName: string): FnPlan {
   let m = PLANS.get(abi);
-  if (!m) { m = new Map(); PLANS.set(abi, m); }
+  if (!m) {
+    m = new Map();
+    PLANS.set(abi, m);
+  }
   let p = m.get(functionName);
   if (!p) {
     const fn = abi.find((i: any) => i.name === functionName);
@@ -285,7 +326,10 @@ export function getPlan(abi: any, functionName: string): FnPlan {
 
 export function encodeFn({ abi, functionName, args = [] }: any): Hex {
   const { fn, selector } = getPlan(abi, functionName);
-  const argsEncoded = processList(fn.inputs.map((i: any, idx: number) => encode(i.type, args[idx], i.components)), false);
+  const argsEncoded = processList(
+    fn.inputs.map((i: any, idx: number) => encode(i.type, args[idx], i.components)),
+    false,
+  );
   return `${selector}${argsEncoded.h}${argsEncoded.t}`;
 }
 
@@ -312,7 +356,7 @@ export function decodeFn({ abi, functionName, data }: any): any {
 export function encodeAbiParameters(params: AbiParameter[], values: any[]): Hex {
   const encoded = processList(
     params.map((p, i) => encode(p.type, values[i], p.components)),
-    false
+    false,
   );
   return `0x${encoded.h}${encoded.t}` as Hex;
 }
@@ -344,7 +388,10 @@ export function decodeAbiParameters(params: AbiParameter[], data: string): any[]
  * out: a written-out selector keeps hashing correctly while the signature rots against the
  * contracts, and mislabels the calldata it was added to explain.
  */
-export function getFunctionSignature(fn: { name: string; inputs?: readonly AbiParameter[] }): string {
+export function getFunctionSignature(fn: {
+  name: string;
+  inputs?: readonly AbiParameter[];
+}): string {
   return `${fn.name}(${(fn.inputs || []).map(canonicalType).join(',')})`;
 }
 
@@ -406,7 +453,7 @@ export function encodeErrorResult(error: AbiError, args: any[]): Hex {
   const selector = getSelector(sig);
   const encoded = processList(
     (error.inputs || []).map((input, i) => encode(input.type, args[i], input.components)),
-    false
+    false,
   );
   return `${selector}${encoded.h}${encoded.t}` as Hex;
 }
@@ -414,11 +461,16 @@ export function encodeErrorResult(error: AbiError, args: any[]): Hex {
 /**
  * Decode error result (for custom errors in revert reasons)
  */
-export function decodeErrorResult(abi: Abi, data: string): { name: string; args: any[] } | undefined {
+export function decodeErrorResult(
+  abi: Abi,
+  data: string,
+): { name: string; args: any[] } | undefined {
   if (!data.startsWith('0x') || data.length < 10) return undefined;
 
   const selector = data.slice(0, 10);
-  const error = abi.find((item: any) => item.type === 'error' && getSelector(getErrorSignature(item)) === selector);
+  const error = abi.find(
+    (item: any) => item.type === 'error' && getSelector(getErrorSignature(item)) === selector,
+  );
 
   if (!error) return undefined;
 

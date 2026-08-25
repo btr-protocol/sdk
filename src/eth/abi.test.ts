@@ -17,18 +17,30 @@ import {
   getSelector,
 } from './abi';
 
-const MC3_ABI = [{
-  name: 'aggregate3',
-  inputs: [{ type: 'tuple[]', components: [
-    { name: 't', type: 'address' },
-    { name: 'f', type: 'bool' },
-    { name: 'd', type: 'bytes' },
-  ]}],
-  outputs: [{ type: 'tuple[]', components: [
-    { name: 's', type: 'bool' },
-    { name: 'r', type: 'bytes' },
-  ]}],
-}];
+const MC3_ABI = [
+  {
+    name: 'aggregate3',
+    inputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 't', type: 'address' },
+          { name: 'f', type: 'bool' },
+          { name: 'd', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 's', type: 'bool' },
+          { name: 'r', type: 'bytes' },
+        ],
+      },
+    ],
+  },
+];
 
 describe('getSelector', () => {
   test('derives well-known selectors (4byte-verified)', () => {
@@ -67,8 +79,13 @@ describe('no hand-maintained mirrors of on-chain signatures', () => {
     // ERC/WETH9/LayerZero shapes are frozen by their standards and have no generated ABI here.
     // Everything BTR-owned must import from src/abis, so no other file may inline a function ABI.
     const allowed = new Set([
-      'eth/erc20.ts', 'eth/erc721.ts', 'eth/erc777.ts', 'eth/erc1155.ts',
-      'eth/erc4626.ts', 'eth/erc7540.ts', 'eth/layerzero-oft.ts',
+      'eth/erc20.ts',
+      'eth/erc721.ts',
+      'eth/erc777.ts',
+      'eth/erc1155.ts',
+      'eth/erc4626.ts',
+      'eth/erc7540.ts',
+      'eth/layerzero-oft.ts',
       'eth/abi.ts', // type declarations, not fragments
       'router/index.ts', // WNATIVE_ABI (WETH9 wrap/unwrap)
     ]);
@@ -84,10 +101,12 @@ describe('canonicalType', () => {
   test('expands tuples to component types', () => {
     expect(canonicalType(MC3_ABI[0].inputs[0] as never)).toBe('(address,bool,bytes)[]');
     expect(canonicalType({ type: 'uint256' })).toBe('uint256');
-    expect(canonicalType({
-      type: 'tuple',
-      components: [{ type: 'address' }, { type: 'tuple[]', components: [{ type: 'bytes' }] }],
-    })).toBe('(address,(bytes)[])');
+    expect(
+      canonicalType({
+        type: 'tuple',
+        components: [{ type: 'address' }, { type: 'tuple[]', components: [{ type: 'bytes' }] }],
+      }),
+    ).toBe('(address,(bytes)[])');
   });
 });
 
@@ -99,15 +118,15 @@ describe('aggregate3 encoding (tuple[] of dynamic tuples)', () => {
       args: [[{ t: '0x0b9cca59cefde03ad8e41da272d946861fa7717f', f: true, d: '0x01e1d114' }]],
     });
     const words = data.slice(10).match(/.{1,64}/g) ?? [];
-    expect(data.slice(0, 10)).toBe('0x82ad56cb');           // canonical selector
-    expect(BigInt(`0x${words[0]}`)).toBe(0x20n);             // arg head → tail ptr
-    expect(BigInt(`0x${words[1]}`)).toBe(1n);                // array length
-    expect(BigInt(`0x${words[2]}`)).toBe(0x20n);             // per-element offset (dynamic tuple)
+    expect(data.slice(0, 10)).toBe('0x82ad56cb'); // canonical selector
+    expect(BigInt(`0x${words[0]}`)).toBe(0x20n); // arg head → tail ptr
+    expect(BigInt(`0x${words[1]}`)).toBe(1n); // array length
+    expect(BigInt(`0x${words[2]}`)).toBe(0x20n); // per-element offset (dynamic tuple)
     expect(words[3].endsWith('0b9cca59cefde03ad8e41da272d946861fa7717f')).toBe(true);
-    expect(BigInt(`0x${words[4]}`)).toBe(1n);                // bool true
-    expect(BigInt(`0x${words[5]}`)).toBe(0x60n);             // bytes offset within tuple
-    expect(BigInt(`0x${words[6]}`)).toBe(4n);                // bytes length
-    expect(words[7].startsWith('01e1d114')).toBe(true);      // calldata payload
+    expect(BigInt(`0x${words[4]}`)).toBe(1n); // bool true
+    expect(BigInt(`0x${words[5]}`)).toBe(0x60n); // bytes offset within tuple
+    expect(BigInt(`0x${words[6]}`)).toBe(4n); // bytes length
+    expect(words[7].startsWith('01e1d114')).toBe(true); // calldata payload
   });
 
   test('round-trips through output decoder', () => {
@@ -115,9 +134,17 @@ describe('aggregate3 encoding (tuple[] of dynamic tuples)', () => {
     // then decode it via decodeFn.
     const ret = encodeAbiParameters(
       [MC3_ABI[0].outputs[0] as never],
-      [[{ s: true, r: `0x${'2dc75f'.padStart(64, '0')}` }, { s: false, r: '0x' }]],
+      [
+        [
+          { s: true, r: `0x${'2dc75f'.padStart(64, '0')}` },
+          { s: false, r: '0x' },
+        ],
+      ],
     );
-    const decoded = decodeFn({ abi: MC3_ABI, functionName: 'aggregate3', data: ret }) as { s: boolean; r: string }[];
+    const decoded = decodeFn({ abi: MC3_ABI, functionName: 'aggregate3', data: ret }) as {
+      s: boolean;
+      r: string;
+    }[];
     expect(decoded.length).toBe(2);
     expect(decoded[0].s).toBe(true);
     expect(BigInt(decoded[0].r)).toBe(0x2dc75fn);
@@ -128,7 +155,12 @@ describe('aggregate3 encoding (tuple[] of dynamic tuples)', () => {
 
 describe('parameter round-trips', () => {
   test('mixed static + dynamic params', () => {
-    const params = [{ type: 'string' }, { type: 'uint256' }, { type: 'bytes' }, { type: 'address' }];
+    const params = [
+      { type: 'string' },
+      { type: 'uint256' },
+      { type: 'bytes' },
+      { type: 'address' },
+    ];
     const vals = ['hello world', 42n, '0xdeadbeef', '0x0b9cca59cefde03ad8e41da272d946861fa7717f'];
     const out = decodeAbiParameters(params, encodeAbiParameters(params, vals));
     expect(out[0]).toBe('hello world');
@@ -144,8 +176,18 @@ describe('parameter round-trips', () => {
   });
 
   test('static tuple stays inline', () => {
-    const params = [{ type: 'tuple', components: [{ name: 'a', type: 'uint256' }, { name: 'b', type: 'address' }] }];
-    const enc = encodeAbiParameters(params, [{ a: 7n, b: '0x0b9cca59cefde03ad8e41da272d946861fa7717f' }]);
+    const params = [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'a', type: 'uint256' },
+          { name: 'b', type: 'address' },
+        ],
+      },
+    ];
+    const enc = encodeAbiParameters(params, [
+      { a: 7n, b: '0x0b9cca59cefde03ad8e41da272d946861fa7717f' },
+    ]);
     expect(enc.length).toBe(2 + 64 * 2); // two inline words, no pointer
     const out = decodeAbiParameters(params, enc) as { a: bigint; b: string }[];
     expect(out[0].a).toBe(7n);
@@ -165,19 +207,32 @@ describe('multi-output decode is positional', () => {
     '0000000000000000000000000000000000000000000000000000000000000000';
 
   test('unnamed outputs destructure positionally (previewWithdraw)', () => {
-    const decoded = decodeFn({ abi: POOL_ABI, functionName: 'previewWithdraw', data: LIVE_PREVIEW_WITHDRAW });
+    const decoded = decodeFn({
+      abi: POOL_ABI,
+      functionName: 'previewWithdraw',
+      data: LIVE_PREVIEW_WITHDRAW,
+    });
     const [amountOut, haircut] = decoded as [bigint, bigint];
     expect(amountOut).toBe(1000035n);
     expect(haircut).toBe(0n);
   });
 
   test('named outputs keep their names AND their positions', () => {
-    const abi = [{
-      name: 'f', type: 'function', stateMutability: 'view', inputs: [],
-      outputs: [{ name: 'lo', type: 'uint256' }, { name: 'hi', type: 'uint256' }],
-    }] as never;
+    const abi = [
+      {
+        name: 'f',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [
+          { name: 'lo', type: 'uint256' },
+          { name: 'hi', type: 'uint256' },
+        ],
+      },
+    ] as never;
     const data = encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [3n, 9n]);
-    const decoded = decodeFn({ abi, functionName: 'f', data }) as Record<string, bigint> & [bigint, bigint];
+    const decoded = decodeFn({ abi, functionName: 'f', data }) as Record<string, bigint> &
+      [bigint, bigint];
     const [lo, hi] = decoded;
     expect(lo).toBe(3n);
     expect(hi).toBe(9n);

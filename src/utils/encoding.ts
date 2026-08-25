@@ -93,9 +93,7 @@ export function bigIntToHex(num: bigint): `0x${string}` {
 /**
  * Convert various types to hex string
  */
-export function toHex(
-  value: string | number | bigint | boolean | Uint8Array,
-): `0x${string}` {
+export function toHex(value: string | number | bigint | boolean | Uint8Array): `0x${string}` {
   if (typeof value === 'string') {
     // Already hex
     if (value.startsWith('0x')) return value as `0x${string}`;
@@ -141,11 +139,7 @@ export function concat(values: (`0x${string}` | Uint8Array)[]): `0x${string}` {
  * @param size - Target byte length (default: 32)
  * @param dir - Padding direction: 'left' (default) or 'right'
  */
-export function pad(
-  hex: `0x${string}`,
-  size = 32,
-  dir: 'left' | 'right' = 'left',
-): `0x${string}` {
+export function pad(hex: `0x${string}`, size = 32, dir: 'left' | 'right' = 'left'): `0x${string}` {
   const stripped = hex.slice(2);
   const targetLength = size * 2; // 2 hex chars per byte
 
@@ -154,8 +148,5 @@ export function pad(
   }
 
   const padding = '0'.repeat(targetLength - stripped.length);
-  return dir === 'left'
-    ? `0x${padding}${stripped}`
-    : `0x${stripped}${padding}`;
+  return dir === 'left' ? `0x${padding}${stripped}` : `0x${stripped}${padding}`;
 }
-

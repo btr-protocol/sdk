@@ -21,13 +21,13 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
  * Consumed by front (`TokenSelector`); mainnets only.
  */
 export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
-  1,     // Ethereum mainnet
-  8453,  // Base
-  56,    // BNB Chain
+  1, // Ethereum mainnet
+  8453, // Base
+  56, // BNB Chain
   42161, // Arbitrum
-  999,   // HyperEVM
+  999, // HyperEVM
   43114, // Avalanche
-  137,   // Polygon
+  137, // Polygon
 ]);
 
 // ─────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
 export interface ChainConfig {
   id: number;
   name: string;
-  icon?: string;      // Optional override. Default: /networks/{name-slugged}.svg
+  icon?: string; // Optional override. Default: /networks/{name-slugged}.svg
   rpcUrls: readonly string[];
   nativeCurrency: {
     name: string;
@@ -211,11 +211,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   59144: {
     id: 59144,
     name: 'Linea',
-    rpcUrls: [
-      'https://rpc.linea.build',
-      'https://1rpc.io/linea',
-      'https://linea.drpc.org',
-    ],
+    rpcUrls: ['https://rpc.linea.build', 'https://1rpc.io/linea', 'https://linea.drpc.org'],
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://lineascan.build'],
     wrappedNative: '0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f',
@@ -255,10 +251,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   324: {
     id: 324,
     name: 'zkSync Era',
-    rpcUrls: [
-      'https://mainnet.era.zksync.io',
-      'https://zksync.drpc.org',
-    ],
+    rpcUrls: ['https://mainnet.era.zksync.io', 'https://zksync.drpc.org'],
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://explorer.zksync.io'],
     wrappedNative: '0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91',
@@ -497,10 +490,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   84532: {
     id: 84532,
     name: 'Base Sepolia Testnet',
-    rpcUrls: [
-      'https://sepolia.base.org',
-      'https://base-sepolia.public.blastapi.io',
-    ],
+    rpcUrls: ['https://sepolia.base.org', 'https://base-sepolia.public.blastapi.io'],
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://sepolia.basescan.org'],
     wrappedNative: '0x4200000000000000000000000000000000000006',
@@ -536,10 +526,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   80002: {
     id: 80002,
     name: 'Polygon Amoy Testnet',
-    rpcUrls: [
-      'https://rpc-amoy.polygon.technology',
-      'https://polygon-amoy.public.blastapi.io',
-    ],
+    rpcUrls: ['https://rpc-amoy.polygon.technology', 'https://polygon-amoy.public.blastapi.io'],
     nativeCurrency: { name: 'Test POL', symbol: 'POL', decimals: 18 },
     blockExplorerUrls: ['https://amoy.polygonscan.com'],
     wrappedNative: '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
@@ -574,10 +561,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   43113: {
     id: 43113,
     name: 'Avalanche Fuji Testnet',
-    rpcUrls: [
-      'https://api.avax-test.network/ext/bc/C/rpc',
-      'https://rpc.ankr.com/avalanche_fuji',
-    ],
+    rpcUrls: ['https://api.avax-test.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche_fuji'],
     nativeCurrency: { name: 'Test Avalanche', symbol: 'AVAX', decimals: 18 },
     blockExplorerUrls: ['https://testnet.snowtrace.io'],
     wrappedNative: '0xd00ae08403B9bbb9124bB305C09058E32C39A48c',
@@ -714,7 +698,7 @@ export function isTestOrLocalChain(chainId: number): boolean {
   // Check name patterns for local dev networks
   const nameLower = chain.name.toLowerCase();
   const localPatterns = ['local', 'anvil', 'ganache', 'hardhat', 'truffle'];
-  if (localPatterns.some(pattern => nameLower.includes(pattern))) return true;
+  if (localPatterns.some((pattern) => nameLower.includes(pattern))) return true;
 
   // Check for testnet in name
   if (chain.name.includes('Testnet')) return true;
@@ -726,7 +710,9 @@ export function isTestOrLocalChain(chainId: number): boolean {
  * Detect forked chain ID from Anvil RPC
  * Anvil can be queried for the forked chain ID via eth_chainId on the fork
  */
-export async function detectAnvilFork(rpcUrl: string = 'http://localhost:8545'): Promise<number | null> {
+export async function detectAnvilFork(
+  rpcUrl: string = 'http://localhost:8545',
+): Promise<number | null> {
   try {
     const response = await fetch(rpcUrl, {
       method: 'POST',
@@ -776,7 +762,9 @@ export async function detectAnvilFork(rpcUrl: string = 'http://localhost:8545'):
  * Get chain config for Anvil, with fork detection
  * If Anvil is forking a chain, returns the forked chain's metadata
  */
-export async function getAnvilChainConfig(rpcUrl: string = 'http://localhost:8545'): Promise<ChainConfig> {
+export async function getAnvilChainConfig(
+  rpcUrl: string = 'http://localhost:8545',
+): Promise<ChainConfig> {
   const forkedChainId = await detectAnvilFork(rpcUrl);
 
   if (forkedChainId && CHAINS[forkedChainId]) {

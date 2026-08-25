@@ -14,7 +14,6 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import * as ABIS from '../src/abis/index.js';
 import {
   CONSTANTS,
   CONTRACTS,
@@ -25,6 +24,7 @@ import {
   poolScopedOps,
   resolveAbi,
 } from '../scripts/manifest.js';
+import * as ABIS from '../src/abis/index.js';
 
 type AbiItem = Record<string, unknown> & {
   type: string;

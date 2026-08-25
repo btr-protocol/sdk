@@ -15,8 +15,8 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { CONTRACTS, EVM_ROOTS, artifact, resolveAbi } from '../scripts/manifest.js';
 import { POOL_MAPPINGS, POOL_STRUCTS } from '../src/pool/layout.generated.js';
-import { artifact, EVM_ROOTS, resolveAbi, CONTRACTS } from '../scripts/manifest.js';
 
 const ARTIFACT = resolve(EVM_ROOTS.dex, 'out/Pool.sol/Pool.json');
 
@@ -42,7 +42,10 @@ describe('Pool ABI vs compiled storageLayout', () => {
       const n = node as Record<string, unknown>;
       const it = n.internalType;
       if (typeof it === 'string' && it.startsWith('struct ') && Array.isArray(n.components)) {
-        const short = it.replace(/^struct\s+/, '').split('.').pop()!;
+        const short = it
+          .replace(/^struct\s+/, '')
+          .split('.')
+          .pop()!;
         out[short] ??= (n.components as Array<{ name: string }>).map((c) => c.name);
       }
       for (const v of Object.values(n)) walk(v);

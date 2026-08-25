@@ -51,7 +51,12 @@ describe('buildSwapCalls', () => {
     expect(calls.slice(0, 2).every((c) => c.data.startsWith(APPROVE_SEL))).toBe(true);
     expect(calls.slice(2).every((c) => c.data.startsWith(SWAP_SEL))).toBe(true);
     expect(new Set(calls.slice(0, 2).map((c) => c.to.toLowerCase())).size).toBe(1); // same token
-    expect(calls.slice(0, 2).map((c) => approveAmount(c.data)).sort()).toEqual([300n, 700n]);
+    expect(
+      calls
+        .slice(0, 2)
+        .map((c) => approveAmount(c.data))
+        .sort(),
+    ).toEqual([300n, 700n]);
   });
 
   test('needsApproval=false skips approvals (cached allowance)', () => {

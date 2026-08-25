@@ -95,15 +95,22 @@ export function reconstructSynthOhlc(
   const rho = opts.rho ?? (() => 0);
 
   const n = legs.length;
-  const v = new Array<number>(n);  // per-leg variances v_i
-  const e = new Array<number>(n);  // per-leg signed exponents e_i
+  const v = new Array<number>(n); // per-leg variances v_i
+  const e = new Array<number>(n); // per-leg signed exponents e_i
 
-  let o = 1, c = 1;
+  let o = 1,
+    c = 1;
   for (let i = 0; i < n; i++) {
     const [sym, exp] = legs[i];
     const k = legOhlc[sym];
     if (!k || k.o <= 0 || k.h <= 0 || k.l <= 0 || k.c <= 0 || k.h < k.l) return null;
-    if (exp === 1) { o *= k.o; c *= k.c; } else { o /= k.o; c /= k.c; }
+    if (exp === 1) {
+      o *= k.o;
+      c *= k.c;
+    } else {
+      o /= k.o;
+      c /= k.c;
+    }
     e[i] = exp;
     const vi = legVariance(k, estimator);
     v[i] = Number.isFinite(vi) && vi >= 0 ? vi : 0;
@@ -121,8 +128,8 @@ export function reconstructSynthOhlc(
   }
   if (!(V >= V_FLOOR)) V = V_FLOOR;
 
-  const R = Math.sqrt(FOUR_LN2 * V);          // Parkinson inversion → log-range
-  const M = Math.sqrt(o * c);                  // geometric mid
+  const R = Math.sqrt(FOUR_LN2 * V); // Parkinson inversion → log-range
+  const M = Math.sqrt(o * c); // geometric mid
   const halfR = R / 2;
   const h = M * Math.exp(halfR);
   const l = M * Math.exp(-halfR);
@@ -201,7 +208,7 @@ export function reconstructSynthSeriesAtBaseTfThenRollup(
 ): ReadonlyArray<OhlcLite & { ts: number; count: number }> {
   const baseSynth = reconstructSynthSeries(legs, legSeries, baseTfMs, opts);
   if (targetTfMs <= baseTfMs) {
-    return baseSynth.map(r => ({ ts: r.ts, o: r.o, h: r.h, l: r.l, c: r.c, count: 1 }));
+    return baseSynth.map((r) => ({ ts: r.ts, o: r.o, h: r.h, l: r.l, c: r.c, count: 1 }));
   }
   const tf = targetTfMs;
   const out: Array<OhlcLite & { ts: number; count: number }> = [];
@@ -254,16 +261,20 @@ export class RollingCorrelation {
     if (this.filled === this.N) {
       const ox = this.bufX[this.idx];
       const oy = this.bufY[this.idx];
-      this.sx -= ox; this.sy -= oy;
-      this.sxx -= ox * ox; this.syy -= oy * oy;
+      this.sx -= ox;
+      this.sy -= oy;
+      this.sxx -= ox * ox;
+      this.syy -= oy * oy;
       this.sxy -= ox * oy;
     } else {
       this.filled++;
     }
     this.bufX[this.idx] = rA;
     this.bufY[this.idx] = rB;
-    this.sx += rA; this.sy += rB;
-    this.sxx += rA * rA; this.syy += rB * rB;
+    this.sx += rA;
+    this.sy += rB;
+    this.sxx += rA * rA;
+    this.syy += rB * rB;
     this.sxy += rA * rB;
     this.idx = (this.idx + 1) % this.N;
   }
@@ -284,7 +295,9 @@ export class RollingCorrelation {
   }
 
   /** Number of observations currently in window. */
-  count(): number { return this.filled; }
+  count(): number {
+    return this.filled;
+  }
 }
 
 // ─── Tick-level synth composition (Wave-3a) ────────────────────────────────

@@ -3,7 +3,14 @@
  * Zero dependencies
  */
 
-import type { Address, Hex, Eip1193Provider, TransactionRequest, TypedData, TransactionReceipt } from './types';
+import type {
+  Address,
+  Eip1193Provider,
+  Hex,
+  TransactionReceipt,
+  TransactionRequest,
+  TypedData,
+} from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Internal Helpers
@@ -35,8 +42,7 @@ export const getTransactionCount = (p: Eip1193Provider, addr: Address) =>
 export const getTransactionReceipt = (p: Eip1193Provider, hash: Hex) =>
   cmd<TransactionReceipt | null>(p, 'eth_getTransactionReceipt', [hash]);
 
-export const getNonce = (p: Eip1193Provider, addr: Address) =>
-  getTransactionCount(p, addr);
+export const getNonce = (p: Eip1193Provider, addr: Address) => getTransactionCount(p, addr);
 
 // ─────────────────────────────────────────────────────────────
 // Contracts & Tx
@@ -58,14 +64,22 @@ export const sendTransaction = (p: Eip1193Provider, tx: TransactionRequest) =>
 export const signMessage = (p: Eip1193Provider, address: Address, msg: string) => {
   const hexMsg = msg.startsWith('0x')
     ? msg
-    : `0x${Array.from(new TextEncoder().encode(msg)).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+    : `0x${Array.from(new TextEncoder().encode(msg))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')}`;
   return cmd<Hex>(p, 'personal_sign', [hexMsg, address]);
 };
 
 export const signTypedData = (p: Eip1193Provider, address: Address, data: TypedData) =>
-  cmd<Hex>(p, 'eth_signTypedData_v4', [address, JSON.stringify({
-    domain: data.domain, types: data.types, primaryType: data.primaryType, message: data.message
-  })]);
+  cmd<Hex>(p, 'eth_signTypedData_v4', [
+    address,
+    JSON.stringify({
+      domain: data.domain,
+      types: data.types,
+      primaryType: data.primaryType,
+      message: data.message,
+    }),
+  ]);
 
 // ─────────────────────────────────────────────────────────────
 // Chain Switching
@@ -86,7 +100,9 @@ export const rpcErrorCode = (e: unknown): number | undefined => {
     if (typeof c === 'number' && Number.isFinite(c) && c !== -32603) return c;
     n = n.data?.originalError ?? n.data ?? n.cause ?? n.error;
   }
-  return typeof (e as { code?: number })?.code === 'number' ? (e as { code: number }).code : undefined;
+  return typeof (e as { code?: number })?.code === 'number'
+    ? (e as { code: number }).code
+    : undefined;
 };
 
 /**
@@ -105,8 +121,9 @@ export const rpcErrorData = (e: unknown): string | undefined => {
 /** True when the injected provider's port is dead (extension updated/reloaded under the page).
  *  Nothing the dapp sends can succeed until the page reloads and re-grabs `window.ethereum`. */
 export const isProviderDisconnected = (e: unknown): boolean =>
-  /extension context invalidated|provider is disconnected|disconnected from all chains|receiving end does not exist/i
-    .test(e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e ?? ''));
+  /extension context invalidated|provider is disconnected|disconnected from all chains|receiving end does not exist/i.test(
+    e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e ?? ''),
+  );
 
 /** Ask the wallet to switch. Throws the wallet's own error, with `rpcErrorCode` readable off it. */
 export const switchChain = (p: Eip1193Provider, id: number) =>
@@ -123,7 +140,7 @@ export const waitForTransaction = async (
   p: Eip1193Provider,
   hash: Hex,
   confirms = 1,
-  timeout = 60000
+  timeout = 60000,
 ): Promise<unknown> => {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -132,13 +149,13 @@ export const waitForTransaction = async (
       if (confirms > 1) {
         const current = await getBlockNumber(p);
         if (current - toBig((r as { blockNumber: string }).blockNumber) + 1n < BigInt(confirms)) {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise((r) => setTimeout(r, 2000));
           continue;
         }
       }
       return r;
     }
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
   }
   throw new Error(`Tx ${hash} timed out`);
 };
@@ -156,7 +173,7 @@ export const onAccountsChanged = (p: Eip1193Provider, cb: (accs: Address[]) => v
   sub(p, 'accountsChanged', (accs: unknown) => cb(accs as Address[]));
 
 export const onChainChanged = (p: Eip1193Provider, cb: (id: number) => void) =>
-  sub(p, 'chainChanged', (id: unknown) => cb(typeof id === 'string' ? toInt(id) : id as number));
+  sub(p, 'chainChanged', (id: unknown) => cb(typeof id === 'string' ? toInt(id) : (id as number)));
 
 export const onDisconnect = (p: Eip1193Provider, cb: (err: unknown) => void) =>
   sub(p, 'disconnect', cb);

@@ -3,19 +3,31 @@
  * Used across frontend and backend for consistent display
  */
 
-import { round, precision, getDigits } from './maths.js';
+import { getDigits, round } from './maths.js';
 
 // ─────────────────────────────────────────────────────────────
 // Currency
 // ─────────────────────────────────────────────────────────────
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥',
-  CHF: 'CHF', CAD: 'C$', AUD: 'A$', KRW: '₩', INR: '₹',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  CNY: '¥',
+  CHF: 'CHF',
+  CAD: 'C$',
+  AUD: 'A$',
+  KRW: '₩',
+  INR: '₹',
 };
 
 /** Format currency with auto-precision based on magnitude */
-export function formatCurrency(n: number | null | undefined, currency = 'USD', signed = false): string {
+export function formatCurrency(
+  n: number | null | undefined,
+  currency = 'USD',
+  signed = false,
+): string {
   if (n == null || !isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0.00`;
 
   const absN = Math.abs(n);
@@ -29,10 +41,14 @@ export function formatCurrency(n: number | null | undefined, currency = 'USD', s
 
   // Standard values: 2 decimals with commas
   if (absN >= 1) {
-    return sign + symbol + absN.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    return (
+      sign +
+      symbol +
+      absN.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
   }
 
   // Small values: show significant figures
@@ -41,7 +57,11 @@ export function formatCurrency(n: number | null | undefined, currency = 'USD', s
 }
 
 /** Format currency with compact notation ($1.5M, $2.3B) */
-export function formatCurrencyCompact(n: number | null | undefined, currency = 'USD', signed = false): string {
+export function formatCurrencyCompact(
+  n: number | null | undefined,
+  currency = 'USD',
+  signed = false,
+): string {
   if (n == null || !isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0`;
 
   const absN = Math.abs(n);
@@ -248,25 +268,34 @@ export function formatAxisLabel(n: number | null | undefined): string {
 // Percentages
 // ─────────────────────────────────────────────────────────────
 
-/** Format percentage value */
-export function formatPercent(n: number | null | undefined, decimals = 2, signed = false): string {
-  if (n == null || !isFinite(n)) return '0.00%';
-  const sign = n > 0 && signed ? '+' : '';
-  // Handle multipliers (>200% shown as Nx)
-  if (Math.abs(n) >= 200) return `${sign}${round(n / 100, 1)}x`;
-  const d = Math.max(2, decimals);
-  return `${sign}${round(n, d).toFixed(d)}%`;
+/**
+ * Percentage value. Legacy fixed-decimals wrapper, kept so existing call sites do not have to
+ * care which formatter they hold: it delegates to the ONE magnitude-adaptive percent formatter
+ * (`formatPercentSig`) at the app-wide law of three significant figures. The old behaviour — a
+ * hardcoded decimal count that collapsed 0.004% to "0.00%", and a ≥200% detour into "2.8x" —
+ * is gone: a rate reads as a percent at every magnitude.
+ */
+export function formatPercent(
+  n: number | null | undefined,
+  _decimals?: number,
+  signed = false,
+): string {
+  return formatPercentSig(n, 3, signed);
 }
 
 /**
- * Percent with `sig` significant figures — small values keep precision (0.024%, 0.06%) instead of
- * collapsing to "0%". Input is already in percent units (2.4 → "2.4%"). Use for spreads / tiny rates.
+ * THE shared percentage formatter: magnitude-adaptive, `sig` significant digits always (default
+ * 3 — the percent analogue of the 5-significant-digit convention amounts use), trailing zeros
+ * trimmed, exactly zero as unsigned "0.00%". Small values keep precision (0.42%, 0.0412%) instead
+ * of collapsing to a bare "0%"; below roughly 0.001% the leading-zero run folds into the exchange
+ * subscript form (0.0000123% → "0.0₄123%"), same as prices. Input is already in percent units
+ * (2.4 → "2.4%").
  *
  * `sig` caps DECIMALS, so above 10^sig every integer digit survives (2222 stays "2222%"). That is
  * right for a spread, where the integer part is the measurement; for a yield it is not, which is
  * what `formatYield` is for.
  */
-export function formatPercentSig(n: number | null | undefined, sig = 2, signed = false): string {
+export function formatPercentSig(n: number | null | undefined, sig = 3, signed = false): string {
   if (n == null || !isFinite(n) || n === 0) return '0.00%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
@@ -279,24 +308,17 @@ export function formatPercentSig(n: number | null | undefined, sig = 2, signed =
 
 /**
  * The ONE yield formatter: APR, APY, fee APR, strategy APR, protocol APR. Input in PERCENT units
- * (17.456 → "17.5%").
- *
- * Three significant figures at or above 1%, two below it: 2222 → "2220%", 17.456 → "17.5%",
- * 0.0987 → "0.099%". A yield is an estimate off a finite fee sample, and printing 2222% asserts
- * four digits of accuracy that no such sample has, while a flat 3sf would round a 0.0987% rate to
- * "0.0987%" and spend all its digits on leading zeros. The step down at 1% is where the number
- * stops being read as "a rate" and starts being read as "nearly nothing".
- *
- * `toPrecision` then `Number` rather than `formatPercentSig`: the latter caps decimals, which does
- * nothing to the integer digits that are the whole problem at 2222%.
+ * (17.456 → "17.5%"). Same law as every other percent on the page — `formatPercentSig` at three
+ * significant figures, magnitude-adaptive: 281%, 14.8%, 1.58%, 0.42%, 0.0412%, 0.0₄123%; exactly
+ * zero renders as unsigned "0.00%". The old step down to two figures below 1% is gone: it was the
+ * reason a small hook yield could print as a bare "0%".
  */
 export function formatYield(n: number | null | undefined, signed = false): string {
   if (n == null || !isFinite(n)) return '—';
-  if (n === 0) return '0%';
-  const sig = Math.abs(n) >= 1 ? 3 : 2;
-  // Round to sig figs FIRST, then let formatPercentSig trim the decimals off the rounded value.
-  // Its decimal rule is already exactly right once the integer digits are no longer the problem.
-  return formatPercentSig(Number(n.toPrecision(sig)), sig, signed);
+  // Round to 3 significant figures FIRST: formatPercentSig caps decimals, which does nothing to
+  // the integer digits that are the whole problem at 2222% (a yield off a finite fee sample must
+  // not assert four digits of accuracy).
+  return formatPercentSig(Number(n.toPrecision(3)), 3, signed);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -339,8 +361,8 @@ export function slugify(s: string, sep = '-'): string {
   return s
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9.\s-]/g, '')  // Keep dots for section numbers (1.1.1)
-    .replace(/\.\s+/g, sep)          // "1.1.1. Something" -> "1.1.1-something"
+    .replace(/[^a-z0-9.\s-]/g, '') // Keep dots for section numbers (1.1.1)
+    .replace(/\.\s+/g, sep) // "1.1.1. Something" -> "1.1.1-something"
     .replace(/[\s_]+/g, sep)
     .replace(new RegExp(`${sep}+`, 'g'), sep);
 }
@@ -360,13 +382,13 @@ export function slugifyDoc(filename: string, categoryPrefix?: string): string {
 export function unslug(s: string, sep = '-'): string {
   return s
     .split(sep)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 }
 
 /** Capitalize first letter of each word */
 export function capitalize(s: string): string {
-  return s.replace(/\b\w/g, c => c.toUpperCase());
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -380,11 +402,11 @@ export function capitalize(s: string): string {
 export function generateAnchorId(text: string): string {
   return text
     .toLowerCase()
-    .replace(/^([\d.]+)\.\s+/, '$1-')  // Leading "X.Y. " -> "X.Y-" (only trailing dot of section number)
-    .replace(/[^a-z0-9\s.-]/g, '')    // Remove special chars (keep dots, numbers, letters, spaces, dashes)
-    .replace(/\s+/g, '-')              // Spaces to dashes
-    .replace(/-+/g, '-')               // Collapse multiple dashes
-    .replace(/^-|-$/g, '');            // Trim leading/trailing dashes
+    .replace(/^([\d.]+)\.\s+/, '$1-') // Leading "X.Y. " -> "X.Y-" (only trailing dot of section number)
+    .replace(/[^a-z0-9\s.-]/g, '') // Remove special chars (keep dots, numbers, letters, spaces, dashes)
+    .replace(/\s+/g, '-') // Spaces to dashes
+    .replace(/-+/g, '-') // Collapse multiple dashes
+    .replace(/^-|-$/g, ''); // Trim leading/trailing dashes
 }
 
 // ─────────────────────────────────────────────────────────────

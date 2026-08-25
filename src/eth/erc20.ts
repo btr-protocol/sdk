@@ -77,7 +77,8 @@ export const ERC20_ABI: Abi = [
     stateMutability: 'nonpayable',
     inputs: [
       { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }],
+      { name: 'amount', type: 'uint256' },
+    ],
     outputs: [{ name: '', type: 'bool' }],
   },
   {

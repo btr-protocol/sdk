@@ -3,13 +3,20 @@
  * Supports both injected wallets (browser) and private key wallets (backend)
  */
 
-import type { Address, Hex, Eip1193Provider, TransactionRequest, TransactionReceipt } from './types';
-import { ethCall, sendTransaction as rpcSendTransaction, getNonce, getChainId, estimateGas, getGasPrice } from './rpc';
-import { keccak256 } from './index';
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { keccak256 } from './index';
 import { rlpEncode } from './rlp';
-import { httpTransport, type TransportOpts } from './transport';
+import {
+  estimateGas,
+  ethCall,
+  getChainId,
+  getGasPrice,
+  getNonce,
+  sendTransaction as rpcSendTransaction,
+} from './rpc';
+import { type TransportOpts, httpTransport } from './transport';
+import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -57,7 +64,10 @@ export function createWalletClient(provider: Eip1193Provider, account: Address):
  * and tick-batched request coalescing (many eth_calls -> one round-trip).
  * Pass an array of URLs to enable failover.
  */
-export function createHttpProvider(rpcUrl: string | readonly string[], opts?: TransportOpts): Eip1193Provider {
+export function createHttpProvider(
+  rpcUrl: string | readonly string[],
+  opts?: TransportOpts,
+): Eip1193Provider {
   return httpTransport(rpcUrl, opts);
 }
 
@@ -87,7 +97,7 @@ export function signDigest(digest: Hex, privateKey: Hex) {
       prehash: false,
       format: 'recovered',
     }),
-    'recovered'
+    'recovered',
   );
 }
 
@@ -97,7 +107,7 @@ export function signDigest(digest: Hex, privateKey: Hex) {
 async function signTransaction(
   provider: Eip1193Provider,
   tx: TransactionRequest,
-  privateKey: Hex
+  privateKey: Hex,
 ): Promise<Hex> {
   const chainId = await getChainId(provider);
   const nonce = tx.nonce ?? (await getNonce(provider, tx.from!));
@@ -105,7 +115,8 @@ async function signTransaction(
 
   // Quantity fields arrive as JSON-RPC hex strings (often odd-nibble like 0x0 / 0x5).
   // Normalize to bigint at the tx boundary so RLP scalar encoding is canonical.
-  const q = (v: Hex | bigint | number | undefined, fallback: bigint) => (v === undefined ? fallback : BigInt(v as any));
+  const q = (v: Hex | bigint | number | undefined, fallback: bigint) =>
+    v === undefined ? fallback : BigInt(v as any);
   const q0 = (v: Hex | bigint | number | undefined) => q(v, 0n);
 
   // EIP-1559 (Type 2)
@@ -207,7 +218,11 @@ export function createPrivateKeyClient(rpcUrl: string, privateKey: Hex): Client 
     },
     sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
       // Sign and send transaction
-      const signedTx = await signTransaction(provider, { ...tx, from: account } as TransactionRequest, privateKey);
+      const signedTx = await signTransaction(
+        provider,
+        { ...tx, from: account } as TransactionRequest,
+        privateKey,
+      );
       return (await provider.request({
         method: 'eth_sendRawTransaction',
         params: [signedTx],

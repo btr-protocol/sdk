@@ -335,7 +335,10 @@ describe('capacity clamp boundary', () => {
 
 describe('audit regressions', () => {
   test('market-mint deposit floor uses the terminal quote, not summed hop floors', () => {
-    const pools = [mkPool('a', { AUDF: leg('AUDF') }), mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') })];
+    const pools = [
+      mkPool('a', { AUDF: leg('AUDF') }),
+      mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') }),
+    ];
     const { best } = rankDeposit(pools, 'AUDF', 'NZDF', 10_000);
     expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
     const [finalHop, deposit] = best?.steps ?? [];

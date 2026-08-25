@@ -46,7 +46,7 @@ export const safeCast = <T>(value: unknown): T => {
 export const safeJson = <T extends object>(text: string): T | undefined => {
   try {
     const v = JSON.parse(text);
-    return (v && typeof v === 'object' && !Array.isArray(v)) ? (v as T) : undefined;
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : undefined;
   } catch {
     return undefined;
   }

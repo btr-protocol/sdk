@@ -10,7 +10,6 @@
 // bands, spread zone and DepthPanel consume an identical payload shape. No parallel pricing model.
 
 import { type DepthCurve, type DepthLevel, type PoolState, depthCurve } from './aimm.js';
-import { enumerateRoutes, type NamedPool, type Route } from './router.js';
 import {
   type AggregateDepthOpts,
   type AggregatedDepthBook,
@@ -20,6 +19,7 @@ import {
   assembleAggBook,
   bookPartFromCurve,
 } from './depthAgg.js';
+import { type NamedPool, type Route, enumerateRoutes } from './router.js';
 
 /**
  * One side of a composed route as cumulative polylines over the route's INPUT (the token the taker

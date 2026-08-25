@@ -1,10 +1,10 @@
 // bun test — route-composed virtual depth (cross-pool books via the router's enumerated routes).
 import { describe, expect, test } from 'bun:test';
+import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
+import { type PoolState, buildLeg, quoteExactIn } from './aimm';
 import { aggregateDepthCurves } from './depthAgg';
 import { aggregatePairDepth, aggregateRouteDepthCurves } from './depthRoute';
-import { rankSwap, type NamedPool } from './router';
-import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
-import { buildLeg, quoteExactIn, type PoolState } from './aimm';
+import { type NamedPool, rankSwap } from './router';
 
 /**
  * Synthetic 2-pool 2-hop fleet: AUDF lives only in the fx core, WBTC only in the crypto core,

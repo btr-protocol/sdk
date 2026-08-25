@@ -450,7 +450,6 @@ export interface LegRisk {
   staleExcess?: number; // seconds past the keeper grace
 }
 
-
 /** One leg's staleness premium in PBPS = STALE_Z·σ·√excess/BPS (Pricing.sol `_staleTerm`), on that
  *  leg's OWN age and σ. BigInt: the product overruns 2^53 at the uint32 ceilings, and the chain
  *  never rounds. `√` is Solady's floor sqrt, one floored division at the end. */

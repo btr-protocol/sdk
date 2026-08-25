@@ -11,19 +11,25 @@
  *   - identity (0-leg, e.g. EUREUR) → 1.0
  */
 
-import { expect, test, describe } from 'bun:test';
-import { computeSynthTick, type LegTick } from '../src/types/synth-ohlc';
+import { describe, expect, test } from 'bun:test';
 import type { Leg } from '../src/types/paths';
+import { type LegTick, computeSynthTick } from '../src/types/synth-ohlc';
 
 const tick = (bid: number, ask: number, conf = 10000): LegTick => ({
-  bid, ask, mid: (bid + ask) / 2, conf,
+  bid,
+  ask,
+  mid: (bid + ask) / 2,
+  conf,
 });
 
 describe('computeSynthTick', () => {
   test('2-leg product: BTCUSDT = BTCUSDC × USDCUSDT', () => {
-    const legs: Leg[] = [['BTCUSDC', 1], ['USDCUSDT', 1]];
+    const legs: Leg[] = [
+      ['BTCUSDC', 1],
+      ['USDCUSDT', 1],
+    ];
     const out = computeSynthTick(legs, {
-      BTCUSDC:  tick(99_500, 100_500),
+      BTCUSDC: tick(99_500, 100_500),
       USDCUSDT: tick(0.9999, 1.0001),
     });
     expect(out).not.toBeNull();
@@ -51,9 +57,12 @@ describe('computeSynthTick', () => {
   });
 
   test('2-leg ratio: ETHBTC = ETHUSDC / BTCUSDC', () => {
-    const legs: Leg[] = [['ETHUSDC', 1], ['BTCUSDC', -1]];
+    const legs: Leg[] = [
+      ['ETHUSDC', 1],
+      ['BTCUSDC', -1],
+    ];
     const out = computeSynthTick(legs, {
-      ETHUSDC: tick(2_790, 2_810),    // mid 2800
+      ETHUSDC: tick(2_790, 2_810), // mid 2800
       BTCUSDC: tick(99_500, 100_500), // mid 100_000
     });
     expect(out).not.toBeNull();
@@ -67,35 +76,43 @@ describe('computeSynthTick', () => {
   });
 
   test('conf composes via min; any leg conf=0 ⇒ synth conf=0', () => {
-    const legs: Leg[] = [['BTCUSDC', 1], ['USDCUSDT', 1]];
+    const legs: Leg[] = [
+      ['BTCUSDC', 1],
+      ['USDCUSDT', 1],
+    ];
     // Stale BTCUSDC leg.
     const stale = computeSynthTick(legs, {
-      BTCUSDC:  tick(99_500, 100_500, 0),
+      BTCUSDC: tick(99_500, 100_500, 0),
       USDCUSDT: tick(0.9999, 1.0001, 10000),
     });
     expect(stale!.conf).toBe(0);
     // Both fresh → 10000.
     const fresh = computeSynthTick(legs, {
-      BTCUSDC:  tick(99_500, 100_500, 10000),
+      BTCUSDC: tick(99_500, 100_500, 10000),
       USDCUSDT: tick(0.9999, 1.0001, 10000),
     });
     expect(fresh!.conf).toBe(10000);
     // Min applies on intermediate values too.
     const mid = computeSynthTick(legs, {
-      BTCUSDC:  tick(99_500, 100_500, 5000),
+      BTCUSDC: tick(99_500, 100_500, 5000),
       USDCUSDT: tick(0.9999, 1.0001, 8000),
     });
     expect(mid!.conf).toBe(5000);
   });
 
   test('missing leg → null', () => {
-    const legs: Leg[] = [['BTCUSDC', 1], ['USDCUSDT', 1]];
+    const legs: Leg[] = [
+      ['BTCUSDC', 1],
+      ['USDCUSDT', 1],
+    ];
     expect(computeSynthTick(legs, { BTCUSDC: tick(99_500, 100_500) })).toBeNull();
   });
 
   test('non-positive leg quote → null', () => {
     const legs: Leg[] = [['BTCUSDC', 1]];
-    expect(computeSynthTick(legs, { BTCUSDC: { bid: 0, ask: 100_500, mid: 50_250, conf: 10000 } })).toBeNull();
+    expect(
+      computeSynthTick(legs, { BTCUSDC: { bid: 0, ask: 100_500, mid: 50_250, conf: 10000 } }),
+    ).toBeNull();
   });
 
   test('identity (0-leg) → 1.0 w/ full conf', () => {
@@ -108,7 +125,10 @@ describe('computeSynthTick', () => {
   });
 
   test('bid ≤ mid ≤ ask preserved across random 2-leg compositions', () => {
-    const legs: Leg[] = [['ETHUSDC', 1], ['BTCUSDC', -1]];
+    const legs: Leg[] = [
+      ['ETHUSDC', 1],
+      ['BTCUSDC', -1],
+    ];
     for (let s = 1; s <= 50; s++) {
       const eth = 1000 + s * 50;
       const btc = 50_000 + s * 1000;

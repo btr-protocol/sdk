@@ -3,10 +3,10 @@
  * Zero dependencies
  */
 
-import type { Address, Hex, Eip1193Provider, TransactionRequest } from './types';
 import type { Abi, AbiFunction } from './abi';
-import { encodeFn, decodeFn } from './abi';
-import { ethCall, sendTransaction, estimateGas } from './rpc';
+import { decodeFn, encodeFn } from './abi';
+import { estimateGas, ethCall, sendTransaction } from './rpc';
+import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -60,7 +60,7 @@ export class Contract {
   async read<T = unknown>(
     functionName: string,
     args: readonly unknown[] = [],
-    options: ReadOptions = {}
+    options: ReadOptions = {},
   ): Promise<T> {
     const data = encodeFn({ abi: this.abi, functionName, args });
     const result = await ethCall(this.provider, this.address, data, options.blockTag || 'latest');
@@ -70,7 +70,7 @@ export class Contract {
   async write(
     functionName: string,
     args: readonly unknown[] = [],
-    options: WriteOptions = {}
+    options: WriteOptions = {},
   ): Promise<Hex> {
     if (!this.account) throw new Error('No account connected');
 
@@ -80,8 +80,10 @@ export class Contract {
     if (options.value !== undefined) tx.value = `0x${options.value.toString(16)}`;
     if (options.gas !== undefined) tx.gas = `0x${options.gas.toString(16)}`;
     if (options.gasPrice !== undefined) tx.gasPrice = `0x${options.gasPrice.toString(16)}`;
-    if (options.maxFeePerGas !== undefined) tx.maxFeePerGas = `0x${options.maxFeePerGas.toString(16)}`;
-    if (options.maxPriorityFeePerGas !== undefined) tx.maxPriorityFeePerGas = `0x${options.maxPriorityFeePerGas.toString(16)}`;
+    if (options.maxFeePerGas !== undefined)
+      tx.maxFeePerGas = `0x${options.maxFeePerGas.toString(16)}`;
+    if (options.maxPriorityFeePerGas !== undefined)
+      tx.maxPriorityFeePerGas = `0x${options.maxPriorityFeePerGas.toString(16)}`;
 
     return sendTransaction(this.provider, tx);
   }
@@ -89,7 +91,7 @@ export class Contract {
   async simulate(
     functionName: string,
     args: readonly unknown[] = [],
-    options: WriteOptions = {}
+    options: WriteOptions = {},
   ): Promise<{ gas: bigint }> {
     if (!this.account) throw new Error('No account connected');
 
@@ -111,7 +113,8 @@ export class Contract {
 
   getFunction(name: string): AbiFunction | undefined {
     return this.abi.find(
-      (item): item is AbiFunction => item.type === 'function' && (item as AbiFunction).name === name
+      (item): item is AbiFunction =>
+        item.type === 'function' && (item as AbiFunction).name === name,
     );
   }
 
@@ -134,7 +137,7 @@ export async function readContract<T = unknown>(
   address: Address,
   abi: Abi,
   functionName: string,
-  args: readonly unknown[] = []
+  args: readonly unknown[] = [],
 ): Promise<T> {
   return new Contract({ address, abi, provider }).read<T>(functionName, args);
 }
@@ -146,7 +149,7 @@ export async function writeContract(
   functionName: string,
   args: readonly unknown[] = [],
   account: Address,
-  options: WriteOptions = {}
+  options: WriteOptions = {},
 ): Promise<Hex> {
   return new Contract({ address, abi, provider, account }).write(functionName, args, options);
 }

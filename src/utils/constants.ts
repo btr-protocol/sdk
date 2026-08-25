@@ -46,14 +46,14 @@ export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Numbe
 
 /**
  * Canonical BTR brand identity. Single source of truth across front/back/docs.
- * GitHub org renamed to `btr-supply` (was `btr-markets`) — keep all links in sync.
+ * GitHub org is `btr-protocol` (was `btr-supply`, before that `btr-markets`) — keep all links in sync.
  */
 export const BRAND = Object.freeze({
   name: 'BTR',
   /** Public display name for social accounts (X, Telegram, etc.). */
   socialName: 'BTR Protocol',
-  github: 'https://github.com/btr-supply',
-  githubOrg: 'btr-supply',
+  github: 'https://github.com/btr-protocol',
+  githubOrg: 'btr-protocol',
   domain: 'btr.markets',
   /** X/Twitter handle — PascalCase, no underscore (`@BTRProtocol`). */
   twitter: 'BTRProtocol',

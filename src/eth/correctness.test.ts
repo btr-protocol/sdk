@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { MC3_ADDR, multicall } from './multicall';
-import { rlpEncode } from './rlp';
-import { checksumAddress, keccak256Input } from './index';
-import { encodeEventTopics, getEventSignature } from './abi';
-import { privateKeyToAddress, signDigest } from './client';
-import { recoverDigestSigner } from '../oracle/verify';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { recoverDigestSigner } from '../oracle/verify';
+import { encodeEventTopics, getEventSignature } from './abi';
+import { privateKeyToAddress, signDigest } from './client';
+import { checksumAddress, keccak256Input } from './index';
+import { MC3_ADDR, multicall } from './multicall';
+import { rlpEncode } from './rlp';
 
 describe('rlpEncode (hex string handling)', () => {
   test('odd-nibble hex does not throw', () => {
@@ -24,7 +24,11 @@ describe('encodeEventTopics (indexed dynamic types)', () => {
   });
 
   test('indexed address topic = padded value (not hashed)', () => {
-    const ev = { type: 'event', name: 'E', inputs: [{ name: 'a', type: 'address', indexed: true }] };
+    const ev = {
+      type: 'event',
+      name: 'E',
+      inputs: [{ name: 'a', type: 'address', indexed: true }],
+    };
     const [t] = encodeEventTopics(ev as any, { a: '0x0b9cca59cefde03ad8e41da272d946861fa7717f' });
     expect(t).toBe('0x0000000000000000000000000b9cca59cefde03ad8e41da272d946861fa7717f');
   });
@@ -43,9 +47,8 @@ describe('checksumAddress (EIP-55)', () => {
   });
 });
 
-
 const PROBE_ABI = [
-  { type: 'function', name: 'getBlockNumber', inputs: [], outputs: [{ type: 'uint256' }] }
+  { type: 'function', name: 'getBlockNumber', inputs: [], outputs: [{ type: 'uint256' }] },
 ] as any;
 
 describe('multicall batching', () => {
@@ -60,8 +63,8 @@ describe('multicall batching', () => {
           // aggregate3 returning an empty Result[] — the request COUNT and the
           // block each chunk pins are what these cases assert.
           return '0x' + '20'.padStart(64, '0') + '0'.repeat(64);
-        }
-      } as any
+        },
+      } as any,
     };
   };
 
@@ -76,12 +79,12 @@ describe('multicall batching', () => {
     const calls = Array.from({ length: 3 }, () => ({
       address: MC3_ADDR as any,
       abi: PROBE_ABI,
-      functionName: 'getBlockNumber'
+      functionName: 'getBlockNumber',
     }));
     // Clamped to 1 — an unclamped 0 never advances the slice cursor.
     await Promise.race([
       multicall(provider, calls, { chunkSize: 0 }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('hung')), 2000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('hung')), 2000)),
     ]);
   });
 
@@ -90,11 +93,11 @@ describe('multicall batching', () => {
     const calls = Array.from({ length: 5 }, () => ({
       address: MC3_ADDR as any,
       abi: PROBE_ABI,
-      functionName: 'getBlockNumber'
+      functionName: 'getBlockNumber',
     }));
     await multicall(provider, calls, { chunkSize: 2 });
-    expect(seen.filter(s => s.method === 'eth_blockNumber').length).toBe(1);
-    const blocks = seen.filter(s => s.method === 'eth_call').map(s => s.params[1]);
+    expect(seen.filter((s) => s.method === 'eth_blockNumber').length).toBe(1);
+    const blocks = seen.filter((s) => s.method === 'eth_call').map((s) => s.params[1]);
     expect(blocks.length).toBe(3);
     expect(new Set(blocks).size).toBe(1);
     expect(blocks[0]).toBe('0x64');
@@ -136,7 +139,7 @@ describe('signDigest (noble-curves v2 prehash trap)', () => {
       secp256k1.sign(hexToBytes(DIGEST.slice(2)), hexToBytes(KEY.slice(2)), {
         format: 'recovered',
       }),
-      'recovered'
+      'recovered',
     );
     expect(recoverDigestSigner(DIGEST, rsv(wrong))).not.toBe(ADDR);
   });

@@ -39,43 +39,115 @@ export type SynthPath = {
  */
 export const SYNTH_PATHS: readonly SynthPath[] = Object.freeze([
   // Pure inversions (FX-style + stables) — canonical raw symbols are USDC-quoted.
-  { sym: 'USDCBTC',  legs: Object.freeze([['BTCUSDC',  -1]] as const) },
-  { sym: 'USDCETH',  legs: Object.freeze([['ETHUSDC',  -1]] as const) },
-  { sym: 'USDCSOL',  legs: Object.freeze([['SOLUSDC',  -1]] as const) },
+  { sym: 'USDCBTC', legs: Object.freeze([['BTCUSDC', -1]] as const) },
+  { sym: 'USDCETH', legs: Object.freeze([['ETHUSDC', -1]] as const) },
+  { sym: 'USDCSOL', legs: Object.freeze([['SOLUSDC', -1]] as const) },
   { sym: 'USDCPAXG', legs: Object.freeze([['PAXGUSDC', -1]] as const) },
 
   // 2-leg crosses (USDC-denominated → cross via USDC)
-  { sym: 'ETHBTC',   legs: Object.freeze([['ETHUSDC',  1], ['BTCUSDC', -1]] as const) },
-  { sym: 'SOLBTC',   legs: Object.freeze([['SOLUSDC',  1], ['BTCUSDC', -1]] as const) },
-  { sym: 'SOLETH',   legs: Object.freeze([['SOLUSDC',  1], ['ETHUSDC', -1]] as const) },
+  {
+    sym: 'ETHBTC',
+    legs: Object.freeze([
+      ['ETHUSDC', 1],
+      ['BTCUSDC', -1],
+    ] as const),
+  },
+  {
+    sym: 'SOLBTC',
+    legs: Object.freeze([
+      ['SOLUSDC', 1],
+      ['BTCUSDC', -1],
+    ] as const),
+  },
+  {
+    sym: 'SOLETH',
+    legs: Object.freeze([
+      ['SOLUSDC', 1],
+      ['ETHUSDC', -1],
+    ] as const),
+  },
 
   // Cross-currency triangulations (sym → EUR via USDC × EURC/USD pivot)
-  { sym: 'BTCEUR',   legs: Object.freeze([['BTCUSDC',  1], ['EURCUSD', -1]] as const) },
-  { sym: 'ETHEUR',   legs: Object.freeze([['ETHUSDC',  1], ['EURCUSD', -1]] as const) },
-  { sym: 'PAXGEUR',  legs: Object.freeze([['PAXGUSDC', 1], ['EURCUSD', -1]] as const) },
+  {
+    sym: 'BTCEUR',
+    legs: Object.freeze([
+      ['BTCUSDC', 1],
+      ['EURCUSD', -1],
+    ] as const),
+  },
+  {
+    sym: 'ETHEUR',
+    legs: Object.freeze([
+      ['ETHUSDC', 1],
+      ['EURCUSD', -1],
+    ] as const),
+  },
+  {
+    sym: 'PAXGEUR',
+    legs: Object.freeze([
+      ['PAXGUSDC', 1],
+      ['EURCUSD', -1],
+    ] as const),
+  },
 
   // Gold crosses (USDC-denominated)
-  { sym: 'BTCPAXG',  legs: Object.freeze([['BTCUSDC',  1], ['PAXGUSDC', -1]] as const) },
-  { sym: 'ETHPAXG',  legs: Object.freeze([['ETHUSDC',  1], ['PAXGUSDC', -1]] as const) },
+  {
+    sym: 'BTCPAXG',
+    legs: Object.freeze([
+      ['BTCUSDC', 1],
+      ['PAXGUSDC', -1],
+    ] as const),
+  },
+  {
+    sym: 'ETHPAXG',
+    legs: Object.freeze([
+      ['ETHUSDC', 1],
+      ['PAXGUSDC', -1],
+    ] as const),
+  },
 
   // ── Back-compat: *USDT synth = *USDC × USDCUSDT ──────────────────────────
   // Source feeds remain USDT-denominated for liquidity; clients can still
   // query e.g. BTCUSDT and get back the USDT-quoted price.
-  { sym: 'BTCUSDT',  legs: Object.freeze([['BTCUSDC',  1], ['USDCUSDT', 1]] as const) },
-  { sym: 'ETHUSDT',  legs: Object.freeze([['ETHUSDC',  1], ['USDCUSDT', 1]] as const) },
-  { sym: 'SOLUSDT',  legs: Object.freeze([['SOLUSDC',  1], ['USDCUSDT', 1]] as const) },
-  { sym: 'PAXGUSDT', legs: Object.freeze([['PAXGUSDC', 1], ['USDCUSDT', 1]] as const) },
+  {
+    sym: 'BTCUSDT',
+    legs: Object.freeze([
+      ['BTCUSDC', 1],
+      ['USDCUSDT', 1],
+    ] as const),
+  },
+  {
+    sym: 'ETHUSDT',
+    legs: Object.freeze([
+      ['ETHUSDC', 1],
+      ['USDCUSDT', 1],
+    ] as const),
+  },
+  {
+    sym: 'SOLUSDT',
+    legs: Object.freeze([
+      ['SOLUSDC', 1],
+      ['USDCUSDT', 1],
+    ] as const),
+  },
+  {
+    sym: 'PAXGUSDT',
+    legs: Object.freeze([
+      ['PAXGUSDC', 1],
+      ['USDCUSDT', 1],
+    ] as const),
+  },
 
   // Identity-like declarations (referenced by front agents).
-  { sym: 'USDTUSD',  legs: Object.freeze([['USDCUSDT', -1]] as const) },
-  { sym: 'EUREUR',   legs: Object.freeze([] as const) }, // trivial 1.0; consumers should short-circuit
+  { sym: 'USDTUSD', legs: Object.freeze([['USDCUSDT', -1]] as const) },
+  { sym: 'EUREUR', legs: Object.freeze([] as const) }, // trivial 1.0; consumers should short-circuit
 ]);
 
 /** Set of synth symbol names (O(1) membership). */
-export const SYNTH_SYMS: ReadonlySet<string> = new Set(SYNTH_PATHS.map(p => p.sym));
+export const SYNTH_SYMS: ReadonlySet<string> = new Set(SYNTH_PATHS.map((p) => p.sym));
 
 /** O(1) lookup: sym → SynthPath or undefined. */
-const PATH_BY_SYM = new Map(SYNTH_PATHS.map(p => [p.sym, p]));
+const PATH_BY_SYM = new Map(SYNTH_PATHS.map((p) => [p.sym, p]));
 export function pathFor(sym: string): SynthPath | undefined {
   return PATH_BY_SYM.get(sym);
 }
@@ -100,5 +172,5 @@ export const SYNTH_DEPS: ReadonlyMap<string, readonly SynthPath[]> = (() => {
 
 /** All leg symbols referenced by any synth path (deduped). */
 export const SYNTH_LEG_SYMS: ReadonlySet<string> = new Set(
-  SYNTH_PATHS.flatMap(p => p.legs.map(([sym]) => sym)),
+  SYNTH_PATHS.flatMap((p) => p.legs.map(([sym]) => sym)),
 );

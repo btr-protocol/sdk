@@ -607,16 +607,33 @@ for (const [symbol, token] of Object.entries(TOKENS)) {
 // ─────────────────────────────────────────────────────────────
 
 /** Canonical tokens (excludes wrappers) */
-export const CANONICAL_TOKENS = Object.keys(TOKENS).filter(s => !TOKENS[s].wrapperOf);
+export const CANONICAL_TOKENS = Object.keys(TOKENS).filter((s) => !TOKENS[s].wrapperOf);
 
 /** All tokens including wrappers */
 export const ALL_TOKENS = Object.keys(TOKENS);
 
 /** Base tokens for pair generation */
 export const BASE_TOKENS = [
-  'BTC', 'ETH', 'SOL', 'BNB', 'AAVE', 'PENDLE', 'ENA', 'UNI',
-  'CAKE', 'CRV', 'LINK', 'ZRO', 'AXL', 'MORPHO', 'HYPE', 'SUI', 'ZEC', 'ARB',
-  'XAUT', 'PAXG'
+  'BTC',
+  'ETH',
+  'SOL',
+  'BNB',
+  'AAVE',
+  'PENDLE',
+  'ENA',
+  'UNI',
+  'CAKE',
+  'CRV',
+  'LINK',
+  'ZRO',
+  'AXL',
+  'MORPHO',
+  'HYPE',
+  'SUI',
+  'ZEC',
+  'ARB',
+  'XAUT',
+  'PAXG',
 ];
 
 /** Quote currencies for pair generation */

@@ -35,7 +35,8 @@ export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>>
 
 /** Grain for a free-form from..to span. Requires METRICS_WINDOWS to stay ascending. */
 export function grainForSpan(spanMs: number): MetricsGrain {
-  for (const w of METRICS_WINDOWS) if (spanMs <= METRICS_WINDOW_MS[w]) return METRICS_WINDOW_GRAIN[w];
+  for (const w of METRICS_WINDOWS)
+    if (spanMs <= METRICS_WINDOW_MS[w]) return METRICS_WINDOW_GRAIN[w];
   return '1d';
 }
 
@@ -97,11 +98,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
 
 /** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the paged bucket
  *  listing stays on GET /protocol/liquidity/history. */
-export type ProtocolLiquidityMetric =
-  | 'liq.dep.usd'
-  | 'liq.wd.usd'
-  | 'liq.net.usd'
-  | 'liq.events';
+export type ProtocolLiquidityMetric = 'liq.dep.usd' | 'liq.wd.usd' | 'liq.net.usd' | 'liq.events';
 
 export const PROTOCOL_LIQUIDITY_METRICS = [
   'liq.dep.usd',

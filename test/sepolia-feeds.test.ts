@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
 import {
   SEPOLIA_BTR,
   SEPOLIA_CHAIN_ID,
@@ -12,7 +13,6 @@ import {
   sepoliaFeedByName,
   sepoliaFeedId,
 } from '../src/venues/sepolia';
-import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
 
 /**
  * The oracle feed table is a money-path identity map, and its ARRAY POSITION is the on-chain

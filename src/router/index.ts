@@ -10,8 +10,8 @@
 import { POOL_ABI } from '../abis/Pool.js';
 import type { SwapPlan } from '../amm/router.js';
 import { encodeFn } from '../eth/abi.js';
-import { ERC20_ABI } from '../eth/erc20.js';
 import type { Abi } from '../eth/abi.js';
+import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
 import { applySlip } from '../utils/maths.js';
@@ -172,7 +172,10 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
  *  the time the swap call actually goes out (a first-time wallet often needs 1-2 approval txs mined
  *  first). Split the two phases with `buildApprovalCalls` + `buildSwapExecCalls` and call the second
  *  one right before the swap send, so its deadline is computed then, not at batch-build time. */
-function validateLegs(legs: ExecLeg[], wnative: string | undefined): { wrapValue: bigint; unwrapAmount: bigint } {
+function validateLegs(
+  legs: ExecLeg[],
+  wnative: string | undefined,
+): { wrapValue: bigint; unwrapAmount: bigint } {
   let wrapValue = 0n;
   let unwrapAmount = 0n;
   for (const leg of legs) {
@@ -218,9 +221,8 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
     const amount = approveAmt(key);
     // A wrapped-native leg holds no allowance before the batch wraps, so it always needs one:
     // the caller's cached-allowance probe reads a pre-batch state that cannot cover it.
-    const need = leg.wrapIn || !opts.needsApproval
-      ? true
-      : opts.needsApproval(leg.tokenIn, leg.pool, amount);
+    const need =
+      leg.wrapIn || !opts.needsApproval ? true : opts.needsApproval(leg.tokenIn, leg.pool, amount);
     if (need && !seen.has(key)) {
       seen.add(key);
       approvals.push({
@@ -230,13 +232,16 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
       });
     }
   }
-  const wrap: ExecCall[] = wrapValue > 0n
-    ? [{
-        to: opts.wrappedNative as Address,
-        data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
-        value: wrapValue,
-      }]
-    : [];
+  const wrap: ExecCall[] =
+    wrapValue > 0n
+      ? [
+          {
+            to: opts.wrappedNative as Address,
+            data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
+            value: wrapValue,
+          },
+        ]
+      : [];
   return [...wrap, ...approvals];
 }
 
@@ -255,13 +260,16 @@ export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
     }),
     value: 0n,
   }));
-  const unwrap: ExecCall[] = unwrapAmount > 0n
-    ? [{
-        to: opts.wrappedNative as Address,
-        data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [unwrapAmount] }),
-        value: 0n,
-      }]
-    : [];
+  const unwrap: ExecCall[] =
+    unwrapAmount > 0n
+      ? [
+          {
+            to: opts.wrappedNative as Address,
+            data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [unwrapAmount] }),
+            value: 0n,
+          },
+        ]
+      : [];
   return [...swaps, ...unwrap];
 }
 
@@ -317,7 +325,11 @@ export function buildDepositCalls(
       ...swaps,
       {
         to: pool,
-        data: encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [args.depositToken, args.depositAmount] }),
+        data: encodeFn({
+          abi: POOL_ABI,
+          functionName: 'deposit',
+          args: [args.depositToken, args.depositAmount],
+        }),
         value: 0n,
       },
     ];

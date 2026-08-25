@@ -12,18 +12,18 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { NXR_MARKS, nxrPair } from '../src/venues/nxr.js';
 import {
-  artifact,
-  CONTRACTS,
-  EVM_ROOTS,
   CONSTANTS,
+  CONTRACTS,
   ENUMS,
+  EVM_ROOTS,
+  artifact,
   constantValues,
   enumMembers,
   poolScopedOps,
   resolveAbi,
 } from './manifest.js';
-import { NXR_MARKS, nxrPair } from '../src/venues/nxr.js';
 
 const SRC = resolve(import.meta.dir, '../src');
 const CHECK = process.argv.includes('--check');

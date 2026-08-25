@@ -3,12 +3,7 @@
   "vcs": { "enabled": false, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": false,
-    "ignore": [
-      "dist",
-      "node_modules",
-      "**/*.d.ts",
-      "test/fixtures/curve-storage.json"
-    ]
+    "ignore": ["dist", "node_modules", "**/*.d.ts", "test/fixtures/curve-storage.json"]
   },
   "formatter": {
     "enabled": true,
