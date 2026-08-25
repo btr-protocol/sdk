@@ -3,7 +3,7 @@
  * Used across frontend and backend for consistent display
  */
 
-import { getDigits, round } from './maths.js';
+import { round } from './maths.js';
 
 // ─────────────────────────────────────────────────────────────
 // Currency
@@ -51,9 +51,13 @@ export function formatCurrency(
     );
   }
 
-  // Small values: show significant figures
-  const decimals = absN >= 0.01 ? 4 : getDigits(absN) + 2;
-  return sign + symbol + absN.toFixed(Math.max(0, Math.min(decimals, 8)));
+  // Small values: cents, app-wide. Money renders at two fraction digits, never a "$0.000"-style
+  // runt; sub-cent dust reads as $0.00 rather than as precision theatre.
+  return (
+    sign +
+    symbol +
+    absN.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
 }
 
 /** Format currency with compact notation ($1.5M, $2.3B) */
