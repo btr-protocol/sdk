@@ -1,5 +1,10 @@
 /**
  * Unified logger for BTR DEX - works in both backend (Bun/Node) and frontend (browser)
+ *
+ * A logger is a DIAGNOSTIC channel and nothing else. It used to forward every `warn`/`error`
+ * to a host-supplied notification handler, which made the front end toast raw developer
+ * strings at users ("bind wallet", "Failed to set pane heights"). Telling a user something is
+ * a deliberate call the caller makes; it is never a side effect of logging.
  * @module @btr-protocol/sdk/utils/logger
  */
 
@@ -13,8 +18,6 @@ interface LogEntry {
   data?: unknown;
 }
 
-let notifyFn: ((type: 'info' | 'success' | 'warning' | 'error', message: string) => void) | null =
-  null;
 let defaultContext: string | undefined;
 let minLevel: LogLevel = 'info';
 
@@ -41,18 +44,6 @@ function shouldLog(level: LogLevel): boolean {
   return levels.indexOf(level) >= levels.indexOf(minLevel);
 }
 
-function levelToNotificationType(level: LogLevel): 'info' | 'success' | 'warning' | 'error' {
-  switch (level) {
-    case 'debug':
-    case 'info':
-      return 'info';
-    case 'warn':
-      return 'warning';
-    case 'error':
-      return 'error';
-  }
-}
-
 function log(level: LogLevel, message: string, data?: unknown, context?: string): void {
   if (!shouldLog(level)) return;
 
@@ -66,19 +57,6 @@ function log(level: LogLevel, message: string, data?: unknown, context?: string)
 
   const method = consoleMethod(level);
   method(formatLog(entry), data ?? '');
-
-  if (notifyFn && (level === 'error' || level === 'warn')) {
-    notifyFn(levelToNotificationType(level), message);
-  }
-}
-
-/**
- * Set the notification handler for frontend integration
- */
-export function setNotificationHandler(
-  fn: (type: 'info' | 'success' | 'warning' | 'error', message: string) => void,
-): void {
-  notifyFn = fn;
 }
 
 /**
