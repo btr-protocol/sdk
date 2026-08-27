@@ -40,10 +40,44 @@ export interface ExecLeg {
   tokenOut: Address;
   amountIn: bigint;
   minOut: bigint; // per-leg slippage floor
+  /** The output this leg was QUOTED at, in base units - the number the user was shown. `minOut` is
+   *  always `applySlip(quotedOut, slippageFrac)` and nothing else, so the tolerance that actually
+   *  reaches calldata is auditable from the leg alone (see `refloorLeg`). */
+  quotedOut: bigint;
   /** tokenIn is the chain's wrapped native and the user pays the gas token: prepend a wrap. */
   wrapIn?: boolean;
   /** tokenOut is the chain's wrapped native and the user wants the gas token: append an unwrap. */
   unwrapOut?: boolean;
+  /** This leg is funded by the PRECEDING leg's output (a cross part's second hop): its `amountIn`
+   *  is the previous leg's `minOut`, so re-flooring the previous leg must re-chain this one. */
+  chained?: boolean;
+}
+
+/** Re-floor one leg against the pool's OWN quote, read fresh at send time.
+ *
+ *  WHY THIS EXISTS. `minOut` used to be `applySlip(quotedOut, slip)` and nothing more, where
+ *  `quotedOut` came from the off-chain model (`@sdk/amm` or the Rust pricer) at DISPLAY time. Two
+ *  gaps then ate the whole tolerance before the transaction was ever sent:
+ *   1. model-vs-chain. The replica is not bit-exact with `Pricing._quotePath`; measured live on Arc
+ *      the front quoted 1000.12 USDC.b for 1000 USDT.b while `Pool.getSwapQuote` returned
+ *      1000.016425205618633264 - 1.04 bps rich, against a spread-scaled tolerance of 0.9 bps.
+ *      Deterministic `ThresholdViolation`, no market move required.
+ *   2. time. `Pricing._staleTerm` is `sigma*sqrt(age - grace)` re-evaluated at `block.timestamp`,
+ *      so the deliverable output DECAYS with wall-clock even with a frozen mark, and an approval
+ *      mined between quote and swap sits squarely inside that window.
+ *
+ *  So the floor is taken against `min(quotedOut, freshOut)`: never above the floor the user was
+ *  promised (`applySlip(quotedOut)`), and never above what the pool can pay right now - which is
+ *  what leaves the tolerance real room for the drift that happens AFTER the send. `freshOut` must
+ *  come from `Pool.getSwapQuote`, the view twin of the `getAnchorPathQuote` call `Pricing.swap`
+ *  makes: same routing path, same maths, evaluated one block early.
+ *
+ *  The caller is responsible for refusing to send when `freshOut < applySlip(quotedOut, slip)`:
+ *  that is the quote going stale beyond what the user agreed to, and it must surface as a warning,
+ *  never as a silently lowered floor. */
+export function refloorLeg(leg: ExecLeg, freshOut: bigint, slippageFrac: number): ExecLeg {
+  const base = freshOut > 0n && freshOut < leg.quotedOut ? freshOut : leg.quotedOut;
+  return { ...leg, minOut: applySlip(base, slippageFrac) };
 }
 
 /** An encoded call ready for eth_sendTransaction / wallet_sendCalls. */
@@ -155,12 +189,14 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tin = opts.tokenOf(rl[0].tokenIn);
       const tout = opts.tokenOf(rl[0].tokenOut);
       if (!rl[0].poolAddr || !tin || !tout) return null;
+      const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
         amountIn: partInUnits(part.fraction, i, tin.decimals),
-        minOut: applySlip(toUnits(part.quote.amountOut, tout.decimals), slip),
+        quotedOut,
+        minOut: applySlip(quotedOut, slip),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
       });
@@ -169,12 +205,15 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tmid = opts.tokenOf(rl[0].tokenOut);
       const t2out = opts.tokenOf(rl[1].tokenOut);
       if (!rl[0].poolAddr || !rl[1].poolAddr || !t1in || !tmid || !t2out) return null;
-      const leg1MinOut = applySlip(toUnits(part.quote.fills[0].amountOut, tmid.decimals), slip);
+      const leg1Quoted = toUnits(part.quote.fills[0].amountOut, tmid.decimals);
+      const leg1MinOut = applySlip(leg1Quoted, slip);
+      const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
         tokenOut: tmid.address,
         amountIn: partInUnits(part.fraction, i, t1in.decimals),
+        quotedOut: leg1Quoted,
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
       });
@@ -183,8 +222,10 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenIn: tmid.address,
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
-        minOut: applySlip(toUnits(part.quote.amountOut, t2out.decimals), slip),
+        quotedOut: leg2Quoted,
+        minOut: applySlip(leg2Quoted, slip),
         unwrapOut: opts.nativeOut,
+        chained: true,
       });
     }
   }
@@ -376,7 +417,8 @@ export function buildDepositCalls(
           tokenIn: args.token,
           tokenOut: args.targetToken,
           amountIn: args.amount,
-          minOut: 0n,
+          quotedOut: 0n,
+          minOut: 0n, // approval-only shim: never encoded as a swap
         },
       ],
       opts,
