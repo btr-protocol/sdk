@@ -42,6 +42,11 @@ export const getTransactionCount = (p: Eip1193Provider, addr: Address) =>
 export const getTransactionReceipt = (p: Eip1193Provider, hash: Hex) =>
   cmd<TransactionReceipt | null>(p, 'eth_getTransactionReceipt', [hash]);
 
+/** Deployed bytecode at `addr`, `0x` for an EOA. The ONE `eth_getCode` in the SDK: the
+ *  contract test and the EIP-7702 delegation test both read the same reply. */
+export const getCode = (p: Eip1193Provider, addr: Address, block = 'latest') =>
+  cmd<Hex>(p, 'eth_getCode', [addr, block]);
+
 export const getNonce = (p: Eip1193Provider, addr: Address) => getTransactionCount(p, addr);
 
 // ─────────────────────────────────────────────────────────────

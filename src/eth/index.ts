@@ -61,7 +61,9 @@ export {
   getChain,
   getChainInfo,
   getAllChainInfo,
+  chainIconSlug,
   getChainIcon,
+  getChainMonoIcon,
   getRpcUrl,
   getAllRpcs,
   getExplorerUrl,
@@ -149,6 +151,7 @@ export {
   getTransactionCount,
   getTransactionReceipt,
   getNonce,
+  getCode,
   ethCall,
   estimateGas,
   sendTransaction,
@@ -198,14 +201,26 @@ export {
 } from './client';
 
 // Wallets
-export type { WalletInfo, Eip6963Detail } from './wallets';
+export type {
+  WalletInfo,
+  Eip6963Detail,
+  AccountClass,
+  WalletChain,
+  WalletIdentity,
+  WalletIdSources,
+} from './wallets';
 export {
   WALLETS,
+  slug,
+  walletId,
+  isSafeApp,
+  resolveWallet,
+  accountClass,
   WC_ICONS,
   DISCOVER_MOBILE,
   DISCOVER_DESKTOP,
   isMobile,
-  getIcon,
+  isKnownWallet,
   getDownloadUrl,
   getName,
   getTooltip,

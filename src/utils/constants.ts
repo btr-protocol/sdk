@@ -69,6 +69,7 @@ export const BRAND = Object.freeze({
  */
 export const AI_PROVIDERS = Object.freeze({
   zai: 'https://api.z.ai/api/coding/paas/v4',
+  gmi: 'https://api.gmi-serving.com/v1',
 });
 
 export type SupportedChainId = number;

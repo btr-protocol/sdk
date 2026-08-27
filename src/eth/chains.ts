@@ -37,7 +37,10 @@ export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
 export interface ChainConfig {
   id: number;
   name: string;
-  icon?: string; // Optional override. Default: /networks/{name-slugged}.svg
+  /** Glyph file stem, when it is not the slugged name. Never a path: the renderer owns the
+   *  directory and the extension, so one slug serves `/networks/<slug>.svg`, its `-mono` mask
+   *  and the rasterised `<slug>.webp` pair. */
+  iconSlug?: string;
   rpcUrls: readonly string[];
   nativeCurrency: {
     name: string;
@@ -56,19 +59,36 @@ export interface ChainConfig {
 const TESTNET_TOKENS = /\b(testnet|sepolia|amoy|fuji|chapel|holesky|goerli|mumbai)\b/gi;
 
 /**
- * Get chain icon path (auto-computed from name or overridden)
+ * THE glyph file stem for a chain: `bnb-chain` for "BNB Chain".
+ *
+ * Every icon a chain has is built from this ONE derivation — the SVG path, the `-mono` mask and
+ * the rasterised WebP pair `scripts/raster-icons.ts` writes. A caller that slugs a chain name
+ * itself is a fork of this waiting to drift.
  */
-export function getChainIcon(chainId: number): string {
+export function chainIconSlug(chainId: number): string {
   const chain = CHAINS[chainId];
-  if (!chain) return '/networks/unknown.svg';
-
-  // Use override if specified
-  if (chain.icon) return chain.icon;
-
-  // Auto-compute from name: "BNB Chain" → "/networks/bnb-chain.svg"
+  if (!chain) return 'unknown';
+  if (chain.iconSlug) return chain.iconSlug;
+  // Auto-compute from name: "BNB Chain" → "bnb-chain"
   const name = chain.testnet ? chain.name.replace(TESTNET_TOKENS, ' ') : chain.name;
-  const slug = name.trim().toLowerCase().replace(/\s+/g, '-');
-  return `/networks/${slug}.svg`;
+  return name.trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+/** The chain's SVG. Kept for the mask/`<img>` surfaces; raster consumers go through the glyph. */
+export function getChainIcon(chainId: number): string {
+  return `/networks/${chainIconSlug(chainId)}.svg`;
+}
+
+/**
+ * The MASKED variant of a chain's glyph: a solid-fill SVG meant to be drawn through a CSS mask
+ * and recoloured (`MaskIcon` + `--icon-tint-primary`).
+ *
+ * It stays an SVG and is deliberately absent from the raster pipeline — a WebP cannot be tinted
+ * to `currentColor`. Here rather than at the two call sites that used to spell the `-mono` suffix
+ * themselves, so the naming rule lives with the naming rule it mirrors.
+ */
+export function getChainMonoIcon(chainId: number): string {
+  return getChainIcon(chainId).replace(/\.svg$/, '-mono.svg');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -145,7 +165,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   43114: {
     id: 43114,
     name: 'Avalanche C-Chain',
-    icon: '/networks/avalanche.svg',
+    iconSlug: 'avalanche',
     rpcUrls: [
       'https://api.avax.network/ext/bc/C/rpc',
       'https://rpc.ankr.com/avalanche',
@@ -180,7 +200,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   42161: {
     id: 42161,
     name: 'Arbitrum One',
-    icon: '/networks/arbitrum.svg',
+    iconSlug: 'arbitrum',
     rpcUrls: [
       'https://arb1.arbitrum.io/rpc',
       'https://arbitrum.llamarpc.com',
@@ -309,7 +329,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   480: {
     id: 480,
     name: 'World Chain',
-    icon: '/networks/worldchain.svg',
+    iconSlug: 'worldchain',
     rpcUrls: ['https://worldchain-mainnet.g.alchemy.com/public'],
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://worldscan.org'],
@@ -320,7 +340,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   999: {
     id: 999,
     name: 'HyperEVM',
-    icon: '/networks/hyperevm.svg',
+    iconSlug: 'hyperevm',
     rpcUrls: ['https://rpc.hyperliquid.xyz/evm'],
     nativeCurrency: { name: 'Hyperliquid', symbol: 'HYPE', decimals: 18 },
     blockExplorerUrls: ['https://hyperevmscan.io'],
@@ -351,7 +371,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   9745: {
     id: 9745,
     name: 'Plasma',
-    icon: '/networks/plasma.svg',
+    iconSlug: 'plasma',
     rpcUrls: ['https://rpc.plasma.to'],
     nativeCurrency: { name: 'Plasma', symbol: 'XPL', decimals: 18 },
     blockExplorerUrls: ['https://plasmascan.to'],
@@ -362,7 +382,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   42220: {
     id: 42220,
     name: 'Celo',
-    icon: '/networks/celo.svg',
+    iconSlug: 'celo',
     rpcUrls: ['https://forno.celo.org'],
     nativeCurrency: { name: 'Celo', symbol: 'CELO', decimals: 18 },
     blockExplorerUrls: ['https://celoscan.io'],
@@ -373,7 +393,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   747474: {
     id: 747474,
     name: 'Katana',
-    icon: '/networks/katana.svg',
+    iconSlug: 'katana',
     rpcUrls: ['https://rpc.katana.network'],
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://katanascan.com'],
@@ -396,7 +416,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     id: 4663,
     name: 'Robinhood Chain',
     // The slug would be `robinhood-chain`; the asset is `robinhood`.
-    icon: '/networks/robinhood.svg',
+    iconSlug: 'robinhood',
     rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
     // Arbitrum Orbit L2, ETH gas. No WETH predeploy at 0x42..06 (verified: no code), and no
     // wrapped native is pinned until one is confirmed on-chain.
@@ -412,7 +432,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   31337: {
     id: 31337,
     name: 'Anvil',
-    icon: '/networks/anvil.svg',
+    iconSlug: 'anvil',
     rpcUrls: ['http://localhost:8545'],
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     testnet: true,
@@ -421,7 +441,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   5042: {
     id: 5042,
     name: 'Arc',
-    icon: '/networks/arc.svg',
+    iconSlug: 'arc',
     // ⚠ NOT LIVE UNTIL LAUNCH. The endpoint below is the owner-authoritative mainnet URL, but
     // Arc mainnet has not launched: it is NOT verified and must not be treated as reachable.
     // Nothing may route here until launch; a `pending` deployment is never selectable.
@@ -550,7 +570,7 @@ export const CHAINS: Record<number, ChainConfig> = {
   46630: {
     id: 46630,
     name: 'Robinhood Chain Testnet',
-    icon: '/networks/robinhood.svg',
+    iconSlug: 'robinhood',
     rpcUrls: ['https://rpc.testnet.chain.robinhood.com'],
     nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://explorer.testnet.chain.robinhood.com'],
@@ -797,7 +817,7 @@ export function getChainInfo(chainId: number): ChainInfo | undefined {
   return {
     id: chain.id,
     name: chain.name,
-    icon: chain.icon || getChainIcon(chainId),
+    icon: getChainIcon(chainId),
     nativeSymbol: chain.nativeCurrency.symbol,
   };
 }
@@ -811,7 +831,7 @@ export function getAllChainInfo(): Record<number, ChainInfo> {
     result[Number(id)] = {
       id: chain.id,
       name: chain.name,
-      icon: chain.icon || getChainIcon(Number(id)),
+      icon: getChainIcon(Number(id)),
       nativeSymbol: chain.nativeCurrency.symbol,
     };
   }
