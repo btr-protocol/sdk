@@ -125,29 +125,59 @@ describe('decodeBlob', () => {
     expect(() => decodeBlob(new Uint8Array(0))).toThrow();
   });
 
-  /**
-   * THE anti-misparse gate. 4 records at the retired 24-byte stride is 96 B, which is also a
-   * valid header + 4 new records: length cannot tell the formats apart, so only the version
-   * byte can. A real old blob's first byte is the high byte of an ordinal `idx` (< 256) = 0.
-   */
-  it('rejects a blob whose length is valid for the OLD 24-byte stride', () => {
-    const old24 = new Uint8Array(96);
-    const dv = new DataView(old24.buffer);
-    for (let i = 0; i < 4; i++) {
+  /** 4 idx24 records, the layout the Arc signers emit (`record_format: idx24`). */
+  function idx24(count: number): Uint8Array {
+    const b = new Uint8Array(count * 24);
+    const dv = new DataView(b.buffer);
+    for (let i = 0; i < count; i++) {
       dv.setUint16(i * 24, i); // idx
       dv.setBigUint64(i * 24 + 2, encodeB64(10n ** 18n, 18));
       dv.setUint32(i * 24 + 10, 300);
       dv.setUint16(i * 24 + 14, 25);
-      dv.setBigUint64(i * 24 + 16, 1_700_000_000_000n);
+      dv.setBigUint64(i * 24 + 16, 1_700_000_000_000n + BigInt(i));
     }
+    return b;
+  }
+
+  it('decodes the headerless idx24 layout, keyed by feedIds ordinal', () => {
+    const decoded = decodeBlob(idx24(4));
+    expect(decoded.format).toBe('idx24');
+    expect(decoded.version).toBe(0);
+    expect(decoded.records).toHaveLength(4);
+    // Repeated per record on this layout; the blob-level value is the NEWEST of them.
+    expect(decoded.sourceTsMs).toBe(1_700_000_000_003n);
+    const [r] = decoded.records;
+    expect(r.feedIndex).toBe(0);
+    expect(r.tickerId).toBeUndefined();
+    expect(r.sigmaPbps).toBe(300);
+    expect(r.confidence).toBe(25);
+    expect(r.sourceTsMs).toBe(1_700_000_000_000n);
+    expect(r.mark1e18).toBe(decodeB64(encodeB64(10n ** 18n, 18), 18));
+  });
+
+  /**
+   * THE anti-misparse gate. 4 records at the 24-byte stride is 96 B, which is also a valid
+   * header + 4 22-byte records: length cannot tell the formats apart, so only the header can.
+   * Auto-detection reads a real idx24 blob correctly (its first byte is the high byte of an
+   * ordinal < 256, so it can never forge the version byte), and a caller that DECLARES ticker22
+   * still refuses it rather than mispricing it.
+   */
+  it('does not confuse the two colliding strides', () => {
+    const old24 = idx24(4);
     expect((old24.length - 8) % 22).toBe(0); // the collision this test exists for
-    expect(() => decodeBlob(old24)).toThrow(/blob version/);
+    expect(decodeBlob(old24).format).toBe('idx24');
+    expect(() => decodeBlob(old24, 'ticker22')).toThrow(/blob version/);
+    // …and the reverse: a real ticker22 blob is never read as idx24.
+    const blob = blobOf(2n, rec(1n, encodeB64(10n ** 18n, 18), 1, 2), rec(2n, 5n, 3, 4));
+    expect(decodeBlob(blob).format).toBe('ticker22');
   });
 
   it('rejects a non-zero reserved byte', () => {
     const blob = record(1n, encodeB64(10n ** 18n, 18), 1, 2, 1n);
     blob[7] = 1;
-    expect(() => decodeBlob(blob)).toThrow(/reserved/);
+    expect(() => decodeBlob(blob, 'ticker22')).toThrow(/reserved/);
+    // Auto-detection still fails closed - it fits neither layout - it just says so differently.
+    expect(() => decodeBlob(blob)).toThrow(/fits neither/);
   });
 });
 

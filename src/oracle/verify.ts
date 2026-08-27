@@ -18,6 +18,7 @@ import { concat, decodeB64, numberToHex, pad } from '../utils/encoding';
 
 const HEADER_BYTES = 8;
 const RECORD_BYTES = 22;
+const IDX24_RECORD_BYTES = 24;
 const SIG_STRIDE = 65;
 /**
  * Wire version, checked FIRST. 24 B and 22 B strides produce colliding blob lengths (4 old
@@ -26,6 +27,18 @@ const SIG_STRIDE = 65;
  */
 const BLOB_VERSION = 1;
 
+/**
+ * Record layout of a signed blob. NXR is the writer and its `RecordFormat`
+ * (`nx-rates/sdk/rust/src/pipeline_config.rs`) is the authority for both spellings; a signer
+ * emits whichever its domain declares (`signed_quotes.record_format`).
+ *
+ * `ticker22` is NXR's native layout. `idx24` is the LEGACY one it still emits for a consumer
+ * that decodes ordinals - and it is what the Arc fleet is signing today
+ * (`ops-flux/k0s/nxr/signer-configs/arc-{primary,reference}.config.yml` both say `idx24`), so
+ * a verifier that knows only `ticker22` rejects every live push as "wrong wire format".
+ */
+export type RecordFormat = 'ticker22' | 'idx24';
+
 /** keccak256("BatchQuote(bytes32 blobHash)") — the batch struct typehash. */
 export const BATCH_TYPEHASH = keccak256Input('BatchQuote(bytes32 blobHash)');
 /** solady EIP712 domain typehash (no salt — ExternalOracle overrides only name+version). */
@@ -33,13 +46,20 @@ export const EIP712_DOMAIN_TYPEHASH = keccak256Input(
   'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)',
 );
 
-/** One decoded 22-byte quote record. Mark is exposed both as raw B64 and 1e18-scaled. */
+/** One decoded quote record. Mark is exposed both as raw B64 and 1e18-scaled. */
 export interface QuoteRecord {
   /**
-   * MITCH instrument id: content-derived from both assets plus the instrument type, so it is
-   * identical on every chain and deployment. Resolves on-chain via `feedIdOf(tickerId)`.
+   * `ticker22` ONLY. MITCH instrument id: content-derived from both assets plus the instrument
+   * type, so it is identical on every chain and deployment. Resolves on-chain via
+   * `feedIdOf(tickerId)`.
    */
-  tickerId: bigint;
+  tickerId?: bigint;
+  /**
+   * `idx24` ONLY. Ordinal into the CONSUMER's own `getFeedIds()` array - a per-deployment fact,
+   * which is exactly why the native layout replaced it. Resolve it as `feedIds[feedIndex]` and
+   * never against a sibling chain's list.
+   */
+  feedIndex?: number;
   /** raw B64-packed mark (uint64). */
   priceB64: bigint;
   /** mark scaled to 1e18 (== on-chain `b64To1e18(price)`). 0 is invalid on-chain. */
@@ -48,15 +68,22 @@ export interface QuoteRecord {
   sigmaPbps: number;
   /** mark confidence interval, bps. */
   confidence: number;
+  /**
+   * NXR-attested source time, ms. `idx24` carries one per record; `ticker22` carries one per blob
+   * and it is copied onto every record here, so a reader never needs to know which layout it got.
+   */
+  sourceTsMs: bigint;
 }
 
-/** A decoded blob: one header source time plus its records. */
+/** A decoded blob: its layout, its source time and its records. */
 export interface QuoteBlob {
-  /** wire version (always {@link BLOB_VERSION} for an accepted blob). */
+  /** Layout the bytes were parsed as. */
+  format: RecordFormat;
+  /** wire version - {@link BLOB_VERSION} for `ticker22`, 0 for headerless `idx24`. */
   version: number;
   /**
-   * NXR-attested source timestamp, ms since epoch (u48 on the wire). BLOB-level: the contract
-   * already refused records with differing source times, so per-record copies were redundant.
+   * NXR-attested source timestamp, ms since epoch. Blob-level for `ticker22` (u48 header field);
+   * for `idx24` it is the NEWEST record's, since that layout repeats it per record.
    */
   sourceTsMs: bigint;
   records: QuoteRecord[];
@@ -94,14 +121,77 @@ function readUint(bytes: Uint8Array, off: number, len: number): bigint {
   return v;
 }
 
+/** True when the bytes carry a well-formed `ticker22` header AND a whole number of its records. */
+function isTicker22(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= HEADER_BYTES + RECORD_BYTES &&
+    bytes[0] === BLOB_VERSION &&
+    bytes[7] === 0 &&
+    (bytes.length - HEADER_BYTES) % RECORD_BYTES === 0
+  );
+}
+
 /**
- * Decode a packed batch blob, byte-exact with `batchPushSigned`:
- *   header(8) = version u8 | sourceTsMs u48 | reserved u8   (reserved MUST be 0)
- *   record(22) = tickerId u64 | price u64 | sigmaPbps u32 | conf u16
+ * Which layout these bytes are in.
+ *
+ * The strides collide on length by construction, so the `ticker22` HEADER is the only
+ * discriminator there is: version byte == 1 and reserved byte == 0. An `idx24` blob opens with
+ * `idx:u16`, whose high byte is 0 for every ordinal below 256, so it cannot forge that header
+ * while a deployment has fewer than 256 feeds.
+ *
+ * ponytail ceiling: a 256th feed would put a 1 in that byte and make a 24 B blob indistinguishable
+ * from a 22 B one. Upgrade path: pass `format` explicitly (the caller knows its own domain) rather
+ * than widening this guess. Detection fails CLOSED - an unparseable blob throws, never misparses.
+ */
+function detectFormat(bytes: Uint8Array): RecordFormat {
+  if (isTicker22(bytes)) return 'ticker22';
+  if (bytes.length >= IDX24_RECORD_BYTES && bytes.length % IDX24_RECORD_BYTES === 0) return 'idx24';
+  throw new Error(
+    `blob length ${bytes.length} fits neither a ticker22 header plus ${RECORD_BYTES}-byte records ` +
+      `nor a whole number of ${IDX24_RECORD_BYTES}-byte idx24 records`,
+  );
+}
+
+/**
+ * Decode a packed batch blob, byte-exact with `batchPushSigned`. Two layouts, per NXR's writer:
+ *   ticker22: header(8) = version u8 | sourceTsMs u48 | reserved u8   (reserved MUST be 0)
+ *             record(22) = tickerId u64 | price u64 | sigmaPbps u32 | conf u16
+ *   idx24:    no header; record(24) = idx u16 | price u64 | sigmaPbps u32 | conf u16 | sourceTs u64
+ * Big-endian throughout. `format` is auto-detected when omitted; pass it to refuse the other one.
  * Fails closed on a wrong version, a non-zero reserved byte, or a ragged body.
  */
-export function decodeBlob(blob: Hex | Uint8Array): QuoteBlob {
+export function decodeBlob(blob: Hex | Uint8Array, format?: RecordFormat): QuoteBlob {
   const bytes = toBytes(blob);
+  const fmt = format ?? detectFormat(bytes);
+
+  if (fmt === 'idx24') {
+    if (bytes.length < IDX24_RECORD_BYTES) {
+      throw new Error(`blob length ${bytes.length} is shorter than one idx24 record`);
+    }
+    if (bytes.length % IDX24_RECORD_BYTES !== 0) {
+      throw new Error(
+        `blob length ${bytes.length} not a whole number of ${IDX24_RECORD_BYTES}-byte records`,
+      );
+    }
+    const records: QuoteRecord[] = [];
+    let newest = 0n;
+    for (let o = 0; o < bytes.length; o += IDX24_RECORD_BYTES) {
+      const priceB64 = readUint(bytes, o + 2, 8);
+      const sourceTsMs = readUint(bytes, o + 16, 8);
+      if (sourceTsMs > newest) newest = sourceTsMs;
+      records.push({
+        feedIndex: Number(readUint(bytes, o, 2)),
+        priceB64,
+        // reuse the SDK B64 decoder (== on-chain b64To1e18) — do NOT reimplement.
+        mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
+        sigmaPbps: Number(readUint(bytes, o + 10, 4)),
+        confidence: Number(readUint(bytes, o + 14, 2)),
+        sourceTsMs,
+      });
+    }
+    return { format: fmt, version: 0, sourceTsMs: newest, records };
+  }
+
   if (bytes.length < HEADER_BYTES + RECORD_BYTES) {
     throw new Error(`blob length ${bytes.length} is shorter than a header plus one record`);
   }
@@ -115,6 +205,7 @@ export function decodeBlob(blob: Hex | Uint8Array): QuoteBlob {
   if (body % RECORD_BYTES !== 0) {
     throw new Error(`blob body ${body} not a whole number of ${RECORD_BYTES}-byte records`);
   }
+  const sourceTsMs = readUint(bytes, 1, 6);
   const records: QuoteRecord[] = [];
   for (let o = HEADER_BYTES; o < bytes.length; o += RECORD_BYTES) {
     const priceB64 = readUint(bytes, o + 8, 8);
@@ -125,9 +216,10 @@ export function decodeBlob(blob: Hex | Uint8Array): QuoteBlob {
       mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
       sigmaPbps: Number(readUint(bytes, o + 16, 4)),
       confidence: Number(readUint(bytes, o + 20, 2)),
+      sourceTsMs,
     });
   }
-  return { version: bytes[0], sourceTsMs: readUint(bytes, 1, 6), records };
+  return { format: fmt, version: bytes[0], sourceTsMs, records };
 }
 
 /**
@@ -220,6 +312,8 @@ export interface VerifyBatchArgs {
   domain: Eip712Domain;
   onchainSigners: Address[];
   threshold: number;
+  /** Record layout. Auto-detected when omitted; see {@link decodeBlob}. */
+  format?: RecordFormat;
 }
 
 export interface VerifiedBatch {
@@ -235,10 +329,11 @@ export function verifyBatch({
   domain,
   onchainSigners,
   threshold,
+  format,
 }: VerifyBatchArgs): VerifiedBatch {
   const digest = batchDigest(blob, domain);
   return {
-    blob: decodeBlob(blob),
+    blob: decodeBlob(blob, format),
     digest,
     quorum: verifyQuorum(recoverSigners(digest, sigs), onchainSigners, threshold),
   };
