@@ -156,10 +156,14 @@ function marketMint(
   const steps: LpRouteStep[] = [];
   let placed = 0;
   let depositExpected = 0;
+  // The FLOOR of what the tail deposit will actually have to hand: only the final hop of each part
+  // lands in targetSym, and only its minOut is guaranteed to exist by the time the deposit runs.
+  let depositFloor = 0;
   for (const part of plan.parts) {
     placed += part.fraction * amountIn;
     part.quote.fills.forEach((fill, i) => {
       const isFinal = i === part.quote.fills.length - 1;
+      const minOut = fill.amountOut * (1 - slip);
       steps.push({
         kind: 'swap',
         poolTag: fill.leg.poolTag,
@@ -168,9 +172,12 @@ function marketMint(
         tokenOut: fill.leg.tokenOut,
         amountIn: fill.amountIn,
         amountOut: fill.amountOut,
-        minOut: fill.amountOut * (1 - slip),
+        minOut,
       });
-      if (isFinal) depositExpected += fill.amountOut;
+      if (isFinal) {
+        depositExpected += fill.amountOut;
+        depositFloor += minOut;
+      }
     });
   }
   // Water-fill left part of the input unroutable, or a part runs past its binding reserve clip
@@ -193,14 +200,18 @@ function marketMint(
   // The terminal target-token amount actually deposited is the final leg quote net of that
   // leg's own slippage; any excess remains with the user as usable holdings.
   const first = steps[0];
-  const depositAmountIn = steps.reduce((sum, step) => sum + step.amountOut, 0);
+  // NOT Σ every step's quoted `amountOut`. That sum double-counted the intermediate hop of a 2-hop
+  // part - an amount denominated in a DIFFERENT token - and, even on a single hop, asked the pool
+  // to pull the QUOTE rather than the floor: an adverse-but-within-slippage fill leaves the user
+  // holding less target token than `Pool.deposit` then tries to `transferFrom`, and the tail of
+  // the batch reverts `TransferFromFailed()` (0x7939f424) after the swap has already landed.
   steps.push({
     kind: 'deposit',
     poolTag: first?.poolTag ?? '',
     poolAddr: first?.poolAddr,
     tokenIn: targetSym,
     tokenOut: targetSym,
-    amountIn: depositAmountIn,
+    amountIn: depositFloor,
     amountOut: depositExpected,
     minOut: 0,
   });

@@ -49,6 +49,13 @@ export interface ChainConfig {
   };
   blockExplorerUrls?: readonly string[];
   wrappedNative?: Address;
+  /** An ERC-20 whose `balanceOf` IS the account's gas balance, viewed at that token's decimals.
+   *  Distinct from `wrappedNative`: a wrapper holds a SEPARATE balance you top up on purpose, while
+   *  this is the very money the next transaction's fee is taken from. Arc's USDC (`0x3600…`) is the
+   *  6-decimal ERC-20 view of the same 18-decimal native balance, and it is also a pool asset — so
+   *  spending "all of it" leaves nothing to mine the spend, and `transferFrom` reverts by exactly
+   *  the fee. Any surface that offers a MAX on this token MUST reserve gas first. */
+  nativeErc20?: Address;
   multicall3?: Address;
   testnet?: boolean;
 }
@@ -473,6 +480,12 @@ export const CHAINS: Record<number, ChainConfig> = {
     blockExplorerUrls: ['https://testnet.arcscan.app'],
     // No `wrappedNative`: 0x3600… is the ERC-20 USDC view (6d) and the pool base, not a
     // WETH9. No deposit()/withdraw(uint256) in its bytecode; pools use wnative=address(0).
+    // It IS the gas balance though, which is a different claim and a live footgun - see
+    // `nativeErc20`. Four stablePool deposits reverted TransferFromFailed() on 2026-08 (e.g.
+    // 0xbaceb5a8…, 0x706d7a3a…) because MAX seeded the whole USDC balance and the tx's own fee
+    // came out of it first: short by exactly gasUsed × gasPrice, then each retry chased the
+    // receding balance.
+    nativeErc20: '0x3600000000000000000000000000000000000000',
     testnet: true,
   },
 

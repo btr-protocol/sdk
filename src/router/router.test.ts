@@ -233,6 +233,135 @@ describe('planToLegs', () => {
     expect(legs[0].amountIn).toBe(750_000_000n);
   });
 
+  // REGRESSION - "transferFrom failed" on a max-balance swap.
+  // The max chip seeds the field with the wei-exact balance; the quote engine is f64, so
+  // `parseFloat("31.049999999999999999")` is 31.05 and rebuilding the pay leg from THAT hands the
+  // pool 31050000000000000000 - one wei more than the wallet holds. `transferFrom` reverts
+  // `TransferFromFailed()` (0x7939f424), and the approval, summed from the same inflated legs,
+  // matches perfectly and hides the cause. INVARIANT: the amount submitted never exceeds the
+  // on-chain balance, and the approval covers exactly the amount submitted.
+  describe('amountInUnits pins the pay leg to the wei', () => {
+    const BALANCE = 31_049_999_999_999_999_999n; // 18-dec faucet twin, chip reads "31.05"
+    const FLOAT_IN = Number.parseFloat('31.049999999999999999'); // === 31.05
+    const rs = direct(POOL_S, 'USDT', 'USDC'); // USDT is the 18-decimal leg in META
+    const plan: SwapPlan = {
+      amountIn: FLOAT_IN,
+      amountOut: 31,
+      isSplit: false,
+      parts: [
+        {
+          route: rs,
+          fraction: 1,
+          quote: { route: rs, amountIn: FLOAT_IN, amountOut: 31, fills: [], maxIn: 1e6 },
+        },
+      ],
+    };
+
+    test('the f64 path overshoots the balance - the bug this pins', () => {
+      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }));
+      expect(legs[0].amountIn).toBe(31_050_000_000_000_000_000n);
+      expect(legs[0].amountIn).toBeGreaterThan(BALANCE); // → TransferFromFailed()
+    });
+
+    test('exact units → amountIn IS the balance, and the approval covers exactly it', () => {
+      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }));
+      expect(legs[0].amountIn).toBe(BALANCE);
+      expect(legs[0].amountIn).toBeLessThanOrEqual(BALANCE);
+      const approves = buildSwapCalls(legs, { recipient: USER }).filter((c) =>
+        c.data.startsWith(APPROVE_SEL),
+      );
+      expect(approves.length).toBe(1);
+      expect(approveAmount(approves[0].data)).toBe(BALANCE);
+    });
+
+    test('split parts sum back to the exact total, none of them over it', () => {
+      const rv = direct(POOL_V, 'USDT', 'USDC');
+      // 1/3 : 2/3 - fractions with no exact f64 (or decimal) representation.
+      const third = 1 / 3;
+      const splitPlan: SwapPlan = {
+        amountIn: FLOAT_IN,
+        amountOut: 31,
+        isSplit: true,
+        parts: [
+          {
+            route: rv,
+            fraction: third,
+            quote: { route: rv, amountIn: FLOAT_IN * third, amountOut: 10, fills: [], maxIn: 1e6 },
+          },
+          {
+            route: rs,
+            fraction: 1 - third,
+            quote: {
+              route: rs,
+              amountIn: FLOAT_IN * (1 - third),
+              amountOut: 21,
+              fills: [],
+              maxIn: 1e6,
+            },
+          },
+        ],
+      };
+      const legs = mustLegs(
+        planToLegs(splitPlan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }),
+      );
+      expect(legs.length).toBe(2);
+      const total = legs.reduce((s, l) => s + l.amountIn, 0n);
+      expect(total).toBe(BALANCE); // to the wei - no dust lost, none invented
+      for (const l of legs) expect(l.amountIn).toBeLessThan(BALANCE);
+      // Σ of the per-(token,pool) approvals is also exactly the balance: distinct spenders.
+      const approves = buildSwapCalls(legs, { recipient: USER }).filter((c) =>
+        c.data.startsWith(APPROVE_SEL),
+      );
+      expect(approves.reduce((s, c) => s + approveAmount(c.data), 0n)).toBe(BALANCE);
+    });
+
+    test('a 2-leg part debits the wallet exactly once, at the exact size', () => {
+      const cross = {
+        legs: [
+          { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'BNB' },
+          { poolTag: 's', poolAddr: POOL_S, tokenIn: 'BNB', tokenOut: 'USDC' },
+        ],
+        tokens: ['USDT', 'BNB', 'USDC'],
+        hops: 2,
+      };
+      const crossPlan: SwapPlan = {
+        amountIn: FLOAT_IN,
+        amountOut: 31,
+        isSplit: false,
+        parts: [
+          {
+            route: cross,
+            fraction: 1,
+            quote: {
+              route: cross,
+              amountIn: FLOAT_IN,
+              amountOut: 31,
+              fills: [
+                { leg: cross.legs[0], amountIn: FLOAT_IN, amountOut: 0.5 },
+                { leg: cross.legs[1], amountIn: 0.5, amountOut: 31 },
+              ],
+              maxIn: 1e6,
+            },
+          },
+        ],
+      };
+      const legs = mustLegs(
+        planToLegs(crossPlan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }),
+      );
+      expect(legs[0].amountIn).toBe(BALANCE);
+      expect(legs[1].amountIn).toBe(legs[0].minOut); // hop 2 spends the bridged floor, not the wallet
+    });
+
+    test('an absent or zero exact total leaves the float path alone', () => {
+      expect(mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }))[0].amountIn).toBe(
+        31_050_000_000_000_000_000n,
+      );
+      expect(
+        mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, amountInUnits: 0n }))[0].amountIn,
+      ).toBe(31_050_000_000_000_000_000n);
+    });
+  });
+
   test('missing pool address or token meta → null', () => {
     const noAddr = direct(undefined, 'USDC', 'USDT');
     const noMeta = direct(POOL_S, 'USDC', 'WOOF');

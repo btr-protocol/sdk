@@ -334,7 +334,15 @@ describe('capacity clamp boundary', () => {
 });
 
 describe('audit regressions', () => {
-  test('market-mint deposit floor uses the terminal quote, not summed hop floors', () => {
+  // The tail deposit spends what the SWAP delivered, and only the swap's `minOut` is guaranteed to
+  // be there: an adverse-but-within-slippage fill leaves the user short of the quote, so a deposit
+  // sized at the quote reverts `TransferFromFailed()` AFTER the swap has landed. `buildDepositCalls`
+  // documents the contract - "pass Σ per-part minOut (the guaranteed floor); anything above it stays
+  // with the user as target tokens" - and this is the producer side of it. The earlier assertion
+  // here pinned the terminal QUOTE, which is the shortfall this test now forbids; the concern it
+  // was written for (never SUM the hop floors - hop 1 is a different token entirely) still holds
+  // and is pinned below.
+  test('market-mint deposit is sized at the terminal FLOOR, never the quote or summed hops', () => {
     const pools = [
       mkPool('a', { AUDF: leg('AUDF') }),
       mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') }),
@@ -342,8 +350,35 @@ describe('audit regressions', () => {
     const { best } = rankDeposit(pools, 'AUDF', 'NZDF', 10_000);
     expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
     const [finalHop, deposit] = best?.steps ?? [];
-    expect(deposit?.amountIn).toBeCloseTo(finalHop?.amountOut ?? 0, 8);
-    expect(finalHop?.minOut).toBeLessThan(deposit?.amountIn ?? 0);
+    // Exactly the final hop's floor: what the batch is guaranteed to be holding by then.
+    expect(deposit?.amountIn).toBeCloseTo(finalHop?.minOut ?? 0, 8);
+    // Never the quote - that is the amount the wallet may not have.
+    expect(deposit?.amountIn).toBeLessThan(finalHop?.amountOut ?? 0);
+    // Never a sum across hops either.
+    const summed = (best?.steps ?? [])
+      .filter((s) => s.kind === 'swap')
+      .reduce((n, s) => n + s.amountOut, 0);
+    expect(deposit?.amountIn).toBeLessThanOrEqual(summed);
+  });
+
+  test('a 2-hop market mint deposits only the FINAL leg floor, not hop 1 in another token', () => {
+    // AUDF -> NZDF only exists via pool b; hop 1 bridges through AUDF in pool a. Summing every
+    // step's output would add an AUDF amount to an NZDF deposit.
+    const pools = [
+      mkPool('a', { AUDF: leg('AUDF') }),
+      mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') }),
+    ];
+    const { best } = rankDeposit(pools, 'AUDF', 'NZDF', 10_000);
+    const swaps = (best?.steps ?? []).filter((s) => s.kind === 'swap');
+    const deposit = (best?.steps ?? []).find((s) => s.kind === 'deposit');
+    const terminal = swaps.filter((s) => s.tokenOut === 'NZDF');
+    expect(terminal.length).toBeGreaterThan(0);
+    // The deposit equals Σ of the NZDF-terminal floors and nothing else.
+    expect(deposit?.amountIn).toBeCloseTo(
+      terminal.reduce((n, s) => n + s.minOut, 0),
+      8,
+    );
+    expect(deposit?.tokenIn).toBe('NZDF');
   });
 
   test('liability routes convert shares to face at accrued liquidity indexes', () => {

@@ -82,6 +82,17 @@ export interface PlanLegOpts {
   nativeIn?: boolean;
   /** User wants the gas token back: the last leg of every part unwraps after it swaps. */
   nativeOut?: boolean;
+  /** EXACT input size in base units - the same bigint the caller's balance guard compared against
+   *  `balanceOf`, and the amount the wallet is actually asked to part with. Supply it whenever it
+   *  is known.
+   *
+   *  Without it the input leg is rebuilt from `plan.amountIn`, an f64 that cannot hold 18 decimals:
+   *  a balance of 31049999999999999999 wei seeds the field as "31.049999999999999999", `parseFloat`
+   *  rounds it to 31.05, and `toUnits` hands the pool 31050000000000000000 - ONE WEI above the
+   *  balance, so `transferFrom` reverts `TransferFromFailed()` (0x7939f424) on every max-balance
+   *  swap. The approval is built from the same inflated sum, so it matches and hides the cause.
+   *  Split parts are carved from this bigint and sum back to it EXACTLY. */
+  amountInUnits?: bigint;
 }
 
 /** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
@@ -115,9 +126,31 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     throw new Error(`planToLegs: slippageFrac must be in [0, 1), got ${slip}`);
   }
   const legs: ExecLeg[] = [];
-  for (const part of [...plan.parts].sort((a, b) => b.fraction - a.fraction)) {
+  const parts = [...plan.parts].sort((a, b) => b.fraction - a.fraction);
+  // INPUT-LEG SIZING. `plan.amountIn` is an f64 and the pay leg is what the wallet is debited, so
+  // rebuilding it from that float is the one place a rounding step can push the swap ABOVE the
+  // balance the caller checked. With `amountInUnits` the slices are carved from THAT bigint: each
+  // is floored, the residual dust rides on the smallest (last) part, and Σ === amountInUnits to
+  // the wei. Without it the old float path stands, for callers that have no exact total.
+  const exactIn =
+    opts.amountInUnits !== undefined && opts.amountInUnits > 0n ? opts.amountInUnits : undefined;
+  const FRAC_SCALE = 1_000_000_000_000n; // 1e12: fraction precision, well inside f64's 15 digits
+  let leftIn = exactIn ?? 0n;
+  const partInUnits = (fraction: number, i: number, decimals: number): bigint => {
+    if (exactIn === undefined) return toUnits(fraction * plan.amountIn, decimals);
+    if (i === parts.length - 1) {
+      const rest = leftIn;
+      leftIn = 0n;
+      return rest;
+    }
+    const f = Number.isFinite(fraction) ? Math.min(Math.max(fraction, 0), 1) : 0;
+    const slice = (exactIn * BigInt(Math.floor(f * Number(FRAC_SCALE)))) / FRAC_SCALE;
+    const take = slice > leftIn ? leftIn : slice;
+    leftIn -= take;
+    return take;
+  };
+  for (const [i, part] of parts.entries()) {
     const rl = part.route.legs;
-    const partIn = part.fraction * plan.amountIn;
     if (rl.length === 1) {
       const tin = opts.tokenOf(rl[0].tokenIn);
       const tout = opts.tokenOf(rl[0].tokenOut);
@@ -126,7 +159,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
-        amountIn: toUnits(partIn, tin.decimals),
+        amountIn: partInUnits(part.fraction, i, tin.decimals),
         minOut: applySlip(toUnits(part.quote.amountOut, tout.decimals), slip),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
@@ -141,7 +174,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
         tokenOut: tmid.address,
-        amountIn: toUnits(partIn, t1in.decimals),
+        amountIn: partInUnits(part.fraction, i, t1in.decimals),
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
       });
