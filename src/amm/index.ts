@@ -1,14 +1,19 @@
-// AIMM — lean: types + pure helpers stay, heavy pricer (aimm.ts 1297L float replica) deprecated.
-// Use Rust `btr-quote` via `quoteExactInAsync` / `routeAsync` — bit-exact integer, same as chain.
-// Docs: POST https://api.btr.markets/v1/quote  and  POST https://api.btr.markets/v1/route
-// Old `quoteExactIn`/`rankSwap` kept for back-compat (will be removed), new code uses async fetch.
+// AIMM — types + pure helpers. The float replica in aimm.ts is the off-chain approximation;
+// the integer-exact answer comes from Rust `btr-quote` over `POST /v1/quote` and `POST /v1/route`.
+//
+// This module used to export `quoteExactInAsync` and `routeAsync` as thin wrappers over those
+// two endpoints. Both were removed: they had no callers anywhere, and neither had ever worked.
+// They serialised camelCase (`tokenIn`, `amountIn`) against a service that requires snake_case,
+// so every call 400'd on `missing field \`token_in\``; and their `pools`/`poolState` payload was
+// the SDK's own `PoolState` shape, which is not the `NamedPoolWire` the endpoint accepts. Fixing
+// them meant writing a full PoolState -> wire mapper that already exists, correctly, in
+// `front/src/lib/quoteApi.ts`. A second, broken copy of it in the SDK is worse than none.
 
 export * from './aimm.js';
 export * from './depthAgg.js';
 export * from './depthRoute.js';
 export * from './router.js';
 
-import { btrFetch } from '../api.js';
 import type { Route } from './router.js';
 
 import type { PoolAsset } from '../pool/index.js';
@@ -64,31 +69,3 @@ export function poolStateFrom(
   return { base, legs, hub };
 }
 
-/** Lean: delegate quoting to Rust btr-quote — POST /v1/quote (integer exact) */
-export async function quoteExactInAsync(
-  poolState: PoolState,
-  tokenIn: string,
-  tokenOut: string,
-  amountIn: bigint,
-): Promise<{ amountOut: bigint; leg: string }> {
-  const res = await btrFetch<{ amountOut: string; leg: string }>('/v1/quote', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ poolState, tokenIn, tokenOut, amountIn: `0x${amountIn.toString(16)}` }),
-  });
-  return { amountOut: BigInt(res.amountOut), leg: res.leg };
-}
-
-/** Lean: delegate routing to Rust — POST /v1/route */
-export async function routeAsync(params: {
-  pools: PoolState[];
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: bigint;
-}): Promise<Route> {
-  return btrFetch<Route>('/v1/route', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...params, amountIn: `0x${params.amountIn.toString(16)}` }),
-  });
-}
