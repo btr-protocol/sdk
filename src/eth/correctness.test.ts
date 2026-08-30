@@ -72,7 +72,7 @@ describe('multicall batching', () => {
         request: async ({ method, params }: { method: string; params?: unknown[] }) => {
           seen.push({ method, params });
           if (method === 'eth_blockNumber') return '0x64';
-          // aggregate3 returning an empty Result[] — the request COUNT and the
+          // aggregate3 returning an empty Result[]: the request COUNT and the
           // block each chunk pins are what these cases assert.
           return `0x${'20'.padStart(64, '0')}${'0'.repeat(64)}`;
         },
@@ -93,7 +93,7 @@ describe('multicall batching', () => {
       abi: PROBE_ABI,
       functionName: 'getBlockNumber',
     }));
-    // Clamped to 1 — an unclamped 0 never advances the slice cursor.
+    // Clamped to 1: an unclamped 0 never advances the slice cursor.
     await Promise.race([
       multicall(provider, calls, { chunkSize: 0 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('hung')), 2000)),
@@ -115,7 +115,7 @@ describe('multicall batching', () => {
     expect(blocks[0]).toBe('0x64');
   });
 
-  // Encode an aggregate3 return for `n` legs (leg `failIndex` marked reverted) — top-level
+  // Encode an aggregate3 return for `n` legs (leg `failIndex` marked reverted): top-level
   // dynamic return: [offset 0x20][array len][elem offsets][elems], each elem {bool,bytes}.
   const encResults = (n: number, failIndex = -1): string => {
     const w = (v: bigint) => v.toString(16).padStart(64, '0');

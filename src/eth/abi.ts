@@ -42,7 +42,7 @@ export type AbiParameter = {
 /**
  * ABI entries the coder does not interpret. Generated artifact ABIs also carry
  * `constructor` / `receive` / `fallback` entries plus extra JSON fields
- * (`stateMutability`, `internalType`) — those ride along untouched.
+ * (`stateMutability`, `internalType`); those ride along untouched.
  */
 export type AbiOther = { type?: string } & Record<string, unknown>;
 
@@ -63,9 +63,9 @@ const decUtf8 = new TextDecoder();
 // unmaintainable: the hashes stay right while the *signatures* rot against the
 // contracts (a stale `swap(address,address,uint256,uint256,address)` entry
 // silently served a selector for a function no contract answers, and `Pool` has
-// no catch-all entrypoint, so the call reverts empty — which reads as an RPC
+// no catch-all entrypoint, so the call reverts empty, which reads as an RPC
 // blink, not as a bug). Deriving costs ~2.3us once per unique signature per
-// process, which no hot path notices — getPlan memoizes per (abi, fn) anyway.
+// process, which no hot path notices: getPlan memoizes per (abi, fn) anyway.
 const SELECTORS: Record<string, string> = {};
 
 export const getSelector = (sig: string): Hex => {
@@ -75,7 +75,7 @@ export const getSelector = (sig: string): Hex => {
   return `0x${sel}` as Hex;
 };
 
-// Canonical ABI type for signature building — tuples must be expanded to
+// Canonical ABI type for signature building: tuples must be expanded to
 // their component types: 'tuple[]' w/ (address,bool,bytes) → '(address,bool,bytes)[]'.
 // Without this, selector derivation/lookup uses non-canonical signatures.
 export function canonicalType(p: AbiParameter): string {
@@ -262,7 +262,7 @@ export function decode(
   if (type === 'tuple' && components) {
     // Positional FIRST, names aliased on top. A tuple IS ordered, and a
     // multi-output function decodes through here, so `const [a, b] = read(...)`
-    // must work — the previous plain object keyed by `name || index` made an
+    // must work: the previous plain object keyed by `name || index` made an
     // unnamed pair decode to `{0:.., 1:..}`, which is not iterable and threw
     // "{} is not iterable" at the call site rather than returning a value.
     const vals: unknown[] = [];
@@ -285,7 +285,7 @@ export function decode(
   const sizeStr = m?.[2];
 
   if (base === 'bytes' && !sizeStr) {
-    // Dynamic bytes — offset points at length word
+    // Dynamic bytes: offset points at length word
     const len = Number(readInt(offset));
     return { val: `0x${d.slice(offset + 64, offset + 64 + len * 2)}`, read: 64 };
   }
@@ -331,7 +331,7 @@ export function getPlan(abi: Abi, functionName: string): FnPlan {
   let p = m.get(functionName);
   if (!p) {
     // Only function-shaped entries are callable; events/errors/generator extras
-    // either miss on name or are cast away — same as the previous untyped lookup.
+    // either miss on name or are cast away, same as the previous untyped lookup.
     const fn = abi.find((i) => i.name === functionName) as AbiFunction | undefined;
     if (!fn) throw new Error(`Fn not found: ${functionName}`);
     p = { fn, selector: getSelector(getFunctionSignature(fn)) };
@@ -360,7 +360,7 @@ export function encodeFn({
 
 /**
  * Decode a function call's return data. The decoded shape follows the ABI entry
- * the caller named, so the value comes back through the generic `T` — assert it
+ * the caller named, so the value comes back through the generic `T`; assert it
  * at the call site (`decodeFn<Asset>(...)`, like `Contract.read<T>`).
  */
 export function decodeFn<T = never>({

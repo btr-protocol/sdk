@@ -25,10 +25,10 @@ export class RpcError extends Error {
     this.name = new.target.name; // subclass name
   }
 }
-export class RpcRevertError extends RpcError {} // execution reverted — NOT retryable
-export class RpcRateLimitError extends RpcError {} // 429 / -32005 — retryable
-export class RpcTimeoutError extends RpcError {} // AbortController fired — retryable
-export class RpcNetworkError extends RpcError {} // fetch fail / non-ok HTTP — retryable
+export class RpcRevertError extends RpcError {} // execution reverted, NOT retryable
+export class RpcRateLimitError extends RpcError {} // 429 / -32005, retryable
+export class RpcTimeoutError extends RpcError {} // AbortController fired, retryable
+export class RpcNetworkError extends RpcError {} // fetch fail / non-ok HTTP, retryable
 
 // Classify a JSON-RPC error object into a typed error.
 function rpcErr(e: { code?: number; message?: string; data?: unknown }): RpcError {

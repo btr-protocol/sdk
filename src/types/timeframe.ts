@@ -1,5 +1,5 @@
 /**
- * Canonical timeframe enum — single source of truth across ∀ BTR services.
+ * Canonical timeframe enum: single source of truth across ∀ BTR services.
  *
  * Values = duration in seconds. Names follow pattern:
  *   - `Sn`  = n seconds   (S10, S20, S30)

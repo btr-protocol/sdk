@@ -2,7 +2,7 @@
 //
 // Every lookup here takes a `chainId` and throws when BTR is not deployed on it. That is the
 // whole point of the module: the previous shape hardcoded Sepolia and took no chain at all, so a
-// bot configured for Arc quoted Sepolia pool addresses and *succeeded* — the worst failure mode
+// bot configured for Arc quoted Sepolia pool addresses and *succeeded*: the worst failure mode
 // available, because nothing reverts and nothing logs. There is deliberately no default chain and
 // no fallback: a caller that cannot name its chain has no business building swap calldata.
 //
@@ -52,7 +52,7 @@ export function chainVenue(chainId: number): ChainVenue {
   return v;
 }
 
-/** USDC base (USDC-hub numeraire) — the first symbol of every roster. */
+/** USDC base (USDC-hub numeraire): the first symbol of every roster. */
 export function activeUsdc(chainId: number): Address {
   const v = chainVenue(chainId);
   const usdc = v.tokens.USDC;
@@ -78,7 +78,7 @@ export function activeOracle(chainId: number): Address {
  *
  * Resolution is case-folded (`nxrMark`) because the roster spelling is per chain: Sepolia lists
  * `cbBTC` and Arc lists `CBBTC` for the same asset, and an exact-key lookup silently drops one of
- * them — sizing then falls back for a token that has a perfectly good mark.
+ * them; sizing then falls back for a token that has a perfectly good mark.
  */
 export function activeRefMarksUsd(chainId: number): Record<string, number> {
   const out: Record<string, number> = {};
@@ -104,7 +104,7 @@ export function activeFeedId(chainId: number, symbol: string): Hex | null {
  * Deployed pools on `chainId`, with the token list that gates which pair each one quotes.
  *
  * A dual-listed asset quotes every pool that lists it and the router picks the better price
- * (best-route across pools). Only broadcast pools appear — a scripted-but-undeployed core is
+ * (best-route across pools). Only broadcast pools appear: a scripted-but-undeployed core is
  * absent from the generated record, so it can never be handed to the router.
  */
 export function staticVenuePools(chainId: number): VenuePool[] {

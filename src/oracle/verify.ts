@@ -5,9 +5,9 @@
  * decode the packed calldata blob, rebuild the EIP-712 digest byte-for-byte, recover the
  * ECDSA signers, and check k-of-n quorum against the on-chain granted-signer set.
  *
- * Byte-contract is LOCKED — see dex/ORACLE_SIGNED_PUSH_SPEC.md. Digest, record layout, and the
+ * Byte-contract is LOCKED: see dex/ORACLE_SIGNED_PUSH_SPEC.md. Digest, record layout, and the
  * concatenated-65-byte signature stride MUST agree with ExternalOracle.sol or verification fails
- * closed. Prices reuse the SDK B64 decoder (never reimplemented — one decoder, no parity drift).
+ * closed. Prices reuse the SDK B64 decoder (never reimplemented: one decoder, no parity drift).
  */
 
 import { secp256k1 } from '@noble/curves/secp256k1.js';
@@ -39,9 +39,9 @@ const BLOB_VERSION = 1;
  */
 export type RecordFormat = 'ticker22' | 'idx24';
 
-/** keccak256("BatchQuote(bytes32 blobHash)") — the batch struct typehash. */
+/** keccak256("BatchQuote(bytes32 blobHash)"): the batch struct typehash. */
 export const BATCH_TYPEHASH = keccak256Input('BatchQuote(bytes32 blobHash)');
-/** solady EIP712 domain typehash (no salt — ExternalOracle overrides only name+version). */
+/** solady EIP712 domain typehash (no salt: ExternalOracle overrides only name+version). */
 export const EIP712_DOMAIN_TYPEHASH = keccak256Input(
   'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)',
 );
@@ -182,7 +182,7 @@ export function decodeBlob(blob: Hex | Uint8Array, format?: RecordFormat): Quote
       records.push({
         feedIndex: Number(readUint(bytes, o, 2)),
         priceB64,
-        // reuse the SDK B64 decoder (== on-chain b64To1e18) — do NOT reimplement.
+        // reuse the SDK B64 decoder (== on-chain b64To1e18); do NOT reimplement.
         mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
         sigmaPbps: Number(readUint(bytes, o + 10, 4)),
         confidence: Number(readUint(bytes, o + 14, 2)),
@@ -212,7 +212,7 @@ export function decodeBlob(blob: Hex | Uint8Array, format?: RecordFormat): Quote
     records.push({
       tickerId: readUint(bytes, o, 8),
       priceB64,
-      // reuse the SDK B64 decoder (== on-chain b64To1e18) — do NOT reimplement.
+      // reuse the SDK B64 decoder (== on-chain b64To1e18); do NOT reimplement.
       mark1e18: priceB64 === 0n ? 0n : decodeB64(priceB64, 18),
       sigmaPbps: Number(readUint(bytes, o + 16, 4)),
       confidence: Number(readUint(bytes, o + 20, 2)),
@@ -262,7 +262,7 @@ export function recoverDigestSigner(digest: Hex, sig: Hex | Uint8Array): Address
 
 /**
  * Recover every signer from concatenated 65-byte signatures over `digest`.
- * `sigs` MUST be a multiple of 65 (fixed stride, no EIP-2098) — the count is the quorum claim.
+ * `sigs` MUST be a multiple of 65 (fixed stride, no EIP-2098): the count is the quorum claim.
  */
 export function recoverSigners(digest: Hex, sigs: Hex | Uint8Array): Address[] {
   const bytes = toBytes(sigs);

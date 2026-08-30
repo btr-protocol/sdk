@@ -1,6 +1,6 @@
 // Test profiles + σ seeds + the portable preset-curve table.
 //
-// Curve SSoT (machine): dex/research/stable-core/out/spline_shared_grid.json — quartic I-spline
+// Curve SSoT (machine): dex/research/stable-core/out/spline_shared_grid.json: quartic I-spline
 // fits per (regime, wall-width W). That artifact is gitignored, so the tracked input here is
 // `spline_grid.json`, its portable-preset slice (see grid.ts; regen + parity check documented
 // there). Only `portable: true` fits are exported (the deployability
@@ -11,7 +11,7 @@
 //   presetId = 100·tier + regimeOrdinal, tier ∈ {1: W0.5, 2: W1, 3: W2, 4: W5},
 //   regimeOrdinal = 1-based index in [hyper, flat, plateau, meso, lepto, platy, skew_L, skew_R,
 //   pin_M, pin_M_tight, pin_M_med, pin_M_wide]. 0 stays reserved (= no curve / fallback quote).
-// dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps) — same ratio the
+// dispRef convention: 200·W pbps (2× the fit's edge offset ±100·W pbps): same ratio the
 // bootstrap curves below use (edge 500 → dispRef 1000, edge 50 → dispRef 100).
 
 import { type AimmProfile, type QuarticCurve, buildCurve, dispersionCap } from '../aimm';
@@ -99,7 +99,7 @@ export const STABLE_PROFILE: AimmProfile = {
 // Volatile: generic preset-1 curve at a floor DERIVED from the preset, never picked. The only
 // configurable endpoint left is `minDispersion`, and `PoolConfig.sanitizeDispersion` CHECKS it
 // against the curve's own `Pricing.dispersionCap` (floor(SWING_CAP·dispRef·Q / span) = 10_000
-// here) — a floor above the cap reverts `BadConfig` at the write. The old 50_000 floor did exactly
+// here): a floor above the cap reverts `BadConfig` at the write. The old 50_000 floor did exactly
 // that: every test that used it validated a pool configuration that cannot exist on chain.
 // Effective edge = (span/2)·disp/(dispRef·Q): ±0.1% at this floor, ±0.5% at the cap
 // (= INTERIOR_SWING_CAP_PBPS/2, by construction).

@@ -1,4 +1,4 @@
-// bun test — order-book aggregation ladder + multi-pool depth curves.
+// bun test: order-book aggregation ladder + multi-pool depth curves.
 import { describe, expect, test } from 'bun:test';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
 import { type PoolState, buildLeg, quoteExactIn, virtualMarketDepth } from './aimm';
@@ -157,7 +157,7 @@ describe('aggregateDepthCurves', () => {
   });
 
   // Regression: crossCurve used to return bids reversed (cum descending), which
-  // aggregate() collapsed to zero rows — WETH/WBTC printed asks only.
+  // aggregate() collapsed to zero rows: WETH/WBTC printed asks only.
   test('cross pair (neither leg is the hub base) prints BOTH sides', () => {
     const weth = buildLeg(
       'WETH',
@@ -487,7 +487,7 @@ describe('aggregateDepthCurves', () => {
     // Best inverted bid ≈ reciprocal of the best forward ask (and vice versa), within a bucket.
     expect(1 / inv.bids[0].price).toBeGreaterThan(fwd.asks[0].price - fwd.step);
     expect(1 / inv.asks[0].price).toBeLessThan(fwd.bids[0].price + fwd.step);
-    // Sizes are re-denominated (~×mid), not copied over — a relabelled book would be identical.
+    // Sizes are re-denominated (~×mid), not copied over; a relabelled book would be identical.
     const fwdTop = fwd.asks[fwd.asks.length - 1].cum;
     const invTop = inv.bids[inv.bids.length - 1].cum;
     expect(invTop / fwdTop).toBeGreaterThan((1 / fwd.mid) * 0.5);

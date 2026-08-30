@@ -1,4 +1,4 @@
-/** Lean SDK — canonical `api.btr.markets`. All BTR data via `api.btr.markets/v1/*` (single subdomain, versioned). Override with `setApiRoot()`. */
+/** Lean SDK: canonical `api.btr.markets`. All BTR data via `api.btr.markets/v1/*` (single subdomain, versioned). Override with `setApiRoot()`. */
 export const BTR_API: string =
   (typeof import.meta !== 'undefined' &&
     (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_BTR_API) ||
@@ -15,7 +15,7 @@ export function getApiRoot() {
   return _api;
 }
 
-/** Generic fetch helper — 10s timeout, typed */
+/** Generic fetch helper: 10s timeout, typed */
 export async function btrFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 10_000);

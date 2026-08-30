@@ -1,5 +1,5 @@
 /**
- * Where each BTR asset's mark comes from on NX Rates — the ONE table that maps a roster symbol to
+ * Where each BTR asset's mark comes from on NX Rates: the ONE table that maps a roster symbol to
  * an NXR pair, and the only thing a deploy ceremony consults before it seeds a feed.
  *
  * The mapping is a property of the ASSET, not of the chain: `WETH` marks `ETH-USDC` on Sepolia, on
@@ -8,7 +8,7 @@
  * whichever chain it was pointed at). A second per-chain copy would drift silently, and the drift
  * would be a mark relayed under the wrong asset's name.
  *
- * What IS per-chain is the BASIS — the unit the chain's pools consume a mark in, i.e. its
+ * What IS per-chain is the BASIS: the unit the chain's pools consume a mark in, i.e. its
  * `quoteUnit` column. A QUOTE_UNIT_UOA pool divides the mark by the USDC/USD reference, so it wants
  * the USD row; a QUOTE_UNIT_ANCHOR pool re-denominates nothing, so it wants the `usdc` row and a
  * USD mark there is silently mispriced from the first swap. Both live on the same asset row and
@@ -19,7 +19,7 @@
  * delimiter-less and answers 200 to shapes that are not the pair you asked for: `/v1/price/CVX-USD`
  * serves Chevron at ~197, not Convex at ~3, and every wrapped-FX ticker (`QCAD-USD`, `BRLA-USD`, …)
  * answers 200 with the underlying's mid re-badged and `confidence: 0`. A resolver that guessed
- * `<SYM>-USD` would therefore never 404 — it would seed a plausible wrong number. Probe an addition
+ * `<SYM>-USD` would therefore never 404; it would seed a plausible wrong number. Probe an addition
  * with the EXPLICIT pair, treat 404 as absent, and never accept a variant that happens to answer.
  */
 
@@ -45,17 +45,17 @@ const BRL_SESSION: MarketSession = [1, 2, 3, 4, 5].map(
 // US equities carry NO session: the NXR stock tape is 24h (overnight + pre/post market,
 // price moves around the clock), so a cash-session window would freeze a live market into
 // "markets closed". Operator rule 2026-08-21: never assume market opening hours. If an
-// underlying ever goes dark, the mark reads STALE — a fault — which is the honest display.
+// underlying ever goes dark, the mark reads STALE, a fault, which is the honest display.
 
 /** One resolved mark source: which pair to fetch and how to turn it into the feed's quantity. */
 export interface NxrPair {
-  /** The pair the feed is DENOMINATED in — what the mark means, and what is written to the record. */
+  /** The pair the feed is DENOMINATED in: what the mark means, and what is written to the record. */
   nxrSymbol: string;
   /** The pair actually SERVED, when NXR only carries the reciprocal. The fetched mid is inverted
    *  back into `nxrSymbol` (see the FX rows). Absent = `nxrSymbol` is served directly. */
   nxrQuote?: string;
   /** Bridge leg for a composed mark: the mark is `mid(nxrSymbol) * mid(quoteVia)`. Used where an
-   *  asset's only first-class tape is quoted in something other than the unit the feed needs —
+   *  asset's only first-class tape is quoted in something other than the unit the feed needs:
    *  `USDS-USDT` x `USDT-USDC` is `USDS-USDC`. Mutually exclusive with `nxrQuote`. */
   quoteVia?: string;
 }
@@ -79,18 +79,18 @@ const PEG_STABLE = (nxrSymbol: string, usdc?: NxrPair): NxrMark => ({ nxrSymbol,
 
 /**
  * Roster symbol ⇒ its NXR mark source. Keys are canonical roster symbols: punctuation stripped,
- * UPPER-CASE (`arc-risk-params.json` `.noteSymbolConvention`). `CBBTC`, not `cbBTC` — the mixed-case
+ * UPPER-CASE (`arc-risk-params.json` `.noteSymbolConvention`). `CBBTC`, not `cbBTC`: the mixed-case
  * spelling mismatches the `TOKENS` registry key and is already rejected by the collector's
  * `/^[A-Z0-9]{1,16}-…/` pair regex, so it resolves here only through `nxrMark`'s case folding.
  */
 export const NXR_MARKS: Record<string, NxrMark> = {
   // ── peg stables. The USD row is Pyth `X-USD`, correct only where the pool re-denominates
-  // on-chain (Pricing._denominate divides by the USDC-USD reference) — it is NOT the retired
+  // on-chain (Pricing._denominate divides by the USDC-USD reference); it is NOT the retired
   // "USDC≈1 proxy", which was extractable (DEN-01, 2026-07-29). The `usdc` row is the pair for a
   // pool that consumes the mark as attested, and only the five Arc lists carry one. USDS, PYUSD and USD1
   // bridge through USDT: USDS and PYUSD because their `-USDC` and `-USD` are both compose-on-read
   // (flags 128), which the signer cannot resolve at all, and USD1 because `USD1-USDC` is flags 64
-  // but DEAD — sampled 6x over 36s its age only climbed, 368s to 408s, while `USD1-USDT` stayed
+  // but DEAD: sampled 6x over 36s its age only climbed, 368s to 408s, while `USD1-USDT` stayed
   // fresh. USDT and RLUSD are first-class USDC tape.
   USDT: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
   USDE: PEG_STABLE('USDE-USD'),
@@ -121,7 +121,7 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // to refUsd 1 rather than inventing a cross.
   USDCB: PEG_STABLE('USDC-USD'),
 
-  // ── volatiles — native USDC CEX tape.
+  // ── volatiles: native USDC CEX tape.
   WETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
   WBTC: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   // CBBTC and WBTC share BTC-USDC: NXR serves neither `WBTC-USD` nor `CBBTC-USD` (both 404,
@@ -153,21 +153,21 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   INTC: { nxrSymbol: 'INTC-USDC', band: [20, 400], refUsd: 93 },
   ASML: { nxrSymbol: 'ASML-USDC', band: [400, 7000], refUsd: 1757 },
   SPCX: { nxrSymbol: 'SPCX-USDC', band: [35, 600], refUsd: 140 },
-  // ── fiat-backed wrappers — mark the UNDERLYING CURRENCY, never the wrapper.
+  // ── fiat-backed wrappers: mark the UNDERLYING CURRENCY, never the wrapper.
   // Owner rule, and on the USDC basis it is no longer merely a preference. A wrapper's own ticker
   // is an issuer claim on the currency: a thinner, more easily dark tape than the rate it tracks.
   // EURC's own Pyth id 240 went unentitled on 2026-08-10 and pinned both oracle keepers in a
   // liveness restart loop, taking 20+ healthy feeds with them.
   //
   // ⚠ NXR ANSWERS 200 on every wrapper ticker, in BOTH units, and none of them is real tape.
-  // Probed 2026-08-14: `QCAD-USD` 0.7185508267, `QCAD-USDC` 0.7186596481, `EURC-USDC` 1.154188538
-  // — all `flags: 128` (FLAG_COMPOSED, compose-on-read) with `ci` and `confidence` hardcoded to 0,
+  // Probed 2026-08-14: `QCAD-USD` 0.7185508267, `QCAD-USDC` 0.7186596481, `EURC-USDC` 1.154188538,
+  // all `flags: 128` (FLAG_COMPOSED, compose-on-read) with `ci` and `confidence` hardcoded to 0,
   // and byte-near-identical to the underlying (`CAD-USDC` 0.7186550655, `EUR-USDC` 1.154159081,
   // both `flags: 64` / `confidence: 129`). A 200 is not evidence a wrapper feed exists.
   //
   // It is worse than redundant on the USDC basis: the signer resolves a configured symbol against
   // the aggregator's live snapshot map and never composes, so a compose-on-read pair has no
-  // snapshot and is PERMANENTLY UNSIGNABLE — the leg is dropped from every blob, its on-chain
+  // snapshot and is PERMANENTLY UNSIGNABLE: the leg is dropped from every blob, its on-chain
   // sourceTs never advances, and its append-only ordinal is burned, all without an error.
   //
   // `nxrQuote` names the pair NXR actually serves; the fetched mid is reciprocated back into
@@ -226,7 +226,7 @@ export function nxrMark(symbol: string): NxrMark | null {
   return NXR_MARKS[symbol.replace(/\.b$/i, '').toUpperCase()] ?? null;
 }
 
-/** The unit a chain's pools consume a mark in — its `quoteUnit` column, not a preference. */
+/** The unit a chain's pools consume a mark in: its `quoteUnit` column, not a preference. */
 export type MarkBasis = 'USD' | 'USDC';
 
 /**
@@ -236,7 +236,7 @@ export type MarkBasis = 'USD' | 'USDC';
  * USD-quoted tape denominates the leg and the row itself is the answer. On the USDC basis
  * (QUOTE_UNIT_ANCHOR) the pool re-denominates NOTHING: a USD mark would be off by the USD/USDC
  * basis with no on-chain correction left, silently mispriced from the first swap. So the USDC row
- * must be DECLARED — the one exception is a row already quoted in USDC outright, which is the same
+ * must be DECLARED: the one exception is a row already quoted in USDC outright, which is the same
  * pair rather than a guess at one.
  *
  * ⚠ Never fall back to the USD row here. `null` is the whole point: the caller must fail.

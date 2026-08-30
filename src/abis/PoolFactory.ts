@@ -4,7 +4,7 @@
  * PoolFactory
  * @module @btr-protocol/sdk/abis
  *
- * EIP-1167 minimal-clone factory for pool instances, and the upgrade beacon itself — clones read `implementation()` from it.
+ * EIP-1167 minimal-clone factory for pool instances, and the upgrade beacon itself: clones read `implementation()` from it.
  * Source: backend ABI service
  */
 

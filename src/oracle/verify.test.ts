@@ -1,5 +1,5 @@
 /**
- * Signed-quote verify helpers — round-trip + fixed-vector tests.
+ * Signed-quote verify helpers: round-trip + fixed-vector tests.
  *
  * The digest/record/signature contract is locked against ExternalOracle.sol
  * (dex/ORACLE_SIGNED_PUSH_SPEC.md). Fixed private keys give deterministic signer

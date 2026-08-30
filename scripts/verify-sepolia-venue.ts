@@ -14,7 +14,7 @@
  * only where the forge artifacts are present; this needs the two JSON files and nothing else.
  *
  * NOT checked, because it is not in the deployment: `nxrSymbol`. That is the NX Rates pair name,
- * declared once in `src/venues/nxr.ts NXR_MARKS` — the deploy JSON has no idea what NXR calls a
+ * declared once in `src/venues/nxr.ts NXR_MARKS`: the deploy JSON has no idea what NXR calls a
  * pair. Verify that against NXR REST, with the EXPLICIT pair.
  */
 

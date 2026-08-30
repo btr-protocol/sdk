@@ -131,7 +131,7 @@ export const rpcErrorCode = (e: unknown): number | undefined => {
 /**
  * Raw revert calldata dug out of the same wrapper nest as `rpcErrorCode`, e.g. MetaMask's
  * `err.data.originalError.data`. This is the ABI-encoded custom error (`selector‖args`), still
- * undecoded — decode it against the reverting contract's ABI to get a real reason.
+ * undecoded; decode it against the reverting contract's ABI to get a real reason.
  */
 export const rpcErrorData = (e: unknown): string | undefined => {
   for (const node of rpcErrorNodes(e)) {

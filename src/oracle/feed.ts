@@ -1,5 +1,5 @@
 /**
- * `IOracle.FeedData` — what `ExternalOracle.getFeed(feedId)` returns.
+ * `IOracle.FeedData`: what `ExternalOracle.getFeed(feedId)` returns.
  *
  * Mirrored as a named interface so consumers stop typing the decode result `as any`. The SDK's
  * decoder keys a tuple by ABI component name (`eth/abi.ts`), so a stale field name does not
@@ -11,7 +11,7 @@
 import type { Assert, FeedDataFields, FieldsMatch } from '../abis/structs.generated.js';
 
 export interface FeedData {
-  /** Packed B64 decimal float (mantissa 52 | decimals 5 | exp+bias 7) — NOT value x 2^64.
+  /** Packed B64 decimal float (mantissa 52 | decimals 5 | exp+bias 7), NOT value x 2^64.
    *  Decode with `decodeB64`; dividing the word by 2^64 reads USDC as 0.222. */
   lastPriceB64: bigint;
   /** Keeper-signed volatility, PBPS (1e6 = 100%). */

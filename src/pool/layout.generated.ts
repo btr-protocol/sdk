@@ -20,7 +20,7 @@ export const POOL_STORAGE = {
   lpTokens: 10n,
 } as const;
 
-/** `PoolStorage` members that are mappings — pinned by slot only; a mapping has no byte offset. */
+/** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
 export const POOL_MAPPINGS = [
   'assets',
   'oracleConfigs',

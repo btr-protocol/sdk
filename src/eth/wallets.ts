@@ -11,7 +11,7 @@ import type { Address, Eip1193Provider } from './types';
 // ─────────────────────────────────────────────────────────────
 
 /** An EIP-1193 provider plus whatever capability flags the wallet injected on it
- *  (isMetaMask, isRabby, providers, ...) — accessed dynamically, so kept as unknowns. */
+ *  (isMetaMask, isRabby, providers, ...): accessed dynamically, so kept as unknowns. */
 type InjectedProvider = Eip1193Provider & Partial<Record<string, unknown>>;
 
 /** The slice of `window` legacy detection probes directly. Everything else goes through
@@ -29,7 +29,7 @@ export interface WalletInfo {
   /**
    * The icon the wallet ANNOUNCED over EIP-6963, verbatim, or `undefined`.
    *
-   * NOT a path into our assets — that is derived from [`WalletInfo.id`] by the glyph component,
+   * NOT a path into our assets: that is derived from [`WalletInfo.id`] by the glyph component,
    * which is the only thing that knows where icons live. This field exists so a wallet the
    * catalog has never seen still draws something, and it is attacker-controlled data (wallets
    * announce `data:image/svg+xml,…`): render it through an `<img src>` and nothing else.
@@ -320,7 +320,7 @@ const byId = new Map(WALLETS.map((w) => [w.id, w]));
 
 /** A display name reduced to its identifying core: lowercase alphanumerics, minus a trailing
  *  "wallet". `Safe{Wallet}`, `Trust Wallet` and `OKX Wallet` are the same wallets as `Safe`,
- *  `Trust` and `OKX` — the suffix is branding, not identity. */
+ *  `Trust` and `OKX`: the suffix is branding, not identity. */
 const nameKey = (s: string) =>
   s
     .toLowerCase()
@@ -555,7 +555,7 @@ export function getInjected(): Eip1193Provider | null {
  *
  * `contract` covers Safe and every other smart account; `7702` is an EOA that has delegated to
  * code under EIP-7702 (its bytecode is the 23-byte `0xef0100 || address` designator). Three
- * values, and never the code itself — the bytecode of a smart account is close to an identifier.
+ * values, and never the code itself: the bytecode of a smart account is close to an identifier.
  */
 export type AccountClass = 'eoa' | 'contract' | '7702';
 
@@ -565,8 +565,8 @@ export type AccountClass = 'eoa' | 'contract' | '7702';
  * `evm` is the only value because EVM is the only chain this app supports. The field exists so
  * the model does not have to change when that stops being true: an SVM wallet would widen this
  * to `'evm' | 'svm'` and add ONE branch in [`resolveWallet`] (marked below) that reads the
- * Wallet Standard registry the way step 2 reads [`eip6963Providers`]. Everything else here —
- * the alias map, the slug fallback, the wire field — is already chain-agnostic. No Wallet
+ * Wallet Standard registry the way step 2 reads [`eip6963Providers`]. Everything else here,
+ * the alias map, the slug fallback, the wire field, is already chain-agnostic. No Wallet
  * Standard dependency is pulled in until there is a Solana surface to use it.
  */
 export type WalletChain = 'evm';
@@ -611,7 +611,7 @@ export function walletId(raw: string): string {
  * Legacy injected flags, in the order they are believed.
  *
  * ORDER IS THE POINT. Rabby, Brave and most Coinbase builds also set `isMetaMask` so that dapps
- * which only ever probed that flag keep working — reading it first labels half the fleet
+ * which only ever probed that flag keep working: reading it first labels half the fleet
  * MetaMask. It is checked LAST, as the residual case, and only ever reached when EIP-6963 (which
  * these wallets all implement, and which cannot be spoofed the same way) gave us nothing.
  */
@@ -638,7 +638,7 @@ const SAFE_HOSTS = ['app.safe.global', 'safe.global'];
  *
  * Host-based, because it is the only test that costs nothing: `@safe-global/safe-apps-sdk` would
  * be a dependency (and a postMessage handshake) to learn something the embedding origin already
- * says. Deliberately narrow — being in SOME iframe proves nothing, so an unknown embedder falls
+ * says. Deliberately narrow: being in SOME iframe proves nothing, so an unknown embedder falls
  * through to the normal resolution rather than being guessed at.
  */
 export function isSafeApp(): boolean {
@@ -655,7 +655,7 @@ export function isSafeApp(): boolean {
 
 /** Where a wallet id may be read from, richest source first. */
 export interface WalletIdSources {
-  /** The LIVE provider the app is connected through — never a scan of what is installed. */
+  /** The LIVE provider the app is connected through, never a scan of what is installed. */
   provider?: Eip1193Provider | null;
   /** WalletConnect `session.peer.metadata.name`, when the connection came over WC. */
   peerName?: string | null;
@@ -666,11 +666,11 @@ export interface WalletIdSources {
 /**
  * The connected wallet's id, resolved in a FIXED order of decreasing trustworthiness.
  *
- * 1. Safe App iframe — the embedder is a fact about the page, not a claim by the provider.
+ * 1. Safe App iframe: the embedder is a fact about the page, not a claim by the provider.
  * 2. EIP-6963 `rdns` of the live provider. Announced by the wallet under a reverse-domain name
  *    it controls, and read back out of the discovery store this SDK already keeps.
  * 3. WalletConnect peer metadata.
- * 4. Legacy injected flags, `isMetaMask` last — see [`LEGACY_FLAGS`].
+ * 4. Legacy injected flags, `isMetaMask` last; see [`LEGACY_FLAGS`].
  * 5. The connector's own name.
  *
  * The id is `''` when nothing is connected: an id is only ever reported for a live connection,
@@ -687,7 +687,7 @@ function resolveId(src: WalletIdSources): string {
   if (!p && !src.peerName && !src.connectorName) return '';
 
   // EIP-6963: match the live provider against the announcements already collected in
-  // `eip6963Providers` — by identity, so a wallet that announced several providers cannot be
+  // `eip6963Providers`, by identity, so a wallet that announced several providers cannot be
   // confused for a sibling. An SVM wallet would be looked up here, in the Wallet Standard
   // registry, and the rest of this function would be unchanged.
   if (p) {

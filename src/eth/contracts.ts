@@ -25,7 +25,7 @@ import { zeroAddress } from './types';
 export const ZERO_ADDRESS: Address = zeroAddress;
 
 /**
- * Canonical LiFi Diamond address — same on all supported EVM chains (LiFi deployment doctrine).
+ * Canonical LiFi Diamond address: same on all supported EVM chains (LiFi deployment doctrine).
  * Single source of truth for the keeper calldata `to` allowlist.
  * @see https://docs.li.fi/smart-contracts/deployments
  */
@@ -159,7 +159,7 @@ export const CONTRACT_ENV_VARS: Record<DexContractKey, string> = {
   FAUCET: 'BTR_FAUCET_ADDRESS',
 } as const;
 
-/** Front (Vite) env var names — `VITE_` + bare key suffix used by Safety Control Center. */
+/** Front (Vite) env var names: `VITE_` + bare key suffix used by Safety Control Center. */
 export const CONTRACT_VITE_ENV_VARS: Record<DexContractKey, string> = {
   POOL_FACTORY: 'VITE_POOL_FACTORY_ADDRESS',
   ADMIN: 'VITE_ADMIN_ADDRESS',

@@ -19,12 +19,12 @@ export type MetricsSource = 'live' | 'empty';
  * Grain per window, shared by the collector and the front so a bucket means one thing.
  * Every table underneath is minute-floored ⇒ 1m is the floor (60 buckets is the practical
  * minimum for a 1h view). Everything else lands near ~200 buckets per full view: points
- * are latency AND cache lifetime — a coarse bucket can be served from the edge cache far
+ * are latency AND cache lifetime: a coarse bucket can be served from the edge cache far
  * longer than a fresh one. A finer view is a zoom away: narrow `from..to` and the span
  * picks the finer grain itself.
  */
 export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>> = {
-  '1h': '1m', // 60 pts — table floor, cannot go finer
+  '1h': '1m', // 60 pts: table floor, cannot go finer
   '6h': '2m', // 180
   '12h': '5m', // 144
   '24h': '5m', // 288
@@ -211,7 +211,7 @@ export interface LiquidityFlowBucket {
   amountUsd: number | null;
 }
 
-/** GET /protocol/liquidity/history — LP deposit/withdraw flow, newest first.
+/** GET /protocol/liquidity/history: LP deposit/withdraw flow, newest first.
  *  Aggregate (per-minute) not per-wallet: `dex_liquidity` keeps `sender` for tx-level
  *  drill-down, but a per-address feed is an unbuilt product decision, not a shape gap. */
 export interface ProtocolLiquidityHistory {

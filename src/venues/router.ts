@@ -1,6 +1,6 @@
 // Lean exact-in router over the deployed BTR pools (eth_call quotes only).
 // Winner-take-all: best single-hop, else simple USDC-hub 2-hop.
-// Does NOT replace the off-chain AIMM router (../router) — on-chain quotes only.
+// Does NOT replace the off-chain AIMM router (../router): on-chain quotes only.
 
 import { decodeErrorResult } from '../eth/abi.js';
 import {
@@ -99,7 +99,7 @@ function classifySkip(e: unknown, pool: Address, tag: string): VenueSkip {
   return { kind: 'transport', pool, tag, reason: e instanceof Error ? e.message : String(e) };
 }
 
-// ── Per-venue single-hop quoter — batched: ONE aggregate3 for the whole candidate set ──
+// ── Per-venue single-hop quoter, batched: ONE aggregate3 for the whole candidate set ──
 
 /** Rebuild the error a failed aggregate3 leg would have thrown on its own: revert data rides
  *  `returnData`, so a deliberate halt keeps its decodable name instead of reading as noise. */

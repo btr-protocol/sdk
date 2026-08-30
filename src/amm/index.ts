@@ -1,4 +1,4 @@
-// AIMM — types + pure helpers. The float replica in aimm.ts is the off-chain approximation;
+// AIMM: types + pure helpers. The float replica in aimm.ts is the off-chain approximation;
 // the integer-exact answer comes from Rust `btr-quote` over `POST /v1/quote` and `POST /v1/route`.
 //
 // This module used to export `quoteExactInAsync` and `routeAsync` as thin wrappers over those

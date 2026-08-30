@@ -1,4 +1,4 @@
-/** Venues lazy — hot + cold cache, version-aware */
+/** Venues lazy: hot + cold cache, version-aware */
 import { btrFetch, getApiRoot } from '../api.js';
 import { coldGet, coldSet } from '../cache.js';
 import type { ChainVenue } from './deployments.generated.js';

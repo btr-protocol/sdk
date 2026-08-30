@@ -131,7 +131,7 @@ describe('httpTransport resilience', () => {
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcRevertError,
     );
-    expect(n).toBe(1); // reverts are deterministic — no retry
+    expect(n).toBe(1); // reverts are deterministic, no retry
   });
 
   test('times out and rejects with RpcTimeoutError', async () => {

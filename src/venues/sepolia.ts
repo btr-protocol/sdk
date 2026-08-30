@@ -71,7 +71,7 @@ export interface SepoliaFeed {
 }
 
 /**
- * ARRAY POSITION IS THE ON-CHAIN `feedIds[]` INDEX — the idx every NXR-signed record carries.
+ * ARRAY POSITION IS THE ON-CHAIN `feedIds[]` INDEX: the idx every NXR-signed record carries.
  *
  * Neither the order nor the ids are stated here: `deployments.generated.ts` keys `feedIds` by name
  * in ordinal order, matching the on-chain records. The NXR
@@ -110,7 +110,7 @@ export function sepoliaFeedByName(name: string): SepoliaFeed | null {
 /**
  * Static USD fallbacks for sizing when a live oracle read fails, keyed by the SEPOLIA spelling of
  * each symbol (`cbBTC`, not `CBBTC`) because the front indexes it by the token symbol it renders.
- * The numbers themselves are `NXR_MARKS[...].refUsd` — a mark is a property of the asset, so it is
+ * The numbers themselves are `NXR_MARKS[...].refUsd`: a mark is a property of the asset, so it is
  * stated once there and any chain's roster narrows it (`registry.ts activeRefMarksUsd`).
  */
 export const SEPOLIA_REF_MARKS_USD: Record<string, number> = Object.fromEntries(

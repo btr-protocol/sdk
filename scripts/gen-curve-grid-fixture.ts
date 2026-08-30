@@ -4,7 +4,7 @@
  *
  * Source grid (dex/research/stable-core/out/spline_shared_grid.json) is 6.6 MB and gitignored
  * (`research/**​/out/`), so a clean clone of sdk cannot read it. Only the portable presets' knot
- * grid + weights are needed by src/amm/__fixtures__/profiles.ts, which is ~13 KB — small enough
+ * grid + weights are needed by src/amm/__fixtures__/profiles.ts, which is ~13 KB: small enough
  * to track. src/amm/__fixtures__/grid.test.ts re-verifies the slice against the full grid
  * whenever the artifact IS present, so drift cannot hide.
  */

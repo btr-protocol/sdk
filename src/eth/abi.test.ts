@@ -198,7 +198,7 @@ describe('parameter round-trips', () => {
 describe('multi-output decode is positional', () => {
   // A function with >1 output decodes as an inline tuple. The tuple decoder used
   // to key EVERY member by `name || index` into a plain object, so unnamed
-  // outputs came back as `{0: .., 1: ..}` — which is not iterable, and
+  // outputs came back as `{0: .., 1: ..}`, which is not iterable, and
   // `const [a] = await readContract(...)` threw "{} is not iterable" instead of
   // reading the first return value. Live blob below is the Arc testnet
   // btr-stable pool answering previewWithdraw(USDT, 1e6).

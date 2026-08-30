@@ -9,12 +9,12 @@
 //
 // Comparison key is DIRECT (spec §2.2): maximize target-LP face (mint) / token-out units
 // (redeem). Face/mark normalization is presentation-only; both routes here terminate in the same
-// pool's receipts so shared terms cancel. Both routes are quoted through the SAME mirrors — the
-// contract-derived haircut pipeline (pool/liability.ts) and aimm.quoteExactIn — never mixed
+// pool's receipts so shared terms cancel. Both routes are quoted through the SAME mirrors: the
+// contract-derived haircut pipeline (pool/liability.ts) and aimm.quoteExactIn, never mixed
 // f64/bignum. Tiebreak: fewer legs (gas).
 //
 // Season gating (§2.5): any route whose first step BURNS leg-LP (B, A', B') is gated on
-// pre-existing seasoned shares — maxRedeem >= burned — because a same-timestamp mint arms the
+// pre-existing seasoned shares, maxRedeem >= burned, because a same-timestamp mint arms the
 // anti-JIT lock and an atomic batch would revert. A gated route is RETURNED with
 // feasible: false, reason: 'cooldown', never picked, so callers surface "available after
 // cooldown" instead of quoting a reverting batch.
@@ -32,7 +32,7 @@ export interface LpRouteOpts {
   /** Unlocked-share capacity per symbol (maxRedeem mirror), in FACE units. Routes that burn a
    *  leg's LP are gated on this. Default: unlimited (caller has no lock machinery). */
   maxRedeem?: (symbol: string) => number;
-  /** haircutSuppressorBps per symbol (default 0 — full haircut applies). */
+  /** haircutSuppressorBps per symbol (default 0: full haircut applies). */
   haircutSuppressorBps?: (symbol: string) => number;
   /** Asset.liquidityIndexWad per symbol (default 1e18). Required once indexes accrue; quoting
    *  every leg at 1 makes face/share conversions and route ranking drift from chain. */
@@ -83,7 +83,7 @@ export interface LpRouteStep {
   /** Quoted output (net, post everything the mirror charges). */
   amountOut: number;
   /** Slippage floor carried into the calldata (minOut / minLpAmountOut). 0 = no price guard
-   *  (deposits mint at index by design — spec §4). */
+   *  (deposits mint at index by design, spec §4). */
   minOut: number;
 }
 
@@ -294,7 +294,7 @@ export function rankDeposit(
   opts: LpRouteOpts = {},
 ): RankedLpPlan {
   if (!(amountIn > 0)) return { best: null, routes: [] };
-  // Same-asset default (spec §3): X -> X-LP is a DIRECT deposit — mints face 1:1 at the current
+  // Same-asset default (spec §3): X -> X-LP is a DIRECT deposit: mints face 1:1 at the current
   // index, no swap leg, no price guard. Enumerating the dual routes here would quote a
   // self-conversion; there is nothing to rank.
   if (xToken === targetSym) {
@@ -430,7 +430,7 @@ function transferExit(
   };
   const flagged = flagGate(shell, [targetSym, outToken], opts);
   if (flagged) return flagged;
-  // Burn of the source LP is lock-gated, and the minted Y-LP is born frozen — this route needs
+  // Burn of the source LP is lock-gated, and the minted Y-LP is born frozen; this route needs
   // seasoned target shares, and its tail cannot clear inside one atomic batch either way:
   // sequential execution after the cooldown is the only path (spec §2.5).
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
@@ -465,7 +465,7 @@ export function rankRedeem(
   opts: LpRouteOpts = {},
 ): RankedLpPlan {
   if (!(lpFaceIn > 0)) return { best: null, routes: [] };
-  // Same-asset exit (spec §2.1 B' tail): T-LP -> T is a DIRECT withdraw — haircut only, no
+  // Same-asset exit (spec §2.1 B' tail): T-LP -> T is a DIRECT withdraw: haircut only, no
   // spread/proto fee, one call. The cross-exit pipeline quotes a self-conversion (out = 0), so
   // short-circuit before enumeration.
   if (targetSym === outToken) {

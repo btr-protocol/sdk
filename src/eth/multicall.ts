@@ -2,7 +2,7 @@
  * Multicall3 helper with cross-caller coalescing.
  *
  * Components don't know about each other, so N subcomponents mounting in the same tick each
- * used to fire their own aggregate3 — N identical-shaped eth_calls racing each other. Calls
+ * used to fire their own aggregate3: N identical-shaped eth_calls racing each other. Calls
  * here are instead QUEUED per (provider, multicall address, block) and flushed once on a
  * microtask: every multicall() made in the same tick shares ONE aggregate3, and results are
  * fanned back out positionally. The transport's JSON-RPC batcher still coalesces whatever
@@ -150,7 +150,7 @@ async function runBatch(p: Eip1193Provider, entry: Batch): Promise<void> {
     let results: MulticallResult[];
     if (entry.calls.length > chunk) {
       // Chunks are separate eth_calls, so without a pinned block they can straddle
-      // one and return a torn snapshot — reserves from block N, marks from N+1.
+      // one and return a torn snapshot: reserves from block N, marks from N+1.
       // Resolved once here, and only on the path that actually splits.
       const block = entry.block ?? `0x${(await getBlockNumber(p)).toString(16)}`;
       const parts: Call[][] = [];
@@ -209,7 +209,7 @@ export async function multicallStrict<T = unknown>(
 ): Promise<T[]> {
   // Legs ride the shared batch FAILURE-TOLERANTLY: inside a MERGED aggregate3, one caller's
   // reverting leg must never abort unrelated components' reads (allowFailure=false reverts the
-  // whole aggregate3 server-side). Strictness is enforced here instead — same observable
+  // whole aggregate3 server-side). Strictness is enforced here instead: same observable
   // contract as before: any failed leg throws, naming the underlying error.
   const res = await multicall(p, calls, opt);
   const err = res.find((r) => !r.success);

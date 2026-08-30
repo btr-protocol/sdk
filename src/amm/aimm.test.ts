@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-// bun test — proves the shared model self-consistent (chart == quote) and the quartic curve
+// bun test: proves the shared model self-consistent (chart == quote) and the quartic curve
 // primitives (evalQ/areaQ/buildCurve) bit-faithful to NUQuartic.sol via the on-chain parity vectors.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -79,7 +79,7 @@ function crossState(): PoolState {
   return { base: BASE, legs: { BTCB: btc, ETH: eth } };
 }
 
-// One under-covered spoke (c<1, toll binds) and one over-covered (c>1, toll-free) — both κ>0.
+// One under-covered spoke (c<1, toll binds) and one over-covered (c>1, toll-free); both κ>0.
 function tolledState(): PoolState {
   const mk = (t: string, res: number) =>
     buildLeg(t, 1, sigmaSeed('stable'), res, 1e6, 5e6, 18, STABLE_PROFILE, 5_000);
@@ -90,7 +90,7 @@ const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(Math.abs(b), 1e
 
 // Integrate the RENDERED marginal ladder (trapezoid) up to cumulative token size S → the base
 // filled. Must track the quote's NET output (chart == quote). The quartic marginal is degree-4
-// in the depth coord, so the polyline trapezoid is an approximation — tolerance reflects that.
+// in the depth coord, so the polyline trapezoid is an approximation; tolerance reflects that.
 function integrateLadder(levels: DepthLevel[], S: number): number {
   const asc = [...levels].sort((a, b) => a.cumTok - b.cumTok);
   let acc = 0;
@@ -111,7 +111,7 @@ function integrateLadder(levels: DepthLevel[], S: number): number {
 
 describe('model primitives (Pricing.sol mirrors)', () => {
   // The law is FIXED (dex f6c26e0): γ / coverageMin / coverageMax are deleted, the band [1/2, 2]
-  // is folded in as constants, and the two arms are DELIBERATELY asymmetric — 200·(1−c) draining,
+  // is folded in as constants, and the two arms are DELIBERATELY asymmetric: 200·(1−c) draining,
   // 100·(c−1) filling. A "tidied" symmetric 200 on the fill arm refunds more on the return leg of
   // a round trip than the outbound charged (Pricing.sol, ImpactConservation.t.sol).
   test('computeSkew is the fixed piecewise law, asymmetric arms, clamped at ±100', () => {
@@ -121,12 +121,12 @@ describe('model primitives (Pricing.sol mirrors)', () => {
     expect(computeSkew(2, 1)).toBe(-100); // c ≥ 2 clamps
     expect(computeSkew(3, 1)).toBe(-100);
     expect(computeSkew(0.75, 1)).toBe(50); // ⌊200·(1−0.75)⌋
-    expect(computeSkew(1.5, 1)).toBe(-50); // −⌊100·(1.5−1)⌋ — NOT −100
+    expect(computeSkew(1.5, 1)).toBe(-50); // −⌊100·(1.5−1)⌋, NOT −100
     expect(computeSkew(1, 0)).toBe(-100); // no liabilities
   });
   // Regression guard: `depthAmplifier`/`calculateDepth` were deleted from Pricing.sol, so the
   // traverse denominator is the leg's RAW reserves at every coverage. An under-covered leg is the
-  // case a coverage-dependent depth term would move, so pin it explicitly — a reintroduced
+  // case a coverage-dependent depth term would move, so pin it explicitly: a reintroduced
   // amplifier inflates `depth` and quotes a book the chain will not fill.
   test('traverse depth == raw reserves at every coverage (no amplification when under-covered)', () => {
     for (const c of [0.6, 0.75, 0.9, 1, 1.5]) {
@@ -143,7 +143,7 @@ describe('model primitives (Pricing.sol mirrors)', () => {
       STABLE_PROFILE.minDisp,
     );
     // `Asset.maxDispersion` is deleted (dex e2e87a7): the σ ramp runs to the protocol ceiling and
-    // stops there, so a saturating σ must land on MAX_DISPERSION_PBPS exactly — not on any
+    // stops there, so a saturating σ must land on MAX_DISPERSION_PBPS exactly, not on any
     // per-asset dial, which is what a reintroduced field would make this return instead.
     expect(dispersion(1e12, VOLATILE_PROFILE)).toBe(MAX_DISPERSION_PBPS);
     expect(spreadPbps(0, STABLE_PROFILE)).toBe(STABLE_PROFILE.minFee); // σ=0 → floor
@@ -173,7 +173,7 @@ describe('path risk composes over legs, never maxes', () => {
     //   σ_path    = ⌊√(30000² + 40000²)⌋ = ⌊√2_500_000_000⌋ = 50000 exactly
     //   raw       = (496+226) + ⌊50000·10000/1e6⌋=500 + 5100 + 7·100=700           = 7022
     // The SDK used to quote 496 here (max reduction, no CI/stale composition), then 5496 while it
-    // mirrored the `maxFee` ceiling — 15.26 bp under the chain, on a path this stale.
+    // mirrored the `maxFee` ceiling: 15.26 bp under the chain, on a path this stale.
     expect(pathSpread([leg(30_000, 496, 2, 30), leg(40_000, 226, 5, 90)], 10_000)).toBe(7_022);
   });
 
@@ -199,7 +199,7 @@ describe('path risk composes over legs, never maxes', () => {
     // One keeper feeds both spokes, so an outage staleses them together: σ 10000, excess 100 each.
     //   per leg: ⌊100·10000·⌊√100⌋=10 / 1e4⌋ = 1000  ⇒ Σ = 2000
     //   coupled: σ_path = ⌊√(2·10000²)⌋ = ⌊√200_000_000⌋ = 14142
-    //            ⌊100·14142·10 / 1e4⌋ = 1414 = 70.7% of 2000 — the √2/2 shortfall exactly.
+    //            ⌊100·14142·10 / 1e4⌋ = 1414 = 70.7% of 2000: the √2/2 shortfall exactly.
     expect(pathSpread([leg(10_000, 0, 0, 100), leg(10_000, 0, 0, 100)], 0)).toBe(2_000);
   });
 
@@ -209,7 +209,7 @@ describe('path risk composes over legs, never maxes', () => {
     //   staleTerm = ⌊100·150070·7 / 1e4⌋      = ⌊10504.9⌋          = 10504
     //   conf      = 7·(1e6/1e4)                                    = 700
     //   raw = 13426
-    // Flooring only the SUM (and a float sqrt) reads 13534 — 1.08 bp wide.
+    // Flooring only the SUM (and a float sqrt) reads 13534: 1.08 bp wide.
     const p = { ...STABLE_PROFILE, vega: 9_999, minFee: 722 };
     expect(spreadPbps(150_070, p, { confidence: 7, staleExcess: 50 })).toBe(13_426);
   });
@@ -225,7 +225,7 @@ describe('path risk composes over legs, never maxes', () => {
     // Both legs VOLATILE_PROFILE: minFee 1000, vega 10000, σ 50000, fresh.
     //   cross:  raw = 2000 + ⌊70710·10000/1e6⌋ = 2000 + 707  = 2707 PBPS
     //   direct: raw = 1000 + ⌊50000·10000/1e6⌋ = 1000 + 500  = 1500 PBPS
-    // Under the old max reduction the cross also quoted 1500 — a whole leg's fence free.
+    // Under the old max reduction the cross also quoted 1500: a whole leg's fence free.
     expect(quoteExactIn(crossState(), 'BTCB', 'ETH', 0.01).spreadBps).toBeCloseTo(27.07, 12);
     expect(quoteExactIn(volState(), 'BTCB', BASE, 0.01).spreadBps).toBeCloseTo(15, 12);
   });
@@ -280,7 +280,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
         }
       }
     }
-    // Report the worst |Δ| (pbps·1e-9 units) — mirrors the on-chain assertLe(worst, 200).
+    // Report the worst |Δ| (pbps·1e-9 units): mirrors the on-chain assertLe(worst, 200).
     console.log(`evalQ parity worst |Δ| = ${worst} (pbps·1e-9) at ${worstAt}`);
     expect(worst).toBeLessThanOrEqual(200n);
   });
@@ -350,7 +350,7 @@ describe('NUQuartic parity (quartic_vectors.json — same integer math as evalQ/
     'fixture preset table: portable-only, wQ quantization identical to the exported vectors',
     () => {
       expect(CURVE_PRESETS.length).toBeGreaterThan(0);
-      // W5 presets are the unprefixed vector families — same quantized wQ by construction.
+      // W5 presets are the unprefixed vector families: same quantized wQ by construction.
       for (const p of CURVE_PRESETS.filter((x) => x.W === 5)) {
         const v = vectors[p.regime];
         if (!v) continue; // pin variants have no exported vector family
@@ -532,7 +532,7 @@ describe('fees == actual haircut (no double-count)', () => {
   });
 });
 
-// GATE-07: covToll/covQ port faithfulness — deterministic examples for the Lemma-C properties
+// GATE-07: covToll/covQ port faithfulness, deterministic examples for the Lemma-C properties
 // machine-checked in the on-chain Pricing fuzz suite.
 describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
   test('κ=0 must be free regardless of drain size', () => {
@@ -563,7 +563,7 @@ describe('coverage-wall toll (GATE-07; ports Pricing.sol._covToll)', () => {
   });
 
   // Wiring: quoteExactIn tolls the DRAINED output book. Spoke κ does not apply on DIRECT SELL
-  // (output=base). Hub κ on `state.hub` does — matches Pricing.sol cacheOut = tokenOut.
+  // (output=base). Hub κ on `state.hub` does: matches Pricing.sol cacheOut = tokenOut.
   test('DIRECT SELL (token→base) does not toll from the spoke κ', () => {
     const leg = buildLeg(
       'BTCB',
@@ -659,7 +659,7 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
     expect(d.maxTokAsk / d.maxTokBid).toBeLessThan(2.5);
     expect(d.bids.length).toBeGreaterThan(0);
     expect(d.asks.length).toBeGreaterThan(0);
-    // Ladder ends at (or just under) the fillable caps — ask vertices use mid-sized
+    // Ladder ends at (or just under) the fillable caps: ask vertices use mid-sized
     // bands so the last knot can sit a hair below maxTokAsk without a forced terminal.
     expect(d.bids[d.bids.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokBid + 1e-9);
     expect(d.asks[d.asks.length - 1].cumTok).toBeLessThanOrEqual(d.maxTokAsk + 1e-9);
@@ -695,7 +695,7 @@ describe('virtualMarketDepth (hub-spoke fillable ladder)', () => {
     const h = d.spreadBps / 2 / 1e4;
     expect(rel(d.asks[0].netPrice, d.mid / (1 - h))).toBeLessThan(1e-12);
     expect(rel(d.bids[0].netPrice, d.mid * (1 - h))).toBeLessThan(1e-12);
-    // Asks above mid, bids below — book fans from mid, not mark.
+    // Asks above mid, bids below: book fans from mid, not mark.
     if (d.asks.length > 1) expect(d.asks[1].price).toBeGreaterThanOrEqual(d.mid - 1e-9);
     if (d.bids.length > 1) expect(d.bids[1].price).toBeLessThanOrEqual(d.mid + 1e-9);
   });
@@ -763,7 +763,7 @@ describe('compose + degenerate', () => {
   });
 });
 
-// Inverted from the old `fallback quote (presetId 0 — skew-anchored linear impact)` block, which
+// Inverted from the old `fallback quote (presetId 0, skew-anchored linear impact)` block, which
 // asserted a curve-less leg still quoted. That was a SECOND pricing law (skew-anchored linear
 // impact) mirroring one the chain deleted: `Pricing._traverseCurveByVolume` now documents "there is
 // no empty-curve fallback", and `PoolConfig.validatePresetAssign` refuses to list an asset without a
@@ -867,12 +867,12 @@ describe('curveDensity (offset-space liquidity density)', () => {
 // ── buildCurve mirrors the WRITE, not just the read (NUQuartic._centre) ─────────
 // `set` centres the control polygon before packing, so the level the caller fitted reaches no
 // quote. A read-side mirror that skips it stores a curve the chain would not: off by span/2 on
-// EVERY quote for any wQ that is not already antisymmetric — 27 of the 28 shipped CURVE_PRESETS
+// EVERY quote for any wQ that is not already antisymmetric: 27 of the 28 shipped CURVE_PRESETS
 // and every family in quartic_vectors.json.
 // These mirror NUQuartic.t.sol's `test_the_write_centres_the_curve_on_the_mark` and
 // `test_the_centring_is_level_independent_on_an_odd_span`. The SDK-vs-Solidity NUMBER agreement is
 // the parity-vector suite above, which compensates the uncentred reference vectors by exactly the
-// shift the write applies — so dropping the shift here reddens both.
+// shift the write applies; so dropping the shift here reddens both.
 describe('buildCurve centring (NUQuartic._centre — write-path parity)', () => {
   // Deliberately NON-antisymmetric monotone polygon, submitted as a pure premium (β=0), with an
   // ODD rise so the floor-divide residual has a sign to depend on.
@@ -940,7 +940,7 @@ describe('fixture profiles satisfy the on-chain admissibility rules', () => {
   // Replaces the old `requireGammaWithinBand` case: γ / coverageMin / coverageMax are deleted on
   // chain and the validator with them, so there is no per-asset write left to check. The bound that
   // validator existed to enforce (PRC-03 round-trip conservation) is now folded into the two fixed
-  // arm slopes, so pin THAT instead — it is the property an asset config could no longer violate
+  // arm slopes, so pin THAT instead: it is the property an asset config could no longer violate
   // but a "tidy the arms into one 200·(1−c)" edit still can.
   test('the fill arm never refunds more than the drain arm charged (PRC-03)', () => {
     for (let d = 0.01; d < 0.5; d += 0.01) {

@@ -1,14 +1,14 @@
 /**
  * Synthetic OHLC reconstruction from leg OHLC candles.
  *
- * Problem: synth_S.OHLC ≠ f(leg_A.OHLC, leg_B.OHLC) in general — naive
+ * Problem: synth_S.OHLC ≠ f(leg_A.OHLC, leg_B.OHLC) in general; naive
  * corner method gives upper bound but overestimates range by 30-50%.
  *
  * Solution: range-vol blended estimator for synth = Π leg_i^{e_i}.
  *
  * Per-leg variance estimator (configurable):
  *   - 'parkinson' (1980): v_i = (1/(4 ln 2)) · ln(H_i/L_i)²
- *   - 'rs' (Rogers-Satchell 1991, default — drift-robust):
+ *   - 'rs' (Rogers-Satchell 1991, default, drift-robust):
  *     v_i = ln(H_i/C_i)·ln(H_i/O_i) + ln(L_i/C_i)·ln(L_i/O_i)
  *
  * Quadratic-form variance accumulator:
@@ -189,7 +189,7 @@ export function reconstructSynthSeries(
  * (per-bucket synth from S10 leg OHLCs) then roll up to target TF via the
  * OHLC monoid (first/max/min/last). Counts are summed.
  *
- * This is the BTR-preferred path — capturing intra-bucket variance correctly
+ * This is the BTR-preferred path, capturing intra-bucket variance correctly
  * at S10 (where leg correlation is weakest), then aggregating to user TFs.
  *
  * @param legs - signed legs config
@@ -255,7 +255,7 @@ export class RollingCorrelation {
     this.bufY = new Float64Array(this.N);
   }
 
-  /** Push paired sample (rA, rB) — typically log-returns. O(1). */
+  /** Push paired sample (rA, rB), typically log-returns. O(1). */
   add(rA: number, rB: number): void {
     if (!Number.isFinite(rA) || !Number.isFinite(rB)) return;
     if (this.filled === this.N) {

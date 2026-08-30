@@ -1,4 +1,4 @@
-// Pure BTR AIMM pricer — the ONE model shared by useSwapQuote (the form) and the
+// Pure BTR AIMM pricer: the ONE model shared by useSwapQuote (the form) and the
 // depth chart, so a quote and its rendered book can never disagree (spec D3).
 //
 // Mirrors the on-chain pricing libraries. The pricing shape is a
@@ -25,7 +25,7 @@ export const PBPS = 1e6; // 0.0001% (fee/offset/dispersion unit)
 const P = 10n ** 18n; // NUQuartic.P
 const QI = 1_000_000_000n; // NUQuartic.Q (pbps fixed point)
 const DI = 1_000_000n; // NUQuartic.D (derivative-pyramid scale)
-/** Hard segment cap — 14×uint16 boundaries is all the on-chain header holds. */
+/** Hard segment cap: 14×uint16 boundaries is all the on-chain header holds. */
 export const MAX_SEGS = 14;
 /** flags bit0: preset only valid on coverage-walled assets (NUQuartic.FLAG_REQUIRES_WALL). */
 export const CURVE_FLAG_REQUIRES_WALL = 1;
@@ -71,7 +71,7 @@ function frame(c: QuarticCurve, x: number): [i: number, x0: number, h: number] {
   return [i, b, next - b];
 }
 
-/** y(x) in pbps·Q — exact integer mirror of NUQuartic.evalQ (BigInt `/` truncates like Solidity). */
+/** y(x) in pbps·Q: exact integer mirror of NUQuartic.evalQ (BigInt `/` truncates like Solidity). */
 export function evalQ(c: QuarticCurve, x: number): bigint {
   const xi = xInt(x);
   const [i, x0, h] = frame(c, xi);
@@ -114,7 +114,7 @@ export function scaleY(yQ: bigint, curve: QuarticCurve, dispersionPbps: number):
   return Number((yQ * BigInt(Math.round(dispersionPbps))) / (BigInt(curve.dispRef) * QI));
 }
 
-// ── Curve builder (admin/fixture path) — exact mirror of NUQuartic.set ──────────
+// ── Curve builder (admin/fixture path): exact mirror of NUQuartic.set ──────────
 
 /** de Boor degree 4 at x in span s (NUQuartic._deBoor4). wQ already pbps·Q. */
 function deBoor4(t: number[], wQ: bigint[], s: number, x: number): bigint {
@@ -129,7 +129,7 @@ function deBoor4(t: number[], wQ: bigint[], s: number, x: number): bigint {
   return d[4];
 }
 
-/** q_i = 4·(w[i+1]−w[i])·D/(t[i+5]−t[i+1]) — first-derivative ctrl (NUQuartic._q). */
+/** q_i = 4·(w[i+1]−w[i])·D/(t[i+5]−t[i+1]): first-derivative ctrl (NUQuartic._q). */
 const qCtrl = (t: number[], wQ: bigint[], i: number): bigint =>
   (4n * (wQ[i + 1] - wQ[i]) * DI) / BigInt(t[i + 5] - t[i + 1]);
 
@@ -175,7 +175,7 @@ function segCoeffs(t: number[], wQ: bigint[], s: number): bigint[] {
 }
 
 /**
- * Validate + convert a clamped quartic B-spline to the packed power basis — exact TS mirror of
+ * Validate + convert a clamped quartic B-spline to the packed power basis: exact TS mirror of
  * NUQuartic.set (same integer truncation), producing the decoded curve `readCurve` would return
  * after an on-chain `setCurve(interior, wQ, dispRef, flags)`.
  * @param interior strictly-increasing integer interior knots in (0, BPS)
@@ -206,12 +206,12 @@ export function buildCurve(
   }
   for (let i = n; i < n + 5; i++) t[i] = BPS;
 
-  // NUQuartic._centre — the write-path transform, applied AFTER validation exactly as `set` does.
+  // NUQuartic._centre: the write-path transform, applied AFTER validation exactly as `set` does.
   // Clamped endpoints ⇒ y(0)=wQ[0], y(BPS)=wQ[n−1], so one subtraction pins y(0)+y(BPS) == span&1
   // (β ≡ −1/2). BigInt `>>` is an arithmetic (FLOOR) shift, matching `sar`, NOT truncate-toward-zero:
   // truncating makes the residual sign-dependent and `rangeQ`'s re-derivation rejects odd spans.
   // Shape-preserving and idempotent, so the fitted density is untouched. Never mutates the caller's
-  // array — Solidity centres its own memory copy.
+  // array; Solidity centres its own memory copy.
   const shift = (wQ[0] + wQ[n - 1]) >> 1n;
   const wC = shift === 0n ? wQ : wQ.map((v) => v - shift);
 
@@ -241,19 +241,19 @@ export function buildCurve(
 // preset's `Pricing.dispersionCap`. Mirroring both here is what lets an off-chain config (or a
 // test fixture) be rejected before it reaches a reverting `setProfile`.
 
-/** Pricing.INTERIOR_SWING_CAP_PBPS — the interior mid swing the fence can bound (fail-closed). */
+/** Pricing.INTERIOR_SWING_CAP_PBPS: the interior mid swing the fence can bound (fail-closed). */
 export const INTERIOR_SWING_CAP_PBPS = 10_000;
-/** `PoolConstantsLib.MAX_DISPERSION_PBPS` — the band CEILING, a protocol constant. It is not a
+/** `PoolConstantsLib.MAX_DISPERSION_PBPS`: the band CEILING, a protocol constant. It is not a
  *  per-asset field: `Asset.maxDispersion` is deleted on chain (dex e2e87a7), because how wide a leg
  *  may quote is a property of the shared preset it quotes on, not of the leg. Only the floor
  *  (`minDispersion`) is configurable. */
 export const MAX_DISPERSION_PBPS = 900_000;
 
-/** y(BPS) − y(0) in pbps·Q — NUQuartic.rangeQ's span (exact at both clamped ends). */
+/** y(BPS) − y(0) in pbps·Q: NUQuartic.rangeQ's span (exact at both clamped ends). */
 export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
 
 /** `Pricing.dispersionCap`: floor(SWING_CAP·dispRef·Q / span). A property of the preset, not the
- *  asset — the widest dispersion whose interior mid swing still fits the fence. FLOORED, never
+ *  asset: the widest dispersion whose interior mid swing still fits the fence. FLOORED, never
  *  ceiled: cap must be the largest dispersion the read still quotes, and cap+1 must not be. */
 export function dispersionCap(c: QuarticCurve): number {
   const span = curveSpanQ(c);
@@ -263,7 +263,7 @@ export function dispersionCap(c: QuarticCurve): number {
 }
 
 /** `PoolConfig.sanitizeDispersion`: 0 → protocol default (1000), then the floor is CHECKED against
- *  the preset's `cap` and the protocol ceiling — never clamped to either, because narrowing it
+ *  the preset's `cap` and the protocol ceiling, never clamped to either, because narrowing it
  *  silently would move the leg's quiet-tape quote instead of reporting a fit that does not fit.
  *  Throws exactly where the chain reverts `BadConfig`. */
 export function sanitizeDispersion(minDispersion: number, cap: number): number {
@@ -277,11 +277,11 @@ export function sanitizeDispersion(minDispersion: number, cap: number): number {
 export interface AimmProfile {
   vega: number; // volatility sensitivity, BPS
   minFee: number; // PBPS (1 = 0.01 bp floor; 100 = 1 bp)
-  minDisp: number; // PBPS — the QUIET-TAPE FLOOR. The ceiling is MAX_DISPERSION_PBPS, protocol-wide.
+  minDisp: number; // PBPS: the QUIET-TAPE FLOOR. The ceiling is MAX_DISPERSION_PBPS, protocol-wide.
   protoShare: number; // % of spread routed to protocol (fee split)
   /** Pricing-shape preset (Asset.presetId → PoolStorage.curves). REQUIRED: there is ONE pricing law
    *  (`Pricing._traverseCurveByVolume`) and `PoolConfig.validatePresetAssign` will not list an asset
-   *  without a curve, so a null here is a read that has not landed — fail closed at the caller
+   *  without a curve, so a null here is a read that has not landed; fail closed at the caller
    *  rather than quote a second, nonexistent law. */
   curve: QuarticCurve;
 }
@@ -291,12 +291,12 @@ export interface PoolLeg {
   token: string;
   twap: number; // NX mark, base-per-token
   sigma: number; // sigma from feed, PBPS-scaled (1e4 = 1%)
-  res: number; // R — token reserves
-  liab: number; // L — token liabilities (c = R/L)
+  res: number; // R: token reserves
+  liab: number; // L: token liabilities (c = R/L)
   baseRes: number; // base (USDC) backing available to pay a sell
   decimals: number;
   profile: AimmProfile;
-  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol) —
+  // Convex coverage-wall strength (0 = off). IPool.RiskConfig.kappaCovBps (Pricing.sol),
   // output-only: fires when this token leaves the pool. The hub book is `PoolState.hub`.
   kappaCovBps: number;
   /** Feed 1σ CI in BPS (ExternalOracle.confidence). Widens path spread. */
@@ -360,7 +360,7 @@ export interface DepthLevel extends GrossLevel {
 }
 
 export interface DepthCurve {
-  /** Oracle mark (NX TWAP), base-per-token — inventory-independent. */
+  /** Oracle mark (NX TWAP), base-per-token: inventory-independent. */
   mark: number;
   /** Skewed size-0 mid = mark + inventory premium, base-per-token. Book is centered here. */
   mid: number;
@@ -389,13 +389,13 @@ export function spokePremiumBps(leg: PoolLeg | undefined | null): number {
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
 
-// ── Primitives (exported for tests) — each mirrors the cited Pricing.sol fn ─────
+// ── Primitives (exported for tests): each mirrors the cited Pricing.sol fn ─────
 
 // Pricing.sol constants mirrored by the float quote path.
 const SPLINE_MIN_OFFSET_PBPS = -0.9 * PBPS;
 
 /** Floored offset → price on every price path (Pricing._flooredOffsetPrice): clamp the offset at
- *  SPLINE_MIN_OFFSET_PBPS, then scale onto the mark. That single floor is the whole law — the
+ *  SPLINE_MIN_OFFSET_PBPS, then scale onto the mark. That single floor is the whole law: the
  *  second `MIN_EXEC_PRICE_BPS` floor this mirrored is deleted on chain, and while it never bound
  *  (−90% of PBPS already pins price ≥ 10% of mark, above the old 5%) it was a live divergence
  *  waiting on any change to either constant. */
@@ -406,7 +406,7 @@ function flooredOffsetPrice(mark: number, offsetPbps: number): number {
 
 /** Inventory skew ∈ [-100, 100] from a leg's coverage (Pricing.computeInventorySkew).
  *  A FIXED law, no per-asset dial: the coverage bounds are hardwired at c ≤ 1/2 → +100 and c ≥ 2 →
- *  -100, and the ramps between are ASYMMETRIC — slope 200 under the peg, 100 over it — because the
+ *  -100, and the ramps between are ASYMMETRIC: slope 200 under the peg, 100 over it, because the
  *  under-covered side must reach the clamp in half the distance. `Asset.gamma` and
  *  `RiskConfig.coverageMin/Max`, which used to parameterize this, are deleted on chain. */
 export function computeSkew(res: number, liab: number): number {
@@ -420,9 +420,9 @@ export function computeSkew(res: number, liab: number): number {
 }
 
 /** Dispersion κ in PBPS. Quiet floor = minDisp; σ·vega widens above it, up to the PROTOCOL ceiling
- *  `MAX_DISPERSION_PBPS` (Pricing `_calculateDispersion`) — there is no per-asset ceiling.
+ *  `MAX_DISPERSION_PBPS` (Pricing `_calculateDispersion`); there is no per-asset ceiling.
  *  vega=10000 ⇒ dispersion tracks σ 1:1. (2026-08-21: dropped the historic σ/1000 damping that
- *  pinned dispersion at the floor — books never widened with vol.) */
+ *  pinned dispersion at the floor: books never widened with vol.) */
 export function dispersion(sigma: number, p: AimmProfile): number {
   return clamp(p.minDisp + (sigma * p.vega) / BPS, p.minDisp, MAX_DISPERSION_PBPS);
 }
@@ -430,7 +430,7 @@ export function dispersion(sigma: number, p: AimmProfile): number {
 const U16_MAX = 65535;
 const U32_MAX = 4294967295;
 
-/** Floor integer sqrt — Solady `FixedPointMathLib.sqrt`, which the chain uses in both `_pathSpread`
+/** Floor integer sqrt: Solady `FixedPointMathLib.sqrt`, which the chain uses in both `_pathSpread`
  *  (σ quadrature) and `_staleTerm`. IEEE sqrt lands within 1 of the true floor, so one BigInt
  *  correction step makes it exact for any integer `n` the caller can represent. */
 function isqrt(n: number): number {
@@ -455,12 +455,12 @@ export interface LegRisk {
  *  never rounds. `√` is Solady's floor sqrt, one floored division at the end. */
 function staleTerm(staleExcess: number, sigma: number): number {
   const e = Math.floor(staleExcess);
-  if (e <= 0 || sigma <= 0) return 0; // inside the keeper grace — the chain skips the sqrt too
+  if (e <= 0 || sigma <= 0) return 0; // inside the keeper grace: the chain skips the sqrt too
   return Number((BigInt(STALE_Z) * BigInt(sigma) * BigInt(isqrt(e))) / BigInt(BPS));
 }
 
 /**
- * Full path spread (fee) in PBPS — mirrors `Pricing._walkLegs` + `_pathSpread` (dex ba76f55,
+ * Full path spread (fee) in PBPS: mirrors `Pricing._walkLegs` + `_pathSpread` (dex ba76f55,
  * 7aa3a54, 2270594). Risk COMPOSES over legs, it is never a `max`: crossing two legs crosses two
  * per-leg 2θ fences, so minFee, confidence and the staleness premium SUM, and σ adds in QUADRATURE
  * (√Σσ², independent leg innovations, one floor-sqrt at the end). A `max` reduction under-fenced
@@ -471,8 +471,8 @@ function staleTerm(staleExcess: number, sigma: number): number {
  * quoted √2/2 = 70.7% of what two equal legs each owe.
  *
  * THERE IS NO FEE CEILING (Pricing.sol `_pathSpread`, dex f6c26e0): `Asset.maxFeePbps` and the
- * per-leg `_legCap` that bounded the path by it are deleted. A ceiling is not trader protection —
- * `minAmountOut` is — and it capped the pool's own defense exactly where it is needed (a stale or
+ * per-leg `_legCap` that bounded the path by it are deleted. A ceiling is not trader protection:
+ * `minAmountOut` is, and it capped the pool's own defense exactly where it is needed (a stale or
  * high-CI leg), on an attacker-TIMEABLE clamp. The only bound left is the uint16 saturation of
  * `SwapQuote.spreadPbps` below, which is a field width, not a policy.
  *
@@ -486,22 +486,22 @@ export function pathSpread(legs: LegRisk[], vega: number): number {
   let confPath = 0;
   let staleTermPath = 0;
   for (const l of legs) {
-    const s = Math.floor(l.sigma); // uint32 on chain — floor before squaring
+    const s = Math.floor(l.sigma); // uint32 on chain: floor before squaring
     sigmaSq += s * s;
     minFeePath += l.minFee;
     confPath += l.confidence ?? 0;
     staleTermPath += staleTerm(l.staleExcess ?? 0, s);
   }
-  // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling — the chain clamps rather than wraps.
+  // √(Σσ²) can exceed uint32 for N ≥ 2 near the type ceiling; the chain clamps rather than wraps.
   const sigmaPath = Math.min(isqrt(sigmaSq), U32_MAX);
   const sVol = minFeePath + Math.floor((sigmaPath * vega) / (100 * BPS));
   const raw = sVol + staleTermPath + confPath * (PBPS / BPS); // bps → PBPS (PBPS/BPS = 100)
-  // SATURATE into the uint16 `SwapQuote.spreadPbps` — the chain's only remaining bound. What
+  // SATURATE into the uint16 `SwapQuote.spreadPbps`: the chain's only remaining bound. What
   // saturates away is a risk PREMIUM, never the interior fence (composed fence ≤ 60306 < 65535).
   return Math.min(raw, U16_MAX);
 }
 
-/** Single-leg spread — `pathSpread` over the one leg, where every sum is that leg's own value.
+/** Single-leg spread: `pathSpread` over the one leg, where every sum is that leg's own value.
  *  Direct (base-to-spoke) quotes and the depth chart. */
 export function spreadPbps(
   sigma: number,
@@ -512,7 +512,7 @@ export function spreadPbps(
 }
 
 /** Coverage potential Q(c) = ln c − c + 1: ≤0, max 0 at c=1, convex wall diverging as c→0.
- *  (Pricing.sol `_covQ`; floored defensively — the real fail-closed lnWad(0) revert only fires
+ *  (Pricing.sol `_covQ`; floored defensively: the real fail-closed lnWad(0) revert only fires
  *  on an on-chain integer-precision edge that `grossOut >= res` already short-circuits below.) */
 export function covQ(c: number): number {
   const cc = Math.max(c, 1e-9);
@@ -520,12 +520,12 @@ export function covQ(c: number): number {
 }
 
 /**
- * Convex coverage-wall toll (GATE-07) on the drained OUTPUT leg — 1:1 port of Pricing.sol
+ * Convex coverage-wall toll (GATE-07) on the drained OUTPUT leg: 1:1 port of Pricing.sol
  * `_covToll` (charge-only, peg-clamped; NOT the older rebate-ledger variant in aimm-sim, which the
  * shipped contract never carried). Charges κ·L·(Q(c0)−Q(c1)) in output-token units: 0 when κ=0 or the
  * leg has no liabilities; `grossOut` when the drain would fully exhaust reserves (wall blocks the
  * whole fill); else the toll, clamped ≤ grossOut. Both coverages are clamped to the peg (min(c,1))
- * before differencing — Q peaks at c=1 and falls on BOTH sides, so an unclamped diff would let a drain
+ * before differencing: Q peaks at c=1 and falls on BOTH sides, so an unclamped diff would let a drain
  * that STARTS over-covered cross the peg toll-free. Charge-only: dQ≤0 (draining toward/at peg) ⇒ 0.
  */
 export function covToll(res: number, liab: number, kappaCovBps: number, grossOut: number): number {
@@ -603,7 +603,7 @@ export function legKit(leg: PoolLeg): LegKit {
 }
 
 /**
- * Marginal base-per-token at depth-coord d = flooredOffsetPrice(scaleY(evalQ(d))) — the exact
+ * Marginal base-per-token at depth-coord d = flooredOffsetPrice(scaleY(evalQ(d))): the exact
  * width-0 branch of `Pricing._traverseCurve`. ONE law, no fallback arm.
  */
 export function priceAt(k: LegKit, d: number): number {
@@ -650,7 +650,7 @@ export function bondingCurveSamples(
 /**
  * On-chain pricing shape as a LIQUIDITY DENSITY over price-offset space: mass of book depth per
  * bp of offset from mark = inverse slope Δx/Δy of the monotone I-spline offset curve y(x),
- * unit-area normalized. Offsets are computed in float straight from the pbps·Q fixed point — NOT
+ * unit-area normalized. Offsets are computed in float straight from the pbps·Q fixed point, NOT
  * via scaleY: its integer-pbps truncation zeroes Δy on near-flat segments → density = Inf.
  * Near-flat steps (Δy ≤ ε·span) are merged into the next advancing step; each emitted point sits
  * at the merged step's offset midpoint. Returns [offsetBp, densityPerBp] pairs, offsets ascending.
@@ -725,7 +725,7 @@ export function crossDensity(
 }
 
 /**
- * Average base-per-token over the ordered depth band [a,b] — the VWAP the trade fills at.
+ * Average base-per-token over the ordered depth band [a,b]: the VWAP the trade fills at.
  * Mirrors Pricing._traverseCurve: areaQ(lo,hi)/width → scaleY → floor SPLINE_MIN_OFFSET_PBPS
  * → mark scale.
  */
@@ -734,7 +734,7 @@ function bandPrice(k: LegKit, a: number, b: number): number {
   const hi = xInt(Math.max(a, b));
   const w = hi - lo;
   if (w === 0) return flooredOffsetPrice(k.twap, scaleY(evalQ(k.curve, a), k.curve, k.dispersion));
-  // On-chain order: areaQ / width (integer), THEN scaleY — mirrored exactly.
+  // On-chain order: areaQ / width (integer), THEN scaleY; mirrored exactly.
   return flooredOffsetPrice(
     k.twap,
     scaleY(areaQ(k.curve, lo, hi) / BigInt(w), k.curve, k.dispersion),
@@ -748,7 +748,7 @@ function traverse(k: LegKit, amountInTok: number, selling: boolean): number {
   return bandPrice(k, k.center, end);
 }
 
-// The only two path-level profile scalars. The fee terms are NOT here — they compose per leg inside
+// The only two path-level profile scalars. The fee terms are NOT here: they compose per leg inside
 // `pathSpread` (Pricing._walkLegs). `vega` is an ENDPOINT max, a path constant `_pathSpread` reads
 // off `acc.vega` (a pool per-asset σ dial, not a per-leg risk quantity); `protoShare` is pool-level
 // ($.feeParams.protoShare, equal across a pool's legs) and reduces unchanged.
@@ -800,7 +800,7 @@ export function quoteExactIn(
   let involved: PoolLeg[] = [];
   let route: string[];
   let maxIn = 0;
-  // The book whose reserves the trade actually DRAINS (the output side) — GATE-07.
+  // The book whose reserves the trade actually DRAINS (the output side): GATE-07.
   // DIRECT SELL (output=base) uses `state.hub` when present; κ=0 or missing hub ⇒ toll 0.
   let outLeg: PoolLeg | undefined;
   let hubOut: HubBook | undefined;
@@ -818,7 +818,7 @@ export function quoteExactIn(
     hubOut = state.hub;
     if (amountIn > 0) grossOut = Math.min(amountIn * traverse(k, amountIn, true), leg.baseRes);
   } else if (inBase && !outBase) {
-    // DIRECT BUY: base → token (one-step fixed point — replicate, don't solve).
+    // DIRECT BUY: base → token (one-step fixed point: replicate, don't solve).
     const leg = state.legs[tokenOut];
     if (!leg) return zeroQuote([tokenIn, tokenOut]);
     const k = legKit(leg);
@@ -858,7 +858,7 @@ export function quoteExactIn(
     return zeroQuote([tokenIn, tokenOut]); // base→base
   }
 
-  // Risk composes over the walked LEGS (the base is never a leg) — Pricing._walkLegs. A cross
+  // Risk composes over the walked LEGS (the base is never a leg): Pricing._walkLegs. A cross
   // walks two legs, a direct walks one; `pathSpread` owns the composition.
   const wp = pathProfile(involved.map((l) => l.profile));
   const spread = pathSpread(
@@ -872,7 +872,7 @@ export function quoteExactIn(
   );
   const spreadBps = spread / 100;
   // Only a HALF-spread is actually deducted from amountOut (getAnchorPathQuote: feeOut = amount·halfSpread),
-  // so the LP/proto split must sum to spreadBps/2 — not the full spread — or the fee reads 2× reality.
+  // so the LP/proto split must sum to spreadBps/2, not the full spread, or the fee reads 2× reality.
   const feeBps = spreadBps / 2;
   const lpFeeBps = feeBps * (1 - wp.protoShare / 100);
   const protoFeeBps = feeBps * (wp.protoShare / 100);
@@ -890,7 +890,7 @@ export function quoteExactIn(
       maxIn,
     };
   }
-  // GATE-07: coverage-wall toll charged on the drained output leg, BEFORE the spread/fee haircut —
+  // GATE-07: coverage-wall toll charged on the drained output leg, BEFORE the spread/fee haircut:
   // mirrors Pricing.sol (`acc.currentAmount -= _covToll(...)` precedes the fee-out computation).
   const toll = outLeg
     ? covToll(outLeg.res, outLeg.liab, outLeg.kappaCovBps, grossOut)
@@ -961,7 +961,7 @@ function capAskBase(k: LegKit, leg: PoolLeg): number {
 /**
  * Depth-axis sample grid from `center` toward `edge`: always includes the skewed mid (`center`),
  * curve segment boundaries, the band edge, plus uniform steps so the polyline follows the AIMM
- * offset curve (quartic I-spline via evalQ). Never samples around the raw mark depth (5000) —
+ * offset curve (quartic I-spline via evalQ). Never samples around the raw mark depth (5000):
  * the virtual book is centered on inventory-skewed mid.
  */
 function depthBandSamples(center: number, edge: number, knotXs: number[], step = 250): number[] {
@@ -1022,7 +1022,7 @@ function annotateNet(
  * The Binance-style book (x = price, y = cumulative size outward from mid). Direct pair = analytic
  * polyline through the quartic curve (depth-axis traversal via priceAt / bandPrice); cross pair =
  * numeric sweep of quoteExactIn (marginal = local slope). Prices and sizes are the SKEW-implied
- * (pre-fee, pre-toll) curve: every vertex satisfies quoteExactIn(cumBase).grossOut == cumTok — the
+ * (pre-fee, pre-toll) curve: every vertex satisfies quoteExactIn(cumBase).grossOut == cumTok: the
  * acceptance invariant (spec §2). `netPrice` on each rung carries the cost the rung excludes.
  */
 export function depthCurve(
@@ -1034,7 +1034,7 @@ export function depthCurve(
   const unit = opts?.unit ?? 'base';
   const base = state.base;
 
-  // Cross (neither side is base) — numeric composition.
+  // Cross (neither side is base): numeric composition.
   if (from !== base && to !== base) return crossCurve(state, from, to, unit);
 
   const leg = state.legs[from === base ? to : from]; // exactly one side is base here
@@ -1049,7 +1049,7 @@ export function depthCurve(
   const knotXs = k.curve ? [0, ...k.curve.boundaries] : [];
 
   // Caps = remaining FILLABLE liquidity (curve band ∩ physical reserves).
-  // Ask drains spoke R; bid drains hub baseRes — both must clip the printed ladder.
+  // Ask drains spoke R; bid drains hub baseRes; both must clip the printed ladder.
   const capAskTok = Math.min(((BPS - k.center) / BPS) * k.depth, leg.res);
   const maxTokBid = capBidTok(k, leg);
 
@@ -1087,14 +1087,14 @@ export function depthCurve(
 }
 
 /**
- * Virtual market depth for a hub-spoke pair — the UI-facing API over `depthCurve`.
+ * Virtual market depth for a hub-spoke pair: the UI-facing API over `depthCurve`.
  *
  * Reads remaining fillable liquidity on BOTH sides of the spoke's bonding curve:
  * - **Bids** (sell `token` → hub): curve bid band ∩ hub `baseRes` (`capBidTok`)
  * - **Asks** (buy `token` ← hub): curve ask band ∩ spoke `res`
  *
  * Prices are always hub-per-token and SKEW-implied (pre-fee, pre-toll): every cumulative size S
- * satisfies `quoteExactIn(…, S).grossOut` under the ladder (spec D3) — no fabricated depth.
+ * satisfies `quoteExactIn(…, S).grossOut` under the ladder (spec D3): no fabricated depth.
  */
 export function virtualMarketDepth(state: PoolState, token: string): DepthCurve {
   if (token === state.base) return emptyCurve('base');
@@ -1104,7 +1104,7 @@ export function virtualMarketDepth(state: PoolState, token: string): DepthCurve 
 
 /**
  * Reciprocal orientation of a depth curve (token↔base roles swap): price→1/price, bids↔asks,
- * and cumTok↔cumBase (a bid's base notional IS the inverted ask's token size — exact, not scaled).
+ * and cumTok↔cumBase (a bid's base notional IS the inverted ask's token size: exact, not scaled).
  * Mid-outward ordering survives: ask price ascending → 1/price descending = a valid bid ladder.
  */
 export function invertDepthCurve(c: DepthCurve): DepthCurve {
@@ -1136,7 +1136,7 @@ function clipDepthLevels(levels: GrossLevel[], maxTok: number): GrossLevel[] {
   const out: GrossLevel[] = [];
   for (const l of levels) {
     if (l.cumTok <= maxTok + 1e-15) {
-      out.push(l); // keep the mid vertex (cumTok=0) — required for ladder integrals
+      out.push(l); // keep the mid vertex (cumTok=0): required for ladder integrals
       continue;
     }
     const prev = out[out.length - 1];
@@ -1176,7 +1176,7 @@ function crossCurve(
   // (Pricing.sol:806-809) and `capBidTok` takes `Infinity` for its clip. Buy-leg capacity is
   // base-denominated, so divide by the sell leg's mid to reach input units. Capping on the sell
   // leg alone (both sides used the buy leg's reserve nowhere) advertised sizes the chain refuses
-  // outright — `_covToll` then blocks the whole fill.
+  // outright; `_covToll` then blocks the whole fill.
   const kIn = legKit(legIn);
   const kOut = legKit(legOut);
   const askMax = Math.min(capBidTok(kIn, legIn, Infinity), capAskBase(kOut, legOut) / kIn.mid); // from-token
@@ -1241,7 +1241,7 @@ function sweep(n: number, max: number, at: (s: number) => SweptNode): SweptNode[
  * nodes. Rung 0 is pinned to the zero-volume skew anchor so a cross book has the same touch
  * definition as a direct one: without it the first rung is an AVERAGE over `max/576`, i.e. a
  * function of the sample grid and of pool capacity rather than of price.
- * Order stays mid-outward (cumTok ascending) for BOTH sides, matching the hub-spoke path —
+ * Order stays mid-outward (cumTok ascending) for BOTH sides, matching the hub-spoke path;
  * depthLevelsToRows/aggregate read cum as monotonically rising.
  */
 function withMarginal(

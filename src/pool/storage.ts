@@ -1,12 +1,12 @@
 /**
- * PoolStorage slot readers — Solana-style deterministic layout, no Solidity getters.
+ * PoolStorage slot readers: Solana-style deterministic layout, no Solidity getters.
  *
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). `POOL_STORAGE` (slots) and `POOL_STRUCTS`
- * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout` — they are the only
+ * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout`; they are the only
  * place either number appears, and every decoder reads them. An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
- * Key = keccak256(abi.encode(key, mappingSlot)) — same as Solidity 0.8.
+ * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
  *
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
  */
@@ -16,7 +16,7 @@ import { encodeAbiParameters } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
 
-/** EIP-7528 native sentinel + Solidity address(0) — both map to PoolStorage.wnative. */
+/** EIP-7528 native sentinel + Solidity address(0): both map to PoolStorage.wnative. */
 const NATIVE_SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
@@ -72,7 +72,7 @@ export async function readAssetHook(
   return decodeHookSlot(word);
 }
 
-/** `IPool.RiskConfig` — 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
+/** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
  *  no longer a storage struct of its own: both fields live in `Asset` slot 2. */
 export interface RiskConfig {
   flags: number;
@@ -107,7 +107,7 @@ export function mappingBase(key: Address, mappingSlot: bigint): bigint {
 
 /**
  * Resolve the storage mapping key for a token. Native (EIP-7528 / address(0)) is stored under
- * `PoolStorage.wnative` — same as Solidity deposit/swap paths that wrap before mapping lookup.
+ * `PoolStorage.wnative`: same as Solidity deposit/swap paths that wrap before mapping lookup.
  */
 export async function resolveTokenStorageKey(
   provider: Eip1193Provider,
@@ -200,7 +200,7 @@ export async function readAssetPresetId(
 /**
  * Read + decode a shared preset curve (`NUQuartic.Curve` @ curves[presetId], slot 6):
  * header slot + the 2m live segment slots (of the fixed uint256[28] block). Returns null when
- * the preset is unset (header 0 — Pricing falls back to the linear-impact quote).
+ * the preset is unset (header 0: Pricing falls back to the linear-impact quote).
  * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
  */
 export async function readCurve(
@@ -250,8 +250,8 @@ export async function readCurve(
 }
 
 /**
- * Per-leg risk fields. The `riskConfigs` mapping is GONE — `flags` and `kappaCovBps` were folded
- * into `Asset` slot 2 — so this reads that word instead. Kept as its own function rather than
+ * Per-leg risk fields. The `riskConfigs` mapping is GONE: `flags` and `kappaCovBps` were folded
+ * into `Asset` slot 2, so this reads that word instead. Kept as its own function rather than
  * folded into `getAsset` because it is one raw `eth_getStorageAt` against a slot the SDK already
  * pins, where `getAsset` is a full `eth_call` returning fourteen fields; callers that want only
  * the coverage wall (front's per-asset risk cache) should not pay for the rest.

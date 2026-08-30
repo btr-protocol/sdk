@@ -92,8 +92,8 @@ function encodeLength(length: number): Uint8Array {
 
 /**
  * Main RLP encode function. A top-level array encodes as an RLP list; its items
- * are scalars (an empty array is the one nested shape callers pass — the empty
- * accessList — and encodes as the empty string `0x80`, as before).
+ * are scalars (an empty array is the one nested shape callers pass, the empty
+ * accessList, and encodes as the empty string `0x80`, as before).
  */
 export function rlpEncode(input: RlpItem | readonly RlpItem[]): Uint8Array {
   if (Array.isArray(input)) {

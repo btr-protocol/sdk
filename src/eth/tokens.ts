@@ -704,7 +704,7 @@ export function tokenBySymbol(symbol: string): TokenMetadata | undefined {
 /**
  * Canonical symbol for a token, unwrapping wrappers (`WETH` → `ETH`, `stETH` → `ETH`).
  *
- * `null` — not a plausible-looking guess — is the answer for an unregistered symbol. The previous
+ * `null`, not a plausible-looking guess, is the answer for an unregistered symbol. The previous
  * `|| symbol.toUpperCase()` fallback is why two live bugs stayed invisible: no wrapper whose
  * registry key is mixed-case ever unwrapped, and every faucet symbol resolved to itself with the
  * suffix glued on (`USDT.b` → `USDT.B`), both reported as if canonical. A resolver that invents an

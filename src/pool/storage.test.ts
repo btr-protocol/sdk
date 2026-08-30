@@ -147,7 +147,7 @@ describe('readCurve (NUQuartic.Curve storage decode)', () => {
   // Pack a decoded curve exactly like NUQuartic.set writes storage.
   function packWords(c: ReturnType<typeof buildCurve>): Map<bigint, bigint> {
     let header = BigInt(c.m);
-    // Interior boundaries ONLY — b_m is the BPS constant and is never stored (NUQuartic.set).
+    // Interior boundaries ONLY: b_m is the BPS constant and is never stored (NUQuartic.set).
     // Writing it here too would leave the directory one entry wider than the contract's.
     c.boundaries.slice(0, -1).forEach((b, j) => {
       header |= BigInt(b) << BigInt(8 + 16 * j);

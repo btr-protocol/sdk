@@ -275,8 +275,8 @@ export function formatAxisLabel(n: number | null | undefined): string {
 /**
  * Percentage value. Legacy fixed-decimals wrapper, kept so existing call sites do not have to
  * care which formatter they hold: it delegates to the ONE magnitude-adaptive percent formatter
- * (`formatPercentSig`) at the app-wide law of three significant figures. The old behaviour — a
- * hardcoded decimal count that collapsed 0.004% to "0.00%", and a ≥200% detour into "2.8x" —
+ * (`formatPercentSig`) at the app-wide law of three significant figures. The old behaviour (a
+ * hardcoded decimal count that collapsed 0.004% to "0.00%", and a ≥200% detour into "2.8x")
  * is gone: a rate reads as a percent at every magnitude.
  */
 export function formatPercent(
@@ -289,7 +289,7 @@ export function formatPercent(
 
 /**
  * THE shared percentage formatter: magnitude-adaptive, `sig` significant digits always (default
- * 3 — the percent analogue of the 5-significant-digit convention amounts use), trailing zeros
+ * 3: the percent analogue of the 5-significant-digit convention amounts use), trailing zeros
  * trimmed, exactly zero as unsigned "0.00%". Small values keep precision (0.42%, 0.0412%) instead
  * of collapsing to a bare "0%"; below roughly 0.001% the leading-zero run folds into the exchange
  * subscript form (0.0000123% → "0.0₄123%"), same as prices. Input is already in percent units
@@ -312,7 +312,7 @@ export function formatPercentSig(n: number | null | undefined, sig = 3, signed =
 
 /**
  * The ONE yield formatter: APR, APY, fee APR, strategy APR, protocol APR. Input in PERCENT units
- * (17.456 → "17.5%"). Same law as every other percent on the page — `formatPercentSig` at three
+ * (17.456 → "17.5%"). Same law as every other percent on the page: `formatPercentSig` at three
  * significant figures, magnitude-adaptive: 281%, 14.8%, 1.58%, 0.42%, 0.0412%, 0.0₄123%; exactly
  * zero renders as unsigned "0.00%". The old step down to two figures below 1% is gone: it was the
  * reason a small hook yield could print as a bare "0%".

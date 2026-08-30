@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-// bun test — dual-route LP ranking + EIP-5792 LP batch builders (spec §2).
+// bun test: dual-route LP ranking + EIP-5792 LP batch builders (spec §2).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/__fixtures__/profiles';
 import { buildLeg } from '../amm/aimm.js';
 import type { NamedPool } from '../amm/router.js';
@@ -239,7 +239,7 @@ describe('buildRedeemCalls', () => {
 
 // ── same-asset direct paths ─────────────────────────────────────────────────────
 // Spec §3: the deposit tab DEFAULTS to pay-leg receipt (X → X-LP); §2.1 B' tail names the
-// same-asset exit. Neither is a dual-route problem — both short-circuit to one call.
+// same-asset exit. Neither is a dual-route problem: both short-circuit to one call.
 
 /** Minimal pool with arbitrary legs, for edge fixtures below. */
 function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>): NamedPool {
@@ -267,7 +267,7 @@ describe('same-asset direct paths', () => {
     const step = best?.steps[0];
     expect(step?.kind).toBe('deposit');
     expect(step?.amountIn).toBe(5_000);
-    expect(step?.amountOut).toBe(5_000); // mints at index — face 1:1
+    expect(step?.amountOut).toBe(5_000); // mints at index, face 1:1
     expect(step?.minOut).toBe(0); // deposits carry NO price guard (spec §4)
   });
 
@@ -288,7 +288,7 @@ describe('same-asset direct paths', () => {
     expect(ok.routes.length).toBe(1);
     expect(ok.best?.steps[0].kind).toBe('withdraw');
     expect(ok.best?.steps[0].amountOut).toBe(5_000);
-    // Under-covered leg (50% covered): the deficit is the only cost — no spread/proto fee.
+    // Under-covered leg (50% covered): the deficit is the only cost, no spread/proto fee.
     const cut = rankRedeem([pool('core', { audfRes: 500_000 })], 'AUDF', 'AUDF', 5_000);
     expect(cut.best?.out).toBeGreaterThan(0);
     expect(cut.best?.out).toBeLessThan(5_000);

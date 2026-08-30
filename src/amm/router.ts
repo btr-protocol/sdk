@@ -1,8 +1,8 @@
-// Off-chain BTR swap router — the routing brain over the pure-TS pool replica (aimm.ts).
+// Off-chain BTR swap router: the routing brain over the pure-TS pool replica (aimm.ts).
 //
 // BTR is a set of depth-1-star pools (a stablecoin hub `base` + spokes). A single Pool.swap already
 // does the intra-pool hop (spoke→base→spoke), so a route is either ONE intra-pool leg or TWO legs
-// across pools that share a token (always the hub in practice). There is NO on-chain router — this
+// across pools that share a token (always the hub in practice). There is NO on-chain router; this
 // module decides the best route (with or without a split) purely off-chain; `sdk/router`
 // (planToLegs + buildSwapCalls) turns the plan into the approval+swap calldata.
 //
@@ -10,7 +10,7 @@
 // capped flat at the reserve clip `maxIn`), and the spread floor is a proportional rate (no fixed
 // activation cost), so the optimal split equalises marginal output price across active routes. We do
 // this with a robust greedy marginal water-fill (assign each slice to the route with the best next
-// marginal) — exact-in-the-limit for the concave case and safe across toll/skew kinks — then keep the
+// marginal), exact-in-the-limit for the concave case and safe across toll/skew kinks, then keep the
 // split only if it beats the best single route by more than the gas it costs.
 
 import { type PoolState, type Quote, quoteExactIn } from './aimm';
@@ -63,7 +63,7 @@ export interface SwapPlan {
 }
 
 export interface RankedSwap {
-  best: SwapPlan; // #1 — the optimal plan (may itself be a split)
+  best: SwapPlan; // #1: the optimal plan (may itself be a split)
   singles: RouteQuote[]; // every single route at 100% amountIn, ranked by output desc
 }
 
@@ -180,7 +180,7 @@ export interface SplitOpts {
 /**
  * Greedy marginal water-fill across `routes`: hand each slice to the route with the best next marginal
  * output. Saturation is detected by the marginal itself going to ~0 (a route past its reserve clip
- * stops producing output), NOT by the quote's `maxIn` estimate — that underestimates the buy-side
+ * stops producing output), NOT by the quote's `maxIn` estimate; that underestimates the buy-side
  * capacity, so using it as a hard cap under-allocates and makes a split lose to a single pool. If every
  * route saturates before the whole amount is placed, the leftover is simply not routable (partial fill).
  */
@@ -227,7 +227,7 @@ export function rankSwap(
   const routes = enumerateRoutes(pools, tokenIn, tokenOut);
   if (routes.length === 0) return null;
 
-  // Every route at 100% — the inspection rows, ranked by output.
+  // Every route at 100%: the inspection rows, ranked by output.
   const singles = routes
     .map((r) => quoteRoute(pools, r, amountIn))
     .filter((q) => q.amountOut > 0)
@@ -243,15 +243,15 @@ export function rankSwap(
   };
 
   // Only bother splitting when >1 viable route and a non-trivial size. Candidates must be POOL-DISJOINT:
-  // waterFill quotes each route against the pool's UNMUTATED state (quoteRoute is pure — no fill is
+  // waterFill quotes each route against the pool's UNMUTATED state (quoteRoute is pure: no fill is
   // applied between slices), so two routes sharing a pool would each independently assume they alone
   // can draw its full depth. That double-counts the shared pool's liquidity and inflates the split's
-  // summed output past what it can actually deliver — enough to clear `minGainBps` on a plan that then
+  // summed output past what it can actually deliver: enough to clear `minGainBps` on a plan that then
   // reverts (atomic batch) or short-fills (sequential) once the shared pool's real, single depth is hit.
   // Picking greedily in ranked (best-output-first) order preserves "prefer the best routes" while a
   // shared-pool candidate is simply skipped rather than silently mispriced.
   // ponytail: routes that share a pool can never be split together, even when the underlying pools have
-  // ample spare depth — upgrade path is a per-slice cloned/mutated PoolState so overlapping routes see
+  // ample spare depth; upgrade path is a per-slice cloned/mutated PoolState so overlapping routes see
   // each other's fills and can be priced (and split) correctly instead of being excluded outright.
   const viable: Route[] = [];
   const usedPools = new Set<string>();

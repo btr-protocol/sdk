@@ -224,7 +224,7 @@ export async function getPoolData(
   poolName: string,
 ): Promise<PoolData> {
   // One aggregate3 for all 2N reads. allowFailure=false, so a reverting leg reverts the whole
-  // eth_call and throws — same contract as the per-token loop this replaced.
+  // eth_call and throws, same contract as the per-token loop this replaced.
   const res = await multicallStrict<Asset | bigint>(
     provider,
     tokens.flatMap((t) => [
@@ -266,7 +266,7 @@ const txValue = (token: Address, amount: bigint): Hex =>
 /** Opt-out sentinel for the trailing `deadline` param. `beforeDeadline` is a bare
  *  `block.timestamp > deadline` compare, so any far-future value opts out; uint32-max is the
  *  cheapest one. type(uint256).max is 32 nonzero calldata bytes (512 gas), this is 4 nonzero +
- *  28 zero (176 gas) — same semantics, 336 gas less. Pool.sol natspec still says
+ *  28 zero (176 gas): same semantics, 336 gas less. Pool.sol natspec still says
  *  type(uint256).max; that is descriptive, not enforced.
  *  ponytail: expires 2106-02-07, widen to uint40 if anything is still running. */
 export const NO_DEADLINE: bigint = 0xffffffffn;

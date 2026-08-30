@@ -1,4 +1,4 @@
-// bun test — numeric display formatting.
+// bun test: numeric display formatting.
 import { describe, expect, test } from 'bun:test';
 import {
   formatNumber,

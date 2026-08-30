@@ -17,7 +17,7 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
 
 /**
  * Canonical chain allowlist for BTR swap (atomic + intent).
- * SVM intentionally excluded — UI shows it greyed w/ "Coming soon".
+ * SVM intentionally excluded: UI shows it greyed w/ "Coming soon".
  * Consumed by front (`TokenSelector`); mainnets only.
  */
 export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
@@ -52,7 +52,7 @@ export interface ChainConfig {
   /** An ERC-20 whose `balanceOf` IS the account's gas balance, viewed at that token's decimals.
    *  Distinct from `wrappedNative`: a wrapper holds a SEPARATE balance you top up on purpose, while
    *  this is the very money the next transaction's fee is taken from. Arc's USDC (`0x3600…`) is the
-   *  6-decimal ERC-20 view of the same 18-decimal native balance, and it is also a pool asset — so
+   *  6-decimal ERC-20 view of the same 18-decimal native balance, and it is also a pool asset, so
    *  spending "all of it" leaves nothing to mine the spend, and `transferFrom` reverts by exactly
    *  the fee. Any surface that offers a MAX on this token MUST reserve gas first. */
   nativeErc20?: Address;
@@ -68,7 +68,7 @@ const TESTNET_TOKENS = /\b(testnet|sepolia|amoy|fuji|chapel|holesky|goerli|mumba
 /**
  * THE glyph file stem for a chain: `bnb-chain` for "BNB Chain".
  *
- * Every icon a chain has is built from this ONE derivation — the SVG path, the `-mono` mask and
+ * Every icon a chain has is built from this ONE derivation: the SVG path, the `-mono` mask and
  * the rasterised WebP pair `scripts/raster-icons.ts` writes. A caller that slugs a chain name
  * itself is a fork of this waiting to drift.
  */
@@ -90,7 +90,7 @@ export function getChainIcon(chainId: number): string {
  * The MASKED variant of a chain's glyph: a solid-fill SVG meant to be drawn through a CSS mask
  * and recoloured (`MaskIcon` + `--icon-tint-primary`).
  *
- * It stays an SVG and is deliberately absent from the raster pipeline — a WebP cannot be tinted
+ * It stays an SVG and is deliberately absent from the raster pipeline: a WebP cannot be tinted
  * to `currentColor`. Here rather than at the two call sites that used to spell the `-mono` suffix
  * themselves, so the naming rule lives with the naming rule it mirrors.
  */

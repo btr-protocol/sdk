@@ -1,11 +1,11 @@
 /**
- * Canonical yield-hook vocabulary — SSoT for back (strategies.yaml `kind`) + front
+ * Canonical yield-hook vocabulary: SSoT for back (strategies.yaml `kind`) + front
  * (strategy catalog). Hoisted here to kill the 2× duplicated StrategyKind unions.
  *
  * A `YieldHookKind` is a DISPLAY / STRATEGY label, distinct from the on-chain hook
  * CONTRACT it binds to. Several venue labels intentionally map to a shared adapter:
  * the dedicated `VenusHook` + `EulerV2YieldHook` contracts were deleted (2026-07) once
- * they proved to be exact aliases of the CompoundV2 / ERC4626 adapters — the venue
+ * they proved to be exact aliases of the CompoundV2 / ERC4626 adapters: the venue
  * label survives for UI/APR attribution, the adapter is reused.
  *
  * kind → on-chain YieldHook adapter:

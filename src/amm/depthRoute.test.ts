@@ -1,4 +1,4 @@
-// bun test — route-composed virtual depth (cross-pool books via the router's enumerated routes).
+// bun test: route-composed virtual depth (cross-pool books via the router's enumerated routes).
 import { describe, expect, test } from 'bun:test';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
 import { type PoolState, buildLeg, quoteExactIn } from './aimm';
@@ -14,7 +14,7 @@ function must<T>(value: T | null | undefined): T {
 
 /**
  * Synthetic 2-pool 2-hop fleet: AUDF lives only in the fx core, WBTC only in the crypto core,
- * joined by the shared USDC hub — the live-demo shape that rendered "pool data unavailable".
+ * joined by the shared USDC hub: the live-demo shape that rendered "pool data unavailable".
  */
 function crossFleet(): NamedPool[] {
   const audf = buildLeg(
@@ -179,7 +179,7 @@ describe('router quote vs composed book consistency', () => {
     const pools = crossFleet();
     const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
     // Bids sell WBTC back down the route; the crypto hub's baseRes (200k USDC) caps that sell at
-    // ~3.35 WBTC while the fx leg could absorb far more — the hop binds, and the book must show it.
+    // ~3.35 WBTC while the fx leg could absorb far more; the hop binds, and the book must show it.
     const knee = routeKnee(pools, REV_LEGS, 10);
     expect(knee).toBeGreaterThan(2);
     expect(knee).toBeLessThan(3.35 * 1.001); // the hub drain, not the fx band
@@ -191,7 +191,7 @@ describe('router quote vs composed book consistency', () => {
     const pools = crossFleet();
     const book = must(aggregateRouteDepthCurves(pools, 'AUDF', 'WBTC'));
     // Selling s WBTC consumes bids; Σ size × price over rungs up to cum s must reproduce the
-    // router's AUDF out — same primitives, zero re-implementation.
+    // router's AUDF out: same primitives, zero re-implementation.
     for (const s of [0.01, 0.25, 1, 2.5]) {
       const expected = routeQuote(pools, REV_LEGS, s);
       let filled = 0;

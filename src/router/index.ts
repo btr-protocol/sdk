@@ -1,11 +1,11 @@
 // Off-chain swap execution builder. BTR has NO on-chain router: a routed/split swap is a sequence of
-// plain `approve` + `Pool.swap` calls the user's wallet submits directly — batched atomically via
+// plain `approve` + `Pool.swap` calls the user's wallet submits directly, batched atomically via
 // EIP-5792 `wallet_sendCalls` where the wallet supports it, else sequentially. This module turns a
 // route plan (computed off-chain, e.g. by front `lib/amm/router`) into that ordered call list.
 //
 // Multicall3 CANNOT execute these: `Pool.swap` pulls tokenIn from `msg.sender`, which under
 // Multicall3.aggregate3 is the Multicall3 contract (no funds, no allowance) → revert. So the calls
-// must originate from the user account — EIP-5792 batch or N direct txs.
+// must originate from the user account: EIP-5792 batch or N direct txs.
 
 import { POOL_ABI } from '../abis/Pool.js';
 import type { SwapPlan } from '../amm/router.js';
@@ -93,7 +93,7 @@ export interface BuildOpts {
    *  per unique (tokenIn, pool). Default: emit an approval for every non-native leg that needs one. */
   needsApproval?: (tokenIn: Address, pool: Address, amountIn: bigint) => boolean;
   /** When true, approve max uint256 (reuse forever). When false/omitted (default), approve only the
-   *  exact Σ amountIn for that (token, pool) — standard exact-amount approve + swap. */
+   *  exact Σ amountIn for that (token, pool): standard exact-amount approve + swap. */
   approveMax?: boolean;
   /** Unix-seconds swap expiry; defaults to now + 600s. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
@@ -154,7 +154,7 @@ const toUnits = (v: number, decimals: number): bigint => {
  *  Null when any pool address or token meta is missing. */
 export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null {
   const slip = opts.slippageFrac;
-  // Unvalidated, slip >= 1 drives every minOut to 0 — a batch with no slippage floor at all,
+  // Unvalidated, slip >= 1 drives every minOut to 0: a batch with no slippage floor at all,
   // which is the one failure mode this function exists to prevent. NaN does the same.
   if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
     throw new Error(`planToLegs: slippageFrac must be in [0, 1), got ${slip}`);
@@ -238,7 +238,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
  *  `WNATIVE.deposit{value}` and then behaves as a plain ERC-20 leg; an `unwrapOut` leg is followed by
  *  `WNATIVE.withdraw(Σ minOut)`. Withdrawing minOut (not the quote) is the only amount guaranteed to
  *  exist: any positive slippage stays with the user as wrapped-native rather than reverting the batch.
- *  No EIP-2612 / Permit2 — plain ERC-20 `approve` only.
+ *  No EIP-2612 / Permit2: plain ERC-20 `approve` only.
  *
  *  `buildSwapCalls` bakes ONE `deadline` into every swap call, read at the moment it is invoked.
  *  Fine for an atomic batch (one wallet prompt, sent together), but a non-atomic multi-tx flow that
@@ -276,7 +276,7 @@ function validateLegs(
   return { wrapValue, unwrapAmount };
 }
 
-/** [wrap?, approvals…] — funds and clears allowance for the swap phase. No deadline involved: safe
+/** [wrap?, approvals…]: funds and clears allowance for the swap phase. No deadline involved: safe
  *  to build and send well ahead of the swap calls. */
 export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
@@ -319,7 +319,7 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
   return [...wrap, ...approvals];
 }
 
-/** [swaps…, unwrap?] — `opts.deadline ?? defaultDeadline()` is read HERE, at call time: call this
+/** [swaps…, unwrap?]: `opts.deadline ?? defaultDeadline()` is read HERE, at call time: call this
  *  immediately before the send so a deadline built during an earlier approval wait cannot expire it. */
 export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
@@ -348,38 +348,38 @@ export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
 }
 
 /** Wrap first (funds the approvals), approvals before the swaps that spend them, unwrap last. One
- *  shared deadline for the whole thing — correct for a single atomic batch (one wallet prompt), but
+ *  shared deadline for the whole thing: correct for a single atomic batch (one wallet prompt), but
  *  see `buildApprovalCalls`/`buildSwapExecCalls` for a non-atomic, multi-tx flow. */
 export function buildSwapCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   return [...buildApprovalCalls(legs, opts), ...buildSwapExecCalls(legs, opts)];
 }
 
-/** Σ msg.value across the calls (native-in legs) — the total to attach to a batched send. */
+/** Σ msg.value across the calls (native-in legs): the total to attach to a batched send. */
 export function totalValue(calls: ExecCall[]): bigint {
   return calls.reduce((a, c) => a + c.value, 0n);
 }
 
 // ── LP dual-route batches (spec §2.3/§2.4) ──────────────────────────────────────
 //
-// The LP routes compose the SAME primitives as a swap — plain calls from the user's account, one
+// The LP routes compose the SAME primitives as a swap: plain calls from the user's account, one
 // shared deadline per atomic batch, no on-chain router. Approval logic is REUSED
 // (buildApprovalCalls), never duplicated.
 
 export interface MarketMintArgs {
-  /** 'market': Route A — [approve?, swap(X→target)…, deposit(target)]. */
+  /** 'market': Route A, [approve?, swap(X→target)…, deposit(target)]. */
   mode: 'market';
   /** Market legs ending in `depositToken` (planToLegs output). */
   legs: ExecLeg[];
   depositToken: Address;
   /** Deposit size: pass Σ per-part minOut (the guaranteed floor); anything above it stays with
-   *  the user as target tokens. Deposits mint at index by design — no price guard exists. */
+   *  the user as target tokens. Deposits mint at index by design; no price guard exists. */
   depositAmount: bigint;
 }
 export interface TransferMintArgs {
-  /** 'transfer': Route B — [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
-   *  needs no allowance. Non-batchable for fresh deposits (anti-JIT) — see lpRoutes gating. */
+  /** 'transfer': Route B, [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
+   *  needs no allowance. Non-batchable for fresh deposits (anti-JIT); see lpRoutes gating. */
   mode: 'transfer';
-  token: Address; // X — deposited, then its liability swapped in the same batch
+  token: Address; // X: deposited, then its liability swapped in the same batch
   amount: bigint;
   targetToken: Address;
   /** Shares the deposit mints for THIS sender (post-dead-seed estimate: amt·WAD/idx − dead). */
@@ -441,7 +441,7 @@ export function buildDepositCalls(
 }
 
 export interface CrossRedeemArgs {
-  /** 'cross': Route A' — [withdrawTo]. Single call, no approvals. */
+  /** 'cross': Route A', [withdrawTo]. Single call, no approvals. */
   mode: 'cross';
   tokenFrom: Address;
   tokenTo: Address;
@@ -449,7 +449,7 @@ export interface CrossRedeemArgs {
   minAmountOut: bigint;
 }
 export interface TransferRedeemArgs {
-  /** 'transfer': Route B' — [swapLiability, withdraw]. No approvals. Same anti-JIT caveat as
+  /** 'transfer': Route B', [swapLiability, withdraw]. No approvals. Same anti-JIT caveat as
    *  Route B: the tail withdraw burns just-minted shares, so this runs sequentially after the
    *  cooldown, not atomically. */
   mode: 'transfer';
@@ -458,7 +458,7 @@ export interface TransferRedeemArgs {
   /** Shares burned by the swapLiability leg (the user's seasoned target-LP). */
   lpAmountIn: bigint;
   minLpAmountOut: bigint;
-  /** Estimated target-leg shares the swapLiability mints — burned by the tail withdraw. The
+  /** Estimated target-leg shares the swapLiability mints: burned by the tail withdraw. The
    *  exact number is only known post-execution; pass a conservative floor (≥ minLpAmountOut). */
   lpWithdraw: bigint;
   minAmountOut: bigint;

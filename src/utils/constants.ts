@@ -30,7 +30,7 @@ export const MS_PER_MINUTE = 60_000;
 export const MS_PER_HOUR = 3_600_000;
 export const MS_PER_DAY = 86_400_000;
 
-// Time helpers — single source for "now" timestamps.
+// Time helpers: single source for "now" timestamps.
 export const nowMs = (): number => Date.now();
 export const nowSec = (): number => Math.floor(Date.now() / 1000);
 
@@ -38,7 +38,7 @@ export const nowSec = (): number => Math.floor(Date.now() / 1000);
 export const DEFAULT_ORACLE_STALENESS = ONE_DAY; // 24 hours
 export const DEFAULT_PRICE_DIVERGENCE_BPS = 500; // 5%
 
-// Supported chains — derived from the canonical CHAINS registry in eth/chains.ts.
+// Supported chains, derived from the canonical CHAINS registry in eth/chains.ts.
 // Kept as a numeric array (single source of truth = CHAINS).
 // For named accessors (ETHEREUM, ARBITRUM, ...) import from `@btr-protocol/sdk/eth` directly.
 import { CHAINS } from '../eth/chains.js';
@@ -46,7 +46,7 @@ export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Numbe
 
 /**
  * Canonical BTR brand identity. Single source of truth across front/back/docs.
- * GitHub org is `btr-protocol` (was `btr-supply`, before that `btr-markets`) — keep all links in sync.
+ * GitHub org is `btr-protocol` (was `btr-supply`, before that `btr-markets`); keep all links in sync.
  */
 export const BRAND = Object.freeze({
   name: 'BTR',
@@ -55,9 +55,9 @@ export const BRAND = Object.freeze({
   github: 'https://github.com/btr-protocol',
   githubOrg: 'btr-protocol',
   domain: 'btr.markets',
-  /** X/Twitter handle — PascalCase, no underscore (`@BTRProtocol`). */
+  /** X/Twitter handle: PascalCase, no underscore (`@BTRProtocol`). */
   twitter: 'BTRProtocol',
-  /** Telegram handle — same branding as X (`t.me/BTRProtocol`). */
+  /** Telegram handle: same branding as X (`t.me/BTRProtocol`). */
   telegram: 'BTRProtocol',
   supportEmail: 'tech@btr.markets',
 });
@@ -65,7 +65,7 @@ export const BRAND = Object.freeze({
 /**
  * Canonical AI provider base URLs. Single source of truth for any back/front
  * consumer needing to talk to an upstream chat/inference API. Override via env
- * at the consumer level — these are the defaults.
+ * at the consumer level; these are the defaults.
  */
 export const AI_PROVIDERS = Object.freeze({
   zai: 'https://api.z.ai/api/coding/paas/v4',

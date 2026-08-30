@@ -12,7 +12,7 @@
  * The ROSTER is never restated here: it is the `symbols` array of that chain's risk-params JSON,
  * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 18, the idx-17 USDC/USD depeg
  * reference is seeded from ORACLE_SEED_USDCUSD_1E18, not from this file). A symbol with no NXR
- * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS` —
+ * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS`,
  * chain-free, because an asset's mark source does not change when it is listed on a second chain.
  * This script therefore needs no per-chain feed table and cannot exit 1 on a chain simply for not
  * being Sepolia, which is what it did before.
@@ -22,7 +22,7 @@
  *
  * A mark is accepted only when the EXPLICIT pair answers 200, is inside its declared scale band, and
  * is fresh. All three are load-bearing. NXR's ticker parser is delimiter-less, so a wrong-shaped
- * symbol does not 404 — it resolves to something else and returns a plausible mid (`CVX-USD` is
+ * symbol does not 404; it resolves to something else and returns a plausible mid (`CVX-USD` is
  * Chevron at ~197, not Convex at ~3). And `status` is served per-mark: `USDG-USD` answered 200 with
  * a peg-plausible 0.99986 and `status: "dead", age_ms: 469991` on 2026-08-14. Neither the band nor
  * the peg clamp can see either failure; only the pair being declared and the age being checked can.
@@ -46,7 +46,7 @@ import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
  *  file and is checked against the risk JSON, so `arc` can never write Sepolia's snapshot. The seed
- *  SIZE is deliberately NOT pinned here — it is read from the risk JSON below. A second hand-written
+ *  SIZE is deliberately NOT pinned here; it is read from the risk JSON below. A second hand-written
  *  copy of it guarded nothing this ceremony does not already guard (`ArcPoolDeploy._loadCfg` asserts
  *  the snapshot against the risk JSON, and `checkSeedBudget()` refuses a roster it cannot fund),
  *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
@@ -76,11 +76,11 @@ const OUT = process.env.SEED_MARKS
 const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$/, '');
 
 /** Peg band for an asset that declares no scale band of its own; matches the Solidity [0.98,1.02]
- *  clamp. Per-asset bands live on `NXR_MARKS[...].band` — they mirror the deploy scripts' own
+ *  clamp. Per-asset bands live on `NXR_MARKS[...].band`; they mirror the deploy scripts' own
  *  requires so a bad snapshot fails HERE, before broadcast, rather than stranding a feed. */
 const PEG = [0.98, 1.02] as const;
 /** The ceremony runbook's freshness bound: seeds must come from live NXR shortly pre-broadcast.
- *  ENFORCED against the per-mark `age_ms`/`status` NXR serves, not merely stamped on the output —
+ *  ENFORCED against the per-mark `age_ms`/`status` NXR serves, not merely stamped on the output:
  *  a peg-plausible mid from a dead ticker is exactly what the band cannot see. */
 const MAX_AGE_MS = 5 * 60_000;
 
@@ -122,7 +122,7 @@ if (risk.chainId !== CHAIN.chainId) {
 // with nothing left on-chain to correct it, which no band or peg clamp can see.
 const roster = (risk.symbols ?? []).map((symbol) => {
   // The BASE is exempt from the basis, and not as an exception to it: it carries no market feed
-  // (there is no USDC/USDC identity — Pricing._readBasePriceOrHalt discards the base read for
+  // (there is no USDC/USDC identity: Pricing._readBasePriceOrHalt discards the base read for
   // quoting), only the signed depeg reference, which is deliberately USD-quoted because a
   // depeg is only observable against USD. Its mark below is the identity 1 and never fetched.
   const basis = symbol === risk.symbols[0] ? 'USD' : CHAIN.basis;
@@ -156,7 +156,7 @@ const KEY = process.env.NXR_API_KEY?.trim();
 /** One live mid from NXR, or a reason it is not seedable. `shut` exempts a scheduled FX halt from
  *  the age bound and from that alone: the mark is frozen because the market is, the keeper's first
  *  push carries the same frozen mark, and failing here would block the ceremony every weekend.
- *  `dead` is never exempt — it is NXR's own verdict that nothing is feeding the ticker. */
+ *  `dead` is never exempt: it is NXR's own verdict that nothing is feeding the ticker. */
 async function fetchMid(pair: string, shut: boolean): Promise<{ mid: number } | { err: string }> {
   let j: { mid?: number; age_ms?: number; status?: string };
   try {
@@ -190,7 +190,7 @@ async function fetchMid(pair: string, shut: boolean): Promise<{ mid: number } | 
 }
 
 for (const f of roster) {
-  // USDC/USDC is an identity feed by construction — never fetched, never off 1.
+  // USDC/USDC is an identity feed by construction: never fetched, never off 1.
   if (f.symbol === 'USDC') {
     marks[f.symbol] = { ticker: f.nxrSymbol, mid: 1, mark1e18: (10n ** 18n).toString() };
     continue;
@@ -199,7 +199,7 @@ for (const f of roster) {
   // {ticker,mid,bid,ask,ci,confidence,flags,age_ms,status}. /v1/tickers/detail is a CATALOGUE and
   // carries no price at all. `nxrQuote` names the served ticker when NXR only carries the
   // reciprocal of the pair the feed is denominated in; the mid is reciprocated back. `quoteVia`
-  // names a BRIDGE leg instead, and the mark is the product — the two are mutually exclusive.
+  // names a BRIDGE leg instead, and the mark is the product: the two are mutually exclusive.
   const quoted = f.nxrQuote ?? f.nxrSymbol;
   const shut = closedUntil(f.symbol) !== null;
   if (shut)

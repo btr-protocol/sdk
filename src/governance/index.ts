@@ -27,7 +27,7 @@ export function govDelays(schedule: bigint): Record<keyof typeof Tier, number> {
 /**
  * True when ANY tier is zero, i.e. the deployment is not production-grade: timelocks are still
  * enforced but mature immediately, so a queued op is executable in the same block it was queued.
- * The only supported shape for a throwaway chain, and never for a live one — surface it.
+ * The only supported shape for a throwaway chain, and never for a live one; surface it.
  */
 export function hasZeroDelay(schedule: bigint): boolean {
   for (let i = 0; i < TIERS; i++) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-// bun test — pins the swapLiability mirror against fixture numbers derived from the contract
+// bun test: pins the swapLiability mirror against fixture numbers derived from the contract
 // source (PoolLiquidity.sol applyHaircut :93 / swapLiability :411, PoolConstantsLib.sol:15/:106).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/__fixtures__/profiles';
 import { type PoolState, buildLeg, quoteExactIn } from '../amm/aimm.js';

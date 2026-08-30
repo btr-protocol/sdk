@@ -145,7 +145,7 @@ export function aggregate(
   const scale = (size: number, price: number) => (denom === 'quote' ? size * price : size);
   const eps = 1e-15;
 
-  // A fully FLAT ladder — every vertex at one price, e.g. a pegged leg capping a composed hop —
+  // A fully FLAT ladder, every vertex at one price, e.g. a pegged leg capping a composed hop,
   // collapses here to a single vertex whose cum carries the whole side. The bucketed walks below
   // seed prevCum at that same cum and would emit nothing; the honest book is one limit rung.
   if (pts.length === 1) {
@@ -309,7 +309,7 @@ export interface AggregatedDepthBook {
   poolCount: number;
 }
 
-/** One contributor's densified book half — a pool or a composed route, same shape either way. */
+/** One contributor's densified book half: a pool or a composed route, same shape either way. */
 export interface BookPart {
   mark: number;
   mid: number;
@@ -357,7 +357,7 @@ export function assembleAggBook(
   parts: BookPart[],
   opts?: AggregateDepthOpts,
 ): AggregatedDepthBook | null {
-  // Allow one-sided books (skewed reserves clip the thin side — e.g. BTCB hub drain).
+  // Allow one-sided books (skewed reserves clip the thin side: e.g. BTCB hub drain).
   // Reject only when BOTH sides are empty across all contributing pools.
   const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
   const hasBids = parts.some((p) => p.bids.some((r) => r.cum > 0));

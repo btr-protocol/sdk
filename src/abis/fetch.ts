@@ -1,4 +1,4 @@
-/** ABIs lazy — hot + cold (localStorage) cache, version-aware. Docs: https://btr.markets/docs/contracts#abis */
+/** ABIs lazy: hot + cold (localStorage) cache, version-aware. Docs: https://btr.markets/docs/contracts#abis */
 import { btrFetch, getApiRoot } from '../api.js';
 import { coldGet, coldSet } from '../cache.js';
 import type { Abi } from '../eth/abi.js';

@@ -12,15 +12,15 @@
  * `feedIds` is keyed by feed NAME and ORDERED by on-chain ordinal: entry `n` is `feedIds[n]`, the
  * index every NXR-signed record carries. Arc's record states that order (`.feedOrder`); Sepolia's
  * predates it. The chain itself remains
- * the authority — `keepers/src/oracle/startup.rs` reads `feedIds(idx)` and refuses to start on a
- * mismatch — but nothing downstream hand-lists an ordinal any more.
+ * the authority: `keepers/src/oracle/startup.rs` reads `feedIds(idx)` and refuses to start on a
+ * mismatch. But nothing downstream hand-lists an ordinal any more.
  */
 
 import type { Address, Hex } from '../eth/types.js';
 
 export interface ChainVenue {
   chainId: number;
-  /** Singletons by name — `oracle`, `refOracle`, `poolFactory`, `faucet`, … */
+  /** Singletons by name: `oracle`, `refOracle`, `poolFactory`, `faucet`, … */
   contracts: Record<string, Address>;
   /** Pool asset ERC20s by canonical symbol. First symbol of each roster is the USDC base. */
   tokens: Record<string, Address>;
@@ -34,7 +34,7 @@ export interface ChainVenue {
   feedIds: Record<string, Hex>;
   /**
    * On-chain feed name ⇒ its MITCH `tickerId` (decimal string), the key every signed record
-   * carries. Content-derived, so it is the same on every chain — join a decoded record to a feed
+   * carries. Content-derived, so it is the same on every chain; join a decoded record to a feed
    * through this, never through an array position. Absent for a pre-migration deployment record.
    */
   tickerIds: Record<string, string>;

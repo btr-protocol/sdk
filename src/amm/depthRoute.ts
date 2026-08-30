@@ -3,7 +3,7 @@
 // zero book and the UI fell back to "pool data unavailable" even though rankSwap fills the swap.
 //
 // Each enumerated route contributes one synthetic DepthCurve: the router's own leg enumeration
-// (enumerateRoutes) supplies the paths, and every rung still comes from depthCurve — leg ask
+// (enumerateRoutes) supplies the paths, and every rung still comes from depthCurve: leg ask
 // ladders are chained input->output in the same sequential order quoteRoute fills them (leg 2
 // spends leg 1's NET output), with sizes re-denominated into from/to units along the way. The
 // composed curves merge mid-outward through the same assembler the direct books use, so chart
@@ -99,7 +99,7 @@ function askChain(state: PoolState, pay: string, recv: string): ChainPoly | null
     // hub for spoke (dHub/dSpoke = dx/dg); selling spoke into the hub earns hub (dHub/dSpoke = dg/dx).
     const localPrice = sellingSpoke ? (g - prevG) / (x - prevX) : (x - prevX) / (g - prevG);
     // Haircut multiplier on the OUTPUT: asks divide (netPrice = price/m), bids multiply
-    // (netPrice = price*m) — annotateNet's asymmetry, either way net = gross * m.
+    // (netPrice = price*m): annotateNet's asymmetry, either way net = gross * m.
     const m = sellingSpoke
       ? localPrice > 0
         ? l.netPrice / localPrice
@@ -165,7 +165,7 @@ function foldChain(cur: ChainPoly | null, leg: ChainPoly | null): ChainPoly | nu
   return leg ? chainThrough(cur, leg) : null;
 }
 
-/** Zero-size marginal slope (output per input) off the first vertex — the touch anchor. */
+/** Zero-size marginal slope (output per input) off the first vertex: the touch anchor. */
 const slope0 = (p: ChainPoly | null, key: 'gross' | 'net'): number => {
   if (!p || !(p.xs[0] > 0)) return 0;
   return p[key][0] / p.xs[0];

@@ -1,5 +1,5 @@
 /**
- * Synthetic symbol paths — single source of truth for inverted + triangulated pairs.
+ * Synthetic symbol paths: single source of truth for inverted + triangulated pairs.
  *
  * Path semantics: synth = Π leg_i^{exp_i}, where exp_i ∈ {+1, -1}.
  *   exp=+1 → multiply by leg's price
@@ -35,10 +35,10 @@ export type SynthPath = {
  *   PAXGEUR = PAXGUSDT × USDEUR (= /EURUSDT) → [['PAXGUSDT', 1], ['EURUSDT', -1]]
  *
  * Constraint: every leg `sym` must be a raw symbol present in collector cfg
- * (or a previously-declared synth — DAG via SYNTH_PATHS_ORDERED).
+ * (or a previously-declared synth: DAG via SYNTH_PATHS_ORDERED).
  */
 export const SYNTH_PATHS: readonly SynthPath[] = Object.freeze([
-  // Pure inversions (FX-style + stables) — canonical raw symbols are USDC-quoted.
+  // Pure inversions (FX-style + stables): canonical raw symbols are USDC-quoted.
   { sym: 'USDCBTC', legs: Object.freeze([['BTCUSDC', -1]] as const) },
   { sym: 'USDCETH', legs: Object.freeze([['ETHUSDC', -1]] as const) },
   { sym: 'USDCSOL', legs: Object.freeze([['SOLUSDC', -1]] as const) },

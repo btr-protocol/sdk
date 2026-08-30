@@ -1,5 +1,5 @@
 /**
- * Binary tick codec — shared between Bun WS server (encode) and front Worker (decode).
+ * Binary tick codec, shared between Bun WS server (encode) and front Worker (decode).
  *
  * Wire format (28 bytes, little-endian):
  *   offset  size  field          notes

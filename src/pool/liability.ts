@@ -20,9 +20,9 @@ import { applySlip } from '../utils/maths.js';
 
 /** SC.WAD */
 export const WAD = 1e18;
-/** PoolConstantsLib.sol:15 — bit 2 of asset flags. Both legs must carry it (:425-426). */
+/** PoolConstantsLib.sol:15: bit 2 of asset flags. Both legs must carry it (:425-426). */
 export const LIABILITY_SWAP_ENABLED_BIT = 1 << 2;
-/** PoolConstantsLib.sol:106 — HAIRCUT_SUPPRESSOR_FULL_BPS = 2 * BPS. */
+/** PoolConstantsLib.sol:106: HAIRCUT_SUPPRESSOR_FULL_BPS = 2 * BPS. */
 export const HAIRCUT_SUPPRESSOR_FULL_BPS = 20_000;
 
 /** The slice of IPool.Asset the liability math reads. Build from getAsset output. Face units. */
@@ -31,7 +31,7 @@ export interface LiabLeg {
   reserves: number;
   liabilities: number;
   haircutSuppressorBps: number;
-  /** Asset.liquidityIndexWad — face-per-share in WAD. Default WAD (1 share = 1 face). */
+  /** Asset.liquidityIndexWad: face-per-share in WAD. Default WAD (1 share = 1 face). */
   indexWad?: number;
 }
 
@@ -69,17 +69,17 @@ export interface SwapLiabilityQuote {
   fairIn: number;
   /** Quoted conversion net of embedded spread/toll/skew, before the Lemma B clamp. */
   convQuoted: number;
-  /** fairIn · markPrice — Lemma B re-denomination bound (_markCap :379). Decimal adjustment is
+  /** fairIn · markPrice: Lemma B re-denomination bound (_markCap :379). Decimal adjustment is
    *  implicit: both amounts and the WAD ratio here live in token units. */
   markCap: number;
-  /** min(convQuoted, markCap) — what actually converts. */
+  /** min(convQuoted, markCap): what actually converts. */
   conv: number;
   /** True when adaptive dispersion pushed the quoted conversion past the oracle mark. */
   markCapBinding: boolean;
   haircutOut: number;
   /** Final credited face on the out leg. */
   liabOut: number;
-  /** liabOut / idxOut — shares minted post-dead-seed (deadOut ~ 0 on a seeded live leg). */
+  /** liabOut / idxOut: shares minted post-dead-seed (deadOut ~ 0 on a seeded live leg). */
   lpAmountOut: number;
   /** 1 − received/redeemed-equivalent vs the 1:1-face baseline, bps of face moved. */
   impactBps: number;
@@ -107,7 +107,7 @@ export function quoteSwapLiabilityCore(
   const idxIn = idxOf(inLeg);
   const idxOut = idxOf(outLeg);
   const liabIn = (lpAmountIn * idxIn) / WAD;
-  // :429 — burn cannot exceed the leg's live liabilities.
+  // :429: burn cannot exceed the leg's live liabilities.
   if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
 
   const { actual: fairIn, haircut: haircutIn } = haircutFace(
@@ -128,8 +128,8 @@ export function quoteSwapLiabilityCore(
     outLeg.liabilities,
     outLeg.haircutSuppressorBps,
   );
-  const lpAmountOut = (liabOut * WAD) / idxOut; // :459 — liabOut·WAD/idxOut
-  // :468 — zero-output guard (a fully hair-cut out-leg re-denominates to nothing).
+  const lpAmountOut = (liabOut * WAD) / idxOut; // :459: liabOut·WAD/idxOut
+  // :468: zero-output guard (a fully hair-cut out-leg re-denominates to nothing).
   if (!(lpAmountOut > 0)) return null;
 
   const faceMoved = (lpAmountIn * idxIn) / WAD;
