@@ -8,6 +8,7 @@
 // must originate from the user account: EIP-5792 batch or N direct txs.
 
 import { POOL_ABI } from '../abis/Pool.js';
+import { ROUTER_ABI } from '../abis/Router.js';
 import type { SwapPlan } from '../amm/router.js';
 import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
@@ -507,3 +508,150 @@ export function buildRedeemCalls(
 
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
 export * from './lpRoutes.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ON-CHAIN ROUTER
+//
+// The same legs, executed as ONE transaction by the `Router` contract instead of N calls from
+// the wallet. Route SELECTION is unchanged and still happens here, off-chain; the router only
+// executes what it is handed.
+//
+// The reason to prefer this path is not gas, it is atomicity: sent as N calls, leg 2 can revert
+// after leg 1 has mined and the user is left holding an intermediate asset they never asked for.
+// One transaction is all-or-nothing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One hop. `tokenIn` is implicit — the part's input first, the previous hop's output after. */
+export interface RouterHop {
+  pool: Address;
+  tokenOut: Address;
+}
+
+/** One independent path. Parts do not feed each other, so a call may carry several inputs. */
+export interface RouterPart {
+  tokenIn: Address;
+  amountIn: bigint;
+  hops: RouterHop[];
+}
+
+/** The end-to-end promise, per OUTPUT TOKEN across the whole call. */
+export interface RouterFloor {
+  token: Address;
+  minOut: bigint;
+}
+
+export interface RouterPlan {
+  parts: RouterPart[];
+  floors: RouterFloor[];
+}
+
+/**
+ * Group `ExecLeg[]` into router parts and end-to-end floors.
+ *
+ * WHY THE FLOORS ARE REBUILT RATHER THAN REUSED. Each leg carries a per-leg `minOut`, and a
+ * chained leg's is derived from the previous leg's FLOOR — which is exactly the compounding that
+ * makes a multi-hop route reject itself on a market that has not moved. The router promises the
+ * user an amount of the token they asked for, so the floor is computed once, on the terminal
+ * output of each path, from the amount that path was QUOTED at.
+ *
+ * Legs arrive in execution order and a `chained` leg continues the path before it; anything else
+ * starts a new part. That is the same convention `planToLegs` emits, so a split becomes several
+ * parts with no extra bookkeeping, and parts may legitimately carry different inputs and outputs.
+ */
+export function legsToRouterPlan(legs: ExecLeg[], slippageFrac: number): RouterPlan {
+  if (slippageFrac < 0 || slippageFrac >= 1) {
+    throw new Error(`legsToRouterPlan: slippageFrac must be in [0, 1), got ${slippageFrac}`);
+  }
+  const parts: RouterPart[] = [];
+  // Terminal output per path, in quoted (pre-slippage) units, summed by token so a split that
+  // lands the same asset twice is floored on the TOTAL. Floored per part it would refuse a fill
+  // that is fine in aggregate, one leg light and the other more than covering it.
+  const quotedOut = new Map<string, bigint>();
+  let openPart: RouterPart | null = null;
+  let openOut: { token: Address; amount: bigint } | null = null;
+
+  const closePart = () => {
+    if (openPart && openOut) {
+      parts.push(openPart);
+      const key = openOut.token.toLowerCase();
+      quotedOut.set(key, (quotedOut.get(key) ?? 0n) + openOut.amount);
+    }
+    openPart = null;
+    openOut = null;
+  };
+
+  for (const leg of legs) {
+    if (!leg.chained || !openPart) {
+      closePart();
+      openPart = { tokenIn: leg.tokenIn, amountIn: leg.amountIn, hops: [] };
+    }
+    openPart.hops.push({ pool: leg.pool, tokenOut: leg.tokenOut });
+    openOut = { token: leg.tokenOut, amount: leg.quotedOut };
+  }
+  closePart();
+
+  const floors: RouterFloor[] = [...quotedOut.entries()].map(([token, out]) => ({
+    token: token as Address,
+    minOut: applySlip(out, slippageFrac),
+  }));
+  return { parts, floors };
+}
+
+/**
+ * `Router.swap` calldata for `legs`.
+ *
+ * ONE approval, to the router, per input token — not one per (token, pool). Emit it with
+ * `buildRouterApprovals`, and note the spender is the router: an approval to a pool does nothing
+ * on this path.
+ */
+export function buildRouterSwapCall(
+  router: Address,
+  legs: ExecLeg[],
+  opts: BuildOpts & { slippageFrac: number },
+): ExecCall {
+  const { parts, floors } = legsToRouterPlan(legs, opts.slippageFrac);
+  if (parts.length === 0) throw new Error('buildRouterSwapCall: no legs');
+  // Read at call time, like `buildSwapExecCalls`: a deadline built while an approval was mining
+  // must not be spent before the swap goes out.
+  const deadline = opts.deadline ?? defaultDeadline();
+  return {
+    to: router,
+    data: encodeFn({
+      abi: ROUTER_ABI,
+      functionName: 'swap',
+      args: [parts, floors, opts.recipient, deadline],
+    }),
+    value: 0n,
+  };
+}
+
+/** Approvals for the ROUTER, one per distinct input token — the whole UX win of routing. */
+export function buildRouterApprovals(
+  router: Address,
+  legs: ExecLeg[],
+  opts: Pick<BuildOpts, 'needsApproval' | 'approveMax'>,
+): ExecCall[] {
+  const totals = new Map<string, { token: Address; amount: bigint }>();
+  for (const part of legsToRouterPlan(legs, 0).parts) {
+    const key = part.tokenIn.toLowerCase();
+    const cur = totals.get(key);
+    totals.set(key, {
+      token: part.tokenIn,
+      amount: (cur?.amount ?? 0n) + part.amountIn,
+    });
+  }
+  const calls: ExecCall[] = [];
+  for (const { token, amount } of totals.values()) {
+    if (opts.needsApproval && !opts.needsApproval(token, router, amount)) continue;
+    calls.push({
+      to: token,
+      data: encodeFn({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [router, opts.approveMax ? MAX_UINT256 : amount],
+      }),
+      value: 0n,
+    });
+  }
+  return calls;
+}

@@ -16,5 +16,6 @@ export * from './IPoolHooks.js';
 export * from './LPToken.js';
 export * from './Pool.js';
 export * from './PoolFactory.js';
+export * from './Router.js';
 export * from './solidity.generated.js';
 export * from './structs.generated.js';
