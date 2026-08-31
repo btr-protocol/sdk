@@ -1,12 +1,18 @@
-// Off-chain swap execution builder. BTR has NO on-chain router: a routed/split swap is a sequence of
-// plain `approve` + `Pool.swap` calls the user's wallet submits directly, batched atomically via
-// EIP-5792 `wallet_sendCalls` where the wallet supports it, else sequentially. This module turns a
-// route plan (computed off-chain, e.g. by front `lib/amm/router`) into that ordered call list.
+// Swap execution builder: a quoted plan → the ordered calls that execute it.
 //
-// Multicall3 CANNOT execute these: `Pool.swap` pulls tokenIn from `msg.sender`, which under
-// Multicall3.aggregate3 is the Multicall3 contract (no funds, no allowance) → revert. So the calls
-// must originate from the user account: EIP-5792 batch or N direct txs.
-
+// TWO PATHS, ONE PLAN. Preferred is the on-chain `Router` (bottom of this file): one transaction,
+// all-or-nothing, one approval per input token. The legacy path sends the same plan as N plain
+// `approve` + `Pool.swap` calls from the user's own account, batched atomically via EIP-5792
+// `wallet_sendCalls` where the wallet supports it and sequentially where it does not — which is
+// why it still exists, and why a multi-hop route on it can strand the user holding an intermediate
+// asset when a later call reverts.
+//
+// Neither path SELECTS a route. The backend quoter does that; this module only encodes its answer.
+//
+// Multicall3 cannot execute the legacy path: `Pool.swap` pulls tokenIn from `msg.sender`, which
+// under `Multicall3.aggregate3` is the Multicall3 contract (no funds, no allowance) → revert. The
+// calls must originate from the user account. `Router` is not subject to this: it holds the pull
+// itself, which is the point of deploying it.
 import { POOL_ABI } from '../abis/Pool.js';
 import { ROUTER_ABI } from '../abis/Router.js';
 import type { SwapPlan } from '../amm/router.js';
@@ -148,6 +154,38 @@ const toUnits = (v: number, decimals: number): bigint => {
   return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
 };
 
+/** Carve the caller's EXACT input across the plan's parts, in the order given.
+ *
+ *  Shared by BOTH execution paths (N pool calls, and one router call) so they cannot disagree
+ *  about what the wallet is debited for the same plan. Each part is floored and the residual dust
+ *  rides on the last one, so Σ === `amountInUnits` to the wei.
+ *
+ *  Without an exact total the old float path stands: `plan.amountIn` is an f64 and cannot hold 18
+ *  decimals, so a max-balance swap rebuilt from it lands ONE WEI above the balance the caller
+ *  checked and `transferFrom` reverts. Pass `amountInUnits` whenever it is known. */
+function inputCarver(
+  plan: SwapPlan,
+  nParts: number,
+  amountInUnits?: bigint,
+): (fraction: number, i: number, decimals: number) => bigint {
+  const exactIn = amountInUnits !== undefined && amountInUnits > 0n ? amountInUnits : undefined;
+  const FRAC_SCALE = 1_000_000_000_000n; // 1e12: fraction precision, well inside f64's 15 digits
+  let leftIn = exactIn ?? 0n;
+  return (fraction: number, i: number, decimals: number): bigint => {
+    if (exactIn === undefined) return toUnits(fraction * plan.amountIn, decimals);
+    if (i === nParts - 1) {
+      const rest = leftIn;
+      leftIn = 0n;
+      return rest;
+    }
+    const f = Number.isFinite(fraction) ? Math.min(Math.max(fraction, 0), 1) : 0;
+    const slice = (exactIn * BigInt(Math.floor(f * Number(FRAC_SCALE)))) / FRAC_SCALE;
+    const take = slice > leftIn ? leftIn : slice;
+    leftIn -= take;
+    return take;
+  };
+}
+
 /** Map a router plan (amm/router rankSwap `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs
  *  where leg2.amountIn = leg1.minOut (the exact bridged amount isn't known until leg1 executes).
@@ -167,23 +205,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   // balance the caller checked. With `amountInUnits` the slices are carved from THAT bigint: each
   // is floored, the residual dust rides on the smallest (last) part, and Σ === amountInUnits to
   // the wei. Without it the old float path stands, for callers that have no exact total.
-  const exactIn =
-    opts.amountInUnits !== undefined && opts.amountInUnits > 0n ? opts.amountInUnits : undefined;
-  const FRAC_SCALE = 1_000_000_000_000n; // 1e12: fraction precision, well inside f64's 15 digits
-  let leftIn = exactIn ?? 0n;
-  const partInUnits = (fraction: number, i: number, decimals: number): bigint => {
-    if (exactIn === undefined) return toUnits(fraction * plan.amountIn, decimals);
-    if (i === parts.length - 1) {
-      const rest = leftIn;
-      leftIn = 0n;
-      return rest;
-    }
-    const f = Number.isFinite(fraction) ? Math.min(Math.max(fraction, 0), 1) : 0;
-    const slice = (exactIn * BigInt(Math.floor(f * Number(FRAC_SCALE)))) / FRAC_SCALE;
-    const take = slice > leftIn ? leftIn : slice;
-    leftIn -= take;
-    return take;
-  };
+  const partInUnits = inputCarver(plan, parts.length, opts.amountInUnits);
   for (const [i, part] of parts.entries()) {
     const rl = part.route.legs;
     if (rl.length === 1) {
@@ -512,13 +534,24 @@ export * from './lpRoutes.js';
 // ─────────────────────────────────────────────────────────────────────────────
 // ON-CHAIN ROUTER
 //
-// The same legs, executed as ONE transaction by the `Router` contract instead of N calls from
-// the wallet. Route SELECTION is unchanged and still happens here, off-chain; the router only
+// The same plan, executed as ONE transaction by the `Router` contract instead of N calls from the
+// wallet. Route SELECTION is unchanged — it happens in the backend quoter, and the router only
 // executes what it is handed.
 //
-// The reason to prefer this path is not gas, it is atomicity: sent as N calls, leg 2 can revert
-// after leg 1 has mined and the user is left holding an intermediate asset they never asked for.
+// The reason to prefer this path is not gas, it is atomicity: sent as N calls, hop 2 can revert
+// after hop 1 has mined and the user is left holding an intermediate asset they never asked for.
 // One transaction is all-or-nothing.
+//
+// THIS BUILDS FROM THE PLAN, NOT FROM `ExecLeg[]`. Going through `planToLegs` first would flatten
+// the backend's parts into legs, attach a per-leg `minOut` to each, and then this code would
+// regroup the legs back into the parts the backend already sent and throw those floors away —
+// re-deriving, in TypeScript, a split the Rust quoter had already decided. It also capped routes
+// at the two hops `planToLegs` hardcodes, while the contract takes any number. Mapping the plan
+// straight across is both shorter and strictly more capable.
+//
+// WHAT IS NOT THE BACKEND'S TO DECIDE: the floors. `minOut` is a structural trust boundary — a
+// server-authored floor is a sandwich the server can write — so the caller derives it here, from
+// the quote it was shown and the slippage tolerance the user set. See `core/src/lib.rs:14`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One hop. `tokenIn` is implicit — the part's input first, the previous hop's output after. */
@@ -541,108 +574,159 @@ export interface RouterFloor {
 }
 
 export interface RouterPlan {
+  /** `Router.swap` arg 1, in plan order (largest part first). */
   parts: RouterPart[];
+  /** `Router.swap` arg 2. One entry per distinct output token, never per part. */
   floors: RouterFloor[];
+  /** msg.value to attach: the gas token wrapped before the swap. 0 unless `nativeIn`. */
+  wrapValue: bigint;
+  /** `WNATIVE.withdraw` amount after the swap. 0 unless `nativeOut`. Tracks the floor, not the
+   *  quote — the floor is the only amount guaranteed to be there, so positive slippage stays with
+   *  the user as wrapped native instead of reverting the batch. */
+  unwrapAmount: bigint;
 }
 
 /**
- * Group `ExecLeg[]` into router parts and end-to-end floors.
+ * Map a quoted `SwapPlan` → the exact arguments `Router.swap` takes.
  *
- * WHY THE FLOORS ARE REBUILT RATHER THAN REUSED. Each leg carries a per-leg `minOut`, and a
- * chained leg's is derived from the previous leg's FLOOR — which is exactly the compounding that
- * makes a multi-hop route reject itself on a market that has not moved. The router promises the
- * user an amount of the token they asked for, so the floor is computed once, on the terminal
- * output of each path, from the amount that path was QUOTED at.
+ * Parts are ordered largest-first, matching `planToLegs`, because both paths carve the caller's
+ * exact input with the same `inputCarver` and the residual dust rides on the last part.
  *
- * Legs arrive in execution order and a `chained` leg continues the path before it; anything else
- * starts a new part. That is the same convention `planToLegs` emits, so a split becomes several
- * parts with no extra bookkeeping, and parts may legitimately carry different inputs and outputs.
+ * FLOORS ARE PER OUTPUT TOKEN, AGGREGATED ACROSS THE WHOLE CALL — not per part. A split that lands
+ * the same asset twice is floored on the TOTAL: floored per part it would refuse a fill that is
+ * fine in aggregate, one path coming in light and the other more than covering it. And they are
+ * end-to-end, on what the user actually asked for, so a route does not compound a tolerance per
+ * hop and reject itself on a market that has not moved.
+ *
+ * Null (never a partial plan) when any pool address or token meta is missing, when a plan claims a
+ * native leg it cannot support, or when a token resolves to the EIP-7528 sentinel — that address
+ * is not a contract, and `transferFrom` against it would revert with nothing to explain why.
  */
-export function legsToRouterPlan(legs: ExecLeg[], slippageFrac: number): RouterPlan {
-  if (slippageFrac < 0 || slippageFrac >= 1) {
-    throw new Error(`legsToRouterPlan: slippageFrac must be in [0, 1), got ${slippageFrac}`);
+export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan | null {
+  const slip = opts.slippageFrac;
+  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
+    throw new Error(`planToRouterPlan: slippageFrac must be in [0, 1), got ${slip}`);
   }
+  const ordered = [...plan.parts].sort((a, b) => b.fraction - a.fraction);
+  if (ordered.length === 0) return null;
+  const carve = inputCarver(plan, ordered.length, opts.amountInUnits);
+
   const parts: RouterPart[] = [];
-  // Terminal output per path, in quoted (pre-slippage) units, summed by token so a split that
-  // lands the same asset twice is floored on the TOTAL. Floored per part it would refuse a fill
-  // that is fine in aggregate, one leg light and the other more than covering it.
-  const quotedOut = new Map<string, bigint>();
-  let openPart: RouterPart | null = null;
-  let openOut: { token: Address; amount: bigint } | null = null;
+  // Quoted terminal output per token, pre-slippage, keyed lowercase so a split landing the same
+  // asset from two paths accumulates onto one floor.
+  const quoted = new Map<string, { token: Address; amount: bigint }>();
+  const inputs = new Set<string>();
 
-  const closePart = () => {
-    if (openPart && openOut) {
-      parts.push(openPart);
-      const key = openOut.token.toLowerCase();
-      quotedOut.set(key, (quotedOut.get(key) ?? 0n) + openOut.amount);
+  for (const [i, part] of ordered.entries()) {
+    const legs = part.route.legs;
+    if (legs.length === 0) return null;
+    const tin = opts.tokenOf(legs[0].tokenIn);
+    if (!tin || isSentinel(tin.address)) return null;
+
+    const hops: RouterHop[] = [];
+    let terminal: TokenMeta | undefined;
+    for (const leg of legs) {
+      const tout = opts.tokenOf(leg.tokenOut);
+      if (!leg.poolAddr || !tout || isSentinel(tout.address)) return null;
+      hops.push({ pool: leg.poolAddr as Address, tokenOut: tout.address });
+      terminal = tout;
     }
-    openPart = null;
-    openOut = null;
-  };
+    if (!terminal) return null;
 
-  for (const leg of legs) {
-    if (!leg.chained || !openPart) {
-      closePart();
-      openPart = { tokenIn: leg.tokenIn, amountIn: leg.amountIn, hops: [] };
-    }
-    openPart.hops.push({ pool: leg.pool, tokenOut: leg.tokenOut });
-    openOut = { token: leg.tokenOut, amount: leg.quotedOut };
-  }
-  closePart();
-
-  const floors: RouterFloor[] = [...quotedOut.entries()].map(([token, out]) => ({
-    token: token as Address,
-    minOut: applySlip(out, slippageFrac),
-  }));
-  return { parts, floors };
-}
-
-/**
- * `Router.swap` calldata for `legs`.
- *
- * ONE approval, to the router, per input token — not one per (token, pool). Emit it with
- * `buildRouterApprovals`, and note the spender is the router: an approval to a pool does nothing
- * on this path.
- */
-export function buildRouterSwapCall(
-  router: Address,
-  legs: ExecLeg[],
-  opts: BuildOpts & { slippageFrac: number },
-): ExecCall {
-  const { parts, floors } = legsToRouterPlan(legs, opts.slippageFrac);
-  if (parts.length === 0) throw new Error('buildRouterSwapCall: no legs');
-  // Read at call time, like `buildSwapExecCalls`: a deadline built while an approval was mining
-  // must not be spent before the swap goes out.
-  const deadline = opts.deadline ?? defaultDeadline();
-  return {
-    to: router,
-    data: encodeFn({
-      abi: ROUTER_ABI,
-      functionName: 'swap',
-      args: [parts, floors, opts.recipient, deadline],
-    }),
-    value: 0n,
-  };
-}
-
-/** Approvals for the ROUTER, one per distinct input token — the whole UX win of routing. */
-export function buildRouterApprovals(
-  router: Address,
-  legs: ExecLeg[],
-  opts: Pick<BuildOpts, 'needsApproval' | 'approveMax'>,
-): ExecCall[] {
-  const totals = new Map<string, { token: Address; amount: bigint }>();
-  for (const part of legsToRouterPlan(legs, 0).parts) {
-    const key = part.tokenIn.toLowerCase();
-    const cur = totals.get(key);
-    totals.set(key, {
-      token: part.tokenIn,
-      amount: (cur?.amount ?? 0n) + part.amountIn,
+    parts.push({
+      tokenIn: tin.address,
+      amountIn: carve(part.fraction, i, tin.decimals),
+      hops,
+    });
+    inputs.add(tin.address.toLowerCase());
+    const key = terminal.address.toLowerCase();
+    const cur = quoted.get(key);
+    quoted.set(key, {
+      token: terminal.address,
+      amount: (cur?.amount ?? 0n) + toUnits(part.quote.amountOut, terminal.decimals),
     });
   }
+
+  const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => ({
+    token,
+    minOut: applySlip(amount, slip),
+  }));
+
+  // A gas-token swap is single-asset on that side by definition — the user pays or is paid in the
+  // one native token. More than one input (or output) with the flag set means the plan and the
+  // flag disagree, and guessing which to believe is how you wrap the wrong amount.
+  if (opts.nativeIn && inputs.size !== 1) return null;
+  if (opts.nativeOut && floors.length !== 1) return null;
+
+  return {
+    parts,
+    floors,
+    wrapValue: opts.nativeIn ? parts.reduce((a, p) => a + p.amountIn, 0n) : 0n,
+    unwrapAmount: opts.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
+  };
+}
+
+/** Re-floor a built plan against a FRESH quote, without re-deriving the route.
+ *
+ *  The quote a user was shown ages between render and send. Rebuilding the whole plan to move the
+ *  floors would re-run the split against whatever the pools look like now and could hand the wallet
+ *  a different route than the one on screen; this moves only the numbers the tolerance controls.
+ *
+ *  `freshOut` is quoted (pre-slippage) output per token, keyed lowercase. A token the fresh quote
+ *  does not mention keeps its existing floor. */
+export function refloorRouterPlan(
+  rp: RouterPlan,
+  freshOut: Map<string, bigint>,
+  slippageFrac: number,
+): RouterPlan {
+  if (!Number.isFinite(slippageFrac) || slippageFrac < 0 || slippageFrac >= 1) {
+    throw new Error(`refloorRouterPlan: slippageFrac must be in [0, 1), got ${slippageFrac}`);
+  }
+  const floors = rp.floors.map((f) => {
+    const fresh = freshOut.get(f.token.toLowerCase());
+    return fresh === undefined ? f : { token: f.token, minOut: applySlip(fresh, slippageFrac) };
+  });
+  return {
+    ...rp,
+    floors,
+    // The unwrap follows the floor it withdraws against, or a re-floored native-out swap tries to
+    // withdraw more wrapped native than the router was required to deliver.
+    unwrapAmount: rp.unwrapAmount > 0n ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
+  };
+}
+
+/** [wrap?, approvals…] for the router path.
+ *
+ *  ONE approval per INPUT TOKEN, to the router — not one per (token, pool), which is the whole UX
+ *  win: a 3-hop route through three pools is one approval, not three. An allowance granted to a
+ *  pool does nothing here. */
+export function buildRouterApprovalCalls(
+  router: Address,
+  rp: RouterPlan,
+  opts: Pick<BuildOpts, 'needsApproval' | 'approveMax' | 'wrappedNative'>,
+): ExecCall[] {
+  const totals = new Map<string, { token: Address; amount: bigint }>();
+  for (const part of rp.parts) {
+    const key = part.tokenIn.toLowerCase();
+    const cur = totals.get(key);
+    totals.set(key, { token: part.tokenIn, amount: (cur?.amount ?? 0n) + part.amountIn });
+  }
   const calls: ExecCall[] = [];
+  if (rp.wrapValue > 0n) {
+    if (!opts.wrappedNative) {
+      throw new Error('buildRouterApprovalCalls: nativeIn plan needs opts.wrappedNative');
+    }
+    calls.push({
+      to: opts.wrappedNative,
+      data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
+      value: rp.wrapValue,
+    });
+  }
   for (const { token, amount } of totals.values()) {
-    if (opts.needsApproval && !opts.needsApproval(token, router, amount)) continue;
+    // Wrapped native holds no allowance before this batch wraps it, so it always needs one: the
+    // caller's cached-allowance probe read a pre-batch state that cannot cover it.
+    const wrapped = rp.wrapValue > 0n && token.toLowerCase() === opts.wrappedNative?.toLowerCase();
+    if (!wrapped && opts.needsApproval && !opts.needsApproval(token, router, amount)) continue;
     calls.push({
       to: token,
       data: encodeFn({
@@ -654,4 +738,51 @@ export function buildRouterApprovals(
     });
   }
   return calls;
+}
+
+/** [Router.swap, unwrap?].
+ *
+ *  `opts.deadline ?? defaultDeadline()` is read HERE, at call time. Call this immediately before
+ *  the send: a deadline built while an approval was still mining can already be spent. */
+export function buildRouterSwapExecCalls(
+  router: Address,
+  rp: RouterPlan,
+  opts: BuildOpts,
+): ExecCall[] {
+  if (rp.parts.length === 0) throw new Error('buildRouterSwapExecCalls: empty plan');
+  const calls: ExecCall[] = [
+    {
+      to: router,
+      data: encodeFn({
+        abi: ROUTER_ABI,
+        functionName: 'swap',
+        args: [rp.parts, rp.floors, opts.recipient, opts.deadline ?? defaultDeadline()],
+      }),
+      value: 0n,
+    },
+  ];
+  if (rp.unwrapAmount > 0n) {
+    if (!opts.wrappedNative) {
+      throw new Error('buildRouterSwapExecCalls: nativeOut plan needs opts.wrappedNative');
+    }
+    calls.push({
+      to: opts.wrappedNative,
+      data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [rp.unwrapAmount] }),
+      value: 0n,
+    });
+  }
+  return calls;
+}
+
+/** Wrap first (funds the approval), approve before the swap that spends it, unwrap last.
+ *
+ *  One shared deadline, which is correct for a single atomic batch — one wallet prompt, sent
+ *  together. A non-atomic flow that mines the approval as its own transaction should call
+ *  `buildRouterApprovalCalls` and `buildRouterSwapExecCalls` separately, the second one right
+ *  before the send. */
+export function buildRouterCalls(router: Address, rp: RouterPlan, opts: BuildOpts): ExecCall[] {
+  return [
+    ...buildRouterApprovalCalls(router, rp, opts),
+    ...buildRouterSwapExecCalls(router, rp, opts),
+  ];
 }

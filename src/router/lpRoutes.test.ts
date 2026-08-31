@@ -152,7 +152,16 @@ describe('buildDepositCalls', () => {
       POOL,
       {
         mode: 'market',
-        legs: [{ pool: POOL, tokenIn: TOK_X, tokenOut: TOK_T, amountIn: 1000n, minOut: 990n }],
+        legs: [
+          {
+            pool: POOL,
+            tokenIn: TOK_X,
+            tokenOut: TOK_T,
+            amountIn: 1000n,
+            quotedOut: 990n,
+            minOut: 990n,
+          },
+        ],
         depositToken: TOK_T,
         depositAmount: 990n,
       },

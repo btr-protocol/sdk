@@ -15,13 +15,24 @@ const DEPOSIT_SEL = '0xd0e30db0'; // deposit()
 const WITHDRAW_SEL = '0x2e1a7d4d'; // withdraw(uint256)
 const MAX_UINT256 = (1n << 256n) - 1n;
 
+// The call builders never read `quotedOut` — only `refloorLeg` does — so these fixtures pin it AT
+// the `minOut` each test is actually asserting on, i.e. a leg quoted with zero slippage. It is
+// required on the type because every real producer knows it and `freshFloor` divides by it.
+
 /** Last word of approve(spender, amount) calldata → amount. */
 const approveAmount = (data: string): bigint => BigInt(`0x${data.slice(2 + 8 + 64)}`);
 
 describe('buildSwapCalls', () => {
   test('single direct leg → [approve exact, swap]', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 1000n, minOut: 995n },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 1000n,
+        quotedOut: 995n,
+        minOut: 995n,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER });
     expect(calls.length).toBe(2);
@@ -35,7 +46,14 @@ describe('buildSwapCalls', () => {
 
   test('approveMax=true → max uint256 allowance', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 1000n, minOut: 995n },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 1000n,
+        quotedOut: 995n,
+        minOut: 995n,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER, approveMax: true });
     expect(approveAmount(calls[0].data)).toBe(MAX_UINT256);
@@ -43,8 +61,22 @@ describe('buildSwapCalls', () => {
 
   test('split across two pools (same tokenIn) → 2 approvals (distinct spenders) + 2 swaps, approvals first', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 700n, minOut: 696n },
-      { pool: POOL_V, tokenIn: USDC, tokenOut: USDT, amountIn: 300n, minOut: 298n },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 700n,
+        quotedOut: 696n,
+        minOut: 696n,
+      },
+      {
+        pool: POOL_V,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 300n,
+        quotedOut: 298n,
+        minOut: 298n,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER });
     expect(calls.length).toBe(4);
@@ -61,7 +93,14 @@ describe('buildSwapCalls', () => {
 
   test('needsApproval=false skips approvals (cached allowance)', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 1000n, minOut: 995n },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 1000n,
+        quotedOut: 995n,
+        minOut: 995n,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER, needsApproval: () => false });
     expect(calls.length).toBe(1);
@@ -70,7 +109,15 @@ describe('buildSwapCalls', () => {
 
   test('wrapIn leg → leading deposit carries the value, swap itself is valueless', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+      {
+        pool: POOL_V,
+        tokenIn: WNATIVE,
+        tokenOut: USDT,
+        amountIn: 5n,
+        quotedOut: 4n,
+        minOut: 4n,
+        wrapIn: true,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER, wrappedNative: WNATIVE });
     expect(calls.length).toBe(3); // deposit, approve, swap
@@ -84,7 +131,15 @@ describe('buildSwapCalls', () => {
 
   test('wrapIn always approves, even when the allowance probe says otherwise', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+      {
+        pool: POOL_V,
+        tokenIn: WNATIVE,
+        tokenOut: USDT,
+        amountIn: 5n,
+        quotedOut: 4n,
+        minOut: 4n,
+        wrapIn: true,
+      },
     ];
     const calls = buildSwapCalls(legs, {
       recipient: USER,
@@ -96,8 +151,24 @@ describe('buildSwapCalls', () => {
 
   test('unwrapOut leg → trailing withdraw of Σ minOut, not of the quote', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: USDC, tokenOut: WNATIVE, amountIn: 9n, minOut: 4n, unwrapOut: true },
-      { pool: POOL_S, tokenIn: USDC, tokenOut: WNATIVE, amountIn: 9n, minOut: 3n, unwrapOut: true },
+      {
+        pool: POOL_V,
+        tokenIn: USDC,
+        tokenOut: WNATIVE,
+        amountIn: 9n,
+        quotedOut: 4n,
+        minOut: 4n,
+        unwrapOut: true,
+      },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: WNATIVE,
+        amountIn: 9n,
+        quotedOut: 3n,
+        minOut: 3n,
+        unwrapOut: true,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER, wrappedNative: WNATIVE });
     const last = calls[calls.length - 1];
@@ -109,20 +180,50 @@ describe('buildSwapCalls', () => {
 
   test('wrap/unwrap flag that does not match the chain wrapped native is refused', () => {
     const wrong: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: USDC, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+      {
+        pool: POOL_V,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 5n,
+        quotedOut: 4n,
+        minOut: 4n,
+        wrapIn: true,
+      },
     ];
     expect(() => buildSwapCalls(wrong, { recipient: USER, wrappedNative: WNATIVE })).toThrow();
     // Missing wrappedNative is equally refused: it would encode a call to `undefined`.
     const right: ExecLeg[] = [
-      { pool: POOL_V, tokenIn: WNATIVE, tokenOut: USDT, amountIn: 5n, minOut: 4n, wrapIn: true },
+      {
+        pool: POOL_V,
+        tokenIn: WNATIVE,
+        tokenOut: USDT,
+        amountIn: 5n,
+        quotedOut: 4n,
+        minOut: 4n,
+        wrapIn: true,
+      },
     ];
     expect(() => buildSwapCalls(right, { recipient: USER })).toThrow();
   });
 
   test('dedup approvals for the same (token,pool) across legs — exact Σ amountIn', () => {
     const legs: ExecLeg[] = [
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 500n, minOut: 498n },
-      { pool: POOL_S, tokenIn: USDC, tokenOut: USDT, amountIn: 500n, minOut: 498n },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 500n,
+        quotedOut: 498n,
+        minOut: 498n,
+      },
+      {
+        pool: POOL_S,
+        tokenIn: USDC,
+        tokenOut: USDT,
+        amountIn: 500n,
+        quotedOut: 498n,
+        minOut: 498n,
+      },
     ];
     const calls = buildSwapCalls(legs, { recipient: USER });
     const approves = calls.filter((c) => c.data.startsWith(APPROVE_SEL));
