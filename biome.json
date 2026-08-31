@@ -19,10 +19,12 @@
       "recommended": true,
       "style": {
         "noParameterAssign": "warn",
-        "useImportType": "warn"
+        "useImportType": "warn",
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "warn",
+        "noAssignInExpressions": "off"
       },
       "correctness": {
         "noUnusedImports": "warn"

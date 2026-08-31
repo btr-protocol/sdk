@@ -848,7 +848,10 @@ export function quoteExactIn(
     // hub balance never bounds a cross (Pricing.sol:806-809). The sell leg still contributes its
     // own depth exhaustion, hence `Infinity` rather than dropping the term. This value is
     // `Quote.maxIn` -> rankSwap order-splitting, so it sizes real routes, not just a chart.
-    maxIn = Math.min(capBidTok(kIn, legIn, Infinity), capAskBase(kOut, legOut) / kIn.mid);
+    maxIn = Math.min(
+      capBidTok(kIn, legIn, Number.POSITIVE_INFINITY),
+      capAskBase(kOut, legOut) / kIn.mid,
+    );
     if (amountIn > 0) {
       const baseMid = amountIn * traverse(kIn, amountIn, true);
       const exec = traverse(kOut, baseMid / kOut.mid, false);
@@ -1179,8 +1182,14 @@ function crossCurve(
   // outright; `_covToll` then blocks the whole fill.
   const kIn = legKit(legIn);
   const kOut = legKit(legOut);
-  const askMax = Math.min(capBidTok(kIn, legIn, Infinity), capAskBase(kOut, legOut) / kIn.mid); // from-token
-  const bidMax = Math.min(capBidTok(kOut, legOut, Infinity), capAskBase(kIn, legIn) / kOut.mid); // to-token
+  const askMax = Math.min(
+    capBidTok(kIn, legIn, Number.POSITIVE_INFINITY),
+    capAskBase(kOut, legOut) / kIn.mid,
+  ); // from-token
+  const bidMax = Math.min(
+    capBidTok(kOut, legOut, Number.POSITIVE_INFINITY),
+    capAskBase(kIn, legIn) / kOut.mid,
+  ); // to-token
   // `grossOut` is the skew-implied leg: pure curve impact plus the exact reserve clip, with the
   // toll and the half-spread applied strictly after it. It is what the book prints. `amountOut`
   // is what fills, and is the ONLY valid cliff test: `_covToll` returns the whole `grossOut`
@@ -1256,7 +1265,7 @@ function withMarginal(
   // hub-spoke path already does (`annotateNet` breaks on the same test). Publishing the degenerate
   // number instead put a non-finite price on the ladder, and `aggregate`'s ask loop walks from
   // Infinity with a break test that is NaN, i.e. forever.
-  if (!(netMid > 0) || !isFinite(netMid)) return [];
+  if (!(netMid > 0) || !Number.isFinite(netMid)) return [];
   const zero: DepthLevel = { price: mid, netPrice: netMid, cumTok: 0, cumBase: 0 };
   const out: DepthLevel[] = [zero];
   for (let i = 0; i < nodes.length; i++) {

@@ -139,10 +139,10 @@ describe("rankRedeem (routes A' / B')", () => {
 
 // ── calldata builders ───────────────────────────────────────────────────────────
 
-const POOL = ('0x' + '11'.repeat(20)) as `0x${string}`;
-const TOK_X = ('0x' + '22'.repeat(20)) as `0x${string}`;
-const TOK_T = ('0x' + '33'.repeat(20)) as `0x${string}`;
-const USER = ('0x' + '44'.repeat(20)) as `0x${string}`;
+const POOL = `0x${'11'.repeat(20)}` as `0x${string}`;
+const TOK_X = `0x${'22'.repeat(20)}` as `0x${string}`;
+const TOK_T = `0x${'33'.repeat(20)}` as `0x${string}`;
+const USER = `0x${'44'.repeat(20)}` as `0x${string}`;
 
 const opts: BuildOpts = { recipient: USER };
 

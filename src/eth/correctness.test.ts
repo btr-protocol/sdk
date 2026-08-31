@@ -125,8 +125,11 @@ describe('multicall batching', () => {
     for (let i = 0; i < n; i++) out += w(base + BigInt(i) * ES);
     for (let i = 0; i < n; i++)
       out +=
-        w(i === failIndex ? 0n : 1n) + w(0x40n) + w(1n) + (i === failIndex ? '08' : '01').padEnd(64, '0');
-    return '0x' + out;
+        w(i === failIndex ? 0n : 1n) +
+        w(0x40n) +
+        w(1n) +
+        (i === failIndex ? '08' : '01').padEnd(64, '0');
+    return `0x${out}`;
   };
   /** Provider answering one Result per aggregate3 leg, counting wire requests. */
   const mc3Provider = (): { seen: string[]; provider: Eip1193Provider } => {
@@ -136,7 +139,7 @@ describe('multicall batching', () => {
         seen.push(method);
         if (method === 'eth_blockNumber') return '0x64';
         const cd = (params as [{ data: string }, string])[0].data;
-        const legs = parseInt(cd.slice(10 + 64, 10 + 128), 16);
+        const legs = Number.parseInt(cd.slice(10 + 64, 10 + 128), 16);
         return encResults(legs);
       },
     } as unknown as Eip1193Provider;
@@ -167,7 +170,7 @@ describe('multicall batching', () => {
     const provider: Eip1193Provider = {
       request: async ({ params }: { method?: string; params?: unknown[] }) => {
         const cd = (params as [{ data: string }, string])[0].data;
-        return encResults(parseInt(cd.slice(10 + 64, 10 + 128), 16), 1);
+        return encResults(Number.parseInt(cd.slice(10 + 64, 10 + 128), 16), 1);
       },
     } as unknown as Eip1193Provider;
     const mk = (to: string): Call => ({

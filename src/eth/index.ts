@@ -48,7 +48,7 @@ export function checksumAddress(address: string): Address {
   const hash = bytesToHex(keccak_256(new TextEncoder().encode(hex)));
   let out = '0x';
   for (let i = 0; i < hex.length; i++) {
-    out += parseInt(hash[i], 16) >= 8 ? hex[i].toUpperCase() : hex[i];
+    out += Number.parseInt(hash[i], 16) >= 8 ? hex[i].toUpperCase() : hex[i];
   }
   return out as Address;
 }

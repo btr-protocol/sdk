@@ -120,7 +120,7 @@ export function aggregate(
   for (const r of rows) {
     // `isFinite` is load-bearing, not decoration: an Infinity price passes `> 0`, and the loops
     // below then never satisfy their break test (`Inf >= Inf - 1e-12*Inf` is `Inf >= NaN`).
-    if (!(r.price > 0) || !isFinite(r.price) || !(r.cum >= 0)) continue;
+    if (!(r.price > 0) || !Number.isFinite(r.price) || !(r.cum >= 0)) continue;
     const last = pts[pts.length - 1];
     if (last && Math.abs(last.price - r.price) < 1e-12 * Math.max(1, r.price)) {
       // Never absorb the touch anchor into a same-price vertex: the bucketed walks below seed

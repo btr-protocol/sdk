@@ -134,7 +134,7 @@ test('toInputValue stays plain ASCII and parses back', () => {
   for (const n of [111.73, 1234.5, 1e-4, 1e-7, 0.000012345]) {
     const s = toInputValue(n);
     expect(s).not.toMatch(/[^0-9.-]/);
-    expect(parseFloat(s)).toBeCloseTo(n, 15);
+    expect(Number.parseFloat(s)).toBeCloseTo(n, 15);
   }
   expect(toInputValue(null)).toBe('');
 });
@@ -168,6 +168,6 @@ describe('formatYield rounds to significant figures', () => {
   test('null and non-finite never invent a zero', () => {
     expect(formatYield(null)).toBe('—');
     expect(formatYield(undefined)).toBe('—');
-    expect(formatYield(NaN)).toBe('—');
+    expect(formatYield(Number.NaN)).toBe('—');
   });
 });

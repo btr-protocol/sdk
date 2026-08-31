@@ -32,8 +32,8 @@ export function sleep(ms: number): Promise<void> {
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000,
+  maxRetries = 3,
+  baseDelay = 1000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
@@ -43,7 +43,7 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       lastError = error as Error;
       if (i < maxRetries - 1) {
-        const delay = baseDelay * Math.pow(2, i);
+        const delay = baseDelay * 2 ** i;
         await sleep(delay);
       }
     }

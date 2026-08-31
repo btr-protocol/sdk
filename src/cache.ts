@@ -1,6 +1,6 @@
 /** Hot Map + cold localStorage (versioned). Dev = no cold (annoying). Browser caches JS/CSS/WebP. */
-const P = 'btr:cache:',
-  V = 'btr:cache:version';
+const P = 'btr:cache:';
+const V = 'btr:cache:version';
 const isDev = () => {
   try {
     const e =
@@ -25,8 +25,8 @@ let ck = false;
 function ensure() {
   if (ck || typeof localStorage === 'undefined' || isDev()) return;
   ck = true;
-  const cur = ver(),
-    old = localStorage.getItem(V);
+  const cur = ver();
+  const old = localStorage.getItem(V);
   if (cur !== old) {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);

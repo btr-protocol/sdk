@@ -111,17 +111,25 @@ export async function multicall(
   if (!byKey) schedulers.set(p, (byKey = new Map()));
   let entry = byKey.get(key);
   if (!entry)
-    byKey.set(key, (entry = {
-      addr,
-      block: opt.block,
-      chunkSize: opt.chunkSize,
-      calls: [],
-      waiters: [],
-      scheduled: false,
-    }));
+    byKey.set(
+      key,
+      (entry = {
+        addr,
+        block: opt.block,
+        chunkSize: opt.chunkSize,
+        calls: [],
+        waiters: [],
+        scheduled: false,
+      }),
+    );
   entry.chunkSize ??= opt.chunkSize;
 
-  const waiter: Waiter = { start: entry.calls.length, count: calls.length, resolve: () => {}, reject: () => {} };
+  const waiter: Waiter = {
+    start: entry.calls.length,
+    count: calls.length,
+    resolve: () => {},
+    reject: () => {},
+  };
   // Copy every leg: the queue outlives the caller's array, and legs are normalized to
   // failure-tolerant on the wire (see multicallStrict) without mutating caller objects.
   entry.calls.push(...calls.map((c) => ({ ...c, allowFailure: true })));
@@ -154,8 +162,11 @@ async function runBatch(p: Eip1193Provider, entry: Batch): Promise<void> {
       // Resolved once here, and only on the path that actually splits.
       const block = entry.block ?? `0x${(await getBlockNumber(p)).toString(16)}`;
       const parts: Call[][] = [];
-      for (let i = 0; i < entry.calls.length; i += chunk) parts.push(entry.calls.slice(i, i + chunk));
-      results = (await Promise.all(parts.map((c) => execAggregate3(p, c, entry.addr, block)))).flat();
+      for (let i = 0; i < entry.calls.length; i += chunk)
+        parts.push(entry.calls.slice(i, i + chunk));
+      results = (
+        await Promise.all(parts.map((c) => execAggregate3(p, c, entry.addr, block)))
+      ).flat();
     } else {
       results = await execAggregate3(p, entry.calls, entry.addr, entry.block);
     }

@@ -28,7 +28,7 @@ export function formatCurrency(
   currency = 'USD',
   signed = false,
 ): string {
-  if (n == null || !isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0.00`;
+  if (n == null || !Number.isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0.00`;
 
   const absN = Math.abs(n);
   const sign = n < 0 ? '-' : signed ? '+' : '';
@@ -66,7 +66,7 @@ export function formatCurrencyCompact(
   currency = 'USD',
   signed = false,
 ): string {
-  if (n == null || !isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0`;
+  if (n == null || !Number.isFinite(n)) return `${CURRENCY_SYMBOLS[currency] ?? '$'}0`;
 
   const absN = Math.abs(n);
   const sign = n < 0 ? '-' : signed ? '+' : '';
@@ -118,7 +118,7 @@ export function parseEther(value: string): bigint {
  *  Pass `maxDecimals === 0` only for explicit integers (inventory skew). Dust (<0.01) uses
  *  `formatPrice` so it does not collapse to "0.00". */
 export function formatNumber(n: number | null | undefined, maxDecimals?: number): string {
-  if (n == null || !isFinite(n)) return '0.00';
+  if (n == null || !Number.isFinite(n)) return '0.00';
   if (maxDecimals === 0) {
     return round(n, 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
@@ -179,13 +179,13 @@ export function subscriptZeros(s: string): string {
  * why seeding a field from `formatPrice(...)` already needed a `.replace(/,/g, '')` chaser to work.
  */
 export function toInputValue(n: number | null | undefined, maxDecimals = 12): string {
-  if (n == null || !isFinite(n)) return '';
+  if (n == null || !Number.isFinite(n)) return '';
   return trimZeros(n, Math.min(Math.max(0, maxDecimals), 100)) || '0';
 }
 
 /** Format with compact notation (1K, 1M, 1B) */
 export function formatCompact(n: number | null | undefined, signed = false): string {
-  if (n == null || !isFinite(n)) return '0';
+  if (n == null || !Number.isFinite(n)) return '0';
 
   const absN = Math.abs(n);
   const sign = n < 0 ? '-' : signed ? '+' : '';
@@ -204,11 +204,11 @@ export function formatCompact(n: number | null | undefined, signed = false): str
  * rows at the default 4 decimals, so any tick-aware surface must pass its own step.
  */
 export function formatPrice(n: number | null | undefined, step?: number): string {
-  if (n == null || !isFinite(n)) return '0.00';
+  if (n == null || !Number.isFinite(n)) return '0.00';
 
   const absN = Math.abs(n);
 
-  if (step != null && step > 0 && isFinite(step)) {
+  if (step != null && step > 0 && Number.isFinite(step)) {
     const decimals = Math.min(12, Math.max(0, Math.ceil(-Math.log10(step) - 1e-9)));
     return n.toLocaleString('en-US', {
       minimumFractionDigits: decimals,
@@ -254,7 +254,7 @@ export function formatPrice(n: number | null | undefined, step?: number): string
  * repeated number.
  */
 export function formatAxisLabel(n: number | null | undefined): string {
-  if (n == null || !isFinite(n)) return '0';
+  if (n == null || !Number.isFinite(n)) return '0';
 
   const absN = Math.abs(n);
 
@@ -300,7 +300,7 @@ export function formatPercent(
  * what `formatYield` is for.
  */
 export function formatPercentSig(n: number | null | undefined, sig = 3, signed = false): string {
-  if (n == null || !isFinite(n) || n === 0) return '0.00%';
+  if (n == null || !Number.isFinite(n) || n === 0) return '0.00%';
   const abs = Math.abs(n);
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
   // Fold a leading-zero run of three or more into the subscript form (0.0000002% ->
@@ -318,7 +318,7 @@ export function formatPercentSig(n: number | null | undefined, sig = 3, signed =
  * reason a small hook yield could print as a bare "0%".
  */
 export function formatYield(n: number | null | undefined, signed = false): string {
-  if (n == null || !isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return '—';
   // Round to 3 significant figures FIRST: formatPercentSig caps decimals, which does nothing to
   // the integer digits that are the whole problem at 2222% (a yield off a finite fee sample must
   // not assert four digits of accuracy).
@@ -347,7 +347,7 @@ export function formatBytes(bytes: number | null | undefined): string {
   if (!bytes || bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${round(bytes / Math.pow(1024, i), 2)} ${units[i]}`;
+  return `${round(bytes / 1024 ** i, 2)} ${units[i]}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -421,8 +421,8 @@ export function generateAnchorId(text: string): string {
 export function parseFormattedNumber(value: string): number {
   if (!value) return 0;
   const cleaned = value.replace(/[^0-9.-]+/g, '');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  const num = Number.parseFloat(cleaned);
+  return Number.isNaN(num) ? 0 : num;
 }
 
 // ─────────────────────────────────────────────────────────────

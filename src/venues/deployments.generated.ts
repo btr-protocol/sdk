@@ -5,7 +5,7 @@
  * Deployed BTR venues, keyed by chain id
  * @module @btr-protocol/sdk/venues
  *
-  * Source: the recorded deployment facts for each chain. A chain with no record is ABSENT, and
+ * Source: the recorded deployment facts for each chain. A chain with no record is ABSENT, and
  * `registry.ts` throws on an absent chain rather than falling back, so a bot pointed at a chain
  * BTR is not deployed on cannot silently quote another chain's addresses.
  *

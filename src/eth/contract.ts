@@ -147,7 +147,7 @@ export async function writeContract(
   address: Address,
   abi: Abi,
   functionName: string,
-  args: readonly unknown[] = [],
+  args: readonly unknown[],
   account: Address,
   options: WriteOptions = {},
 ): Promise<Hex> {

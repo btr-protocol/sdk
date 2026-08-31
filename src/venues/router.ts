@@ -197,21 +197,20 @@ export function buildVenueExecCalls(
     needsApproval?: (token: Address, spender: Address) => boolean;
   } = {},
 ): VenueExecCall[] {
-  const legs: VenueLegQuote[] =
-    quote.legs && quote.legs.length
-      ? quote.legs
-      : [
-          {
-            venue: 'btr',
-            pool: quote.pool,
-            tag: quote.tag,
-            tokenIn: quote.tokenIn,
-            tokenOut: quote.tokenOut,
-            amountIn: quote.amountIn,
-            amountOut: quote.amountOut,
-            calldata: quote.calldata,
-          },
-        ];
+  const legs: VenueLegQuote[] = quote.legs?.length
+    ? quote.legs
+    : [
+        {
+          venue: 'btr',
+          pool: quote.pool,
+          tag: quote.tag,
+          tokenIn: quote.tokenIn,
+          tokenOut: quote.tokenOut,
+          amountIn: quote.amountIn,
+          amountOut: quote.amountOut,
+          calldata: quote.calldata,
+        },
+      ];
 
   const out: VenueExecCall[] = [];
   const approveAmt = (n: bigint) => (opts.approveMax ? MAX_UINT256 : n);

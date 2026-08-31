@@ -65,9 +65,8 @@ export function decodeB64(packed: bigint, targetDecimals: number): bigint {
 
   if (totalShift >= 0n) {
     return mant * 10n ** totalShift;
-  } else {
-    return mant / 10n ** -totalShift;
   }
+  return mant / 10n ** -totalShift;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -75,7 +74,7 @@ export function decodeB64(packed: bigint, targetDecimals: number): bigint {
 // ─────────────────────────────────────────────────────────────
 
 export function hexToNumber(hex: string): number {
-  return parseInt(hex, 16);
+  return Number.parseInt(hex, 16);
 }
 
 export function numberToHex(num: number | bigint): `0x${string}` {

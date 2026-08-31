@@ -98,8 +98,8 @@ export function reconstructSynthOhlc(
   const v = new Array<number>(n); // per-leg variances v_i
   const e = new Array<number>(n); // per-leg signed exponents e_i
 
-  let o = 1,
-    c = 1;
+  let o = 1;
+  let c = 1;
   for (let i = 0; i < n; i++) {
     const [sym, exp] = legs[i];
     const k = legOhlc[sym];

@@ -14,8 +14,6 @@ export * from './depthAgg.js';
 export * from './depthRoute.js';
 export * from './router.js';
 
-import type { Route } from './router.js';
-
 import type { PoolAsset } from '../pool/index.js';
 import { formatUnits } from '../utils/format.js';
 import { type AimmProfile, type PoolState, buildLeg } from './aimm.js';
@@ -68,4 +66,3 @@ export function poolStateFrom(
     : undefined;
   return { base, legs, hub };
 }
-
