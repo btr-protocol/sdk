@@ -58,10 +58,10 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       admin: '0x35BB3BBeB86c7caee532083DAC639400912C8f00',
       faucet: '0x97BE19E537B9064f5c4984dD1e83Ad8b6aBe0cC3',
       flash: '0x544128B1F23D959F1B2660b1e392cb9D5e24d81f',
-      oracle: '0xcd7d5d0fCd08f08570D95bdd159eB148e453aB37',
+      oracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
       poolFactory: '0xaF5Dfa6F3f549bAb1598Ff24d15c0cF9aCaA6Df7',
       poolImpl: '0x136bC3A713DB3C8da6836244923F7bdA401F1b27',
-      refOracle: '0xebc298A8d2d98114C5b448EC9e1f96e176aBF0d5',
+      refOracle: '0x8523ce6EBc563b1C69aAE7558Eb775DfEE89Fbd0',
     },
     tokens: {
       USDC: '0x3600000000000000000000000000000000000000',
