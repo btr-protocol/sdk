@@ -584,6 +584,13 @@ export interface RouterPlan {
    *  quote — the floor is the only amount guaranteed to be there, so positive slippage stays with
    *  the user as wrapped native instead of reverting the batch. */
   unwrapAmount: bigint;
+  /** Whether the user asked to be paid in the GAS TOKEN.
+   *
+   *  Carried explicitly because `unwrapAmount > 0n` is not the same question. A re-floor can drive
+   *  a floor to zero, and inferring the intent from the amount meant the plan stopped unwrapping
+   *  from then on — a later re-floor back up produced a real floor with no withdraw beside it, and
+   *  the user was silently paid in wrapped native. */
+  nativeOut: boolean;
 }
 
 /**
@@ -625,7 +632,11 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
 
     const hops: RouterHop[] = [];
     let terminal: TokenMeta | undefined;
-    for (const leg of legs) {
+    for (const [h, leg] of legs.entries()) {
+      // The contract takes `tokenIn` as implicit — the previous hop's output — so a route whose
+      // legs do not actually join would be re-chained here into a pair the pool never listed, and
+      // the mismatch would surface on chain as an opaque pool revert instead of here.
+      if (h > 0 && leg.tokenIn !== legs[h - 1].tokenOut) return null;
       const tout = opts.tokenOf(leg.tokenOut);
       if (!leg.poolAddr || !tout || isSentinel(tout.address)) return null;
       hops.push({ pool: leg.poolAddr as Address, tokenOut: tout.address });
@@ -633,11 +644,14 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
     }
     if (!terminal) return null;
 
-    parts.push({
-      tokenIn: tin.address,
-      amountIn: carve(part.fraction, i, tin.decimals),
-      hops,
-    });
+    const amountIn = carve(part.fraction, i, tin.decimals);
+    // A part can be carved down to nothing — `inputCarver` floors every non-last slice, so a tiny
+    // input split across several routes leaves the small ones empty. Sending it costs a wallet
+    // prompt to reach a guaranteed `ZeroValue` revert in the pool, and flooring its quoted output
+    // would promise the user a delivery that no part is funded to make.
+    if (amountIn <= 0n) continue;
+
+    parts.push({ tokenIn: tin.address, amountIn, hops });
     inputs.add(tin.address.toLowerCase());
     const key = terminal.address.toLowerCase();
     const cur = quoted.get(key);
@@ -646,6 +660,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
       amount: (cur?.amount ?? 0n) + toUnits(part.quote.amountOut, terminal.decimals),
     });
   }
+  if (parts.length === 0) return null;
 
   const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => ({
     token,
@@ -663,6 +678,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
     floors,
     wrapValue: opts.nativeIn ? parts.reduce((a, p) => a + p.amountIn, 0n) : 0n,
     unwrapAmount: opts.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
+    nativeOut: opts.nativeOut === true,
   };
 }
 
@@ -689,9 +705,10 @@ export function refloorRouterPlan(
   return {
     ...rp,
     floors,
-    // The unwrap follows the floor it withdraws against, or a re-floored native-out swap tries to
-    // withdraw more wrapped native than the router was required to deliver.
-    unwrapAmount: rp.unwrapAmount > 0n ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
+    // Keyed on the INTENT, not on the current amount. Guarding this on `unwrapAmount > 0n` meant a
+    // re-floor to zero permanently disabled the unwrap, and the next re-floor back up paid the
+    // user in wrapped native with no withdraw at all.
+    unwrapAmount: rp.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
   };
 }
 

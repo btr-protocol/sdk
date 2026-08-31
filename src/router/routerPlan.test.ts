@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { ROUTER_ABI } from '../abis/Router.js';
 import type { SwapPlan } from '../amm/router.js';
 import type { Address } from '../eth/index.js';
 import {
@@ -439,5 +440,103 @@ describe('refloorRouterPlan', () => {
 
   test('a slippage outside [0,1) throws', () => {
     expect(() => refloorRouterPlan(base, new Map(), 1)).toThrow(/slippageFrac/);
+  });
+});
+
+// ── what the pre-deployment audit found ────────────────────────────────────
+//
+// Each of these reproduces a defect a reviewer demonstrated against this module before the Router
+// was broadcast. Regression pins, not hypotheticals.
+
+describe('audit regressions', () => {
+  test('a part carved down to nothing is dropped, not sent to a guaranteed revert', () => {
+    // `inputCarver` floors every non-last slice, so a tiny input split across routes empties the
+    // small ones. Sending a zero-amount part costs a wallet prompt to reach `ZeroValue` in the
+    // pool, and flooring its quoted output would promise a delivery nothing is funded to make.
+    const a = route([P1], ['USDC', 'USDT']);
+    const b = route([P2], ['USDC', 'USDT']);
+    const rp = must(
+      planToRouterPlan(plan(100, 99, [part(a, 0.7, 70, 69), part(b, 0.3, 30, 30)]), {
+        slippageFrac: 0,
+        tokenOf,
+        amountInUnits: 1n,
+      }),
+    );
+    expect(rp.parts.length).toBe(1);
+    expect(rp.parts.every((p) => p.amountIn > 0n)).toBe(true);
+    expect(rp.parts[0].amountIn).toBe(1n);
+  });
+
+  test('a plan whose every part rounds to zero is null, not an empty call', () => {
+    // The float path (no `amountInUnits`) has no residual to fall back on, so an amount below the
+    // token's smallest unit floors every part to nothing. Returning `{parts: []}` here would
+    // encode a call that reverts `NoParts`.
+    const a = route([P1], ['USDC', 'USDT']);
+    const b = route([P2], ['USDC', 'USDT']);
+    expect(
+      planToRouterPlan(
+        plan(1e-12, 1e-12, [part(a, 0.5, 5e-13, 5e-13), part(b, 0.5, 5e-13, 5e-13)]),
+        {
+          slippageFrac: 0,
+          tokenOf,
+        },
+      ),
+    ).toBeNull();
+  });
+
+  test('a route whose legs do not actually join is refused', () => {
+    // `tokenIn` is implicit on chain — the previous hop's output — so a broken chain would be
+    // re-chained into a pair the pool never listed, and surface as an opaque on-chain revert.
+    const broken = {
+      legs: [
+        { poolTag: 'p0', poolAddr: P1, tokenIn: 'USDC', tokenOut: 'DAI' },
+        { poolTag: 'p1', poolAddr: P2, tokenIn: 'USDT', tokenOut: 'BNB' }, // USDT, not DAI
+      ],
+      tokens: ['USDC', 'DAI', 'BNB'],
+      hops: 2,
+    };
+    expect(
+      planToRouterPlan(plan(100, 99, [part(broken, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+    ).toBeNull();
+  });
+
+  test('a re-floor to zero does not permanently kill a native-out unwrap', () => {
+    const rt = route([P1], ['USDC', 'BNB']);
+    const rp = must(
+      planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
+        slippageFrac: 0,
+        tokenOf,
+        nativeOut: true,
+      }),
+    );
+    const zeroed = refloorRouterPlan(rp, new Map([[WNATIVE.toLowerCase(), 0n]]), 0);
+    expect(zeroed.unwrapAmount).toBe(0n);
+    // Guarded on the amount rather than the intent, the plan stopped unwrapping from here on and
+    // the next re-floor paid the user in WRAPPED native with no withdraw beside it.
+    const back = refloorRouterPlan(zeroed, new Map([[WNATIVE.toLowerCase(), 3n * 10n ** 18n]]), 0);
+    expect(back.floors[0].minOut).toBe(3n * 10n ** 18n);
+    expect(back.unwrapAmount).toBe(back.floors[0].minOut);
+  });
+
+  test('the ABI carries every error the contract can revert with', () => {
+    // A missing entry decodes as raw hex in the UI, which is what the user sees when a swap fails.
+    const names = new Set(
+      (ROUTER_ABI as readonly { type: string; name?: string }[])
+        .filter((e) => e.type === 'error')
+        .map((e) => e.name),
+    );
+    for (const e of [
+      'DeadlineExpired',
+      'NoParts',
+      'EmptyPath',
+      'UnknownPool',
+      'BelowFloor',
+      'UnclaimedOutput',
+      'DuplicateFloor',
+      'BadRecipient',
+      'Reentrancy',
+    ]) {
+      expect(names).toContain(e);
+    }
   });
 });

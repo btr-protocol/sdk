@@ -132,6 +132,21 @@ export const ROUTER_ABI = [
   },
   {
     type: 'error',
+    name: 'UnclaimedOutput',
+    inputs: [{ name: 'token', type: 'address', internalType: 'address' }],
+  },
+  {
+    type: 'error',
+    name: 'DuplicateFloor',
+    inputs: [{ name: 'token', type: 'address', internalType: 'address' }],
+  },
+  {
+    type: 'error',
+    name: 'BadRecipient',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'DeadlineExpired',
     inputs: [],
   },
