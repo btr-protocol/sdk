@@ -576,8 +576,18 @@ export interface RouterFloor {
 export interface RouterPlan {
   /** `Router.swap` arg 1, in plan order (largest part first). */
   parts: RouterPart[];
-  /** `Router.swap` arg 2. One entry per distinct output token, never per part. */
+  /** `Router.swap` arg 2. One entry per distinct output token, never per part.
+   *
+   *  EXACTLY the contract's struct, nothing more: this array is handed straight to the encoder, so
+   *  an extra field here rides into the calldata layout. Anything else the caller needs about a
+   *  floor lives beside it, not in it. */
   floors: RouterFloor[];
+  /** The pre-slippage output each floor was derived from, keyed by lowercased token address.
+   *
+   *  Kept so a re-floor can hold the floor to `min(quoted, fresh)` — the user must never be
+   *  promised MORE than the quote they were shown, however well the market has moved since — and
+   *  so the fall can be reported against the number that was actually on screen. */
+  quotedOut: Readonly<Record<string, bigint>>;
   /** msg.value to attach: the gas token wrapped before the swap. 0 unless `nativeIn`. */
   wrapValue: bigint;
   /** `WNATIVE.withdraw` amount after the swap. 0 unless `nativeOut`. Tracks the floor, not the
@@ -676,6 +686,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   return {
     parts,
     floors,
+    quotedOut: Object.fromEntries([...quoted.entries()].map(([k, v]) => [k, v.amount])),
     wrapValue: opts.nativeIn ? parts.reduce((a, p) => a + p.amountIn, 0n) : 0n,
     unwrapAmount: opts.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
     nativeOut: opts.nativeOut === true,
@@ -699,8 +710,15 @@ export function refloorRouterPlan(
     throw new Error(`refloorRouterPlan: slippageFrac must be in [0, 1), got ${slippageFrac}`);
   }
   const floors = rp.floors.map((f) => {
-    const fresh = freshOut.get(f.token.toLowerCase());
-    return fresh === undefined ? f : { token: f.token, minOut: applySlip(fresh, slippageFrac) };
+    const key = f.token.toLowerCase();
+    const fresh = freshOut.get(key);
+    if (fresh === undefined) return f;
+    // `min`, never the fresh number alone. A market that moved in the user's FAVOUR would
+    // otherwise raise the floor above the quote they agreed to, turning a better fill into a
+    // revert; and the floor must still never exceed what the pool can pay right now.
+    const quoted = rp.quotedOut[key];
+    const base = quoted !== undefined && quoted < fresh ? quoted : fresh;
+    return { token: f.token, minOut: applySlip(base, slippageFrac) };
   });
   return {
     ...rp,
