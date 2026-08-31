@@ -549,3 +549,65 @@ describe('audit regressions', () => {
     }
   });
 });
+
+describe('the calldata that actually executed on Arc', () => {
+  // Byte-for-byte from tx 0xc2aca727bf02532173e118e1240d81f9a7fb1c7bcf76cb9a5249e0e4950655e3,
+  // the first swap through the deployed Router (0xb96d5049…eCc4): 10 EURC.b -> USDC.b in the FX
+  // core -> WETH in the Crypto core, one transaction, 431,489 gas, delivered 0.00472603 WETH.
+  //
+  // This is the only test here anchored to a transaction that a chain accepted, so it is what
+  // catches an ABI or struct-order drift that every hand-written expectation would agree with.
+  const ROUTER = '0xb96d5049045B68548454474d68e597f48414eCc4' as Address;
+  const EURCB = '0xd9016a91387db71fbD07Cde32E900E17061dE5A1' as Address;
+  const USDCB = '0x9A8Ea4AB461d0Db943ecB1B1e4CE0B68df9061CC' as Address;
+  const AWETH = '0x89A9cD1dd6DE3ab7152EF9c7C5496c2946334D0D' as Address;
+  const FXPOOL = '0xCbB809d5A5583301e7753D57D73A25C0d12EC232' as Address;
+  const CRPOOL = '0xACe9a150cdc3ab8AdBbc3e7CC5d5ce92485624F5' as Address;
+  const SENDER = '0x57b3771F6b772C52E81646Aa007D1Ab28d91B3Fe' as Address;
+
+  const ONCHAIN =
+    '0x2477447a' +
+    '0000000000000000000000000000000000000000000000000000000000000080' +
+    '00000000000000000000000000000000000000000000000000000000000001c0' +
+    '00000000000000000000000057b3771f6b772c52e81646aa007d1ab28d91b3fe' +
+    '000000000000000000000000000000000000000000000000000000006a957992' +
+    '0000000000000000000000000000000000000000000000000000000000000001' +
+    '0000000000000000000000000000000000000000000000000000000000000020' +
+    '000000000000000000000000d9016a91387db71fbd07cde32e900e17061de5a1' +
+    '0000000000000000000000000000000000000000000000008ac7230489e80000' +
+    '0000000000000000000000000000000000000000000000000000000000000060' +
+    '0000000000000000000000000000000000000000000000000000000000000002' +
+    '000000000000000000000000cbb809d5a5583301e7753d57d73a25c0d12ec232' +
+    '0000000000000000000000009a8ea4ab461d0db943ecb1b1e4ce0b68df9061cc' +
+    '000000000000000000000000ace9a150cdc3ab8adbbc3e7cc5d5ce92485624f5' +
+    '00000000000000000000000089a9cd1dd6de3ab7152ef9c7c5496c2946334d0d' +
+    '0000000000000000000000000000000000000000000000000000000000000001' +
+    '00000000000000000000000089a9cd1dd6de3ab7152ef9c7c5496c2946334d0d' +
+    '00000000000000000000000000000000000000000000000000109df67a519761';
+
+  test('the SDK reproduces it exactly', () => {
+    const rp: RouterPlan = {
+      parts: [
+        {
+          tokenIn: EURCB,
+          amountIn: 10_000000000000000000n,
+          hops: [
+            { pool: FXPOOL, tokenOut: USDCB },
+            { pool: CRPOOL, tokenOut: AWETH },
+          ],
+        },
+      ],
+      floors: [{ token: AWETH, minOut: 4_677281567053665n }],
+      quotedOut: { [AWETH.toLowerCase()]: 4_724526835407742n },
+      wrapValue: 0n,
+      unwrapAmount: 0n,
+      nativeOut: false,
+    };
+    const [call] = buildRouterSwapExecCalls(ROUTER, rp, {
+      recipient: SENDER,
+      deadline: 1788180882n,
+    });
+    expect(call.to).toBe(ROUTER);
+    expect(call.data.toLowerCase()).toBe(ONCHAIN);
+  });
+});
