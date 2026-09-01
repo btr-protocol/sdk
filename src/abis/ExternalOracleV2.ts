@@ -1,12 +1,19 @@
 /**
- * ExternalOracleV2 / ExternalOracleV3 - shared READ surface.
+ * ExternalOracleV2 / V3 / V4 - shared READ surface.
  *
- * Both packed-slot oracles expose the same consumer reads (`IOracle.getFeed`, `feedConfig`,
- * `feedIdAt`, `EPOCH`, and the NxrSignerSet roster getters), so one ABI serves either; only the
+ * All three packed-slot oracles expose the same consumer reads (`IOracle.getFeed`, `feedConfig`,
+ * `feedIdAt`, and the NxrSignerSet roster getters), so one ABI serves any of them; only the
  * push paths and events differ, and those are decoded from raw calldata (`oracle/wire.ts`),
  * never through this ABI. Bundled statically: the transparency page must read the chain with
  * zero server trust, so it cannot depend on the backend ABI service.
- * Source: dex src/oracles/ExternalOracleV{2,3}.sol + NxrSignerSet.sol.
+ *
+ * ! `EPOCH` IS NOT UNIVERSAL. V2/V3 date a push as EPOCH + sourceTsDs deciseconds; V4 dropped the
+ * epoch entirely for a CYCLIC clock (`tsDs` = deciseconds since midnight UTC) and exposes
+ * `DAY_DS`/`nowDs`/`MAX_RECON_AGE` instead, so calling `EPOCH` on a V4 address REVERTS. Gate the
+ * call on the lane map's `wire` and reconstruct a v5 source time with `reconSecsFromDs` against
+ * the pushing block's timestamp. Everything else here is safe on all three.
+ *
+ * Source: dex-evm src/oracles/ExternalOracleV{2,3,4}.sol + NxrSignerSet.sol.
  */
 
 const FEED_DATA_COMPONENTS = [
