@@ -1,0 +1,209 @@
+{
+  "_comment": "ExternalOracleV4 / wire v5 golden vectors. Byte-exact source of truth for the Solidity, keeper-Rust, NXR-Rust and sdk-TypeScript codecs. Regenerate ONLY on a deliberate wire change.",
+  "wire_version": 5,
+  "header_bytes": 11,
+  "header_layout": "ver:u8(=5) | seq:u32 | tsDs:u24 (u20 value, zero-padded) | nP:u8 | nS:u8 | nC:u8  => 11 bytes",
+  "price_entry_bytes": 5,
+  "price_entry_layout": "gi:u8 | lane:u32 big-endian, top 3 bits MUST be zero (29 significant bits)",
+  "sigma_entry_bytes": 5,
+  "sigma_entry_layout": "gi:u8 | sigmaPbps:u32",
+  "conf_entry_bytes": 3,
+  "conf_entry_layout": "gi:u8 | confBps:u16",
+  "lanes_per_slot": 8,
+  "lane_layout": "exp:u4 (bits 25..28) | mant:u25 (bits 0..24); mant MSB (bit 24) ALWAYS set for a live price; all-zero lane = STALE sentinel",
+  "price_word_layout": "bits [0,232) = 8 lanes x 29b (lane i at 29*i); bits [232,252) = ts:u20 (deciseconds since midnight UTC); bits [252,254) = dayMod:u2; bits [254,256) unused",
+  "clock": {
+    "unit": "deciseconds since midnight UTC",
+    "modulus_ds": 864000,
+    "field_bits": 20,
+    "max_recon_age_secs": 21600,
+    "source_ts_future_skew_secs": 5,
+    "reconstruction": "nowDs=(block.timestamp%86400)*10; d=storedDs-nowDs; if d>432000 d-=864000; if d<-432000 d+=864000; absSecs=block.timestamp+d/10"
+  },
+  "day_mod": {
+    "bits": "[252,254)",
+    "value": "(reconstructedSourceSecs / 86400) % 4",
+    "on_the_wire": false,
+    "note": "DERIVED ON CHAIN, NOT A WIRE FIELD - wire v5 and every vector in this file are unchanged by it. Encoders MUST NOT emit it. It exists so a read can reject a reconstruction whose candidate day disagrees with the stored tag: without it a feed dark for exactly ~24h reconstructs onto `now` and reads FRESH. With it an alias needs an exact 4-day (96h) multiple, which is the stated residual bound.",
+    "read_rule": "reject (treat as stale) on mismatch; never search another candidate day",
+    "alias_period_hours": 96
+  },
+  "lanes": [
+    {
+      "name": "JPYC_small",
+      "value_1e18": "6275858108000000",
+      "expBias": 28,
+      "exp": 0,
+      "mant": 23379393,
+      "lane_bits": 23379393,
+      "lane_hex": "0x0164bdc1",
+      "decoded_1e18": "6275858020958208",
+      "abs_err": "87041792"
+    },
+    {
+      "name": "KRW1_tiny",
+      "value_1e18": "706885139000000",
+      "expBias": 25,
+      "exp": 0,
+      "mant": 21066818,
+      "lane_bits": 21066818,
+      "lane_hex": "0x01417442",
+      "decoded_1e18": "706885112037376",
+      "abs_err": "26962624"
+    },
+    {
+      "name": "USDT_near_one",
+      "value_1e18": "999099975000000000",
+      "expBias": 35,
+      "exp": 0,
+      "mant": 29077636,
+      "lane_bits": 29077636,
+      "lane_hex": "0x01bbb084",
+      "decoded_1e18": "999099965319938048",
+      "abs_err": "9680061952"
+    },
+    {
+      "name": "WETH",
+      "value_1e18": "1884643675999999885312",
+      "expBias": 46,
+      "exp": 0,
+      "mant": 26782397,
+      "lane_bits": 26782397,
+      "lane_hex": "0x0198aabd",
+      "decoded_1e18": "1884643642957635780608",
+      "abs_err": "33042364104704"
+    },
+    {
+      "name": "WBTC_large",
+      "value_1e18": "63362982389999997026304",
+      "expBias": 51,
+      "exp": 0,
+      "mant": 28138816,
+      "lane_bits": 28138816,
+      "lane_hex": "0x01ad5d40",
+      "decoded_1e18": "63362980626123475386368",
+      "abs_err": "1763876521639936"
+    },
+    {
+      "name": "PAXG",
+      "value_1e18": "4326589203000000512000",
+      "expBias": 47,
+      "exp": 0,
+      "mant": 30742265,
+      "lane_bits": 30742265,
+      "lane_hex": "0x01d516f9",
+      "decoded_1e18": "4326589162453907537920",
+      "abs_err": "40546092974080"
+    },
+    {
+      "name": "mant_min_2p24",
+      "value_1e18": "16777216",
+      "expBias": 0,
+      "exp": 0,
+      "mant": 16777216,
+      "lane_bits": 16777216,
+      "lane_hex": "0x01000000",
+      "decoded_1e18": "16777216",
+      "abs_err": "0"
+    },
+    {
+      "name": "mant_max_2p25m1",
+      "value_1e18": "33554431",
+      "expBias": 0,
+      "exp": 0,
+      "mant": 33554431,
+      "lane_bits": 33554431,
+      "lane_hex": "0x01ffffff",
+      "decoded_1e18": "33554431",
+      "abs_err": "0"
+    },
+    {
+      "name": "mant_min_exp15",
+      "value_1e18": "549755813888",
+      "expBias": 0,
+      "exp": 15,
+      "mant": 16777216,
+      "lane_bits": 520093696,
+      "lane_hex": "0x1f000000",
+      "decoded_1e18": "549755813888",
+      "abs_err": "0"
+    },
+    {
+      "name": "mant_max_exp15",
+      "value_1e18": "1099511595008",
+      "expBias": 0,
+      "exp": 15,
+      "mant": 33554431,
+      "lane_bits": 536870911,
+      "lane_hex": "0x1fffffff",
+      "decoded_1e18": "1099511595008",
+      "abs_err": "0"
+    },
+    {
+      "name": "gi0_2500e18_bias36",
+      "value_1e18": "2500000000000000000000",
+      "expBias": 36,
+      "exp": 11,
+      "mant": 17763568,
+      "lane_bits": 386862320,
+      "lane_hex": "0x170f0cf0",
+      "decoded_1e18": "2499999944549077090304",
+      "abs_err": "55450922909696"
+    },
+    {
+      "name": "gi1_1900e18_bias36",
+      "value_1e18": "1900000000000000000000",
+      "expBias": 36,
+      "exp": 10,
+      "mant": 27000623,
+      "lane_bits": 362544943,
+      "lane_hex": "0x159bff2f",
+      "decoded_1e18": "1899999932524550684672",
+      "abs_err": "67475449315328"
+    }
+  ],
+  "blob": {
+    "description": "wire v5 blob: seq=1, tsDs=288100, 2 price entries (gi0,gi1 @ expBias 36), 1 sigma (gi0=100000 pbps), 1 conf (gi1=9 bps)",
+    "epoch_hint_secs": 1800000010,
+    "tsDs": 288100,
+    "hex": "0x050000000104656402010100170f0cf001159bff2f00000186a0010009",
+    "length": 29,
+    "keccak256": "0x6615180489aad02e35006978fa1ff39fbdd81129e84fa95037374454c5399b35",
+    "decoded": {
+      "ver": 5,
+      "seq": 1,
+      "tsDs": 288100,
+      "nP": 2,
+      "nS": 1,
+      "nC": 1,
+      "prices": [
+        {
+          "gi": 0,
+          "lane": 386862320,
+          "lane_hex": "0x170f0cf0",
+          "expBias": 36,
+          "mark1e18": "2499999944549077090304"
+        },
+        {
+          "gi": 1,
+          "lane": 362544943,
+          "lane_hex": "0x159bff2f",
+          "expBias": 36,
+          "mark1e18": "1899999932524550684672"
+        }
+      ],
+      "sigmas": [
+        {
+          "gi": 0,
+          "sigmaPbps": 100000
+        }
+      ],
+      "confs": [
+        {
+          "gi": 1,
+          "confBps": 9
+        }
+      ]
+    }
+  }
+}
