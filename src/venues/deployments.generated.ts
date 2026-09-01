@@ -58,10 +58,19 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       admin: '0x35BB3BBeB86c7caee532083DAC639400912C8f00',
       faucet: '0x97BE19E537B9064f5c4984dD1e83Ad8b6aBe0cC3',
       flash: '0x544128B1F23D959F1B2660b1e392cb9D5e24d81f',
-      oracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
+      // ExternalOracleV4 (wire v5). AUTHORITATIVE: every one of the 37 pool legs was repointed
+      // here, so this is what `registry.ts` and the pools read.
+      oracle: '0x842c2736F072A8A7b523D23bd3Ef21F21AC24d5C',
       poolFactory: '0xaF5Dfa6F3f549bAb1598Ff24d15c0cF9aCaA6Df7',
       poolImpl: '0x136bC3A713DB3C8da6836244923F7bdA401F1b27',
+      // The reference oracle every non-base spoke still prices against is STILL the V3 instance:
+      // its repoint is a second timelock round that has not executed. `refOracleV4` is deployed
+      // and fed but not yet pointed at, so both generations are live at once and a client that
+      // reads marks must decode BOTH wires. Join a lane map on the ADDRESS, never on the tag.
       refOracle: '0x8523ce6EBc563b1C69aAE7558Eb775DfEE89Fbd0',
+      refOracleV4: '0xC17920b2cC4Ac028c7F8bdB46E952Fb2d2a172a6',
+      // The superseded V3 primary. Kept named so historical `SlotsPushed` logs stay attributable.
+      prevOracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
     },
     tokens: {
       USDC: '0x3600000000000000000000000000000000000000',
