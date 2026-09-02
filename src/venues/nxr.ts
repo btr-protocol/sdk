@@ -2,10 +2,10 @@
  * Where each BTR asset's mark comes from on NX Rates: the ONE table that maps a roster symbol to
  * an NXR pair, and the only thing a deploy ceremony consults before it seeds a feed.
  *
- * The mapping is a property of the ASSET, not of the chain: `WETH` marks `ETH-USDC` on Sepolia, on
- * Arc, and on anything after them. So this table is chain-free and every chain's roster is resolved
- * THROUGH it (`sepolia.ts` builds its feed rows from it; `scripts/fetch-seed-marks.ts` reads it for
- * whichever chain it was pointed at). A second per-chain copy would drift silently, and the drift
+ * The mapping is a property of the ASSET, not of the chain: `WETH` marks `ETH-USDC` on Arc and on
+ * anything after it. So this table is chain-free and every chain's roster is resolved
+ * THROUGH it (`registry.ts` resolves a chain's feed rows from it; `scripts/fetch-seed-marks.ts`
+ * reads it for whichever chain it was pointed at). A second per-chain copy would drift silently, and the drift
  * would be a mark relayed under the wrong asset's name.
  *
  * What IS per-chain is the BASIS: the unit the chain's pools consume a mark in, i.e. its

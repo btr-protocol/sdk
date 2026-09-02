@@ -167,7 +167,7 @@ describe('path risk composes over legs, never maxes', () => {
   });
 
   test('fees, CI and the staleness premium SUM; σ composes in quadrature', () => {
-    // sepolia stable pool, vega 10000. USDG(σ 30000, minFee 496, CI 2, age 30) and
+    // stable pool, vega 10000. USDG(σ 30000, minFee 496, CI 2, age 30) and
     // PYUSD(σ 40000, minFee 226, CI 5, age 90).
     //   staleTerm = ⌊100·30000·⌊√30⌋=5 / 1e4⌋ = 1500,  ⌊100·40000·⌊√90⌋=9 / 1e4⌋ = 3600  ⇒ 5100
     //   σ_path    = ⌊√(30000² + 40000²)⌋ = ⌊√2_500_000_000⌋ = 50000 exactly

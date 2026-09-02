@@ -7,7 +7,7 @@
  * checks Rust against Solidity. This closes the gap that let a `reserve * 0.999` fudge advertise
  * fills the chain refuses outright.
  *
- * Requires ORACLE_RPC_URL (`source ~/Work/btr/keepers/.env.sepolia`); skipped without it.
+ * Requires ORACLE_RPC_URL (the Arc testnet RPC); skipped without it.
  */
 
 import { beforeAll, describe, expect, test } from 'bun:test';
@@ -24,22 +24,34 @@ import { createHttpProvider } from '../src/eth/client';
 import type { Address, Eip1193Provider, Hex } from '../src/eth/types';
 import { getAsset, getSwapQuote, readCurve, readRiskConfig } from '../src/pool/index';
 import { decodeB64 } from '../src/utils/encoding';
-import {
-  SEPOLIA_BTR,
-  SEPOLIA_ORACLE_FEEDS,
-  SEPOLIA_TOKENS,
-  sepoliaFeedByName,
-} from '../src/venues/sepolia';
+import { nxrMark } from '../src/venues/nxr';
+import { chainVenue } from '../src/venues/registry';
 
 const RPC = process.env.ORACLE_RPC_URL ?? '';
 const BASE = 'USDC';
 const STALE_GRACE_CAP_S = 30; // Pricing._readOracleStale
 
+/** Arc testnet: the only chain BTR is deployed on. Addresses, tokens and feed ids all come from
+ *  the one deployment record, so this harness has no table of its own to go stale. */
+const ARC = 5_042_002;
+const V = chainVenue(ARC);
+const TOKENS = V.tokens;
+const ORACLE = V.contracts.oracle!;
+const poolAt = (tag: string) => V.pools.find((p) => p.tag === tag)?.address;
+
+/** On-chain feed name for a symbol (`<SYM>-USDC`, and `USDC-USD` for the base). */
+const feedNameOf = (sym: string): string | null =>
+  V.feedIds[`${sym}-${BASE}`] ? `${sym}-${BASE}` : V.feedIds[`${sym}-USD`] ? `${sym}-USD` : null;
+
 /** DEN-01: NXR signs `<X>-USD` under an on-chain `<X>-USDC` name ⇒ Pricing._denominate divides. */
 const USD_QUOTED = new Set(
-  SEPOLIA_ORACLE_FEEDS.filter(
-    (f) => f.symbol !== BASE && f.name.endsWith(`-${BASE}`) && !f.nxrSymbol.endsWith(`-${BASE}`),
-  ).map((f) => f.symbol),
+  Object.keys(V.feedIds)
+    .filter((name) => name.endsWith(`-${BASE}`))
+    .map((name) => name.slice(0, name.lastIndexOf('-')))
+    .filter((sym) => {
+      const m = nxrMark(sym);
+      return sym !== BASE && !!m && !m.nxrSymbol.endsWith(`-${BASE}`);
+    }),
 );
 
 /** Rewrites the block tag of every eth_call / eth_getStorageAt so one run sees one state. */
@@ -66,7 +78,7 @@ async function feedRow(p: Eip1193Provider, feedId: Hex) {
     method: 'eth_call',
     params: [
       {
-        to: SEPOLIA_BTR.oracle,
+        to: ORACLE,
         data: encodeFn({ abi: EXTERNAL_ORACLE_ABI, functionName: 'getFeed', args: [feedId] }),
       },
       'latest',
@@ -85,13 +97,13 @@ async function buildState(
   symbols: readonly string[],
   now: number,
 ): Promise<Built> {
-  const baseUsdFeed = sepoliaFeedByName(`${BASE}-USD`);
-  const baseUsdRow = baseUsdFeed ? await feedRow(p, baseUsdFeed.feedId) : null;
+  const baseUsdId = V.feedIds[`${BASE}-USD`];
+  const baseUsdRow = baseUsdId ? await feedRow(p, baseUsdId) : null;
   const baseUsd = baseUsdRow
     ? Number(decodeB64(BigInt(baseUsdRow.lastPriceB64 ?? 0n), 18)) / 1e18
     : 0;
 
-  const baseAsset = await getAsset(p, pool, SEPOLIA_TOKENS[BASE]!);
+  const baseAsset = await getAsset(p, pool, TOKENS[BASE]!);
   const baseDec = Number(baseAsset.decimals);
   const baseRes = Number(baseAsset.reserves) / 10 ** baseDec;
 
@@ -99,13 +111,13 @@ async function buildState(
   const decimals: Record<string, number> = { [BASE]: baseDec };
   for (const sym of symbols) {
     if (sym === BASE) continue;
-    const token = SEPOLIA_TOKENS[sym];
-    const feed = SEPOLIA_ORACLE_FEEDS.find((f) => f.symbol === sym);
-    if (!token || !feed) continue;
+    const token = TOKENS[sym];
+    const feedName = feedNameOf(sym);
+    if (!token || !feedName) continue;
     const [asset, risk, row] = await Promise.all([
       getAsset(p, pool, token),
       readRiskConfig(p, pool, token),
-      feedRow(p, feed.feedId),
+      feedRow(p, V.feedIds[feedName]!),
     ]);
     const dec = Number(asset.decimals);
     if (!(Number(asset.liabilities) > 0)) continue;
@@ -156,18 +168,19 @@ async function buildState(
 
 /** Pairs and size ladders. Sizes are fractions of the OUTPUT leg's reserves so every ladder
  *  crosses the reserve boundary; the chain refuses at and past it (Pricing.sol:737). */
-const PAIRS: Array<{ pool: 'stable' | 'volatile'; from: string; to: string }> = [
-  { pool: 'stable', from: 'USDC', to: 'RLUSD' },
-  { pool: 'stable', from: 'RLUSD', to: 'USDC' },
-  { pool: 'stable', from: 'RLUSD', to: 'DAI' },
-  { pool: 'stable', from: 'DAI', to: 'USDT' },
+const STABLE_SYMS = ['USDC', 'USDT', 'USDS', 'USD1', 'PYUSD'] as const;
+const PAIRS: Array<{ pool: 'stable'; from: string; to: string }> = [
+  { pool: 'stable', from: 'USDC', to: 'PYUSD' },
+  { pool: 'stable', from: 'PYUSD', to: 'USDC' },
+  { pool: 'stable', from: 'PYUSD', to: 'USDS' },
+  { pool: 'stable', from: 'USDS', to: 'USDT' },
   { pool: 'stable', from: 'USDC', to: 'USDT' },
 ];
 const FRACTIONS = [0.01, 0.1, 0.5, 0.9, 0.999, 1.05];
 
 type Row = { pair: string; size: number; chain: number; sdk: number; deltaBp: number | null };
 
-describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () => {
+describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Arc block)', () => {
   let block: Hex;
   let built: Record<string, Built>;
   let pools: Record<string, Address>;
@@ -183,15 +196,8 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
     };
     const now = Number(BigInt(head.timestamp));
     p = pinned(raw, block);
-    pools = { stable: SEPOLIA_BTR.stablePool, volatile: SEPOLIA_BTR.volatilePool };
-    built = {
-      stable: await buildState(
-        p,
-        pools.stable,
-        ['USDC', 'USDT', 'DAI', 'RLUSD', 'USDE', 'USDS'],
-        now,
-      ),
-    };
+    pools = { stable: poolAt('btr-stable')! };
+    built = { stable: await buildState(p, pools.stable, STABLE_SYMS, now) };
   }, 180_000);
 
   test('parity across pairs and sizes, including the reserve boundary', async () => {
@@ -210,13 +216,9 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
         const px = quoteExactIn(state, from, to, 0).midPrice || 1; // out-per-in
         const size = Math.max(1, Math.round((ref * f) / px));
         const wei = BigInt(Math.round(size)) * 10n ** BigInt(decimals[from] ?? 18);
-        const cq = await getSwapQuote(
-          p,
-          pools[pool]!,
-          SEPOLIA_TOKENS[from]!,
-          SEPOLIA_TOKENS[to]!,
-          wei,
-        ).catch(() => null);
+        const cq = await getSwapQuote(p, pools[pool]!, TOKENS[from]!, TOKENS[to]!, wei).catch(
+          () => null,
+        );
         const chain = cq ? Number(cq.amountOut) / 10 ** (decimals[to] ?? 18) : 0;
         const sdk = quoteExactIn(state, from, to, size).amountOut;
         const deltaBp = chain > 0 ? (sdk / chain - 1) * 1e4 : null;
@@ -262,9 +264,9 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
     let worst = 0;
     const dead: string[] = [];
     for (const [from, to] of [
-      ['USDC', 'RLUSD'],
-      ['USDC', 'DAI'],
-      ['DAI', 'RLUSD'],
+      ['USDC', 'PYUSD'],
+      ['USDC', 'USDS'],
+      ['USDS', 'PYUSD'],
     ] as const) {
       const curve = depthCurve(state, from, to);
       // ask: spend cumBase of `from` → cumTok of `to`; bid: sell cumTok of `to` → cumBase of `from`.
@@ -287,13 +289,9 @@ describe.skipIf(!RPC)('SDK ↔ chain quote parity (pinned Sepolia block)', () =>
           const dIn = decimals[tIn] ?? 18;
           const wei = BigInt(Math.round(amtIn * 10 ** dIn));
           if (wei <= 0n) continue;
-          const cq = await getSwapQuote(
-            p,
-            pools.stable!,
-            SEPOLIA_TOKENS[tIn]!,
-            SEPOLIA_TOKENS[tOut]!,
-            wei,
-          ).catch(() => null);
+          const cq = await getSwapQuote(p, pools.stable!, TOKENS[tIn]!, TOKENS[tOut]!, wei).catch(
+            () => null,
+          );
           const chain = cq ? Number(cq.amountOut) / 10 ** (decimals[tOut] ?? 18) : 0;
           if (!(chain > 0)) {
             dead.push(`${from}→${to} ${side} @ ${amtIn.toFixed(4)} ${tIn}: chain refused`);

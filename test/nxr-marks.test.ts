@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { NXR_MARKS, closedUntil, nxrMark, nxrPair } from '../src/venues/nxr';
-import { SEPOLIA_ORACLE_FEEDS } from '../src/venues/sepolia';
+import { chainVenue } from '../src/venues/registry';
 
 /**
  * `NXR_MARKS` is the only statement of where an asset's mark comes from, and the deploy ceremony
@@ -20,7 +20,7 @@ const roster = (chain: string): string[] => {
 };
 
 describe('NXR mark sources', () => {
-  test.each(['sepolia', 'arc'])('every %s roster symbol has a declared mark source', (chain) => {
+  test.each(['arc'])('every %s roster symbol has a declared mark source', (chain) => {
     const syms = roster(chain);
     if (!syms.length) return; // sdk-only checkout: contract repo is closed source
     const missing = syms.filter((s) => !nxrMark(s));
@@ -56,7 +56,7 @@ describe('NXR mark sources', () => {
     // non-recovering resubscribe loop (dex 773cc31, 2026-08-14). Re-listing is a roster line.
     expect(syms).not.toContain('RLUSD');
     expect(nxrPair('RLUSD', 'USDC')).not.toBeNull();
-    // The only mixed-case symbol in the Sepolia emit is renamed. `.` and case quirks are both
+    // The only mixed-case symbol in the emit is renamed. `.` and case quirks are both
     // forbidden in a roster symbol: it is simultaneously the risk-params key, the seed-marks key,
     // the `feed_<SYM>` record key and the keeper feed name, and Foundry reads `.` as a JSONPath
     // separator, so `parseJsonAddress(sot, ".USDT.b")` looks up `{"USDT":{"b":…}}` and reads absent.
@@ -103,8 +103,8 @@ describe('NXR mark sources', () => {
     }
   });
 
-  // Case folding and the `.b` faucet suffix, so the ERC-20 `symbol()` of a mock and the legacy
-  // Sepolia spelling both land on the canonical row instead of reading as an unknown asset.
+  // Case folding and the `.b` faucet suffix, so the ERC-20 `symbol()` of a mock and a legacy
+  // mixed-case spelling both land on the canonical row instead of reading as an unknown asset.
   test('resolution folds case and the .b faucet suffix', () => {
     expect(nxrMark('cbBTC')).toBe(NXR_MARKS.CBBTC!);
     expect(nxrMark('USDT.b')).toBe(NXR_MARKS.USDT!);
@@ -161,10 +161,15 @@ describe('NXR mark sources', () => {
     }
   });
 
-  test('the sepolia feed table reads its mapping from this table, not a copy', () => {
-    for (const f of SEPOLIA_ORACLE_FEEDS) {
-      const m = nxrMark(f.symbol)!;
-      expect({ s: f.nxrSymbol, q: f.nxrQuote }, f.name).toEqual({ s: m.nxrSymbol, q: m.nxrQuote });
+  // Every on-chain feed name resolves its mark source THROUGH this table. A feed the deployment
+  // record carries but `NXR_MARKS` does not is a leg nothing can seed or push, and it would only
+  // surface at ceremony time.
+  test('every deployed arc feed resolves its mapping from this table, not a copy', () => {
+    const feeds = Object.keys(chainVenue(5_042_002).feedIds);
+    expect(feeds.length).toBeGreaterThan(0);
+    for (const name of feeds) {
+      const symbol = name.slice(0, name.lastIndexOf('-'));
+      expect(nxrMark(symbol), name).not.toBeNull();
     }
   });
 

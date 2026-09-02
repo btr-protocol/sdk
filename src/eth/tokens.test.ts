@@ -51,7 +51,7 @@ describe('resolveTokenAlias', () => {
   });
 
   // Blanket punctuation-stripping would fold `USDT.b` onto `USDTB`: Ethena USDtb, a DIFFERENT
-  // asset listed beside USDT on the same Sepolia core. Only the trailing faucet suffix may drop.
+  // asset listed beside USDT on the same stable core. Only the trailing faucet suffix may drop.
   test('the .b suffix never collides two distinct tokens', () => {
     expect(canonicalTokenSymbol('USDT.b')).toBe('USDT');
     expect(canonicalTokenSymbol('USDTB.b')).toBe('USDTB');
