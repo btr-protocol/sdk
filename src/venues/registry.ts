@@ -1,8 +1,8 @@
 // Venue registry for BTR pool quoting, resolved PER CHAIN.
 //
 // Every lookup here takes a `chainId` and throws when BTR is not deployed on it. That is the
-// whole point of the module: the previous shape hardcoded Sepolia and took no chain at all, so a
-// bot configured for Arc quoted Sepolia pool addresses and *succeeded*: the worst failure mode
+// whole point of the module: the previous shape hardcoded one chain and took no chain at all, so a
+// bot configured for another chain quoted the hardcoded pool addresses and *succeeded*: the worst failure mode
 // available, because nothing reverts and nothing logs. There is deliberately no default chain and
 // no fallback: a caller that cannot name its chain has no business building swap calldata.
 //
@@ -77,9 +77,9 @@ export function activeOracle(chainId: number): Address {
  * for a token that chain does not have. A symbol with no static mark is absent, and the caller
  * falls back rather than sizing off a fabricated number.
  *
- * Resolution is case-folded (`nxrMark`) because the roster spelling is per chain: Sepolia lists
- * `cbBTC` and Arc lists `CBBTC` for the same asset, and an exact-key lookup silently drops one of
- * them; sizing then falls back for a token that has a perfectly good mark.
+ * Resolution is case-folded (`nxrMark`) because the roster spelling is per chain: one chain may
+ * list `cbBTC` where Arc lists `CBBTC` for the same asset, and an exact-key lookup silently drops
+ * one of them; sizing then falls back for a token that has a perfectly good mark.
  */
 export function activeRefMarksUsd(chainId: number): Record<string, number> {
   const out: Record<string, number> = {};

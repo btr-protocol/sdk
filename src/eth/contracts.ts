@@ -5,7 +5,7 @@
  * Frontend and other consumers should import from here.
  *
  * PLACEHOLDER REGISTRY. This is not the source of truth for deployed addresses and nothing
- * should be wired to it: there is no 11155111 key, so CONTRACTS[11155111] is undefined on the
+ * should be wired to it: there is no 5042002 key, so CONTRACTS[5042002] is undefined on the
  * only chain BTR is deployed to, and every DEX address on the chains listed below is
  * ZERO_ADDRESS. The real source of truth for deployed addresses is the backend venues API
  * (`GET {api}/v1/venues`), which the front end consumes directly.

@@ -24,7 +24,10 @@ import {
   staticVenuePools,
 } from '../src/venues/registry';
 import { quoteAllExactIn } from '../src/venues/router';
-import { SEPOLIA_BTR, SEPOLIA_CHAIN_ID, SEPOLIA_TOKENS } from '../src/venues/sepolia';
+
+/** Arc testnet: the only chain BTR is deployed on. */
+const ARC = 5_042_002;
+const ARC_TOKENS = chainVenue(ARC).tokens;
 
 /** Encode a real Pool custom error exactly as the node would return it in `error.data`. */
 const revertData = (name: string, args: unknown[]) => {
@@ -36,8 +39,8 @@ const revertData = (name: string, args: unknown[]) => {
 
 const ZERO = '0x0000000000000000000000000000000000000000' as Address;
 const ALICE = '0x1111111111111111111111111111111111111111' as Address;
-const TOKEN_A = SEPOLIA_TOKENS.USDC; // both in the stable core, so pools are candidates
-const TOKEN_B = SEPOLIA_TOKENS.USDT;
+const TOKEN_A = ARC_TOKENS.USDC; // both in the stable core, so pools are candidates
+const TOKEN_B = ARC_TOKENS.USDT;
 
 /** Provider that never answers — the quote path must fail on the recipient BEFORE any call. */
 const deadProvider: Eip1193Provider = {
@@ -48,7 +51,7 @@ const deadProvider: Eip1193Provider = {
 
 describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
   const base = {
-    chainId: SEPOLIA_CHAIN_ID,
+    chainId: ARC,
     provider: deadProvider,
     tokenIn: TOKEN_A,
     tokenOut: TOKEN_B,
@@ -86,8 +89,8 @@ describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
 });
 
 describe('quoteAllExactIn separates a protocol halt from a transport failure', () => {
-  const poolTag = staticVenuePools(SEPOLIA_CHAIN_ID)[0].tag;
-  const poolAddr = staticVenuePools(SEPOLIA_CHAIN_ID)[0].address;
+  const poolTag = staticVenuePools(ARC)[0].tag;
+  const poolAddr = staticVenuePools(ARC)[0].address;
 
   const runWith = async (err: Error) => {
     const skips: { kind: string; reason: string; tag: string }[] = [];
@@ -97,7 +100,7 @@ describe('quoteAllExactIn separates a protocol halt from a transport failure', (
       },
     } as unknown as Eip1193Provider;
     await quoteAllExactIn({
-      chainId: SEPOLIA_CHAIN_ID,
+      chainId: ARC,
       provider,
       tokenIn: TOKEN_A,
       tokenOut: TOKEN_B,
@@ -207,26 +210,8 @@ describe('planToLegs validates slippage and derives minOut in bigint space', () 
   });
 });
 
-describe('SEPOLIA_BTR.fxPool is declared-but-undeployed', () => {
-  test('fxPool is present as a key and explicitly undefined', () => {
-    expect('fxPool' in SEPOLIA_BTR).toBe(true);
-    expect(SEPOLIA_BTR.fxPool).toBeUndefined();
-  });
-
-  test('the venue registry lists no FX pool while it is undeployed', () => {
-    expect(staticVenuePools(SEPOLIA_CHAIN_ID).some((p) => p.tag === 'btr-fx')).toBe(false);
-  });
-
-  test('no stale FX address from a superseded broadcast leaks into the registry', () => {
-    const stale = '0x18c7376a4f9b3c3fb8a0a33faf3c55ad225cb229';
-    expect(staticVenuePools(SEPOLIA_CHAIN_ID).some((p) => p.address.toLowerCase() === stale)).toBe(
-      false,
-    );
-  });
-});
-
 /**
- * The registry is the one place a bot can silently trade the wrong chain: quoting Sepolia
+ * The registry is the one place a bot can silently trade the wrong chain: quoting another chain's
  * addresses from an Arc-configured bot reverts nowhere and logs nothing, it just executes against
  * a chain nobody meant. So resolution for an undeployed chain must THROW, not fall back.
  */
@@ -245,7 +230,6 @@ describe('chain resolution refuses to guess', () => {
   // quoted, and simply could not route WETH/WBTC/CBBTC/BNB/XAUT/PAXG. Pinned by tag and roster
   // size so losing a class again fails here rather than downstream as an unroutable pair.
   test('arc resolves all four broadcast pools, crypto and stocks cores included', () => {
-    const ARC = 5_042_002;
     expect(deployedChainIds()).toContain(ARC);
     const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
     expect(Object.keys(byTag).sort()).toEqual(['btr-crypto', 'btr-fx', 'btr-stable', 'btr-stocks']);
@@ -259,7 +243,6 @@ describe('chain resolution refuses to guess', () => {
   // (`.filter(Boolean)`), and a missing feed alias sends the bot's `liveMarks` to a `?? 1` that is
   // 14% wrong on EURC.b. This is the whole gate that kept the bot off the mintable legs.
   test('arc faucet twins are routable, marked and off the ordinal roster', () => {
-    const ARC = 5_042_002;
     const v = chainVenue(ARC);
     const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
     for (const [sym, feed, tags] of [
@@ -279,7 +262,7 @@ describe('chain resolution refuses to guess', () => {
   });
 
   test('the error names what IS deployed, so the operator sees the mismatch', () => {
-    expect(() => chainVenue(0)).toThrow(new RegExp(`deployed: \\[5042002, ${SEPOLIA_CHAIN_ID}\\]`));
+    expect(() => chainVenue(0)).toThrow(/deployed: \[5042002\]/);
   });
 
   test('every deployed chain resolves a base, an oracle and at least one pool', () => {
@@ -293,7 +276,7 @@ describe('chain resolution refuses to guess', () => {
   });
 
   test('the base resolves to the signed USDC-USD reference, never a USDC/USDC identity', () => {
-    const id = SEPOLIA_CHAIN_ID;
+    const id = ARC;
     expect(activeFeedId(id, 'USDC')).toBe(chainVenue(id).feedIds['USDC-USD']!);
     expect(chainVenue(id).feedIds['USDC-USDC']).toBeUndefined();
   });

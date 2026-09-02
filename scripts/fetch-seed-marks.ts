@@ -1,8 +1,8 @@
 /**
  * Fetch the ONE NX Rates mark snapshot a deploy ceremony seeds from.
  *
- *   bun run scripts/fetch-seed-marks.ts            # sepolia (default) → 11155111.seed-marks.json
- *   bun run scripts/fetch-seed-marks.ts arc        # arc testnet      → 5042002.seed-marks.json
+ *   bun run scripts/fetch-seed-marks.ts            # arc (default) → 5042002.seed-marks.json
+ *   bun run scripts/fetch-seed-marks.ts arc        # same, explicit
  *   CHAIN=arc bun run scripts/fetch-seed-marks.ts  # same, via env
  *
  * Both halves of the ceremony read this file: <Chain>OracleDeploy seeds every feed from it, and
@@ -15,7 +15,7 @@
  * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS`,
  * chain-free, because an asset's mark source does not change when it is listed on a second chain.
  * This script therefore needs no per-chain feed table and cannot exit 1 on a chain simply for not
- * being Sepolia, which is what it did before.
+ * being the one it was originally written against.
  *
  * Auth: NXR serves /v1/price anonymously; if NXR_API_KEY is exported it is sent as the API key
  * header. Never inline a key here.
@@ -30,7 +30,7 @@
  * Why fresh marks matter beyond the seed size: the first signed keeper push has dt=0, so its
  * deviation band is the bare maxDev floor (50bp stable / 100bp volatile) around the SEED. A seed
  * fetched minutes before broadcast lands the push inside the band by construction; a stale one
- * strands the feed (Sepolia, 2026-07-24: WBTC seeded 65,020 and never recoverable by ladder,
+ * strands the feed (2026-07-24: WBTC seeded 65,020 and never recoverable by ladder,
  * because NXR signs market marks, not rungs).
  */
 
@@ -42,20 +42,18 @@ import {
   nxrPair,
   sessionOpenLabel,
 } from '../src/venues/nxr.js';
-import { SEPOLIA_CHAIN_ID } from '../src/venues/sepolia.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
- *  file and is checked against the risk JSON, so `arc` can never write Sepolia's snapshot. The seed
+ *  file and is checked against the risk JSON, so one chain can never write another's snapshot. The seed
  *  SIZE is deliberately NOT pinned here; it is read from the risk JSON below. A second hand-written
  *  copy of it guarded nothing this ceremony does not already guard (`ArcPoolDeploy._loadCfg` asserts
  *  the snapshot against the risk JSON, and `checkSeedBudget()` refuses a roster it cannot fund),
  *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
 const CHAINS = {
-  sepolia: { chainId: SEPOLIA_CHAIN_ID, risk: 'sepolia-risk-params.json', basis: 'USD' },
   arc: { chainId: 5_042_002, risk: 'arc-risk-params.json', basis: 'USDC' },
 } as const satisfies Record<string, { chainId: number; risk: string; basis: MarkBasis }>;
 
-const chainArg = (process.argv[2] || process.env.CHAIN || 'sepolia').toLowerCase();
+const chainArg = (process.argv[2] || process.env.CHAIN || 'arc').toLowerCase();
 const CHAIN = CHAINS[chainArg as keyof typeof CHAINS];
 if (!CHAIN) {
   console.error(`unknown chain '${chainArg}' — expected one of ${Object.keys(CHAINS).join(', ')}`);
@@ -95,8 +93,8 @@ if (!Number.isFinite(seedUsdPerLeg) || seedUsdPerLeg <= 0) {
   console.error(`${RISK}: seedUsdPerLeg absent or non-positive — nothing to size a seed from`);
   process.exit(1);
 }
-// The native (unmintable) legs read a SECOND depth target from the same SoT. OPTIONAL: Sepolia's
-// USDC is a TestnetERC20 mock (the bridged concept does not exist there), so sepolia-risk-params.json
+// The native (unmintable) legs read a SECOND depth target from the same SoT. OPTIONAL: on a chain
+// whose USDC is a TestnetERC20 mock the bridged concept does not exist, so its risk-params JSON
 // carries no key and the snapshot must not either. Where the params file HAS the key (Arc) the
 // snapshot must carry it too, or ArcPoolDeploy._assertSeedMarksCfg sees a mismatch on a key this file
 // never wrote. A present-but-non-positive key is a hard error, never a silently zero-sized class.
