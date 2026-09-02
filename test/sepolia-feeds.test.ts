@@ -75,6 +75,11 @@ describe('sepolia oracle feed table', () => {
     expect(SEPOLIA_ORACLE_FEEDS.map((f) => f.name)).toEqual(expected);
 
     // feedId = keccak(asset, quote), recorded per symbol by the deploy scripts.
+    //
+    // This pins the LEGACY identity scheme, deliberately. Feed identity is migrating to the MITCH
+    // ticker id (`src/oracle/mitch.ts`), but the Sepolia deployment is NOT part of that phase: its
+    // oracle is keyed by keccak on chain and will stay that way, so weakening this assertion would
+    // stop pinning the identity the live contract actually answers to.
     for (const [idx, f] of SEPOLIA_ORACLE_FEEDS.entries()) {
       const key = f.name === 'USDC-USD' ? 'feed_USDC-USD' : `feed_${f.symbol}`;
       expect({ idx, name: f.name, feedId: f.feedId.toLowerCase() }).toEqual({

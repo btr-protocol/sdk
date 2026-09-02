@@ -11,6 +11,7 @@
 // at the first lookup instead of resolving to plausible-looking addresses.
 
 import type { Address, Hex } from '../eth/index.js';
+import { mitchFeedId } from '../oracle/mitch.js';
 import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { nxrMark } from './nxr.js';
 
@@ -98,6 +99,30 @@ export function activeRefMarksUsd(chainId: number): Record<string, number> {
 export function activeFeedId(chainId: number, symbol: string): Hex | null {
   const v = chainVenue(chainId);
   return v.feedIds[`${symbol}-USDC`] ?? v.feedIds[`${symbol}-USD`] ?? null;
+}
+
+/**
+ * The MITCH `tickerId` (decimal string) for a token symbol; null when the chain has no feed for it.
+ *
+ * Same `<SYM>-USDC` then `<SYM>-USD` resolution as `activeFeedId`, so the base still resolves to
+ * its signed `USDC-USD` reference. Absent for a deployment record recorded before the migration.
+ */
+export function activeTickerId(chainId: number, symbol: string): string | null {
+  const t = chainVenue(chainId).tickerIds;
+  return t?.[`${symbol}-USDC`] ?? t?.[`${symbol}-USD`] ?? null;
+}
+
+/**
+ * The MITCH-scheme `feedId` for a token symbol; null when the chain records no ticker for it.
+ *
+ * NOT a replacement for `activeFeedId`: during the migration a NEW oracle instance keyed by MITCH
+ * runs alongside the live keccak-keyed one, and the generated `feedIds` map stays the source of
+ * truth for whichever identity the deployment artifact actually holds. This resolves the incoming
+ * scheme for readers that must address the new instance.
+ */
+export function mitchFeedIdFor(chainId: number, symbol: string): Hex | null {
+  const id = activeTickerId(chainId, symbol);
+  return id === null ? null : mitchFeedId(id);
 }
 
 /**
