@@ -66,7 +66,7 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       // its repoint is a second timelock round that has not executed. `refOracleV4` is deployed
       // and fed but not yet pointed at, so both generations are live at once and a client that
       // reads marks must decode BOTH wires. Join a lane map on the ADDRESS, never on the tag.
-      refOracle: '0x8523ce6EBc563b1C69aAE7558Eb775DfEE89Fbd0',
+      refOracle: '0xC17920b2cC4Ac028c7F8bdB46E952Fb2d2a172a6',
       refOracleV4: '0xC17920b2cC4Ac028c7F8bdB46E952Fb2d2a172a6',
       // The superseded V3 primary. Kept named so historical `SlotsPushed` logs stay attributable.
       prevOracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
