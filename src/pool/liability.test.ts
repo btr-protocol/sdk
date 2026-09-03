@@ -12,6 +12,7 @@ import {
   minLpAmountOut,
   quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
+  quoteSwapLiabilityCoreAsync,
 } from './liability';
 
 const legOf = (symbol: string, reserves: number, liabilities: number) => ({
@@ -79,11 +80,17 @@ describe('liabilitySwapEnabled (flag bit gate)', () => {
   });
 });
 
-describe('quoteSwapLiabilityCore (pipeline order)', () => {
+describe('quoteSwapLiabilityCore (sync stub)', () => {
+  test('sync entry throws: conversion is backend SSOT, use the Async core', () => {
+    expect(() => quoteSwapLiabilityCore()).toThrow();
+  });
+});
+
+describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
   const inLeg = legOf('AUDF', 1_000_000, 1_000_000);
   const outLeg = legOf('NZDF', 1_000_000, 1_000_000);
   function makeConvert(amountOut: number, markPrice = 1) {
-    const convert = (fairIn: number) => {
+    const convert = async (fairIn: number) => {
       void fairIn;
       return {
         amountOut,
@@ -105,8 +112,8 @@ describe('quoteSwapLiabilityCore (pipeline order)', () => {
     return convert;
   }
 
-  test('balanced legs at mark: no haircuts, conversion passes through unclamped', () => {
-    const q = quoteSwapLiabilityCore(inLeg, outLeg, 10_000, makeConvert(9_990));
+  test('balanced legs at mark: no haircuts, conversion passes through unclamped', async () => {
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, makeConvert(9_990));
     expect(q).not.toBeNull();
     expect(q?.liabIn).toBe(10_000);
     expect(q?.fairIn).toBe(10_000);
@@ -121,19 +128,19 @@ describe('quoteSwapLiabilityCore (pipeline order)', () => {
     expect(q?.haircutOutBps).toBe(0);
   });
 
-  test('Lemma B clamp: conv quoted past the oracle mark is capped at fairIn·markPrice (:442)', () => {
+  test('Lemma B clamp: conv quoted past the oracle mark is capped at fairIn·markPrice (:442)', async () => {
     // 2% skew premium quoted over a 1.0 mark ⇒ cap binds at 1% over face... here mark 1.0, fair 10k.
-    const q = quoteSwapLiabilityCore(inLeg, outLeg, 10_000, makeConvert(10_400, 1));
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, makeConvert(10_400, 1));
     expect(q?.markCapBinding).toBe(true);
     expect(q?.conv).toBe(10_000); // fairIn · markPrice
     expect(q?.liabOut).toBe(10_000);
     expect(q?.markClampBps).toBeCloseTo(((10_400 - 10_000) / 10_400) * 1e4, 6);
   });
 
-  test('in-leg haircut applies BEFORE conversion and pricing (:435-437)', () => {
+  test('in-leg haircut applies BEFORE conversion and pricing (:435-437)', async () => {
     const shortIn = { ...inLeg, reserves: 800_000 }; // 20% deficit, suppressor 0 ⇒ 20% haircut
     let sawFairIn = 0;
-    const q = quoteSwapLiabilityCore(shortIn, outLeg, 10_000, (fairIn) => {
+    const q = await quoteSwapLiabilityCoreAsync(shortIn, outLeg, 10_000, async (fairIn) => {
       sawFairIn = fairIn;
       return makeConvert(9_990)(fairIn);
     });
@@ -143,28 +150,32 @@ describe('quoteSwapLiabilityCore (pipeline order)', () => {
     expect(sawFairIn).toBe(8_000);
   });
 
-  test('out-leg haircut applies AGAIN after the mark cap (:454)', () => {
+  test('out-leg haircut applies AGAIN after the mark cap (:454)', async () => {
     const shortOut = { ...outLeg, reserves: 750_000 }; // 25% deficit, suppressor 0
-    const q = quoteSwapLiabilityCore(inLeg, shortOut, 10_000, makeConvert(9_990));
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, shortOut, 10_000, makeConvert(9_990));
     expect(q?.haircutOut).toBe(2_498); // ceil(9990 · 0.25 = 2497.5)
     expect(q?.liabOut).toBeCloseTo(9_990 - 2_498, 6);
   });
 
-  test('zero-output guard: fully hair-cut out-leg reverts to null (:468)', () => {
+  test('zero-output guard: fully hair-cut out-leg reverts to null (:468)', async () => {
     const deadOut = { ...outLeg, reserves: 0 }; // R=0, suppressor 0 ⇒ 100% haircut
-    expect(quoteSwapLiabilityCore(inLeg, deadOut, 10_000, makeConvert(9_990))).toBeNull();
-  });
-
-  test('burn past live liabilities reverts to null (:429)', () => {
-    expect(quoteSwapLiabilityCore(inLeg, outLeg, inLeg.liabilities + 1, makeConvert(1))).toBeNull();
     expect(
-      quoteSwapLiabilityCore({ ...inLeg, liabilities: 0 }, outLeg, 1, makeConvert(1)),
+      await quoteSwapLiabilityCoreAsync(inLeg, deadOut, 10_000, makeConvert(9_990)),
     ).toBeNull();
   });
 
-  test('share indices convert shares ↔ face on both legs', () => {
+  test('burn past live liabilities reverts to null (:429)', async () => {
+    expect(
+      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, inLeg.liabilities + 1, makeConvert(1)),
+    ).toBeNull();
+    expect(
+      await quoteSwapLiabilityCoreAsync({ ...inLeg, liabilities: 0 }, outLeg, 1, makeConvert(1)),
+    ).toBeNull();
+  });
+
+  test('share indices convert shares ↔ face on both legs', async () => {
     const idx = WAD * 1.05;
-    const q = quoteSwapLiabilityCore(
+    const q = await quoteSwapLiabilityCoreAsync(
       { ...inLeg, indexWad: idx },
       { ...outLeg, indexWad: idx },
       10_000, // shares
@@ -194,10 +205,24 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
     lp_fee: '0x0',
   });
 
-  test('balanced pool: small transfer converts at the backend quote, never clamps', async () => {
+  test('balanced pool: spoke cross routes over POST /v1/route, never clamps', async () => {
     const outs = [4_990_000_000n, 4_985_000_000n];
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(outs.shift() ?? 0n) });
+    globalThis.fetch = async (url: string, init: { body?: string }) => {
+      if (String(url).endsWith('/route')) {
+        const body = JSON.parse(init.body ?? '{}');
+        return {
+          ok: true,
+          json: async () => ({
+            best_amount_out: body.amount_in,
+            best_is_split: false,
+            best_parts: [],
+            singles: [],
+          }),
+        };
+      }
+      return { ok: true, json: async () => quoteWire(outs.shift() ?? 0n) };
+    };
     try {
       const state = balancedState();
       const inLeg = { ...legOf('AUDF', 1_000_000, 1_000_000), haircutSuppressorBps: 0 };
@@ -210,7 +235,7 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       );
       expect(q).not.toBeNull();
       expect(q?.markCapBinding).toBe(false);
-      expect(q?.convQuoted).toBeCloseTo(4_985, 6);
+      expect(q?.convQuoted).toBeCloseTo(5_000, 6);
       expect(q?.haircutIn).toBe(0);
       expect(q?.haircutOut).toBe(0);
     } finally {
@@ -222,7 +247,21 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
   test('under-covered in-leg: haircut-in dominates before the backend conversion', async () => {
     const outs = [5_940_000_000n, 5_934_000_000n];
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(outs.shift() ?? 0n) });
+    globalThis.fetch = async (url: string, init: { body?: string }) => {
+      if (String(url).endsWith('/route')) {
+        const body = JSON.parse(init.body ?? '{}');
+        return {
+          ok: true,
+          json: async () => ({
+            best_amount_out: body.amount_in,
+            best_is_split: false,
+            best_parts: [],
+            singles: [],
+          }),
+        };
+      }
+      return { ok: true, json: async () => quoteWire(outs.shift() ?? 0n) };
+    };
     try {
       const state = balancedState();
       const inLeg = legOf('AUDF', 600_000, 1_000_000); // 40% deficit

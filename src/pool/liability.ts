@@ -1,12 +1,12 @@
-// Pure mirror of the on-chain Pool liability-swap path.
+// Liability-swap pipeline over the backend quoter (POST /v1/quote|route).
 // Same style as front/src/lib/lpMath.ts: f64 in, f64 out, no chain reads. State inputs come from
-// getAsset (sdk/pool/index.ts) and the intra-pool conversion from amm/aimm.quoteExactIn, which
-// already mirrors Pricing.anchorPathQuoteLp.
+// getAsset (sdk/pool/index.ts); conversion is backend SSOT (quoteLegAsync / routeAsync), never
+// the deleted TS curve replica.
 //
 // Pipeline (contract order, PoolLiquidity.sol:428-464):
 //   1. liabIn     = lpAmountIn * idxIn / WAD                          (:428)
 //   2. haircutIn  = applyHaircut(liabIn, R_in, L_in, suppressor_in)    (:93, :435)
-//   3. conv       = quoteExactIn(in -> out, fairIn); spread/toll/skew embedded (:437)
+//   3. conv       = backendConvert(in -> out, fairIn); spread/toll/skew embedded (:437)
 //   4. markCap    = fairIn * q.markPrice   [Lemma B cap, _markCap :379]; conv clamped (:442)
 //   5. haircutOut applied to the converted amount                      (:454)
 //   6. lpAmountOut = liabOut / idxOut (deadOut ~ 0 on any seeded live leg) (:458-464)
@@ -20,10 +20,13 @@ import {
   type PoolState,
   type Quote,
   type QuoteResponseWire,
+  type RouteRequestWire,
   type WireMeta,
+  poolStateToWire,
   premiumBps,
   quoteFromWire,
   quoteLegAsync,
+  routeAsync,
 } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 
@@ -103,65 +106,12 @@ export interface SwapLiabilityQuote {
   markClampBps: number;
 }
 
-/** Core pipeline with the conversion injected: tests pin the clamp/guard logic against synthetic
- *  quotes; the public wrapper binds aimm.quoteExactIn. Null = the contract would revert
- *  (InsufficientAmount on liabIn > L_in, or ZeroValue on a zero-output mint). */
-export function quoteSwapLiabilityCore(
-  inLeg: LiabLeg,
-  outLeg: LiabLeg,
-  lpAmountIn: number,
-  convert: (fairIn: number) => Quote,
-): SwapLiabilityQuote | null {
-  if (!(lpAmountIn > 0)) return null;
-  const idxIn = idxOf(inLeg);
-  const idxOut = idxOf(outLeg);
-  const liabIn = (lpAmountIn * idxIn) / WAD;
-  // :429: burn cannot exceed the leg's live liabilities.
-  if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
-
-  const { actual: fairIn, haircut: haircutIn } = haircutFace(
-    liabIn,
-    inLeg.reserves,
-    inLeg.liabilities,
-    inLeg.haircutSuppressorBps,
+/** Sync pipeline deleted with the TS pricer: conversion is backend SSOT, use
+ *  quoteSwapLiabilityCoreAsync. Kept by name so old imports fail loud, never silently local. */
+export function quoteSwapLiabilityCore(): SwapLiabilityQuote | null {
+  throw new Error(
+    'aimm TS pricer deleted: liability conversion over POST /v1/quote|route via quoteSwapLiabilityCoreAsync (backend SSOT)',
   );
-
-  const q = convert(fairIn);
-  const markCap = fairIn * q.markPrice;
-  const markCapBinding = q.amountOut > markCap;
-  const conv = markCapBinding ? markCap : q.amountOut;
-
-  const { actual: liabOut, haircut: haircutOut } = haircutFace(
-    conv,
-    outLeg.reserves,
-    outLeg.liabilities,
-    outLeg.haircutSuppressorBps,
-  );
-  const lpAmountOut = (liabOut * WAD) / idxOut; // :459: liabOut·WAD/idxOut
-  // :468: zero-output guard (a fully hair-cut out-leg re-denominates to nothing).
-  if (!(lpAmountOut > 0)) return null;
-
-  const faceMoved = (lpAmountIn * idxIn) / WAD;
-  const faceReceived = (lpAmountOut * idxOut) / WAD;
-  return {
-    liabIn,
-    haircutIn,
-    fairIn,
-    convQuoted: q.amountOut,
-    markCap,
-    conv,
-    markCapBinding,
-    haircutOut,
-    liabOut,
-    lpAmountOut,
-    impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
-    haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
-    haircutOutBps: conv > 0 ? (haircutOut / conv) * 1e4 : 0,
-    convSpreadBps: q.spreadBps / 2,
-    convImpactBps: q.priceImpactBps,
-    markClampBps:
-      q.amountOut > 0 && markCapBinding ? ((q.amountOut - conv) / q.amountOut) * 1e4 : 0,
-  };
 }
 
 /** Async mirror of the core pipeline with the conversion injected (backend quoter). */
@@ -229,7 +179,9 @@ export interface BackendConvertOpts {
 
 /**
  * Backend conversion for the liability pipeline: one POST /v1/quote per walked leg,
- * composed in fill order over the backend's own outputs (no local curve math).
+ * except the spoke→spoke cross which routes over POST /v1/route (routing SSOT).
+ * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint
+ * nothing from). Composed in fill order over the backend's own outputs.
  */
 export function backendConvert(
   state: PoolState,
@@ -243,6 +195,12 @@ export function backendConvert(
   const decIn = inBase ? opts.baseDecimals : (state.legs[tokenIn]?.decimals ?? opts.baseDecimals);
   const legIn = state.legs[tokenIn];
   const legOut = state.legs[tokenOut];
+  const toU128 = (tok: number, dec: number): string => {
+    if (!Number.isFinite(tok) || tok < 0) throw new Error('backendConvert: non-finite amount');
+    const scaled = Math.round(tok * 10 ** dec);
+    if (!Number.isSafeInteger(scaled)) throw new Error('backendConvert: amount exceeds 2^53');
+    return `0x${BigInt(scaled).toString(16)}`;
+  };
   return async (fairIn: number): Promise<Quote> => {
     if (!inBase && outBase && legIn) {
       const w = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
@@ -253,16 +211,25 @@ export function backendConvert(
       return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (!inBase && !outBase && legIn && legOut) {
+      const wire = poolStateToWire('liab', undefined, state, opts.meta, opts.baseDecimals);
+      const req: RouteRequestWire = {
+        pools: [wire],
+        token_in: tokenIn,
+        token_out: tokenOut,
+        amount_in: toU128(fairIn, decIn),
+      };
+      const routed = await routeAsync(req, opts.backendBase);
+      const amountOut = Number(BigInt(routed.best_amount_out)) / 10 ** legOut.decimals;
       const w1 = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
       const q1 = quoteFromWire(w1, decIn, opts.baseDecimals, [tokenIn, base], fairIn);
       const baseMid = q1.amountOut;
       const w2 = await quoteLegAsync(legOut, baseMid, false, opts.baseDecimals, opts.backendBase);
       const q2 = quoteFromWire(w2, opts.baseDecimals, legOut.decimals, [base, tokenOut], baseMid);
-      const avg = fairIn > 0 && q2.amountOut > 0 ? q2.amountOut / fairIn : 0;
+      const avg = fairIn > 0 && amountOut > 0 ? amountOut / fairIn : 0;
       const mid = q1.midPrice * q2.midPrice;
       const mark = q1.markPrice * q2.markPrice;
       return {
-        amountOut: q2.amountOut,
+        amountOut,
         grossOut: q2.grossOut,
         avgPrice: avg,
         midPrice: mid,
@@ -278,23 +245,7 @@ export function backendConvert(
         route: [tokenIn, base, tokenOut],
       };
     }
-    const empty: Quote = {
-      amountOut: 0,
-      grossOut: 0,
-      avgPrice: 0,
-      midPrice: 0,
-      markPrice: 0,
-      midPremiumBps: 0,
-      netPremiumBps: 0,
-      priceImpactBps: 0,
-      spreadBps: 0,
-      lpFeeBps: 0,
-      protoFeeBps: 0,
-      covTollBps: 0,
-      maxIn: 0,
-      route: [tokenIn, tokenOut],
-    };
-    return empty;
+    throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
   };
 }
 
