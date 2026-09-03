@@ -67,10 +67,13 @@ const LANE_SPEC: Record<PushWire, { mantBits: number; expBits: number }> = {
   v5: { mantBits: 25, expBits: 4 },
 };
 
-const toBytes = (b: Hex | Uint8Array): Uint8Array =>
-  typeof b === 'string'
-    ? Uint8Array.from((b.slice(2).match(/../g) ?? []).map((x) => Number.parseInt(x, 16)))
-    : b;
+const toBytes = (b: Hex | Uint8Array): Uint8Array => {
+  if (typeof b !== 'string') return b;
+  if (!/^0x[0-9a-fA-F]*$/.test(b)) throw new Error('hex blob must be 0x-prefixed hex');
+  const h = b.slice(2);
+  if (h.length % 2 !== 0) throw new Error(`hex blob odd length ${h.length}: full octets only`);
+  return Uint8Array.from((h.match(/../g) ?? []).map((x) => Number.parseInt(x, 16)));
+};
 
 function readUint(bytes: Uint8Array, off: number, len: number): bigint {
   let v = 0n;
