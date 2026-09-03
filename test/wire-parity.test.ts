@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 // Offline wire parity: the deleted quote-parity net compared TS math to chain math over RPC.
 // No TS pricer remains, so parity is wire-level: hex codec round-trips, guards fail closed,
 // and malformed/outage wires never masquerade as no-liquidity.
-import { rankSwapAsync, routeAsync } from '../src/amm/router.js';
+import { routeAsync } from '../src/amm/router.js';
 import { backendConvert } from '../src/pool/liability.js';
 import { hexToF64, rankDeposit, toRawHex, wirePlanToSwap } from '../src/router/lpRoutes.js';
 
@@ -82,8 +82,8 @@ describe('wirePlanToSwap', () => {
 });
 
 describe('backend aliases + guards', () => {
-  test('rankSwapAsync points at the live routeAsync export', () => {
-    expect(rankSwapAsync).toBe(routeAsync);
+  test('routeAsync is the live POST /v1/route entry (rankSwapAsync alias deleted)', () => {
+    expect(typeof routeAsync).toBe('function');
   });
   test('backendConvert throws on an unknown leg instead of a silent zero-Quote', async () => {
     const state = { base: 'USDC', legs: {} };

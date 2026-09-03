@@ -192,6 +192,4 @@ export async function aggregateDepthAsync(
 
 export type { DepthBookWire, NamedPoolWire, QuoteRouteWire, RouteRequestWire, RouteResponseWire };
 export { backendBase, routeAsync };
-/** Deleted-sync alias: old imports of rankSwapAsync resolve to the live routeAsync. */
-export { routeAsync as rankSwapAsync };
 export { aggregateDepthCurvesAsync };
