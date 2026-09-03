@@ -223,6 +223,23 @@ describe('wire v5 blob', () => {
     expect(() => decodeBlobV5(bad((b) => (b[16] = 0)))).toThrow(/ascending/);
   });
 
+  it('rejects an MSB-clear nonzero lane: the sentinel-write the chain skips', () => {
+    const sent = (lane: number): Uint8Array => {
+      const c = Uint8Array.from(bytes);
+      c[12] = (lane >>> 24) & 0xff;
+      c[13] = (lane >>> 16) & 0xff;
+      c[14] = (lane >>> 8) & 0xff;
+      c[15] = lane & 0xff;
+      return c;
+    };
+    expect(() => decodeBlobV5(sent(0x00ffffff))).toThrow(/sentinel/);
+    expect(() => decodeBlobV5(sent(0x00000001))).toThrow(/sentinel/);
+    expect(() => decodeBlobV5(sent(0))).not.toThrow();
+    expect(() =>
+      encodeBlobV5({ seq: 1, tsDs: 0, prices: [{ gi: 0, lane: 0x00ffffff }], sigmas: [], confs: [] }),
+    ).toThrow(/sentinel/);
+  });
+
   it('rejects an out-of-range field at encode rather than truncating it', () => {
     const one = { gi: 0, lane: 0x01000000 };
     expect(() =>

@@ -52,6 +52,8 @@ export const V5_CONF_ENTRY_BYTES = 3; // gi u8 | confBps u16
 export const V5_LANES_PER_SLOT = 8;
 /** 29 significant lane bits; the top 3 of the u32 entry are reserved and MUST be zero. */
 export const V5_LANE_MASK = (1 << 29) - 1;
+/** Mantissa MSB (bit 24): set ⇔ live price; clear + nonzero = a sentinel-write the chain skips. */
+export const V5_MANT_MSB = 1 << 24;
 /** Deciseconds in a day: the modulus of the v5 `tsDs` field (u20 value, zero-padded to u24). */
 export const V5_DAY_DS = 864_000;
 
@@ -250,9 +252,11 @@ export interface V5Blob {
  * then nP x 5B price entries (gi u8 | lane u32), nS x 5B sigma entries (gi u8 | sigmaPbps u32),
  * nC x 3B conf entries (gi u8 | confBps u16).
  *
- * Fails closed exactly where `_checkHeader` / the price walk revert `BadBlobHeader`: wrong version,
- * `tsDs >= 864000`, an all-empty blob, a length that disagrees with the section counts, a lane with
- * any of its reserved top 3 bits set, and a non-ascending `gi` inside a section.
+ * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `tsDs >= 864000`,
+ * all-empty blob, length disagreeing with section counts, reserved top-3 lane bits, non-ascending
+ * `gi`), plus anywhere the price walk SKIPS instead of pricing: a nonzero lane with the mantissa
+ * MSB clear is the sentinel-write the chain flags and ignores, so the decoder rejects it rather
+ * than carrying a lane that will never become a mark.
  *
  * `dayMod` is NOT read here: it is a storage-only tag the contract derives from the reconstructed
  * source day, never a wire field.
@@ -286,6 +290,9 @@ export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
     last = gi;
     const lane = Number(readUint(b, o + 1, 4));
     if (lane > V5_LANE_MASK) throw new Error(`V5 lane ${lane} sets a reserved top bit (gi ${gi})`);
+    if (lane !== 0 && (lane & V5_MANT_MSB) === 0) {
+      throw new Error(`V5 lane ${lane} MSB-clear sentinel (gi ${gi}): chain skips, never a price`);
+    }
     prices.push({ gi, lane });
   }
   last = -1;
@@ -341,6 +348,11 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
     last = p.gi;
     if (p.lane < 0 || p.lane > V5_LANE_MASK) {
       throw new Error(`V5 lane ${p.lane} outside 29 bits (gi ${p.gi})`);
+    }
+    if (p.lane !== 0 && (p.lane & V5_MANT_MSB) === 0) {
+      throw new Error(
+        `V5 lane ${p.lane} MSB-clear sentinel (gi ${p.gi}): chain skips, never a price`,
+      );
     }
     out[o] = p.gi;
     writeUint(out, o + 1, 4, BigInt(p.lane));
