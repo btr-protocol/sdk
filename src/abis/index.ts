@@ -1,5 +1,6 @@
-// Interface snapshot of the deployed BTR contracts. The backend serves ABIs live
-// (`GET {api}/v1/abis/{name}`); these static copies exist for offline typing.
+// Pool/Admin/ExternalOracle are gitignored build artifacts (`bun run fetch-abis`, backend
+// getAbi SSoT); the rest below are static offline-trust surfaces (ExternalOracleV4 reads the
+// chain with zero server trust).
 /**
  * Contract ABIs
  * @module @btr-protocol/sdk/abis
