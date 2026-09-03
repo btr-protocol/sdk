@@ -1,47 +1,45 @@
-// Dual-route LP mint/redeem ranking.
+// Dual-route LP mint/redeem ranking over the backend pricer (POST /v1/route|quote).
 //
-// Every pool entry composes into one of two terminating instruments, and the routes are directly
-// comparable because both end in the SAME receipt:
-//   mint   X -> target-LP : Route A  market-first  [rankSwap legs, Pool.deposit]
-//                          Route B  deposit-first [Pool.deposit, Pool.swapLiability]
-//   redeem T-LP -> Y      : Route A' cross-exit     [Pool.withdrawTo]
-//                          Route B' transfer-exit  [Pool.swapLiability, Pool.withdraw]
-//
-// Comparison key is DIRECT (spec §2.2): maximize target-LP face (mint) / token-out units
-// (redeem). Face/mark normalization is presentation-only; both routes here terminate in the same
-// pool's receipts so shared terms cancel. Both routes are quoted through the SAME mirrors: the
-// contract-derived haircut pipeline (pool/liability.ts) and aimm.quoteExactIn, never mixed
-// f64/bignum. Tiebreak: fewer legs (gas).
-//
-// Season gating (§2.5): any route whose first step BURNS leg-LP (B, A', B') is gated on
-// pre-existing seasoned shares, maxRedeem >= burned, because a same-timestamp mint arms the
-// anti-JIT lock and an atomic batch would revert. A gated route is RETURNED with
-// feasible: false, reason: 'cooldown', never picked, so callers surface "available after
-// cooldown" instead of quoting a reverting batch.
+// Same two terminating instruments and the same comparison key (DIRECT, spec §2.2).
+// Ranking and conversion are backend SSOT; season/flag gates and the haircut pipeline
+// stay local (no pricing law in them). rankDeposit/rankRedeem keep their names and are
+// async now: callers pass backend wire meta (addresses/decimals) for the request build.
 
-import { quoteExactIn } from '../amm/aimm.js';
-import { type NamedPool, type SwapPlan, rankSwap } from '../amm/router.js';
-import { type LiabLeg, WAD, haircutFace, quoteSwapLiabilityCore } from '../pool/liability.js';
+import {
+  type NamedPoolWire,
+  type QuoteRouteWire,
+  type RouteRequestWire,
+  type WireMeta,
+  poolStateToWire,
+  routeAsync,
+} from '../amm/aimm.js';
+import { type NamedPool, type SwapPlan, enumerateRoutes } from '../amm/router.js';
+import {
+  type BackendConvertOpts,
+  type LiabLeg,
+  WAD,
+  backendConvert,
+  haircutFace,
+  quoteSwapLiabilityCoreAsync,
+} from '../pool/liability.js';
 
 export interface LpRouteOpts {
-  /** Per-leg slippage floor fraction (default 0.005). Market legs get minOut floors; liability
-   *  legs get minLpAmountOut on received shares; deposits get NONE (they mint at index). */
   slippageFrac?: number;
-  /** Liability-transfer flag gate per symbol (LIABILITY_SWAP_ENABLED_BIT). Default: enabled. */
   liabilityEnabled?: (symbol: string) => boolean;
-  /** Unlocked-share capacity per symbol (maxRedeem mirror), in FACE units. Routes that burn a
-   *  leg's LP are gated on this. Default: unlimited (caller has no lock machinery). */
   maxRedeem?: (symbol: string) => number;
-  /** haircutSuppressorBps per symbol (default 0: full haircut applies). */
   haircutSuppressorBps?: (symbol: string) => number;
-  /** Asset.liquidityIndexWad per symbol (default 1e18). Required once indexes accrue; quoting
-   *  every leg at 1 makes face/share conversions and route ranking drift from chain. */
   liquidityIndexWad?: (symbol: string) => number;
+  /** Backend wire meta (required for any priced route): token addresses + decimals. */
+  backend?: BackendConvertOpts & { meta: WireMeta };
 }
 
 const DEFAULT_SLIP = 0.005;
 
-/** The leg book swapLiability reads, lifted from a router PoolState (+ per-symbol suppressor). */
+const needBackend = (opts: LpRouteOpts): BackendConvertOpts & { meta: WireMeta } => {
+  if (!opts.backend) throw new Error('lpRoutes: backend SSOT required (no TS pricer)');
+  return opts.backend;
+};
+
 function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | null {
   const s = pool.state;
   const suppressor = opts.haircutSuppressorBps?.(symbol) ?? 0;
@@ -72,7 +70,6 @@ function poolHolding(pools: NamedPool[], a: string, b: string): NamedPool | unde
   return pools.find((p) => has(p, a) && has(p, b));
 }
 
-/** One composed step. LP-side amounts are FACE units (shares · idx/WAD, idx normalized to 1). */
 export interface LpRouteStep {
   kind: 'swap' | 'deposit' | 'withdraw' | 'withdrawTo' | 'swapLiability';
   poolTag: string;
@@ -80,34 +77,24 @@ export interface LpRouteStep {
   tokenIn: string;
   tokenOut: string;
   amountIn: number;
-  /** Quoted output (net, post everything the mirror charges). */
   amountOut: number;
-  /** Slippage floor carried into the calldata (minOut / minLpAmountOut). 0 = no price guard
-   *  (deposits mint at index by design, spec §4). */
   minOut: number;
 }
 
 export interface RankedLpRoute {
-  /** A market-first (mint) · B deposit-first (mint) · A' cross-exit · B' transfer-exit. */
   id: 'market-first' | 'deposit-first' | 'cross-exit' | 'transfer-exit';
   label: string;
   feasible: boolean;
-  /** Why the route is gated off: 'cooldown' | 'flag-disabled' | 'capacity' | 'no-route'. */
   reason?: string;
-  /** COMPARISON METRIC: target-LP face for mints, token-out units for redeems. */
   out: number;
   hops: number;
   steps: LpRouteStep[];
 }
 
 export interface RankedLpPlan {
-  /** Highest-output FEASIBLE route (ties → fewer legs). Null when every route is gated off. */
   best: RankedLpRoute | null;
-  /** All enumerated routes, ranked by output desc (losing routes included for the compare view). */
   routes: RankedLpRoute[];
 }
-
-// ── helpers ─────────────────────────────────────────────────────────────────────
 
 type RouteShell = Omit<RankedLpRoute, 'feasible' | 'reason'> & { steps: LpRouteStep[] };
 
@@ -135,29 +122,105 @@ const flagGate = (
   return null;
 };
 
-/** Rank: output desc, then fewer legs (gas), then stable input order. */
 const rankRoutes = (routes: RankedLpRoute[]): RankedLpRoute[] =>
   [...routes].sort((a, b) => b.out - a.out || a.hops - b.hops || 0);
 
+const hexToF64 = (h: string, dec: number): number => Number(BigInt(h)) / 10 ** dec;
+const toRawHex = (amountTok: number, dec: number): string =>
+  `0x${BigInt(Math.max(0, Math.round(amountTok * 10 ** dec))).toString(16)}`;
+
+function wiresOf(pools: NamedPool[], b: BackendConvertOpts & { meta: WireMeta }): NamedPoolWire[] {
+  return pools.map((p) =>
+    poolStateToWire(p.tag, p.addr, p.state, b.meta, b.meta.decimalsOf(p.state.base)),
+  );
+}
+
+function wirePlanToSwap(
+  pools: NamedPool[],
+  req: { tokenIn: string; tokenOut: string; amountIn: number },
+  res: Awaited<ReturnType<typeof routeAsync>>,
+  decOf: (sym: string) => number,
+): { plan: SwapPlan; singles: import('../amm/router.js').RouteQuote[] } {
+  const addrOf = (tag: string) => pools.find((p) => p.tag === tag)?.addr;
+  const toRoute = (legs: { pool_tag: string; token_in: string; token_out: string }[]) => {
+    const rl = legs.map((l) => ({
+      poolTag: l.pool_tag,
+      poolAddr: addrOf(l.pool_tag),
+      tokenIn: l.token_in,
+      tokenOut: l.token_out,
+    }));
+    const tokens: string[] = rl.length ? [rl[0].tokenIn] : [];
+    for (const leg of rl) if (tokens[tokens.length - 1] !== leg.tokenOut) tokens.push(leg.tokenOut);
+    return { legs: rl, tokens, hops: rl.length };
+  };
+  const toQuote = (q: QuoteRouteWire): import('../amm/router.js').RouteQuote => {
+    const r = toRoute(q.legs);
+    const fills = q.legs.map((l, i) => ({
+      leg: r.legs[i],
+      amountIn: hexToF64(l.amount_in, decOf(l.token_in)),
+      amountOut: hexToF64(l.amount_out, decOf(l.token_out)),
+    }));
+    return {
+      route: r,
+      amountIn: hexToF64(q.amount_in, decOf(r.legs[0].tokenIn)),
+      amountOut: hexToF64(q.amount_out, decOf(r.legs[r.legs.length - 1].tokenOut)),
+      fills,
+      maxIn: Number.POSITIVE_INFINITY,
+    };
+  };
+  const parts = res.best_parts.map((p) => {
+    const fraction = hexToF64(p.fraction, 18);
+    const quote = toQuote({
+      legs: p.legs,
+      amount_in: p.legs[0]?.amount_in ?? '0x0',
+      amount_out: p.amount_out,
+    });
+    return { route: quote.route, fraction, quote };
+  });
+  const plan: SwapPlan = {
+    amountIn: req.amountIn,
+    amountOut: hexToF64(res.best_amount_out, decOf(req.tokenOut)),
+    parts,
+    isSplit: res.best_is_split,
+  };
+  return { plan, singles: res.singles.map(toQuote) };
+}
+
 // ── mint: X -> target-LP ────────────────────────────────────────────────────────
 
-function marketMint(
+async function marketMint(
   pools: NamedPool[],
+  wires: NamedPoolWire[],
   xToken: string,
   targetSym: string,
   amountIn: number,
   opts: LpRouteOpts,
-): RankedLpRoute | null {
+): Promise<RankedLpRoute | null> {
+  const b = needBackend(opts);
   const slip = opts.slippageFrac ?? DEFAULT_SLIP;
-  const ranked = rankSwap(pools, xToken, targetSym, amountIn);
-  if (!ranked) return null;
-  const plan: SwapPlan = ranked.best;
+  const decOf = (s: string) => b.meta.decimalsOf(s);
+  const req: RouteRequestWire = {
+    pools: wires,
+    token_in: xToken,
+    token_out: targetSym,
+    amount_in: toRawHex(amountIn, decOf(xToken)),
+  };
+  let res: Awaited<ReturnType<typeof routeAsync>>;
+  try {
+    res = await routeAsync(req, b.backendBase);
+  } catch {
+    return null;
+  }
+  const { plan } = wirePlanToSwap(
+    pools,
+    { tokenIn: xToken, tokenOut: targetSym, amountIn },
+    res,
+    decOf,
+  );
 
   const steps: LpRouteStep[] = [];
   let placed = 0;
   let depositExpected = 0;
-  // The FLOOR of what the tail deposit will actually have to hand: only the final hop of each part
-  // lands in targetSym, and only its minOut is guaranteed to exist by the time the deposit runs.
   let depositFloor = 0;
   for (const part of plan.parts) {
     placed += part.fraction * amountIn;
@@ -180,11 +243,7 @@ function marketMint(
       }
     });
   }
-  // Water-fill left part of the input unroutable, or a part runs past its binding reserve clip
-  // (single-route plans are never split, so `placed` alone cannot see saturation): the plan
-  // would revert on-chain or silently drop input.
-  const overClip = plan.parts.some((part) => part.quote.amountIn > part.quote.maxIn * 1.001);
-  if (placed < amountIn * 0.999 || overClip) {
+  if (placed < amountIn * 0.999) {
     return {
       id: 'market-first',
       label: 'market swap, then deposit',
@@ -195,16 +254,7 @@ function marketMint(
       reason: 'capacity',
     };
   }
-  // Deposits carry NO price guard (they mint at the current index), but a batched market-first
-  // deposit must not ask for the sum of every hop's independent floor as its input floor.
-  // The terminal target-token amount actually deposited is the final leg quote net of that
-  // leg's own slippage; any excess remains with the user as usable holdings.
   const first = steps[0];
-  // NOT Σ every step's quoted `amountOut`. That sum double-counted the intermediate hop of a 2-hop
-  // part - an amount denominated in a DIFFERENT token - and, even on a single hop, asked the pool
-  // to pull the QUOTE rather than the floor: an adverse-but-within-slippage fill leaves the user
-  // holding less target token than `Pool.deposit` then tries to `transferFrom`, and the tail of
-  // the batch reverts `TransferFromFailed()` (0x7939f424) after the swap has already landed.
   steps.push({
     kind: 'deposit',
     poolTag: first?.poolTag ?? '',
@@ -219,20 +269,21 @@ function marketMint(
   return {
     id: 'market-first',
     label: 'market swap, then deposit',
-    out: plan.amountOut, // target tokens → face at the current index
+    out: plan.amountOut,
     hops: steps.length,
     steps,
     feasible: true,
   };
 }
 
-function transferMint(
+async function transferMint(
   pools: NamedPool[],
   xToken: string,
   targetSym: string,
   amountIn: number,
   opts: LpRouteOpts,
-): RankedLpRoute | null {
+): Promise<RankedLpRoute | null> {
+  const b = needBackend(opts);
   const slip = opts.slippageFrac ?? DEFAULT_SLIP;
   const holder = poolHolding(pools, xToken, targetSym);
   if (!holder) return null;
@@ -270,33 +321,30 @@ function transferMint(
   };
   const flagged = flagGate(shell, [xToken, targetSym], opts);
   if (flagged) return flagged;
-  // The deposit mints fresh X-LP the very same batch would burn: gated on seasoned X-LP (§2.5).
   const gated = seasonGate(shell, xToken, amountIn, opts);
   if (!gated.feasible) return gated;
 
-  // Index-normalized: the deposit mints face == amountIn of X-LP.
-  const q = quoteSwapLiabilityCore(inLeg, outLeg, amountIn, (fair) =>
-    quoteExactIn(holder.state, xToken, targetSym, fair),
-  );
+  const q = await quoteSwapLiabilityCoreAsync(
+    inLeg,
+    outLeg,
+    amountIn,
+    backendConvert(holder.state, xToken, targetSym, b),
+  ).catch(() => null);
   if (!q) return { ...shell, feasible: false, reason: 'no-route', out: 0 };
   shell.steps[1].amountOut = q.lpAmountOut;
   shell.steps[1].minOut = q.lpAmountOut * (1 - slip);
   return { ...shell, out: q.lpAmountOut, feasible: true };
 }
 
-/** Mint amountIn of xToken, ending in targetSym LP. Both symbols live in ONE pool (spec §2.1:
- *  single-pool scope; cross-pool is out of scope v1). Returns every enumerated route ranked. */
-export function rankDeposit(
+/** Mint amountIn of xToken, ending in targetSym LP. Single-pool scope (spec §2.1). */
+export async function rankDeposit(
   pools: NamedPool[],
   xToken: string,
   targetSym: string,
   amountIn: number,
   opts: LpRouteOpts = {},
-): RankedLpPlan {
+): Promise<RankedLpPlan> {
   if (!(amountIn > 0)) return { best: null, routes: [] };
-  // Same-asset default (spec §3): X -> X-LP is a DIRECT deposit: mints face 1:1 at the current
-  // index, no swap leg, no price guard. Enumerating the dual routes here would quote a
-  // self-conversion; there is nothing to rank.
   if (xToken === targetSym) {
     const holder = poolHolding(pools, xToken, xToken);
     if (!holder) return { best: null, routes: [] };
@@ -321,21 +369,23 @@ export function rankDeposit(
     };
     return { best: direct, routes: [direct] };
   }
-  const market = marketMint(pools, xToken, targetSym, amountIn, opts);
-  const transfer = transferMint(pools, xToken, targetSym, amountIn, opts);
+  const wires = wiresOf(pools, needBackend(opts));
+  const market = await marketMint(pools, wires, xToken, targetSym, amountIn, opts);
+  const transfer = await transferMint(pools, xToken, targetSym, amountIn, opts);
   const routes = rankRoutes([market, transfer].filter((r): r is RankedLpRoute => r !== null));
   return { best: routes.find((r) => r.feasible) ?? null, routes };
 }
 
 // ── redeem: target-LP -> Y ──────────────────────────────────────────────────────
 
-function crossExit(
+async function crossExit(
   pools: NamedPool[],
   targetSym: string,
   outToken: string,
   lpFaceIn: number,
   opts: LpRouteOpts,
-): RankedLpRoute | null {
+): Promise<RankedLpRoute | null> {
+  const b = needBackend(opts);
   const slip = opts.slippageFrac ?? DEFAULT_SLIP;
   const holder = poolHolding(pools, targetSym, outToken);
   if (!holder) return null;
@@ -343,10 +393,6 @@ function crossExit(
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
 
-  // Mirror of _quoteWithdrawCross (PoolLiquidity.sol:335-369): shares → face at the source
-  // index, then from-haircut → anchor-path conversion (fees embedded) → Lemma B mark cap →
-  // out-haircut. Reserve sufficiency and the liquid floor stay on-chain; the gate below
-  // mirrors maxRedeem's fold.
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   const { actual: fair } = haircutFace(
     withdrawValue,
@@ -354,7 +400,18 @@ function crossExit(
     fromLeg.liabilities,
     fromLeg.haircutSuppressorBps,
   );
-  const q = quoteExactIn(holder.state, targetSym, outToken, fair);
+  const convert = backendConvert(holder.state, targetSym, outToken, b);
+  const q = await convert(fair).catch(() => null);
+  if (!q || !(q.amountOut > 0)) {
+    const shell: RouteShell = {
+      id: 'cross-exit',
+      label: 'cross withdraw (one call)',
+      out: 0,
+      hops: 1,
+      steps: [],
+    };
+    return { ...shell, feasible: false, reason: 'no-route', out: 0 };
+  }
   const markCap = fair * q.markPrice;
   const conv = q.amountOut > markCap ? markCap : q.amountOut;
   const { actual: out } = haircutFace(
@@ -382,17 +439,17 @@ function crossExit(
       },
     ],
   };
-  // Burns target-LP like every exit: capacity + season folded (maxRedeem mirror).
   return seasonGate(shell, targetSym, lpFaceIn, opts);
 }
 
-function transferExit(
+async function transferExit(
   pools: NamedPool[],
   targetSym: string,
   outToken: string,
   lpFaceIn: number,
   opts: LpRouteOpts,
-): RankedLpRoute | null {
+): Promise<RankedLpRoute | null> {
+  const b = needBackend(opts);
   const slip = opts.slippageFrac ?? DEFAULT_SLIP;
   const holder = poolHolding(pools, targetSym, outToken);
   if (!holder) return null;
@@ -430,18 +487,17 @@ function transferExit(
   };
   const flagged = flagGate(shell, [targetSym, outToken], opts);
   if (flagged) return flagged;
-  // Burn of the source LP is lock-gated, and the minted Y-LP is born frozen; this route needs
-  // seasoned target shares, and its tail cannot clear inside one atomic batch either way:
-  // sequential execution after the cooldown is the only path (spec §2.5).
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
   if (!gated.feasible) return gated;
 
-  const q = quoteSwapLiabilityCore(fromLeg, toLeg, lpFaceIn, (fair) =>
-    quoteExactIn(holder.state, targetSym, outToken, fair),
-  );
+  const q = await quoteSwapLiabilityCoreAsync(
+    fromLeg,
+    toLeg,
+    lpFaceIn,
+    backendConvert(holder.state, targetSym, outToken, b),
+  ).catch(() => null);
   if (!q) return { ...shell, feasible: false, reason: 'no-route', out: 0 };
 
-  // Same-asset exit of the received Y face: haircut only, no spread/proto fee (spec §2.1 B').
   const { actual: exitOut } = haircutFace(
     q.liabOut,
     toLeg.reserves,
@@ -456,18 +512,15 @@ function transferExit(
   return { ...shell, out: exitOut, feasible: true };
 }
 
-/** Redeem lpFaceIn (FACE units: shares · idx/WAD) of targetSym LP, ending in outToken tokens. */
-export function rankRedeem(
+/** Redeem lpFaceIn (FACE units) of targetSym LP, ending in outToken tokens. */
+export async function rankRedeem(
   pools: NamedPool[],
   targetSym: string,
   outToken: string,
   lpFaceIn: number,
   opts: LpRouteOpts = {},
-): RankedLpPlan {
+): Promise<RankedLpPlan> {
   if (!(lpFaceIn > 0)) return { best: null, routes: [] };
-  // Same-asset exit (spec §2.1 B' tail): T-LP -> T is a DIRECT withdraw: haircut only, no
-  // spread/proto fee, one call. The cross-exit pipeline quotes a self-conversion (out = 0), so
-  // short-circuit before enumeration.
   if (targetSym === outToken) {
     const holder = poolHolding(pools, targetSym, targetSym);
     const leg = holder && liabLeg(holder, targetSym, opts);
@@ -490,7 +543,6 @@ export function rankRedeem(
         },
       ],
     };
-    // Burns target-LP like every exit: capacity + season folded (maxRedeem mirror).
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
     const slip = opts.slippageFrac ?? DEFAULT_SLIP;
@@ -505,8 +557,11 @@ export function rankRedeem(
     gated.out = actual;
     return { best: gated, routes: [gated] };
   }
-  const cross = crossExit(pools, targetSym, outToken, lpFaceIn, opts);
-  const transfer = transferExit(pools, targetSym, outToken, lpFaceIn, opts);
+  needBackend(opts);
+  const cross = await crossExit(pools, targetSym, outToken, lpFaceIn, opts);
+  const transfer = await transferExit(pools, targetSym, outToken, lpFaceIn, opts);
   const routes = rankRoutes([cross, transfer].filter((r): r is RankedLpRoute => r !== null));
   return { best: routes.find((r) => r.feasible) ?? null, routes };
 }
+
+export { enumerateRoutes };

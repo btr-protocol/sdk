@@ -143,8 +143,9 @@ export {
   haircutFace,
   liabilitySwapEnabled,
   minLpAmountOut,
-  quoteSwapLiability,
+  quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
+  quoteSwapLiabilityCoreAsync,
 } from './liability.js';
 export type { YieldHookKind } from './hooks.js';
 export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
