@@ -1,24 +1,20 @@
 /**
- * ExternalOracleV4 - the deployed READ surface.
+ * ExternalOracleV4 - the deployed READ surface (V4-safe reads only).
  *
- * Named for the generation the fleet actually runs. The reads are the ones every packed-slot
- * oracle exposes (`IOracle.getFeed`, `feedConfig`, `feedIdAt`, and the NxrSignerSet roster
- * getters), so the same ABI also serves a V2 or V3 address; only the push paths and events
- * differ, and those are decoded from raw calldata (`oracle/wire.ts`), never through this ABI.
+ * The fleet runs V4 (cyclic clock, no EPOCH). Every entry here answers on a V4 address; the
+ * V2-only extras (`EPOCH`, `feedConfig`) live in {@link EXTERNAL_ORACLE_V2_EXTRA_ABI} and REVERT
+ * on V4. Push paths and events differ per generation and are decoded from raw calldata
+ * (`oracle/wire.ts`), never through this ABI.
  * Bundled statically: the transparency page must read the chain with zero server trust, so it
  * cannot depend on the backend ABI service.
  *
- * ! `EPOCH` IS NOT UNIVERSAL. V2/V3 date a push as EPOCH + sourceTsDs deciseconds; V4 dropped the
- * epoch entirely for a CYCLIC clock (`tsDs` = deciseconds since midnight UTC) and exposes
- * `DAY_DS`/`nowDs`/`MAX_RECON_AGE` instead, so calling `EPOCH` on a V4 address REVERTS. Gate the
- * call on the lane map's `wire` and reconstruct a v5 source time with `reconSecsFromDs` against
- * the pushing block's timestamp. Everything else here is safe on all three.
+ * ! V2/V3 clock reads need the lane map's `wire`: V2/V3 date a push as EPOCH + sourceTsDs
+ * deciseconds, V4 dropped the epoch for a CYCLIC clock (`tsDs` = deciseconds since midnight UTC).
+ * Reconstruct a v5 source time with `reconSecsFromDs` against the pushing block's timestamp.
+ * ! `feedConfig` IS V2-ONLY: V4 moved the per-feed config into the packed cfg word and exposes
+ * no struct getter for it.
  *
- * ! `feedConfig` IS V2/V3-ONLY for the same reason and REVERTS on V4, which moved the per-feed
- * config into the packed cfg word and exposes no struct getter for it. The consumer reads
- * (`getFeed`, `isFeedFresh`, `feedIdAt`, `session`, and the roster getters) are the portable set.
- *
- * Source: dex-evm src/oracles/ExternalOracleV{2,3,4}.sol + NxrSignerSet.sol.
+ * Source: dex-evm src/oracles/ExternalOracleV4.sol + NxrSignerSet.sol.
  */
 
 const FEED_DATA_COMPONENTS = [
@@ -32,14 +28,21 @@ const FEED_DATA_COMPONENTS = [
   { name: 'sourceTsMs', type: 'uint48', internalType: 'uint48' },
 ] as const;
 
+/** Live push session (relay + expiry + maxSeq + nonce). V3 and V4 share the shape. */
+const SESSION_FN = {
+  type: 'function',
+  name: 'session',
+  inputs: [],
+  outputs: [
+    { name: 'relay', type: 'address', internalType: 'address' },
+    { name: 'expiresAt', type: 'uint48', internalType: 'uint48' },
+    { name: 'maxSeq', type: 'uint32', internalType: 'uint32' },
+    { name: 'nonce', type: 'uint16', internalType: 'uint16' },
+  ],
+  stateMutability: 'view',
+} as const;
+
 export const EXTERNAL_ORACLE_V4_ABI = [
-  {
-    type: 'function',
-    name: 'EPOCH',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint32', internalType: 'uint32' }],
-    stateMutability: 'view',
-  },
   {
     type: 'function',
     name: 'getFeed',
@@ -56,22 +59,19 @@ export const EXTERNAL_ORACLE_V4_ABI = [
   },
   {
     type: 'function',
-    name: 'feedConfig',
+    name: 'isFeedFresh',
     inputs: [{ name: 'feedId', type: 'bytes32', internalType: 'bytes32' }],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct IExternalOracleV2.FeedConfig',
-        components: [
-          { name: 'globalIndex', type: 'uint32', internalType: 'uint32' },
-          { name: 'expBias', type: 'int8', internalType: 'int8' },
-          { name: 'maxDeviationBps', type: 'uint16', internalType: 'uint16' },
-          { name: 'ttlSecs', type: 'uint16', internalType: 'uint16' },
-          { name: 'flags', type: 'uint16', internalType: 'uint16' },
-        ],
-      },
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isFeedFresh',
+    inputs: [
+      { name: 'feedId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'maxAge', type: 'uint32', internalType: 'uint32' },
     ],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -81,11 +81,36 @@ export const EXTERNAL_ORACLE_V4_ABI = [
     outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
+  SESSION_FN,
   {
     type: 'function',
-    name: 'isFeedFresh',
+    name: 'nowDs',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'DAY_DS',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_RECON_AGE',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint32', internalType: 'uint32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'expHeadroom',
     inputs: [{ name: 'feedId', type: 'bytes32', internalType: 'bytes32' }],
-    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    outputs: [
+      { name: 'stepsUp', type: 'uint8', internalType: 'uint8' },
+      { name: 'stepsDown', type: 'uint8', internalType: 'uint8' },
+    ],
     stateMutability: 'view',
   },
   {
@@ -111,24 +136,43 @@ export const EXTERNAL_ORACLE_V4_ABI = [
   },
 ] as const;
 
-/** V3-only extra read: the live push session (relay + expiry + maxSeq + nonce). */
-export const EXTERNAL_ORACLE_V3_SESSION_ABI = [
+/** V2-only extras: revert on V4. Pair with {@link EXTERNAL_ORACLE_V4_ABI} for a legacy address. */
+export const EXTERNAL_ORACLE_V2_EXTRA_ABI = [
   {
     type: 'function',
-    name: 'session',
+    name: 'EPOCH',
     inputs: [],
+    outputs: [{ name: '', type: 'uint32', internalType: 'uint32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'feedConfig',
+    inputs: [{ name: 'feedId', type: 'bytes32', internalType: 'bytes32' }],
     outputs: [
-      { name: 'relay', type: 'address', internalType: 'address' },
-      { name: 'expiresAt', type: 'uint48', internalType: 'uint48' },
-      { name: 'maxSeq', type: 'uint32', internalType: 'uint32' },
-      { name: 'nonce', type: 'uint16', internalType: 'uint16' },
+      {
+        name: '',
+        type: 'tuple',
+        internalType: 'struct IExternalOracleV2.FeedConfig',
+        components: [
+          { name: 'globalIndex', type: 'uint32', internalType: 'uint32' },
+          { name: 'expBias', type: 'int8', internalType: 'int8' },
+          { name: 'maxDeviationBps', type: 'uint16', internalType: 'uint16' },
+          { name: 'ttlSecs', type: 'uint16', internalType: 'uint16' },
+          { name: 'flags', type: 'uint16', internalType: 'uint16' },
+        ],
+      },
     ],
     stateMutability: 'view',
   },
 ] as const;
 
+/** @deprecated V3 and V4 share the session shape; prefer {@link EXTERNAL_ORACLE_V4_ABI}. */
+export const EXTERNAL_ORACLE_V3_SESSION_ABI = [SESSION_FN] as const;
+
 /**
- * @deprecated use {@link EXTERNAL_ORACLE_V4_ABI}. Same bytes, honest name: the fleet runs V4, and
- * a V2 label on a V4 address is exactly the confusion the rename removes.
+ * @deprecated use {@link EXTERNAL_ORACLE_V4_ABI} (+ {@link EXTERNAL_ORACLE_V2_EXTRA_ABI} for a
+ * legacy V2 address). Kept so existing V2 callers keep compiling; a V2 label on a V4 address is
+ * exactly the confusion the rename removes.
  */
-export const EXTERNAL_ORACLE_V2_ABI = EXTERNAL_ORACLE_V4_ABI;
+export const EXTERNAL_ORACLE_V2_ABI = [...EXTERNAL_ORACLE_V4_ABI, ...EXTERNAL_ORACLE_V2_EXTRA_ABI];
