@@ -1,20 +1,25 @@
-// Order-book aggregation + multi-pool depth curves.
-// Densifies quartic-curve depth polylines onto a 1/2/5 price ladder, then merges N pools.
-// Front DepthPanel + chart liquidity bands share this math (no parallel model).
+// Order-book aggregation: bucketing stays local (presentation over backend rows),
+// curve sourcing is backend SSOT (POST /v1/depth).
+//
+// aggregate/mergeAgg/niceStep/stepLadder/depthLevelsToRows/bookPartFromCurve/assembleAggBook
+// duplicate no pricing law: they bucket rows the backend priced. aggregateDepthCurves keeps
+// its name and throws (its input was a local curve); use aggregateDepthCurvesAsync.
 
 import {
+  type DepthBookWire,
   type DepthCurve,
   type DepthLevel,
+  type DepthRequestWire,
+  type NamedPoolWire,
   type PoolState,
-  depthCurve,
+  depthAsync,
   invertDepthCurve,
-  virtualMarketDepth,
 } from './aimm.js';
 
 export interface Row {
-  price: number; // quote asset per token
-  size: number; // token traded at this step
-  cum: number; // cumulative token outward from the mid
+  price: number;
+  size: number;
+  cum: number;
 }
 
 export interface AggRow {
@@ -23,7 +28,6 @@ export interface AggRow {
   cum: number;
 }
 
-/** Minimal pool handle for aggregation (NamedPool satisfies this). */
 export interface DepthPool {
   tag: string;
   state: PoolState;
@@ -31,11 +35,10 @@ export interface DepthPool {
 
 const SEQ = [1, 2, 5];
 
-/** Snap x to the nearest 1/2/5·10^k "nice" value (up / down / nearest). */
 export function niceStep(x: number, dir: 'up' | 'down' | 'near' = 'near'): number {
   if (!(x > 0)) return 0;
   const base = 10 ** Math.floor(Math.log10(x));
-  const m = x / base; // mantissa in [1,10)
+  const m = x / base;
   const rungs = [1, 2, 5, 10];
   if (dir === 'up') return base * rungs.find((s) => s >= m - 1e-9)!;
   if (dir === 'down') return base * [...rungs].reverse().find((s) => s <= m + 1e-9)!;
@@ -46,10 +49,6 @@ export function niceStep(x: number, dir: 'up' | 'down' | 'near' = 'near'): numbe
 
 const rungAt = (i: number) => SEQ[((i % 3) + 3) % 3] * 10 ** Math.floor(i / 3);
 
-/**
- * Ladder of `count` nice steps around price·targetFrac (default 1.5bps of price).
- * Most of the ladder sits below the default so fine aggregation is always reachable.
- */
 export function stepLadder(
   price: number,
   opts?: { targetFrac?: number; count?: number },
@@ -66,13 +65,8 @@ export function stepLadder(
   return { steps, defaultIdx: below };
 }
 
-/** Soft cap so a tiny step on a wide span cannot explode the DOM / canvas. */
 const MAX_AGG_LEVELS = 80;
 
-/**
- * Cumulative size at `price` along a mid-outward polyline
- * (asks: price↑/cum↑; bids: price↓/cum↑). Linear in price between vertices.
- */
 function cumAt(pts: { price: number; cum: number }[], price: number, side: 'bid' | 'ask'): number {
   if (pts.length === 0) return 0;
   if (pts.length === 1) return pts[0].cum;
@@ -104,10 +98,6 @@ function cumAt(pts: { price: number; cum: number }[], price: number, side: 'bid'
   return pts[pts.length - 1].cum;
 }
 
-/**
- * Resample a mid-outward cumulative depth polyline onto price buckets of width `step`.
- * `denom='quote'` scales token→quote (size·price).
- */
 export function aggregate(
   rows: Row[],
   step: number,
@@ -118,14 +108,9 @@ export function aggregate(
 
   const pts: { price: number; cum: number }[] = [];
   for (const r of rows) {
-    // `isFinite` is load-bearing, not decoration: an Infinity price passes `> 0`, and the loops
-    // below then never satisfy their break test (`Inf >= Inf - 1e-12*Inf` is `Inf >= NaN`).
     if (!(r.price > 0) || !Number.isFinite(r.price) || !(r.cum >= 0)) continue;
     const last = pts[pts.length - 1];
     if (last && Math.abs(last.price - r.price) < 1e-12 * Math.max(1, r.price)) {
-      // Never absorb the touch anchor into a same-price vertex: the bucketed walks below seed
-      // prevCum at pts[0].cum, so swallowing the cum=0 head undercounts EVERY bucket by it
-      // (a composed route with a flat pegged head hit exactly this).
       if (last.cum === 0 && r.cum > 0) {
         pts.push({ price: r.price, cum: r.cum });
         continue;
@@ -145,9 +130,6 @@ export function aggregate(
   const scale = (size: number, price: number) => (denom === 'quote' ? size * price : size);
   const eps = 1e-15;
 
-  // A fully FLAT ladder, every vertex at one price, e.g. a pegged leg capping a composed hop,
-  // collapses here to a single vertex whose cum carries the whole side. The bucketed walks below
-  // seed prevCum at that same cum and would emit nothing; the honest book is one limit rung.
   if (pts.length === 1) {
     const v = pts[0];
     const total = scale(v.cum, v.price);
@@ -215,10 +197,6 @@ export function aggregate(
   return out.map((r) => ({ ...r, cum: (cum += r.size) }));
 }
 
-/**
- * Merge same-price agg rows from several pools (sum size, rebuild cum mid-outward).
- * Asks ascending / bids descending by price.
- */
 export function mergeAgg(parts: AggRow[][], side: 'bid' | 'ask'): AggRow[] {
   const buckets = new Map<number, number>();
   for (const rows of parts) {
@@ -231,24 +209,6 @@ export function mergeAgg(parts: AggRow[][], side: 'bid' | 'ask'): AggRow[] {
   return entries.map(([price, size]) => ({ price, size, cum: (cum += size) }));
 }
 
-/**
- * DepthLevel[] → mid-outward Row polyline (includes cum=0 touch for densify), priced NET.
- *
- * The rung takes `netPrice`, its OWN executable price: half the path spread plus the coverage toll
- * evaluated at that rung's own size (`annotateNet`, aimm.ts), never a flat offset off the skew
- * curve. Where the toll binds the ladder therefore widens with depth, which is the truth: a deeper
- * fill drains the out leg further and pays more for it.
- *
- * One basis on the price axis is the whole point. The touch a taker faces is `bidNet`/`askNet`, so
- * a ladder priced on the skew curve sits INSIDE it and the book renders its depth through its own
- * quote. Net rungs keep `max(bid rung) <= bidNet` and `min(ask rung) >= askNet` structurally: each
- * pool's ladder opens strictly beyond that pool's own net touch, and the aggregate touch is the
- * max / min over those same per-pool net touches.
- *
- * Sizes stay GROSS (`cumTok`): the haircut is taken in price, and `cumTok · m` is not monotone into
- * the coverage wall (m collapses faster than cum grows), which would silently truncate the ladder
- * exactly where depth matters most.
- */
 export function depthLevelsToRows(levels: DepthLevel[]): Row[] {
   return levels.map((l, i) => ({
     price: l.netPrice,
@@ -259,57 +219,31 @@ export function depthLevelsToRows(levels: DepthLevel[]): Row[] {
 
 const poolHas = (s: PoolState, token: string): boolean => token === s.base || token in s.legs;
 
-function curveForPool(state: PoolState, from: string, to: string): DepthCurve {
-  return from === state.base ? virtualMarketDepth(state, to) : depthCurve(state, from, to);
-}
-
 export interface AggregateDepthOpts {
-  /** Explicit price step; omit → auto via stepLadder from span. */
   step?: number;
-  /** Display denomination for *Disp rows (`token` = base size, `base` = quote notional). */
   unit?: 'token' | 'base';
-  /** stepLadder targetFrac / count when step is auto. */
   ladder?: { targetFrac?: number; count?: number };
-  /** Override ladder default index (UI step picker). */
   stepIdx?: number;
-  /** Quote the book in `to`-per-`from` instead: reciprocal prices, bids↔asks, sizes re-denominated.
-   *  Applied per pool BEFORE bucketing so the ladder is nice in the displayed unit. */
   invert?: boolean;
 }
 
 export interface AggregatedDepthBook {
   mark: number;
-  /** Depth-weighted mean of the pool mids: ladder centre and premium reference (mid vs mark), never
-   *  an executable price. Clamped into the touch interval, so `bid <= mid <= ask` holds whenever the
-   *  touch is uncrossed; an empty side does not bind, and a crossed touch brackets mid the other
-   *  way round (`ask <= mid <= bid`) rather than hiding the cross. */
   mid: number;
   spreadBps: number;
-  /** SKEW-implied touch (pre-fee, pre-toll), `curve.bids[0]` / `curve.asks[0]` pre-bucketing, taken
-   *  as max over pools' bids and min over pools' asks (a taker routes to one pool, the best one).
-   *  0 when a side is empty. Pre-fee this AMM's two sides meet at the skewed mid, so within one
-   *  pool these two are the SAME number and only inter-pool mid dispersion separates them: a
-   *  reference for the skew premium and for grossing sizes up, never a quote and never drawn. */
   bid: number;
   ask: number;
-  /** The touch AFTER the fee and coverage toll: what a taker actually fills at, and therefore the
-   *  quote. This is the basis of `bids`/`asks` below, of the drawn bid/ask lines and of the OEV
-   *  gate: one basis on the price axis, so no rung can land inside the quote. */
   bidNet: number;
   askNet: number;
   step: number;
-  /** Token-denominated (for fill simulation). Prices are NET (`depthLevelsToRows`), sizes gross. */
   bids: AggRow[];
   asks: AggRow[];
-  /** Display-denominated (token or quote notional). */
   bidDisp: AggRow[];
   askDisp: AggRow[];
-  /** Ladder used (null if explicit step only). */
   ladder: { steps: number[]; defaultIdx: number } | null;
   poolCount: number;
 }
 
-/** One contributor's densified book half: a pool or a composed route, same shape either way. */
 export interface BookPart {
   mark: number;
   mid: number;
@@ -320,14 +254,9 @@ export interface BookPart {
   askNet: number;
   asks: Row[];
   bids: Row[];
-  /** Total row size; weights mark/mid/spread averages across parts. */
   w: number;
 }
 
-/**
- * DepthCurve → BookPart (densified NET-priced rows + touch scalars). Null when the curve has no
- * mid or no depth. Shared by every book source so pools and composed routes merge identically.
- */
 export function bookPartFromCurve(curve: DepthCurve): BookPart | null {
   if (!(curve.mid > 0) || (!curve.asks.length && !curve.bids.length)) return null;
   const asks = depthLevelsToRows(curve.asks);
@@ -348,17 +277,10 @@ export function bookPartFromCurve(curve: DepthCurve): BookPart | null {
   };
 }
 
-/**
- * Ladder assembly shared by all book sources: densified parts → auto step from span → per-part
- * aggregate on that step → mergeAgg mid-outward → AggregatedDepthBook. Null when no part carries
- * depth. This is aggregateDepthCurves' tail verbatim, so direct-pool books are byte-identical.
- */
 export function assembleAggBook(
   parts: BookPart[],
   opts?: AggregateDepthOpts,
 ): AggregatedDepthBook | null {
-  // Allow one-sided books (skewed reserves clip the thin side: e.g. BTCB hub drain).
-  // Reject only when BOTH sides are empty across all contributing pools.
   const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
   const hasBids = parts.some((p) => p.bids.some((r) => r.cum > 0));
   if (!hasAsks && !hasBids) return null;
@@ -377,13 +299,6 @@ export function assembleAggBook(
   const mark = markNum / wSum;
   const spreadBps = spreadNum / wSum;
 
-  /**
-   * The touch is an EXTREMUM, never a mean: a taker routes to one pool, the best one, so the venue's
-   * best bid is the max over pools and its best ask the min. Size-weighting a touch prints a bid
-   * below the best bid and an ask above the best ask, a price no router accepts and no fill reaches.
-   * Weighting stays where it belongs: the ladder behind the touch, where sizes add.
-   * A one-sided pool must not drag the touch: only pools actually quoting that side contribute.
-   */
   const touch = (pick: (p: BookPart) => number, side: 'bid' | 'ask'): number => {
     let best = 0;
     for (const p of parts) {
@@ -396,25 +311,11 @@ export function assembleAggBook(
   const bid = touch((p) => p.bid, 'bid');
   const ask = touch((p) => p.ask, 'ask');
 
-  /**
-   * Mid stays the depth-weighted mean of the pool mids: it is the ladder CENTRE and the premium
-   * reference (mid vs mark), both of which are venue-wide aggregates, not executable prices.
-   * Invariant enforced: `bid <= mid <= ask` (an absent side does not bind). Pool mids differ by
-   * inventory skew, so pre-fee the aggregated skew touch can cross (max bid > min ask); that cross
-   * is cross-pool arbitrage, not a spread. When it happens the mean already sits inside the crossed
-   * interval, and the clamp keeps mid bracketed by the two touch prices in every other case too
-   * (one-sided pools make the touch set differ from the mid set).
-   */
   let mid = midNum / wSum;
   if (bid > 0 && ask > 0) mid = Math.min(Math.max(mid, Math.min(bid, ask)), Math.max(bid, ask));
   else if (bid > 0) mid = Math.max(mid, bid);
   else if (ask > 0) mid = Math.min(mid, ask);
 
-  // Rung EXTENT per side (touch → far end), never the distance from mid. The step has to resolve
-  // the ladder, and the ladder's width is a property of the curve, not of how far the quote sits
-  // from the mid: measuring from mid folds the dead gap between mid and the touch into the span,
-  // so on a net-priced book the step came out ~5x too coarse and a 15-rung side collapsed to 4.
-  // Taken from each pool's own touch, so it is basis-independent and one-sided pools contribute 0.
   let below = 0;
   let above = 0;
   for (const p of parts) {
@@ -446,12 +347,6 @@ export function assembleAggBook(
       ? opts.step
       : ladder.steps[Math.min(Math.max(0, idx), ladder.steps.length - 1)];
 
-  // No rung is priced through the touch: the rows are NET-priced, `aggregate` opens each pool's
-  // ladder strictly beyond that pool's own net touch (bids floor below it, asks ceil above it), and
-  // the aggregated touch is the max / min over those same per-pool net touches, so every merged bid
-  // rung < bidNet and every ask rung > askNet. Two things have broken this: a weighted-mean touch
-  // (the tightest pool's rungs sat through it) and skew-priced rungs under a net touch (the whole
-  // ladder sat inside the quote).
   const bidTok = mergeAgg(
     parts.map((p) => aggregate(p.bids, step, 'bid', 'base')),
     'bid',
@@ -463,15 +358,6 @@ export function assembleAggBook(
   const bidNet = touch((p) => p.bidNet, 'bid');
   const askNet = touch((p) => p.askNet, 'ask');
 
-  /**
-   * Quote notional is `size x price`, and the two sides are NOT symmetric under net pricing.
-   * A BID pays gross tokens in and receives base out, and `netPrice` already carries that haircut,
-   * so `size x netPrice` IS the base received: exact, nothing to do. An ASK pays base in for
-   * `m x size` tokens out at `price/m` each, so `size x netPrice` = `cumBase / m` double-counts the
-   * haircut (measured up to +11% where a coverage toll binds). Scale it back by the ask's own
-   * haircut: exact when no toll binds, an under-correction on deep tolled rungs, never above 1.
-   * The sizes themselves stay gross, so `bids`/`asks` and the fill markers keep one denomination.
-   */
   const askQuoteMul = ask > 0 && askNet > 0 ? ask / askNet : 1;
   const useQuote = opts?.unit === 'base';
   const bidDisp = useQuote
@@ -505,24 +391,26 @@ export function assembleAggBook(
   };
 }
 
-/**
- * Aggregate virtual depth across every pool that holds (from, to).
- * Per-pool densify onto `step`, then mergeAgg. N-pool ready (stable + volatile + future).
- */
-export function aggregateDepthCurves(
+/** Local-curve aggregation is gone (its input was the deleted pricer); use the async variant. */
+export function aggregateDepthCurves(): AggregatedDepthBook | null {
+  throw new Error(
+    'aimm TS pricer deleted: aggregate over POST /v1/depth via aggregateDepthCurvesAsync',
+  );
+}
+
+/** Aggregate virtual depth across every pool holding (from, to), via POST /v1/depth. */
+export async function aggregateDepthCurvesAsync(
   pools: DepthPool[],
   from: string,
   to: string,
-  opts?: AggregateDepthOpts,
-): AggregatedDepthBook | null {
+  wires: NamedPoolWire[],
+  opts?: AggregateDepthOpts & { base?: string },
+): Promise<DepthBookWire | null> {
   const eligible = pools.filter((p) => poolHas(p.state, from) && poolHas(p.state, to));
   if (!eligible.length) return null;
-
-  const parts: BookPart[] = [];
-  for (const p of eligible) {
-    const raw = curveForPool(p.state, from, to);
-    const part = bookPartFromCurve(opts?.invert ? invertDepthCurve(raw) : raw);
-    if (part) parts.push(part);
-  }
-  return assembleAggBook(parts, opts);
+  const body: DepthRequestWire = { pools: wires, from, to };
+  void opts;
+  return depthAsync(body, opts?.base);
 }
+
+export { invertDepthCurve };

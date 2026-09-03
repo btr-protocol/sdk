@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 // bun test: pins the swapLiability mirror against fixture numbers derived from the contract
 // source (PoolLiquidity.sol applyHaircut :93 / swapLiability :411, PoolConstantsLib.sol:15/:106).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/__fixtures__/profiles';
-import { type PoolState, buildLeg, quoteExactIn } from '../amm/aimm.js';
+import { type PoolState, buildLeg } from '../amm/aimm.js';
 import {
   HAIRCUT_SUPPRESSOR_FULL_BPS,
   LIABILITY_SWAP_ENABLED_BIT,
@@ -10,7 +10,7 @@ import {
   haircutFace,
   liabilitySwapEnabled,
   minLpAmountOut,
-  quoteSwapLiability,
+  quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
 } from './liability';
 
@@ -175,33 +175,67 @@ describe('quoteSwapLiabilityCore (pipeline order)', () => {
   });
 });
 
-describe('quoteSwapLiability (bound to aimm.quoteExactIn)', () => {
-  test('balanced pool: small transfer loses only the path spread, never clamps', () => {
-    const state = balancedState();
-    const inLeg = { ...legOf('AUDF', 1_000_000, 1_000_000), haircutSuppressorBps: 0 };
-    const q = quoteSwapLiability(state, inLeg, legOf('NZDF', 1_000_000, 1_000_000), 5_000);
-    expect(q).not.toBeNull();
-    expect(q?.markCapBinding).toBe(false);
-    // Mark is 1.0 and the book quotes around it, so received face < moved face by spread only.
-    expect(q?.liabOut).toBeLessThan(5_000);
-    expect(q?.liabOut).toBeGreaterThan(4_900);
-    const direct = quoteExactIn(state, 'AUDF', 'NZDF', 5_000);
-    expect(q?.convQuoted).toBe(direct.amountOut);
-    // Protocol fee exempt + no LP-fee booking: cost decomposition carries no fee rows.
-    expect(direct.protoFeeBps).toBeGreaterThanOrEqual(0); // quoted, but NOT charged on this path
-    expect(q?.haircutIn).toBe(0);
-    expect(q?.haircutOut).toBe(0);
+describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
+  const meta = {
+    addressOf: () => null,
+    decimalsOf: () => 6,
+  };
+  const backendOpts = { meta, baseDecimals: 6, backendBase: 'https://q.example/v1' };
+
+  const quoteWire = (amountOutRaw: bigint, midWad = 10n ** 18n) => ({
+    amount_out: `0x${amountOutRaw.toString(16)}`,
+    gross_out: `0x${amountOutRaw.toString(16)}`,
+    avg_price: `0x${midWad.toString(16)}`,
+    mid_price: `0x${midWad.toString(16)}`,
+    mark_price: `0x${midWad.toString(16)}`,
+    spread_pbps: 40,
+    cov_toll: '0x0',
+    proto_fee: '0x0',
+    lp_fee: '0x0',
   });
 
-  test('under-covered in-leg: haircut-in dominates and matches the standalone mirror', () => {
-    const state = balancedState();
-    const inLeg = legOf('AUDF', 600_000, 1_000_000); // 40% deficit
-    const outLeg = legOf('NZDF', 1_000_000, 1_000_000);
-    const q = quoteSwapLiability(state, inLeg, outLeg, 10_000);
-    const { haircut } = haircutFace(10_000, 600_000, 1_000_000, 0);
-    expect(q?.haircutIn).toBe(haircut);
-    expect(q?.haircutInBps).toBeCloseTo(4_000, 6);
-    expect(q?.convQuoted).toBe(quoteExactIn(state, 'AUDF', 'NZDF', 6_000).amountOut);
+  test('balanced pool: small transfer converts at the backend quote, never clamps', async () => {
+    const outs = [4_990_000_000n, 4_985_000_000n];
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(outs.shift() ?? 0n) });
+    try {
+      const state = balancedState();
+      const inLeg = { ...legOf('AUDF', 1_000_000, 1_000_000), haircutSuppressorBps: 0 };
+      const q = await quoteSwapLiabilityAsync(
+        state,
+        inLeg,
+        legOf('NZDF', 1_000_000, 1_000_000),
+        5_000,
+        backendOpts,
+      );
+      expect(q).not.toBeNull();
+      expect(q?.markCapBinding).toBe(false);
+      expect(q?.convQuoted).toBeCloseTo(4_985, 6);
+      expect(q?.haircutIn).toBe(0);
+      expect(q?.haircutOut).toBe(0);
+    } finally {
+      // @ts-expect-error restore the real fetch
+      globalThis.fetch = undefined;
+    }
+  });
+
+  test('under-covered in-leg: haircut-in dominates before the backend conversion', async () => {
+    const outs = [5_940_000_000n, 5_934_000_000n];
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(outs.shift() ?? 0n) });
+    try {
+      const state = balancedState();
+      const inLeg = legOf('AUDF', 600_000, 1_000_000); // 40% deficit
+      const outLeg = legOf('NZDF', 1_000_000, 1_000_000);
+      const q = await quoteSwapLiabilityAsync(state, inLeg, outLeg, 10_000, backendOpts);
+      const { haircut } = haircutFace(10_000, 600_000, 1_000_000, 0);
+      expect(q?.haircutIn).toBe(haircut);
+      expect(q?.haircutInBps).toBeCloseTo(4_000, 6);
+      expect(q?.fairIn).toBe(6_000);
+    } finally {
+      // @ts-expect-error restore the real fetch
+      globalThis.fetch = undefined;
+    }
   });
 });
 

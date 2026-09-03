@@ -1,13 +1,5 @@
-// AIMM: types + pure helpers. The float replica in aimm.ts is the off-chain approximation;
-// the integer-exact answer comes from Rust `btr-quote` over `POST /v1/quote` and `POST /v1/route`.
-//
-// This module used to export `quoteExactInAsync` and `routeAsync` as thin wrappers over those
-// two endpoints. Both were removed: they had no callers anywhere, and neither had ever worked.
-// They serialised camelCase (`tokenIn`, `amountIn`) against a service that requires snake_case,
-// so every call 400'd on `missing field \`token_in\``; and their `pools`/`poolState` payload was
-// the SDK's own `PoolState` shape, which is not the `NamedPoolWire` the endpoint accepts. Fixing
-// them meant writing a full PoolState -> wire mapper that already exists, correctly, in
-// `front/src/lib/quoteApi.ts`. A second, broken copy of it in the SDK is worse than none.
+// AIMM adapter surface: types + backend fetchers. Quotes route over POST /v1/quote|route,
+// depth over POST /v1/depth (btr-quote, btr-core SSOT). The f64 replica is deleted.
 
 export * from './aimm.js';
 export * from './depthAgg.js';
@@ -18,21 +10,15 @@ import type { PoolAsset } from '../pool/index.js';
 import { formatUnits } from '../utils/format.js';
 import { type AimmProfile, type PoolState, buildLeg } from './aimm.js';
 
-/** Per-spoke market inputs the chain doesn't serve: NX mark, feed σ (PBPS-scaled), profile, κ. */
 export interface LegFeed {
-  twap: number; // base-per-token
-  sigma: number; // sigma, PBPS-scaled (1e4 = 1%)
+  twap: number;
+  sigma: number;
   profile: AimmProfile;
-  kappaCovBps?: number; // default 0 = wall off
+  kappaCovBps?: number;
 }
 
 const toFloat = (v: bigint, decimals: number): number => Number(formatUnits(v, decimals));
 
-/**
- * Pure conversion: on-chain pool reads (`getPoolData().assets`, bigint) → the pricer's PoolState.
- * `base` = hub symbol (carries no leg; its reserves become every leg's baseRes); spokes without a
- * `feedOf` entry are skipped (no mark ⇒ unquotable).
- */
 export function poolStateFrom(
   assets: PoolAsset[],
   base: string,

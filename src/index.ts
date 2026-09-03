@@ -56,7 +56,7 @@ export * from './types/index.js';
 export * from './pool/index.js';
 export * from './router/index.js';
 
-// Off-chain AIMM pricer + route-finding (quoteExactIn, rankSwap, poolStateFrom)
+// Off-chain AIMM adapter: state assembly + backend fetchers (POST /v1/quote|route|depth)
 export * from './amm/index.js';
 
 // Deployed-venue registry + on-chain exact-in router

@@ -15,7 +15,16 @@
 // embedded spread only; no reserves move. The decomposition below surfaces each component so the
 // UI can show impact vs the 1:1-face baseline without hiding a binding clamp inside it.
 
-import { type PoolState, type Quote, quoteExactIn } from '../amm/aimm.js';
+import {
+  type PoolLeg,
+  type PoolState,
+  type Quote,
+  type QuoteResponseWire,
+  type WireMeta,
+  premiumBps,
+  quoteFromWire,
+  quoteLegAsync,
+} from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 
 /** SC.WAD */
@@ -155,17 +164,157 @@ export function quoteSwapLiabilityCore(
   };
 }
 
-/** Public mirror: conversion priced by the same off-chain replica the swap form ranks on. */
-export function quoteSwapLiability(
+/** Async mirror of the core pipeline with the conversion injected (backend quoter). */
+export async function quoteSwapLiabilityCoreAsync(
+  inLeg: LiabLeg,
+  outLeg: LiabLeg,
+  lpAmountIn: number,
+  convert: (fairIn: number) => Promise<Quote>,
+): Promise<SwapLiabilityQuote | null> {
+  if (!(lpAmountIn > 0)) return null;
+  const idxIn = idxOf(inLeg);
+  const idxOut = idxOf(outLeg);
+  const liabIn = (lpAmountIn * idxIn) / WAD;
+  if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
+
+  const { actual: fairIn, haircut: haircutIn } = haircutFace(
+    liabIn,
+    inLeg.reserves,
+    inLeg.liabilities,
+    inLeg.haircutSuppressorBps,
+  );
+
+  const q = await convert(fairIn);
+  const markCap = fairIn * q.markPrice;
+  const markCapBinding = q.amountOut > markCap;
+  const conv = markCapBinding ? markCap : q.amountOut;
+
+  const { actual: liabOut, haircut: haircutOut } = haircutFace(
+    conv,
+    outLeg.reserves,
+    outLeg.liabilities,
+    outLeg.haircutSuppressorBps,
+  );
+  const lpAmountOut = (liabOut * WAD) / idxOut;
+  if (!(lpAmountOut > 0)) return null;
+
+  const faceMoved = (lpAmountIn * idxIn) / WAD;
+  const faceReceived = (lpAmountOut * idxOut) / WAD;
+  return {
+    liabIn,
+    haircutIn,
+    fairIn,
+    convQuoted: q.amountOut,
+    markCap,
+    conv,
+    markCapBinding,
+    haircutOut,
+    liabOut,
+    lpAmountOut,
+    impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
+    haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
+    haircutOutBps: conv > 0 ? (haircutOut / conv) * 1e4 : 0,
+    convSpreadBps: q.spreadBps / 2,
+    convImpactBps: q.priceImpactBps,
+    markClampBps:
+      q.amountOut > 0 && markCapBinding ? ((q.amountOut - conv) / q.amountOut) * 1e4 : 0,
+  };
+}
+
+export interface BackendConvertOpts {
+  meta: WireMeta;
+  baseDecimals: number;
+  backendBase?: string;
+}
+
+/**
+ * Backend conversion for the liability pipeline: one POST /v1/quote per walked leg,
+ * composed in fill order over the backend's own outputs (no local curve math).
+ */
+export function backendConvert(
+  state: PoolState,
+  tokenIn: string,
+  tokenOut: string,
+  opts: BackendConvertOpts,
+): (fairIn: number) => Promise<Quote> {
+  const base = state.base;
+  const inBase = tokenIn === base;
+  const outBase = tokenOut === base;
+  const decIn = inBase ? opts.baseDecimals : (state.legs[tokenIn]?.decimals ?? opts.baseDecimals);
+  const legIn = state.legs[tokenIn];
+  const legOut = state.legs[tokenOut];
+  return async (fairIn: number): Promise<Quote> => {
+    if (!inBase && outBase && legIn) {
+      const w = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
+      return quoteFromWire(w, decIn, opts.baseDecimals, [tokenIn, tokenOut], fairIn);
+    }
+    if (inBase && !outBase && legOut) {
+      const w = await quoteLegAsync(legOut, fairIn, false, decIn, opts.backendBase);
+      return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, tokenOut], fairIn);
+    }
+    if (!inBase && !outBase && legIn && legOut) {
+      const w1 = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
+      const q1 = quoteFromWire(w1, decIn, opts.baseDecimals, [tokenIn, base], fairIn);
+      const baseMid = q1.amountOut;
+      const w2 = await quoteLegAsync(legOut, baseMid, false, opts.baseDecimals, opts.backendBase);
+      const q2 = quoteFromWire(w2, opts.baseDecimals, legOut.decimals, [base, tokenOut], baseMid);
+      const avg = fairIn > 0 && q2.amountOut > 0 ? q2.amountOut / fairIn : 0;
+      const mid = q1.midPrice * q2.midPrice;
+      const mark = q1.markPrice * q2.markPrice;
+      return {
+        amountOut: q2.amountOut,
+        grossOut: q2.grossOut,
+        avgPrice: avg,
+        midPrice: mid,
+        markPrice: mark,
+        midPremiumBps: premiumBps(mid, mark),
+        netPremiumBps: premiumBps(avg, mark),
+        priceImpactBps: q1.priceImpactBps + q2.priceImpactBps,
+        spreadBps: q1.spreadBps + q2.spreadBps,
+        lpFeeBps: q1.lpFeeBps + q2.lpFeeBps,
+        protoFeeBps: 0,
+        covTollBps: q2.covTollBps,
+        maxIn: Number.POSITIVE_INFINITY,
+        route: [tokenIn, base, tokenOut],
+      };
+    }
+    const empty: Quote = {
+      amountOut: 0,
+      grossOut: 0,
+      avgPrice: 0,
+      midPrice: 0,
+      markPrice: 0,
+      midPremiumBps: 0,
+      netPremiumBps: 0,
+      priceImpactBps: 0,
+      spreadBps: 0,
+      lpFeeBps: 0,
+      protoFeeBps: 0,
+      covTollBps: 0,
+      maxIn: 0,
+      route: [tokenIn, tokenOut],
+    };
+    return empty;
+  };
+}
+
+/** Backend-priced liability swap: same pipeline as the core, conversion over POST /v1/quote. */
+export function quoteSwapLiabilityAsync(
   state: PoolState,
   inLeg: LiabLeg,
   outLeg: LiabLeg,
   lpAmountIn: number,
-): SwapLiabilityQuote | null {
-  return quoteSwapLiabilityCore(inLeg, outLeg, lpAmountIn, (fairIn) =>
-    quoteExactIn(state, inLeg.symbol, outLeg.symbol, fairIn),
+  opts: BackendConvertOpts,
+): Promise<SwapLiabilityQuote | null> {
+  return quoteSwapLiabilityCoreAsync(
+    inLeg,
+    outLeg,
+    lpAmountIn,
+    backendConvert(state, inLeg.symbol, outLeg.symbol, opts),
   );
 }
+
+export type { PoolLeg, QuoteResponseWire, WireMeta };
 
 /** §1.3 slippage guard: minLpAmountOut = quoted shares · (1 − slippageFrac), bigint, rounded DOWN
  *  (same applySlip semantics as the market-swap minOut floors). The contract checks it against the

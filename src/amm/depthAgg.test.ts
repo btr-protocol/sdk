@@ -1,16 +1,16 @@
-// bun test: order-book aggregation ladder + multi-pool depth curves.
-import { describe, expect, test } from 'bun:test';
-import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
-import { type PoolState, buildLeg, quoteExactIn, virtualMarketDepth } from './aimm';
+// bun test: order-book aggregation ladder (bucketing over backend-priced rows).
+import { afterEach, describe, expect, test } from 'bun:test';
+import { STABLE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
+import { buildLeg } from './aimm.js';
 import {
   type Row,
   aggregate,
   aggregateDepthCurves,
+  aggregateDepthCurvesAsync,
   mergeAgg,
   niceStep,
   stepLadder,
 } from './depthAgg';
-import type { NamedPool } from './router';
 
 describe('niceStep', () => {
   test('snaps to 1/2/5 ladder (near)', () => {
@@ -93,409 +93,73 @@ describe('mergeAgg', () => {
   });
 });
 
-function miniPools(): NamedPool[] {
-  const usdtStable = buildLeg(
-    'USDT',
-    1,
-    sigmaSeed('stable'),
-    1_000_000,
-    1_000_000,
-    1_000_000,
-    18,
-    STABLE_PROFILE,
-  );
-  const usdtVol = buildLeg(
-    'USDT',
-    1,
-    sigmaSeed('volatile'),
-    800_000,
-    800_000,
-    800_000,
-    18,
-    VOLATILE_PROFILE,
-  );
-  const stable: PoolState = { base: 'USDC', legs: { USDT: usdtStable } };
-  const volatile: PoolState = { base: 'USDC', legs: { USDT: usdtVol } };
-  return [
-    { tag: 'stable', state: stable },
-    { tag: 'volatile', state: volatile },
-  ];
-}
-
-describe('aggregateDepthCurves', () => {
-  test('merges N pools holding the pair; finer step → more bands', () => {
-    const pools = miniPools();
-    const coarse = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.01 });
-    const fine = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.001 });
-    expect(coarse).not.toBeNull();
-    expect(fine).not.toBeNull();
-    expect(coarse!.poolCount).toBe(2);
-    expect(coarse!.mid).toBeGreaterThan(0);
-    expect(coarse!.bids.length).toBeGreaterThan(0);
-    expect(coarse!.asks.length).toBeGreaterThan(0);
-    expect(fine!.asks.length + fine!.bids.length).toBeGreaterThanOrEqual(
-      coarse!.asks.length + coarse!.bids.length,
-    );
+describe('aggregateDepthCurves (backend SSOT)', () => {
+  test('sync entry point is deleted: throws instead of pricing locally', () => {
+    expect(() => aggregateDepthCurves()).toThrow();
   });
 
-  test('one-sided pool still returns a book (skewed reserves)', () => {
-    const twap = 64_000;
-    const leg = buildLeg(
-      'BTCB',
-      twap,
-      sigmaSeed('volatile'),
-      10_000,
-      10_000,
-      10_000,
-      18,
-      VOLATILE_PROFILE,
-    );
-    const pool: NamedPool = { tag: 'volatile', state: { base: 'USDC', legs: { BTCB: leg } } };
-    const book = aggregateDepthCurves([pool], 'USDC', 'BTCB', { step: 50 });
-    expect(book).not.toBeNull();
-    expect(book!.asks.length + book!.bids.length).toBeGreaterThan(0);
+  const wire = {
+    mark: 1,
+    mid: 1.0001,
+    bid: 0.9999,
+    ask: 1.0003,
+    bid_net: 0.9998,
+    ask_net: 1.0004,
+    step: 0.0001,
+    bids: [{ price: 0.9998, size: 10, cum: 10 }],
+    asks: [{ price: 1.0004, size: 12, cum: 12 }],
+    poolCount: 1,
+  };
+
+  afterEach(() => {
+    // @ts-expect-error restore the real fetch
+    globalThis.fetch = undefined;
   });
 
-  // Regression: crossCurve used to return bids reversed (cum descending), which
-  // aggregate() collapsed to zero rows: WETH/WBTC printed asks only.
-  test('cross pair (neither leg is the hub base) prints BOTH sides', () => {
-    const weth = buildLeg(
-      'WETH',
-      1_880,
-      sigmaSeed('volatile'),
-      500,
-      500,
-      940_000,
-      18,
-      VOLATILE_PROFILE,
-    );
-    const wbtc = buildLeg(
-      'WBTC',
-      63_500,
-      sigmaSeed('volatile'),
-      15,
-      15,
-      952_500,
-      18,
-      VOLATILE_PROFILE,
-    );
-    const pool: NamedPool = {
-      tag: 'volatile',
-      state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } },
+  test('async variant POSTs /depth and returns the wire book', async () => {
+    let path = '';
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (url: string) => {
+      path = String(url);
+      return { ok: true, json: async () => wire };
     };
-    const book = aggregateDepthCurves([pool], 'WETH', 'WBTC');
-    expect(book).not.toBeNull();
-    expect(book!.asks.length).toBeGreaterThan(0);
-    expect(book!.bids.length).toBeGreaterThan(0);
-    // Bids sit below the mid, asks above.
-    expect(book!.bids[0].price).toBeLessThanOrEqual(book!.mid);
-    expect(book!.asks[0].price).toBeGreaterThanOrEqual(book!.mid);
-  });
-
-  // Regression: a drained hub erased the whole cross ladder. `capBidTok` clipped the sell leg on
-  // `baseRes`, so with the crypto core's live hub (266e-6 USDC against 3262 of liabilities,
-  // coverage 8.15e-08) BNB/XAUT swept 6e-8 tokens and `aggregate` returned zero rungs: the touch
-  // still priced, so the tape drew four price lines over an empty book. On chain `_legScaleOut`
-  // clips the DELIVERING leg only (Pricing.sol:806-809) and a spoke→base→spoke swap never moves
-  // the hub balance, so the hub is a numeraire here and must not bound the book at all.
-  test('cross ladder ignores the hub balance (drained hub == full hub)', () => {
-    const mk = (baseRes: number): NamedPool => ({
-      tag: 'volatile',
-      state: {
-        base: 'USDC',
-        legs: {
-          BNB: buildLeg(
-            'BNB',
-            638,
-            sigmaSeed('volatile'),
-            76.733824,
-            80.994363,
-            baseRes,
-            18,
-            VOLATILE_PROFILE,
-          ),
-          XAUT: buildLeg(
-            'XAUT',
-            4_380,
-            sigmaSeed('volatile'),
-            10.274214,
-            11.195566,
-            baseRes,
-            18,
-            VOLATILE_PROFILE,
-          ),
+    const pools = [
+      {
+        tag: 'stable',
+        state: {
+          base: 'USDC',
+          legs: {
+            USDT: buildLeg(
+              'USDT',
+              1,
+              sigmaSeed('stable'),
+              1_000_000,
+              1_000_000,
+              1_000_000,
+              18,
+              STABLE_PROFILE,
+            ),
+          },
         },
       },
+    ];
+    const book = await aggregateDepthCurvesAsync(pools, 'USDC', 'USDT', [], {
+      base: 'https://q.example/v1',
     });
-    const drained = aggregateDepthCurves([mk(266e-6)], 'BNB', 'XAUT');
-    const funded = aggregateDepthCurves([mk(50_000)], 'BNB', 'XAUT');
-    expect(drained).not.toBeNull();
-    expect(drained!.bids.length).toBeGreaterThan(0);
-    expect(drained!.asks.length).toBeGreaterThan(0);
-    expect(drained!.bids).toEqual(funded!.bids);
-    expect(drained!.asks).toEqual(funded!.asks);
-    // A cross quote is bounded by the BUY leg's reserve, never by the hub.
-    expect(quoteExactIn(mk(266e-6).state, 'BNB', 'XAUT', 1).amountOut).toBeGreaterThan(0.1);
-    // The hub still binds a DIRECT sell: there the base is the delivering leg.
-    const direct = aggregateDepthCurves([mk(266e-6)], 'USDC', 'BNB');
-    expect(direct!.bids.reduce((n, r) => n + r.size, 0)).toBeLessThan(
-      aggregateDepthCurves([mk(50_000)], 'USDC', 'BNB')!.bids.reduce((n, r) => n + r.size, 0),
-    );
+    expect(path).toBe('https://q.example/v1/depth');
+    expect(book?.mid).toBe(1.0001);
+    expect(book?.bids.length).toBe(1);
   });
 
-  // Regression: `netOutMul` returns EXACTLY 0 once the marginal coverage toll reaches 1
-  // (c <= κ/(κ+BPS); κ=5000 ⇒ c <= 1/3), so crossCurve's touch was `mid / 0` = Infinity. Rungs are
-  // priced off `netPrice`, and an Infinity price passes `> 0` and then makes `aggregate`'s break
-  // test `Inf >= Inf - 1e-12*Inf`, i.e. `Inf >= NaN`: the ask loop never terminates and the tab
-  // freezes. Asserted structurally, never by timing, so a regression fails instead of hanging.
-  test('a side past the coverage wall is empty, never a non-finite price', () => {
-    const weth = buildLeg(
-      'WETH',
-      1_880,
-      sigmaSeed('volatile'),
-      500,
-      500,
-      940_000,
-      18,
-      VOLATILE_PROFILE,
-    );
-    // res/liab = 0.2 < 1/3 with κ=5000: the wall refuses the whole fill at size 0.
-    const wbtc = buildLeg(
-      'WBTC',
-      63_500,
-      sigmaSeed('volatile'),
-      3,
-      15,
-      952_500,
-      18,
-      VOLATILE_PROFILE,
-      5_000,
-    );
-    const pool: NamedPool = {
-      tag: 'volatile',
-      state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } },
+  test('no pool holding the pair resolves to null without a round trip', async () => {
+    let called = false;
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async () => {
+      called = true;
+      return { ok: true, json: async () => wire };
     };
-    for (const [from, to] of [
-      ['WETH', 'WBTC'],
-      ['WBTC', 'WETH'],
-    ] as const) {
-      const book = aggregateDepthCurves([pool], from, to);
-      if (!book) continue;
-      for (const v of [book.bid, book.ask, book.bidNet, book.askNet, book.mid, book.step]) {
-        expect(Number.isFinite(v)).toBe(true);
-      }
-      for (const r of [...book.bids, ...book.asks]) {
-        expect(Number.isFinite(r.price)).toBe(true);
-        expect(r.price).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  test('touch is the un-bucketed curve[0] of each side, not a ladder-snapped row', () => {
-    const usdt = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      1_000_000,
-      1_000_000,
-      1_000_000,
-      18,
-      STABLE_PROFILE,
-    );
-    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
-    const curve = virtualMarketDepth(pool.state, 'USDT');
-    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.01 })!;
-    expect(book.bid).toBeCloseTo(curve.bids[0].price, 12);
-    expect(book.ask).toBeCloseTo(curve.asks[0].price, 12);
-    // Pre-fee the two sides meet at the skewed mid; the cost sits on the NET touch beside it.
-    expect(book.bid).toBeCloseTo(book.mid, 12);
-    expect(book.ask).toBeCloseTo(book.mid, 12);
-    expect(book.bidNet).toBeLessThan(book.mid);
-    expect(book.askNet).toBeGreaterThan(book.mid);
-    // The coarse ladder rounds the printed rows away from the touch; the touch must survive it.
-    expect(Math.abs(book.asks[0].price - book.ask)).toBeGreaterThan(0);
-  });
-
-  test('touch of an empty side is 0, and one side present still reports the other', () => {
-    const usdt = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      1_000_000,
-      1_000_000,
-      0,
-      18,
-      STABLE_PROFILE,
-    );
-    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
-    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.001 });
-    if (book) expect(book.ask > 0 || book.bid > 0).toBe(true);
-  });
-
-  // Two pools quoting the same pair carry their own inventory skew, hence their own mid. A taker
-  // routes to the best pool, so the venue touch is max-bid / min-ask, never the size-weighted mean.
-  function skewedPair(): { pools: NamedPool[]; midHi: number; midLo: number } {
-    // Same profile, different reserve/liability balance ⇒ different skew ⇒ different mid.
-    const hi = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      600_000,
-      1_000_000,
-      1_000_000,
-      18,
-      STABLE_PROFILE,
-    );
-    const lo = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      1_400_000,
-      1_000_000,
-      1_000_000,
-      18,
-      STABLE_PROFILE,
-    );
-    const pools: NamedPool[] = [
-      { tag: 'stable', state: { base: 'USDC', legs: { USDT: hi } } },
-      { tag: 'volatile', state: { base: 'USDC', legs: { USDT: lo } } },
-    ];
-    const midHi = virtualMarketDepth(pools[0].state, 'USDT').mid;
-    const midLo = virtualMarketDepth(pools[1].state, 'USDT').mid;
-    return { pools, midHi, midLo };
-  }
-
-  test('two pools with different mids: touch is max-bid / min-ask, not the mean', () => {
-    const { pools, midHi, midLo } = skewedPair();
-    expect(Math.abs(midHi - midLo)).toBeGreaterThan(0); // premise: the pools really do differ
-    const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.0001 })!;
-    const bids = pools.map((p) => virtualMarketDepth(p.state, 'USDT').bids[0]);
-    const asks = pools.map((p) => virtualMarketDepth(p.state, 'USDT').asks[0]);
-    expect(book.bid).toBeCloseTo(Math.max(...bids.map((l) => l.price)), 12);
-    expect(book.ask).toBeCloseTo(Math.min(...asks.map((l) => l.price)), 12);
-    expect(book.bidNet).toBeCloseTo(Math.max(...bids.map((l) => l.netPrice)), 12);
-    expect(book.askNet).toBeCloseTo(Math.min(...asks.map((l) => l.netPrice)), 12);
-    // The mean would sit strictly inside: a bid worse than the best bid, an ask worse than the best.
-    expect(book.bid).toBeGreaterThan((midHi + midLo) / 2);
-    expect(book.ask).toBeLessThan((midHi + midLo) / 2);
-  });
-
-  test('a one-sided pool does not drag the touch', () => {
-    const two = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      1_000_000,
-      1_000_000,
-      1_000_000,
-      18,
-      STABLE_PROFILE,
-    );
-    // baseRes = 0 ⇒ no bid side (capBidTok = 0); over-covered ⇒ its ask is the better one.
-    const askOnly = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      1_200_000,
-      1_000_000,
-      0,
-      18,
-      STABLE_PROFILE,
-    );
-    const solo: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: two } } };
-    const pools: NamedPool[] = [
-      solo,
-      { tag: 'volatile', state: { base: 'USDC', legs: { USDT: askOnly } } },
-    ];
-    const one = aggregateDepthCurves([solo], 'USDC', 'USDT', { step: 0.0001 })!;
-    const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step: 0.0001 })!;
-    const other = virtualMarketDepth(pools[1].state, 'USDT');
-    expect(other.bids.length).toBe(0); // premise: the second pool quotes one side only
-    expect(book.bid).toBeCloseTo(one.bid, 12); // bid untouched by the ask-only pool
-    expect(book.bidNet).toBeCloseTo(one.bidNet, 12);
-    expect(book.ask).toBeCloseTo(Math.min(one.ask, other.asks[0].price), 12);
-    expect(book.ask).toBeLessThan(one.ask); // it did contribute: the better ask won
-    expect(book.mid).toBeGreaterThanOrEqual(Math.min(book.bid, book.ask));
-    expect(book.mid).toBeLessThanOrEqual(Math.max(book.bid, book.ask));
-  });
-
-  test('single pool is unchanged by aggregation, and bid <= mid <= ask holds', () => {
-    const usdt = buildLeg(
-      'USDT',
-      1,
-      sigmaSeed('stable'),
-      900_000,
-      1_000_000,
-      1_000_000,
-      18,
-      STABLE_PROFILE,
-    );
-    const pool: NamedPool = { tag: 'stable', state: { base: 'USDC', legs: { USDT: usdt } } };
-    const curve = virtualMarketDepth(pool.state, 'USDT');
-    const book = aggregateDepthCurves([pool], 'USDC', 'USDT', { step: 0.0001 })!;
-    expect(book.mid).toBeCloseTo(curve.mid, 12);
-    expect(book.mark).toBeCloseTo(curve.mark, 12);
-    expect(book.bid).toBeCloseTo(curve.bids[0].price, 12);
-    expect(book.ask).toBeCloseTo(curve.asks[0].price, 12);
-    expect(book.bid).toBeLessThanOrEqual(book.mid);
-    expect(book.ask).toBeGreaterThanOrEqual(book.mid);
-  });
-
-  test('bid <= mid <= ask, and no rung is priced through the touch', () => {
-    const { pools } = skewedPair();
-    for (const step of [0.0001, 0.001, 0.01]) {
-      const book = aggregateDepthCurves(pools, 'USDC', 'USDT', { step })!;
-      const lo = Math.min(book.bid, book.ask);
-      const hi = Math.max(book.bid, book.ask);
-      expect(book.mid).toBeGreaterThanOrEqual(lo);
-      expect(book.mid).toBeLessThanOrEqual(hi);
-      // Every printed rung sits behind the touch it belongs to.
-      for (const r of book.bids) expect(r.price).toBeLessThan(book.bid);
-      for (const r of book.asks) expect(r.price).toBeGreaterThan(book.ask);
-    }
-  });
-
-  test('invert mirrors the book: reciprocal mid, sides swap, sizes change unit', () => {
-    const weth = buildLeg(
-      'WETH',
-      1_880,
-      sigmaSeed('volatile'),
-      500,
-      500,
-      940_000,
-      18,
-      VOLATILE_PROFILE,
-    );
-    const wbtc = buildLeg(
-      'WBTC',
-      63_500,
-      sigmaSeed('volatile'),
-      15,
-      15,
-      952_500,
-      18,
-      VOLATILE_PROFILE,
-    );
-    const pool: NamedPool = {
-      tag: 'volatile',
-      state: { base: 'USDC', legs: { WETH: weth, WBTC: wbtc } },
-    };
-    const fwd = aggregateDepthCurves([pool], 'WETH', 'WBTC')!;
-    const inv = aggregateDepthCurves([pool], 'WETH', 'WBTC', { invert: true })!;
-    expect(inv.mid).toBeCloseTo(1 / fwd.mid, 9);
-    expect(inv.mark).toBeCloseTo(1 / fwd.mark, 9);
-    // Best inverted bid ≈ reciprocal of the best forward ask (and vice versa), within a bucket.
-    expect(1 / inv.bids[0].price).toBeGreaterThan(fwd.asks[0].price - fwd.step);
-    expect(1 / inv.asks[0].price).toBeLessThan(fwd.bids[0].price + fwd.step);
-    // Sizes are re-denominated (~×mid), not copied over; a relabelled book would be identical.
-    const fwdTop = fwd.asks[fwd.asks.length - 1].cum;
-    const invTop = inv.bids[inv.bids.length - 1].cum;
-    expect(invTop / fwdTop).toBeGreaterThan((1 / fwd.mid) * 0.5);
-    // Ordering contract for aggregate(): cum ascending mid-outward on both sides.
-    for (const side of [inv.bids, inv.asks]) {
-      for (let i = 1; i < side.length; i++) expect(side[i].cum).toBeGreaterThan(side[i - 1].cum);
-    }
-    expect(inv.bids[0].price).toBeLessThanOrEqual(inv.mid);
-    expect(inv.asks[0].price).toBeGreaterThanOrEqual(inv.mid);
+    const pools = [{ tag: 'stable', state: { base: 'USDC', legs: {} } }];
+    expect(await aggregateDepthCurvesAsync(pools, 'FOO', 'BAR', [])).toBeNull();
+    expect(called).toBe(false);
   });
 });
