@@ -70,13 +70,15 @@
   "files": ["src", "README.md"],
   "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle"],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "build": "bun scripts/fetch-abis.ts && bun build ./src/index.ts --outdir ./dist --target node",
     "check": "bun run typecheck && bun test",
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
+    "fetch-abis": "bun scripts/fetch-abis.ts",
     "format": "bunx biome format --write src",
     "lint": "bunx biome check src",
-    "test": "bun test",
-    "typecheck": "bunx tsgo -p tsconfig.json --noEmit"
+    "postinstall": "bun scripts/fetch-abis.ts",
+    "test": "bun scripts/fetch-abis.ts && bun test",
+    "typecheck": "bun scripts/fetch-abis.ts && bunx tsgo -p tsconfig.json --noEmit"
   },
   "sideEffects": false,
   "type": "module",
