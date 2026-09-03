@@ -49,6 +49,13 @@ const hexToBytes = (h: string): Uint8Array =>
 const bytesToHex = (b: Uint8Array): Hex =>
   `0x${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
 
+// Byte-exact golden, pinned as literals so a regenerated fixture cannot drift silently:
+// hex and keccak must BOTH match, or the TS codec no longer reads chain-accepted bytes.
+const GOLDEN_HEX =
+  '0x050000000104656402010100170f0cf001159bff2f00000186a0010009' as Hex;
+const GOLDEN_KECCAK =
+  '0x6615180489aad02e35006978fa1ff39fbdd81129e84fa95037374454c5399b35' as Hex;
+
 describe('wire v5 fixture shape', () => {
   it('agrees with the constants the codec is built on', () => {
     expect(GOLDEN.wire_version).toBe(V5_BLOB_VERSION);
@@ -128,9 +135,11 @@ describe('wire v5 blob', () => {
   const bytes = hexToBytes(BLOB_HEX);
 
   it('pins the golden blob length and keccak256', () => {
+    expect(BLOB_HEX).toBe(GOLDEN_HEX);
+    expect(BLOB_HASH).toBe(GOLDEN_KECCAK);
     expect(bytes.length).toBe(BLOB.length);
     expect(bytes.length).toBe(V5_HEADER_BYTES + 2 * 5 + 1 * 5 + 1 * 3);
-    expect(keccak256(bytes)).toBe(BLOB_HASH);
+    expect(keccak256(bytes)).toBe(GOLDEN_KECCAK);
   });
 
   it('decodes the golden header and every section', () => {
@@ -152,8 +161,8 @@ describe('wire v5 blob', () => {
   it('re-encodes the golden blob byte-for-byte', () => {
     const d = decodeBlobV5(bytes);
     const re = encodeBlobV5(d);
-    expect(bytesToHex(re)).toBe(BLOB_HEX);
-    expect(keccak256(re)).toBe(BLOB_HASH);
+    expect(bytesToHex(re)).toBe(GOLDEN_HEX);
+    expect(keccak256(re)).toBe(GOLDEN_KECCAK);
   });
 
   it('round-trips a multi-magnitude blob (JPYC-scale through WBTC-scale)', () => {
