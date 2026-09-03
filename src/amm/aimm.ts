@@ -633,6 +633,8 @@ export function quoteFromWire(
   const markPrice = wadToF64(w.mark_price) * unit;
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
   const spreadBps = w.spread_pbps / 100;
+  const feeBps = (fee: string): number =>
+    grossOut > 0 ? (Number(BigInt(fee)) / Number(BigInt(w.gross_out))) * 1e4 : 0;
   return {
     amountOut,
     grossOut,
@@ -643,8 +645,8 @@ export function quoteFromWire(
     netPremiumBps: premiumBps(avgPrice, markPrice),
     priceImpactBps: midPrice > 0 && grossAvg > 0 ? Math.abs(grossAvg / midPrice - 1) * 1e4 : 0,
     spreadBps,
-    lpFeeBps: spreadBps / 2,
-    protoFeeBps: 0,
+    lpFeeBps: feeBps(w.lp_fee),
+    protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
     maxIn: Number.POSITIVE_INFINITY,
     route,
