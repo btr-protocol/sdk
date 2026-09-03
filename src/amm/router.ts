@@ -3,7 +3,7 @@
 // A route is one intra-pool leg or two legs across pools sharing a token. Enumeration
 // (enumerateRoutes) duplicates no pricing law: it only names pool tags and shared tokens.
 // Every function that priced (quoteRoute, rankSwap, aggregateDepth) keeps its name and
-// throws: rank over POST /v1/route via rankSwapAsync, depth over POST /v1/depth via
+// throws: rank over POST /v1/route via routeAsync, depth over POST /v1/depth via
 // aggregateDepthAsync. `sdk/router` (planToLegs + buildSwapCalls) turns plans into calldata.
 
 import {
@@ -144,9 +144,9 @@ function sharedTokens(
   return [b.base, ...Object.keys(b.legs)].filter((t) => inA.has(t));
 }
 
-const OFFLINE = 'aimm TS pricer deleted: rank over POST /v1/route via rankSwapAsync (backend SSOT)';
+const OFFLINE = 'aimm TS pricer deleted: rank over POST /v1/route via routeAsync (backend SSOT)';
 
-/** Priced server-side now; use rankSwapAsync. */
+/** Priced server-side now; use routeAsync. */
 export function quoteRoute(): RouteQuote {
   throw new Error(OFFLINE);
 }
@@ -157,7 +157,7 @@ export interface SplitOpts {
   maxRoutes?: number;
 }
 
-/** Priced server-side now; use rankSwapAsync. */
+/** Priced server-side now; use routeAsync. */
 export function rankSwap(): RankedSwap | null {
   throw new Error(OFFLINE);
 }
@@ -192,4 +192,6 @@ export async function aggregateDepthAsync(
 
 export type { DepthBookWire, NamedPoolWire, QuoteRouteWire, RouteRequestWire, RouteResponseWire };
 export { backendBase, routeAsync };
+/** Deleted-sync alias: old imports of rankSwapAsync resolve to the live routeAsync. */
+export { routeAsync as rankSwapAsync };
 export { aggregateDepthCurvesAsync };
