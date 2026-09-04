@@ -18,9 +18,6 @@ type InjectedProvider = Eip1193Provider & Partial<Record<string, unknown>>;
  *  getPath's dynamic walk, so only the named globals are typed here. */
 interface WalletWindow {
   ethereum?: InjectedProvider;
-  rabby?: InjectedProvider;
-  phantom?: { ethereum?: InjectedProvider };
-  coinbaseWalletExtension?: InjectedProvider;
 }
 
 export interface WalletInfo {
@@ -286,33 +283,8 @@ export const WALLETS: WalletDef[] = [
     path: 'xfi.ethereum',
     flag: 'isXDEFI',
   },
-  {
-    id: 'exodus',
-    name: 'Exodus',
-    url: 'https://exodus.com',
-    rdns: 'com.exodus',
-    path: 'exodus.ethereum',
-    flag: 'isExodus',
-  },
-  {
-    id: 'tally',
-    name: 'Taho',
-    url: 'https://taho.xyz',
-    rdns: 'xyz.taho',
-    path: 'tally',
-    flag: 'isTally',
-  },
-  {
-    id: 'core',
-    name: 'Core',
-    url: 'https://core.app',
-    rdns: 'app.core.extension',
-    path: 'avalanche',
-    flag: 'isAvalanche',
-  },
   { id: 'zeal', name: 'Zeal', url: 'https://zeal.app', rdns: 'app.zeal' },
   { id: 'nightly', name: 'Nightly', url: 'https://nightly.app', rdns: 'app.nightly' },
-  { id: 'guarda', name: 'Guarda', url: 'https://guarda.com' },
 ];
 
 // Build lookup maps from WALLETS array
@@ -502,48 +474,6 @@ export function mergeWallets(eip6963: Eip6963Detail[], legacy: WalletInfo[]): Wa
   return [...wallets, ...legacy.filter((w) => !seen.has(w.id))].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Specific Wallet Getters
-// ─────────────────────────────────────────────────────────────
-
-export function getMetaMask(): Eip1193Provider | null {
-  const w = win();
-  if (!w) return null;
-  const eth = w.ethereum;
-  const multi = multiProviders().find(
-    (p) => hasFlag(p, 'isMetaMask') && !hasFlag(p, 'isBraveWallet'),
-  );
-  if (multi) return multi;
-  return eth?.isMetaMask && !eth.isBraveWallet ? eth : null;
-}
-
-export function getBaseWallet(): Eip1193Provider | null {
-  const w = win();
-  if (!w) return null;
-  const cb = w.coinbaseWalletExtension;
-  if (cb?.request) return cb;
-  const multi = multiProviders().find((p) => hasFlag(p, 'isCoinbaseWallet'));
-  return multi || (w.ethereum?.isCoinbaseWallet ? w.ethereum : null);
-}
-
-export function getRabby(): Eip1193Provider | null {
-  const w = win();
-  if (!w) return null;
-  return w.rabby?.request ? w.rabby : w.ethereum?.isRabby ? w.ethereum : null;
-}
-
-export function getPhantom(): Eip1193Provider | null {
-  const w = win();
-  if (!w) return null;
-  const ph = w.phantom?.ethereum;
-  return ph?.request ? ph : w.ethereum?.isPhantom ? w.ethereum : null;
-}
-
-export function getInjected(): Eip1193Provider | null {
-  const eth = win()?.ethereum;
-  return eth?.request ? eth : null;
 }
 
 // ─────────────────────────────────────────────────────────────
