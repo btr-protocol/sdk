@@ -1,6 +1,11 @@
 /**
  * MITCH instrument ids, and the oracle feed identity derived from them.
  *
+ * Layout canonical: `back/crates/common/src/mitch.rs` (richest: decode +
+ * names + committed catalog) per `https://github.com/nxrates/mitch/blob/main/model/ticker.md`.
+ * This module + `keepers/src/mitch.rs` are structural mirrors (decode/encode/
+ * feed_id only); asset tables stay with the NXR resolver/generator.
+ *
  * The oracle's feed identity is migrating from `keccak256(abi.encodePacked(token, USDC))` to the
  * MITCH ticker id, left-padded into a bytes32. keccak names a feed after a PAIR OF ADDRESSES, so
  * the same asset has a different id on every chain, a faucet twin has an id no feed answers to,

@@ -11,6 +11,7 @@
 // at the first lookup instead of resolving to plausible-looking addresses.
 
 import type { Address, Hex } from '../eth/index.js';
+import { normalizeAddress } from '../eth/types.js';
 import { mitchFeedId } from '../oracle/mitch.js';
 import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { nxrMark } from './nxr.js';
@@ -24,7 +25,8 @@ export interface VenuePool {
   tokens?: Address[];
 }
 
-export const eqAddr = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+export const eqAddr = (a: string, b: string): boolean =>
+  normalizeAddress(a) === normalizeAddress(b);
 
 export const hasToken = (tokens: readonly Address[] | undefined, t: Address): boolean =>
   !!tokens?.some((x) => eqAddr(x, t));

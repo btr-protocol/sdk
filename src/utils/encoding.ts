@@ -1,6 +1,10 @@
 /**
  * Encoding utilities: Hex and Compact Formats
  * Keccak256 is exported from @sdk/eth (uses @noble/hashes)
+ *
+ * B64 layout canonical: `core/src/b64.rs` mirroring `B64Lib.sol`.
+ * `encodeB64`/`decodeB64` below are the TS mirror for off-chain codecs;
+ * parity vectors: USDC 1.0 = 4096000000000002371, WETH 1885.03 = 7721082880000002374.
  */
 
 // ─────────────────────────────────────────────────────────────
