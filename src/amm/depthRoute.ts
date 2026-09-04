@@ -43,21 +43,32 @@ export async function aggregatePairDepthAsync(
   if (!directPools.some(holds)) return null;
   const wire = await depthAsync({ pools: wires, from, to }, opts?.base);
   const flip = !!opts?.invert;
-  const rec = (v: number) => (flip && v > 0 ? 1 / v : 0);
+  const rec = (v: number): number | null => (v > 0 ? 1 / v : null);
+  const inv = (v: number): number => rec(v) ?? 0;
+  const spreadOf = (bid: number, ask: number, mid: number): number =>
+    bid > 0 && ask > 0 && mid > 0 ? (Math.abs(ask - bid) / mid) * 1e4 : 0;
   const rows = (rs: { price: number; size: number; cum: number }[]) =>
-    rs.map((r) => ({ price: flip ? rec(r.price) : r.price, size: r.size, cum: r.cum }));
+    flip
+      ? rs.flatMap((r) => {
+          const price = rec(r.price);
+          return price == null ? [] : [{ price, size: r.size, cum: r.cum }];
+        })
+      : rs.map((r) => ({ price: r.price, size: r.size, cum: r.cum }));
   const bids = rows(wire.bids);
   const asks = rows(wire.asks);
   if (flip) {
+    const bid = inv(wire.ask);
+    const ask = inv(wire.bid);
+    const mid = inv(wire.mid);
     const t = bids;
     return {
-      mark: rec(wire.mark),
-      mid: rec(wire.mid),
-      spreadBps: 0,
-      bid: rec(wire.ask),
-      ask: rec(wire.bid),
-      bidNet: rec(wire.ask_net),
-      askNet: rec(wire.bid_net),
+      mark: inv(wire.mark),
+      mid,
+      spreadBps: spreadOf(bid, ask, mid),
+      bid,
+      ask,
+      bidNet: inv(wire.ask_net),
+      askNet: inv(wire.bid_net),
       step: wire.step,
       bids: asks.map((r) => ({ ...r })),
       asks: bids.map((r) => ({ ...r })),
@@ -70,7 +81,7 @@ export async function aggregatePairDepthAsync(
   return {
     mark: wire.mark,
     mid: wire.mid,
-    spreadBps: 0,
+    spreadBps: spreadOf(wire.bid, wire.ask, wire.mid),
     bid: wire.bid,
     ask: wire.ask,
     bidNet: wire.bid_net ?? wire.bid,

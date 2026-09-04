@@ -19,11 +19,23 @@ export function getApiRoot() {
 export async function btrFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 10_000);
+  const caller = init?.signal;
+  if (caller?.aborted) {
+    clearTimeout(t);
+    throw caller.reason instanceof Error ? caller.reason : new Error('aborted');
+  }
+  const onCallerAbort = (): void => ctrl.abort();
+  caller?.addEventListener('abort', onCallerAbort, { once: true });
+  const signal =
+    caller && typeof AbortSignal.any === 'function'
+      ? AbortSignal.any([ctrl.signal, caller])
+      : ctrl.signal;
   try {
-    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal: ctrl.signal });
+    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal });
     if (!res.ok) throw new Error(`BTR API ${res.status} ${path}`);
     return (await res.json()) as T;
   } finally {
+    caller?.removeEventListener('abort', onCallerAbort);
     clearTimeout(t);
   }
 }

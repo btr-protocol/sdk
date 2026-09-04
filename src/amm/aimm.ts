@@ -479,16 +479,47 @@ export function backendBase(explicit?: string): string {
   return DEFAULT_BASE;
 }
 
+let quote429Until = 0;
+
+export function noteQuote429(ms = 20_000): void {
+  quote429Until = Math.max(quote429Until, Date.now() + ms);
+}
+
+function guardQuote429(path: string): void {
+  if (Date.now() < quote429Until) throw new Error(`btr-quote HTTP 429 ${path}: cooling down`);
+}
+
+function noteQuote429Status(status: number): void {
+  if (status === 429) noteQuote429();
+}
+
+function noteQuote429Error(e: unknown): void {
+  if (e instanceof Error && /(^| )429[ :]|HTTP 429/.test(e.message)) noteQuote429();
+}
+
 async function post<T>(
   base: string,
   path: '/quote' | '/route' | '/depth',
   body: unknown,
 ): Promise<T> {
-  const res = await fetch(`${base}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  guardQuote429(path);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10_000);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    noteQuote429Error(e);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+  noteQuote429Status(res.status);
   if (!res.ok) throw new Error(`btr-quote HTTP ${res.status} ${path}`);
   return (await res.json()) as T;
 }
@@ -516,7 +547,13 @@ export function depthAsync(req: DepthRequestWire, base?: string): Promise<DepthB
 const toHex = (v: bigint): string => `0x${v.toString(16)}`;
 const TWO_256 = 1n << 256n;
 const i256Hex = (v: bigint): string => toHex(v < 0n ? TWO_256 + v : v);
-const toU128Hex = (v: number): string => `0x${BigInt(Math.max(0, Math.round(v))).toString(16)}`;
+const MAX_U128 = (1n << 128n) - 1n;
+const toU128Hex = (v: number): string => {
+  if (!Number.isFinite(v) || v < 0) throw new Error(`toU128Hex out of range: ${v}`);
+  const b = BigInt(Math.round(v));
+  if (b < 0n || b > MAX_U128) throw new Error(`toU128Hex out of range: ${v}`);
+  return `0x${b.toString(16)}`;
+};
 
 /** Pack an SDK QuarticCurve into the CurveWire header (median pinned at BPS/2 = 5000). */
 export function curveToWire(c: QuarticCurve): CurveWire {
