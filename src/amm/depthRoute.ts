@@ -8,9 +8,7 @@
 
 import { type NamedPoolWire, depthAsync } from './aimm.js';
 import type { AggregateDepthOpts, AggregatedDepthBook, DepthPool } from './depthAgg.js';
-import { type NamedPool, enumerateRoutes } from './router.js';
-
-export { enumerateRoutes };
+import type { NamedPool } from './router.js';
 
 /** Composed books were priced locally; the backend serves hub pairs only. */
 export function aggregateRouteDepthCurves(): AggregatedDepthBook | null {
@@ -42,7 +40,6 @@ export async function aggregatePairDepthAsync(
   const directPools = direct ?? pools;
   const holds = (p: DepthPool) =>
     p.state.base === from || p.state.base === to || from in p.state.legs || to in p.state.legs;
-  void enumerateRoutes;
   if (!directPools.some(holds)) return null;
   const wire = await depthAsync({ pools: wires, from, to }, opts?.base);
   const flip = !!opts?.invert;

@@ -13,7 +13,7 @@ import {
   poolStateToWire,
   routeAsync,
 } from '../amm/aimm.js';
-import { type NamedPool, type SwapPlan, enumerateRoutes } from '../amm/router.js';
+import type { NamedPool, SwapPlan } from '../amm/router.js';
 import {
   type BackendConvertOpts,
   type LiabLeg,
@@ -630,5 +630,3 @@ export async function rankRedeem(
   const routes = rankRoutes([cross, transfer].filter((r): r is RankedLpRoute => r !== null));
   return { best: routes.find((r) => r.feasible) ?? null, routes };
 }
-
-export { enumerateRoutes };

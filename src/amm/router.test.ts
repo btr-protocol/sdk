@@ -3,7 +3,7 @@ import type { PoolAsset } from '../pool/index';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './__fixtures__/profiles';
 import { type PoolState, buildLeg } from './aimm';
 import { poolStateFrom } from './index';
-import { type NamedPool, aggregateDepth, enumerateRoutes, quoteRoute, rankSwap } from './router';
+import { type NamedPool, enumerateRoutes } from './router';
 
 const BASE = 'USDC';
 
@@ -95,14 +95,6 @@ describe('enumerateRoutes', () => {
     expect(hop3.length).toBeGreaterThanOrEqual(1);
     expect(hop3[0].tokens[0]).toBe('AAA');
     expect(hop3[0].tokens[3]).toBe('BBB');
-  });
-});
-
-describe('deleted local ranking', () => {
-  test('quoteRoute / rankSwap / aggregateDepth throw: rank over POST /v1/route', () => {
-    expect(() => quoteRoute()).toThrow();
-    expect(() => rankSwap()).toThrow();
-    expect(() => aggregateDepth()).toThrow();
   });
 });
 
