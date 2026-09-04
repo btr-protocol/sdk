@@ -1,6 +1,6 @@
 /**
- * Formatting utilities for numbers, currencies, durations, and text
- * Used across frontend and backend for consistent display
+ * Display formatting canonical for TS surfaces (front imports from here, never restates).
+ * Durations live in front `src/utils/datetime.ts`; Rust back formats server-side independently.
  */
 
 import { round } from './maths.js';
@@ -9,7 +9,7 @@ import { round } from './maths.js';
 // Currency
 // ─────────────────────────────────────────────────────────────
 
-export const CURRENCY_SYMBOLS: Record<string, string> = {
+const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
   EUR: '€',
   GBP: '£',
@@ -326,31 +326,6 @@ export function formatYield(n: number | null | undefined, signed = false): strin
 }
 
 // ─────────────────────────────────────────────────────────────
-// Duration / Time
-// ─────────────────────────────────────────────────────────────
-
-/** Format milliseconds to human-readable duration */
-export function formatDuration(ms: number | null | undefined): string {
-  if (!ms || ms < 0) return '0ms';
-
-  const s = ms / 1000;
-  if (s < 1) return `${Math.round(ms)}ms`;
-  if (s < 60) return `${round(s, 2)}s`;
-  if (s < 3600) return `${round(s / 60, 2)}m`;
-  if (s < 86400) return `${round(s / 3600, 2)}h`;
-  if (s < 31536000) return `${round(s / 86400, 2)}d`;
-  return `${round(s / 31536000, 2)}y`;
-}
-
-/** Format bytes to human-readable size */
-export function formatBytes(bytes: number | null | undefined): string {
-  if (!bytes || bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${round(bytes / 1024 ** i, 2)} ${units[i]}`;
-}
-
-// ─────────────────────────────────────────────────────────────
 // Text
 // ─────────────────────────────────────────────────────────────
 
@@ -360,76 +335,16 @@ export function shortenAddress(address: string, start = 4, end = 4, sep = '...')
   return `${address.slice(0, 2 + start)}${sep}${address.slice(-end)}`;
 }
 
-/** Convert string to URL-friendly slug */
-export function slugify(s: string, sep = '-'): string {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9.\s-]/g, '') // Keep dots for section numbers (1.1.1)
-    .replace(/\.\s+/g, sep) // "1.1.1. Something" -> "1.1.1-something"
-    .replace(/[\s_]+/g, sep)
-    .replace(new RegExp(`${sep}+`, 'g'), sep);
-}
-
-/** Slugify a doc file, handling category prefix for generic names like Overview */
-export function slugifyDoc(filename: string, categoryPrefix?: string): string {
-  const slug = slugify(filename);
-  // Prefix generic names with category number to avoid collisions
-  if (slug === 'overview' && categoryPrefix) {
-    const match = categoryPrefix.match(/^(\d+)\./);
-    if (match) return `${match[1]}-overview`;
-  }
-  return slug;
-}
-
-/** Convert slug back to readable string */
-export function unslug(s: string, sep = '-'): string {
-  return s
-    .split(sep)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
 /** Capitalize first letter of each word */
 export function capitalize(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/**
- * Generate anchor ID from heading text.
- * Only strips the trailing ". " from section numbers (e.g., "7.1. Title" -> "7.1-title").
- *
- * @example
- * generateAnchorId("2.2. Spending Authorities") // "2.2-spending-authorities"
- * generateAnchorId("7.1. Cross-Chain Voting") // "7.1-cross-chain-voting"
- */
-export function generateAnchorId(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/^([\d.]+)\.\s+/, '$1-') // Leading "X.Y. " -> "X.Y-" (only trailing dot of section number)
-    .replace(/[^a-z0-9\s.-]/g, '') // Remove special chars (keep dots, numbers, letters, spaces, dashes)
-    .replace(/\s+/g, '-') // Spaces to dashes
-    .replace(/-+/g, '-') // Collapse multiple dashes
-    .replace(/^-|-$/g, ''); // Trim leading/trailing dashes
-}
-
-// ─────────────────────────────────────────────────────────────
-// Parsing
-// ─────────────────────────────────────────────────────────────
-
-/** Parse formatted number string back to number */
-export function parseFormattedNumber(value: string): number {
-  if (!value) return 0;
-  const cleaned = value.replace(/[^0-9.-]+/g, '');
-  const num = Number.parseFloat(cleaned);
-  return Number.isNaN(num) ? 0 : num;
 }
 
 // ─────────────────────────────────────────────────────────────
 // Date/Time Formatting
 // ─────────────────────────────────────────────────────────────
 
-export const TIME_FORMATS = {
+const TIME_FORMATS = {
   TIME_24H: { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' },
   TIME_12H: { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' },
   DATE_LONG: { weekday: 'long', month: 'long', day: 'numeric' },
@@ -465,14 +380,4 @@ export function formatVerticalLineTime(timestamp: number): string {
   const hours = date.getUTCHours().toString().padStart(2, '0');
   const minutes = date.getUTCMinutes().toString().padStart(2, '0');
   return `${day}/${month} ${hours}:${minutes}`;
-}
-
-/** Format timestamp as relative time ("5m ago", "2h ago") */
-export function formatTimeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(timestamp).toLocaleDateString();
 }

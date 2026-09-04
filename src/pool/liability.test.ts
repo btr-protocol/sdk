@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import { type PoolState, buildLeg } from '../amm/aimm.js';
 // bun test: pins the swapLiability mirror against fixture numbers derived from the contract
 // source (PoolLiquidity.sol applyHaircut :93 / swapLiability :411, PoolConstantsLib.sol:15/:106).
-import { STABLE_PROFILE, sigmaSeed } from '../amm/__fixtures__/profiles';
-import { type PoolState, buildLeg } from '../amm/aimm.js';
+import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   HAIRCUT_SUPPRESSOR_FULL_BPS,
   LIABILITY_SWAP_ENABLED_BIT,

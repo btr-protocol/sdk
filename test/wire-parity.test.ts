@@ -106,7 +106,7 @@ describe('outage vs no-liquidity', () => {
     globalThis.fetch = undefined;
   });
   test('a 500 from /route surfaces backend-error, never a silent null', async () => {
-    const { STABLE_PROFILE, sigmaSeed } = await import('../src/amm/__fixtures__/profiles.js');
+    const { STABLE_PROFILE, sigmaSeed } = await import('../src/amm/profiles.js');
     const { buildLeg } = await import('../src/amm/aimm.js');
     const pools = [
       {

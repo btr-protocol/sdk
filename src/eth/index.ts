@@ -137,9 +137,6 @@ export { ERC4626_ABI } from './erc4626';
 export { ERC7540_ABI } from './erc7540';
 export { LAYERZERO_OFT_ABI } from './layerzero-oft';
 
-// Mock Data
-export { MOCK_PRICES, getMockPrice } from './mock';
-
 // RPC
 export {
   requestAccounts,
@@ -228,11 +225,6 @@ export {
   eip6963Providers,
   toWalletInfo,
   mergeWallets,
-  getMetaMask,
-  getBaseWallet,
-  getRabby,
-  getPhantom,
-  getInjected,
 } from './wallets';
 
 // ─────────────────────────────────────────────────────────────
