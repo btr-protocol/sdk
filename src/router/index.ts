@@ -15,13 +15,13 @@
 // itself, which is the point of deploying it.
 import { POOL_ABI } from '../abis/Pool.js';
 import { ROUTER_ABI } from '../abis/Router.js';
-import type { SwapPlan } from '../amm/router.js';
 import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
 import { applySlip } from '../utils/maths.js';
+import type { SwapPlan } from './route.js';
 export { applySlip };
 
 /** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
@@ -186,7 +186,7 @@ function inputCarver(
   };
 }
 
-/** Map a router plan (amm/router `best`) → ExecLeg[], largest part first (so the
+/** Map a router plan (router/route `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs
  *  where leg2.amountIn = leg1.minOut (the exact bridged amount isn't known until leg1 executes).
  *  `nativeIn`/`nativeOut` flag the outer legs so the batch wraps/unwraps around them.
