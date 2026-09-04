@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 // Offline wire parity: the deleted quote-parity net compared TS math to chain math over RPC.
 // No TS pricer remains, so parity is wire-level: hex codec round-trips, guards fail closed,
 // and malformed/outage wires never masquerade as no-liquidity.
-import { routeAsync } from '../src/amm/router.js';
+import { routeAsync } from '../src/amm/aimm.js';
 import { backendConvert } from '../src/pool/liability.js';
 import { hexToF64, rankDeposit, toRawHex, wirePlanToSwap } from '../src/router/lpRoutes.js';
 

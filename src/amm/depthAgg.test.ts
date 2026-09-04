@@ -1,6 +1,5 @@
 // bun test: order-book aggregation ladder (bucketing over backend-priced rows).
 import { afterEach, describe, expect, test } from 'bun:test';
-import { buildLeg } from './aimm.js';
 import {
   type Row,
   aggregate,
@@ -9,7 +8,8 @@ import {
   mergeAgg,
   niceStep,
   stepLadder,
-} from './depthAgg';
+} from '../router/depth.js';
+import { buildLeg } from './aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from './profiles';
 
 describe('niceStep', () => {

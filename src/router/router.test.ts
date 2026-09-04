@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import type { SwapPlan } from '../amm/router.js';
 import { type ExecLeg, type TokenMeta, buildSwapCalls, planToLegs, totalValue } from './index.js';
+import type { SwapPlan } from './route.js';
 
 const USER = '0x00000000000000000000000000000000000000AA' as const;
 const USDC = '0x0000000000000000000000000000000000000001' as const;

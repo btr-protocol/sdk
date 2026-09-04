@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { PoolAsset } from '../pool/index';
+import { type NamedPool, enumerateRoutes } from '../router/route.js';
 import { type PoolState, buildLeg } from './aimm';
 import { poolStateFrom } from './index';
 import { STABLE_PROFILE, VOLATILE_PROFILE, sigmaSeed } from './profiles';
-import { type NamedPool, enumerateRoutes } from './router';
 
 const BASE = 'USDC';
 

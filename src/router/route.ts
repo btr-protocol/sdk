@@ -1,11 +1,12 @@
 // Canonical route enumeration: quote-free, backend SSOT for ranking.
 //
-// A route is one intra-pool leg or two legs across pools sharing a token.
-// Enumeration names pool tags and shared tokens only (no pricing law); ranking
-// runs over POST /v1/route via routeAsync (aimm.js), depth over POST /v1/depth
-// via depth.js. `router/index.js` (planToLegs + buildSwapCalls) turns plans
-// into EIP-5792 calldata. Single home for pool predicates (poolHas,
-// poolHolding) shared by depth + lpRoutes.
+// A route is one intra-pool leg, two legs across pools sharing a token, or a
+// 3-hop fallback when no 2-hop join exists. Enumeration names pool tags and
+// shared tokens only (no pricing law); ranking runs over POST /v1/route via
+// routeAsync in amm/aimm.js, depth over POST /v1/depth via depthAsync there,
+// consumed through router/depth.js. `router/index.js` (planToLegs +
+// buildSwapCalls) turns plans into EIP-5792 calldata. Single home for pool
+// predicates (poolHas, poolHolding) shared by depth + lpRoutes.
 
 import type { PoolState } from '../amm/aimm.js';
 
