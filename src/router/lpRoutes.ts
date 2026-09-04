@@ -94,6 +94,30 @@ export interface RankedLpPlan {
 
 type RouteShell = Omit<RankedLpRoute, 'feasible' | 'reason'> & { steps: LpRouteStep[] };
 
+/** Single infeasible-shell pipeline: every dead route is built here, never as an inline literal. */
+const unfeasible = (route: RouteShell, reason: string, out = 0): RankedLpRoute => ({
+  ...route,
+  out,
+  feasible: false,
+  reason,
+});
+
+const MARKET_DEAD: RouteShell = {
+  id: 'market-first',
+  label: 'market swap, then deposit',
+  out: 0,
+  hops: 1,
+  steps: [],
+};
+
+const CROSS_DEAD: RouteShell = {
+  id: 'cross-exit',
+  label: 'cross withdraw (one call)',
+  out: 0,
+  hops: 1,
+  steps: [],
+};
+
 const seasonGate = (
   route: RouteShell,
   burnedSymbol: string,
@@ -102,7 +126,7 @@ const seasonGate = (
 ): RankedLpRoute => {
   const capacity = opts.maxRedeem?.(burnedSymbol);
   if (capacity !== undefined && capacity < burnedFace) {
-    return { ...route, feasible: false, reason: 'cooldown' };
+    return unfeasible(route, 'cooldown', route.out);
   }
   return { ...route, feasible: true };
 };
@@ -113,7 +137,7 @@ const flagGate = (
   opts: LpRouteOpts,
 ): RankedLpRoute | null => {
   if (!symbols.every((s) => opts.liabilityEnabled?.(s) ?? true)) {
-    return { ...route, feasible: false, reason: 'flag-disabled' };
+    return unfeasible(route, 'flag-disabled', route.out);
   }
   return null;
 };
@@ -229,15 +253,7 @@ async function marketMint(
   try {
     res = await routeAsync(req, b.backendBase);
   } catch {
-    return {
-      id: 'market-first',
-      label: 'market swap, then deposit',
-      out: 0,
-      hops: 1,
-      steps: [],
-      feasible: false,
-      reason: 'backend-error',
-    };
+    return unfeasible(MARKET_DEAD, 'backend-error');
   }
   let plan: SwapPlan;
   try {
@@ -248,15 +264,7 @@ async function marketMint(
       decOf,
     ));
   } catch {
-    return {
-      id: 'market-first',
-      label: 'market swap, then deposit',
-      out: 0,
-      hops: 1,
-      steps: [],
-      feasible: false,
-      reason: 'backend-error',
-    };
+    return unfeasible(MARKET_DEAD, 'backend-error');
   }
 
   const steps: LpRouteStep[] = [];
@@ -285,15 +293,17 @@ async function marketMint(
     });
   }
   if (placed < amountIn * 0.999) {
-    return {
-      id: 'market-first',
-      label: 'market swap, then deposit',
-      out: plan.amountOut,
-      hops: steps.length + 1,
-      steps,
-      feasible: false,
-      reason: 'capacity',
-    };
+    return unfeasible(
+      {
+        id: 'market-first',
+        label: 'market swap, then deposit',
+        out: plan.amountOut,
+        hops: steps.length + 1,
+        steps,
+      },
+      'capacity',
+      plan.amountOut,
+    );
   }
   const first = steps[0];
   steps.push({
@@ -374,9 +384,9 @@ async function transferMint(
       backendConvert(holder.state, xToken, targetSym, b),
     );
   } catch {
-    return { ...shell, feasible: false, reason: 'backend-error', out: 0 };
+    return unfeasible(shell, 'backend-error');
   }
-  if (!q) return { ...shell, feasible: false, reason: 'no-route', out: 0 };
+  if (!q) return unfeasible(shell, 'no-route');
   shell.steps[1].amountOut = q.lpAmountOut;
   shell.steps[1].minOut = q.lpAmountOut * (1 - slip);
   return { ...shell, out: q.lpAmountOut, feasible: true };
@@ -451,24 +461,10 @@ async function crossExit(
   try {
     q = await convert(fair);
   } catch {
-    const shell: RouteShell = {
-      id: 'cross-exit',
-      label: 'cross withdraw (one call)',
-      out: 0,
-      hops: 1,
-      steps: [],
-    };
-    return { ...shell, feasible: false, reason: 'backend-error', out: 0 };
+    return unfeasible(CROSS_DEAD, 'backend-error');
   }
   if (!q || !(q.amountOut > 0)) {
-    const shell: RouteShell = {
-      id: 'cross-exit',
-      label: 'cross withdraw (one call)',
-      out: 0,
-      hops: 1,
-      steps: [],
-    };
-    return { ...shell, feasible: false, reason: 'no-route', out: 0 };
+    return unfeasible(CROSS_DEAD, 'no-route');
   }
   const markCap = fair * q.markPrice;
   const conv = q.amountOut > markCap ? markCap : q.amountOut;
@@ -557,9 +553,9 @@ async function transferExit(
       backendConvert(holder.state, targetSym, outToken, b),
     );
   } catch {
-    return { ...shell, feasible: false, reason: 'backend-error', out: 0 };
+    return unfeasible(shell, 'backend-error');
   }
-  if (!q) return { ...shell, feasible: false, reason: 'no-route', out: 0 };
+  if (!q) return unfeasible(shell, 'no-route');
 
   const { actual: exitOut } = haircutFace(
     q.liabOut,

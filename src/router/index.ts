@@ -154,6 +154,48 @@ const toUnits = (v: number, decimals: number): bigint => {
   return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
 };
 
+/** Single route-plan pipeline: every plan→calls mapping starts here — largest part first, so the
+ *  sequential fallback fills the biggest slice first and residual dust rides on the last part. */
+function orderedParts(plan: SwapPlan): SwapPlan['parts'] {
+  return [...plan.parts].sort((a, b) => b.fraction - a.fraction);
+}
+
+/** One slippage gate for every plan→calls mapping. Unvalidated, slip >= 1 drives every minOut to
+ *  0: a batch with no slippage floor at all, which is the one failure mode planning exists to
+ *  prevent. NaN does the same. */
+function assertSlip(caller: string, slip: number): void {
+  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
+    throw new Error(`${caller}: slippageFrac must be in [0, 1), got ${slip}`);
+  }
+}
+
+/** Single call pipeline: one encoder per EIP-5792 call shape, shared by the legacy N-call path,
+ *  the on-chain router path, and the LP batches — identical bytes, one owner. */
+function approveCall(token: Address, spender: Address, amount: bigint): ExecCall {
+  return {
+    to: token,
+    data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [spender, amount] }),
+    value: 0n,
+  };
+}
+
+function wrapDepositCall(wnative: Address, value: bigint): ExecCall {
+  return { to: wnative, data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }), value };
+}
+
+function unwrapCall(wnative: Address, amount: bigint): ExecCall {
+  return {
+    to: wnative,
+    data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [amount] }),
+    value: 0n,
+  };
+}
+
+/** Deadline is read at send time, never baked at batch-build time (see buildSwapCalls). */
+function swapDeadline(opts: BuildOpts): bigint {
+  return opts.deadline ?? defaultDeadline();
+}
+
 /** Carve the caller's EXACT input across the plan's parts, in the order given.
  *
  *  Shared by BOTH execution paths (N pool calls, and one router call) so they cannot disagree
@@ -193,13 +235,9 @@ function inputCarver(
  *  Null when any pool address or token meta is missing. */
 export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null {
   const slip = opts.slippageFrac;
-  // Unvalidated, slip >= 1 drives every minOut to 0: a batch with no slippage floor at all,
-  // which is the one failure mode this function exists to prevent. NaN does the same.
-  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
-    throw new Error(`planToLegs: slippageFrac must be in [0, 1), got ${slip}`);
-  }
+  assertSlip('planToLegs', slip);
   const legs: ExecLeg[] = [];
-  const parts = [...plan.parts].sort((a, b) => b.fraction - a.fraction);
+  const parts = orderedParts(plan);
   // INPUT-LEG SIZING. `plan.amountIn` is an f64 and the pay leg is what the wallet is debited, so
   // rebuilding it from that float is the one place a rounding step can push the swap ABOVE the
   // balance the caller checked. With `amountInUnits` the slices are carved from THAT bigint: each
@@ -322,23 +360,11 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
       leg.wrapIn || !opts.needsApproval ? true : opts.needsApproval(leg.tokenIn, leg.pool, amount);
     if (need && !seen.has(key)) {
       seen.add(key);
-      approvals.push({
-        to: leg.tokenIn,
-        data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [leg.pool, amount] }),
-        value: 0n,
-      });
+      approvals.push(approveCall(leg.tokenIn, leg.pool, amount));
     }
   }
   const wrap: ExecCall[] =
-    wrapValue > 0n
-      ? [
-          {
-            to: opts.wrappedNative as Address,
-            data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
-            value: wrapValue,
-          },
-        ]
-      : [];
+    wrapValue > 0n ? [wrapDepositCall(opts.wrappedNative as Address, wrapValue)] : [];
   return [...wrap, ...approvals];
 }
 
@@ -347,7 +373,7 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
 export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
   const { unwrapAmount } = validateLegs(legs, wnative);
-  const deadline = opts.deadline ?? defaultDeadline();
+  const deadline = swapDeadline(opts);
   const swaps: ExecCall[] = legs.map((leg) => ({
     to: leg.pool,
     data: encodeFn({
@@ -358,15 +384,7 @@ export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
     value: 0n,
   }));
   const unwrap: ExecCall[] =
-    unwrapAmount > 0n
-      ? [
-          {
-            to: opts.wrappedNative as Address,
-            data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [unwrapAmount] }),
-            value: 0n,
-          },
-        ]
-      : [];
+    unwrapAmount > 0n ? [unwrapCall(opts.wrappedNative as Address, unwrapAmount)] : [];
   return [...swaps, ...unwrap];
 }
 
@@ -431,21 +449,17 @@ export function buildDepositCalls(
       },
     ];
   }
-  const deadline = opts.deadline ?? defaultDeadline();
+  const deadline = swapDeadline(opts);
+  // ONE approval total: the LP burn needs no allowance. Built directly — the old path faked an
+  // ExecLeg (minOut 0, never encoded as a swap) just to borrow buildApprovalCalls.
+  if (isSentinel(args.token) || isSentinel(args.targetToken)) {
+    throw new Error('leg carries the native sentinel: pass the wrapped-native address');
+  }
+  const amount = opts.approveMax ? MAX_UINT256 : args.amount;
+  const need = !opts.needsApproval ? true : opts.needsApproval(args.token, pool, amount);
+  const approval: ExecCall[] = need ? [approveCall(args.token, pool, amount)] : [];
   return [
-    ...buildApprovalCalls(
-      [
-        {
-          pool,
-          tokenIn: args.token,
-          tokenOut: args.targetToken,
-          amountIn: args.amount,
-          quotedOut: 0n,
-          minOut: 0n, // approval-only shim: never encoded as a swap
-        },
-      ],
-      opts,
-    ),
+    ...approval,
     {
       to: pool,
       data: encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [args.token, args.amount] }),
@@ -492,7 +506,7 @@ export function buildRedeemCalls(
   args: CrossRedeemArgs | TransferRedeemArgs,
   opts: BuildOpts,
 ): ExecCall[] {
-  const deadline = opts.deadline ?? defaultDeadline();
+  const deadline = swapDeadline(opts);
   if (args.mode === 'cross') {
     return [
       {
@@ -657,10 +671,8 @@ export interface RouterPlan {
  */
 export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan | null {
   const slip = opts.slippageFrac;
-  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
-    throw new Error(`planToRouterPlan: slippageFrac must be in [0, 1), got ${slip}`);
-  }
-  const ordered = [...plan.parts].sort((a, b) => b.fraction - a.fraction);
+  assertSlip('planToRouterPlan', slip);
+  const ordered = orderedParts(plan);
   if (ordered.length === 0) return null;
   const carve = inputCarver(plan, ordered.length, opts.amountInUnits);
 
@@ -742,9 +754,7 @@ export function refloorRouterPlan(
   freshOut: Map<string, bigint>,
   slippageFrac: number,
 ): RouterPlan {
-  if (!Number.isFinite(slippageFrac) || slippageFrac < 0 || slippageFrac >= 1) {
-    throw new Error(`refloorRouterPlan: slippageFrac must be in [0, 1), got ${slippageFrac}`);
-  }
+  assertSlip('refloorRouterPlan', slippageFrac);
   const floors = rp.floors.map((f) => {
     const key = f.token.toLowerCase();
     const fresh = freshOut.get(key);
@@ -784,29 +794,18 @@ export function buildRouterApprovalCalls(
   }
   const calls: ExecCall[] = [];
   if (rp.wrapValue > 0n) {
-    if (!opts.wrappedNative) {
+    const wnative = opts.wrappedNative;
+    if (!wnative) {
       throw new Error('buildRouterApprovalCalls: nativeIn plan needs opts.wrappedNative');
     }
-    calls.push({
-      to: opts.wrappedNative,
-      data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }),
-      value: rp.wrapValue,
-    });
+    calls.push(wrapDepositCall(wnative, rp.wrapValue));
   }
   for (const { token, amount } of totals.values()) {
     // Wrapped native holds no allowance before this batch wraps it, so it always needs one: the
     // caller's cached-allowance probe read a pre-batch state that cannot cover it.
     const wrapped = rp.wrapValue > 0n && token.toLowerCase() === opts.wrappedNative?.toLowerCase();
     if (!wrapped && opts.needsApproval && !opts.needsApproval(token, router, amount)) continue;
-    calls.push({
-      to: token,
-      data: encodeFn({
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [router, opts.approveMax ? MAX_UINT256 : amount],
-      }),
-      value: 0n,
-    });
+    calls.push(approveCall(token, router, opts.approveMax ? MAX_UINT256 : amount));
   }
   return calls;
 }
@@ -821,26 +820,24 @@ export function buildRouterSwapExecCalls(
   opts: BuildOpts,
 ): ExecCall[] {
   if (rp.parts.length === 0) throw new Error('buildRouterSwapExecCalls: empty plan');
+  const deadline = swapDeadline(opts);
   const calls: ExecCall[] = [
     {
       to: router,
       data: encodeFn({
         abi: ROUTER_ABI,
         functionName: 'swap',
-        args: [rp.parts, rp.floors, opts.recipient, opts.deadline ?? defaultDeadline()],
+        args: [rp.parts, rp.floors, opts.recipient, deadline],
       }),
       value: 0n,
     },
   ];
   if (rp.unwrapAmount > 0n) {
-    if (!opts.wrappedNative) {
+    const wnative = opts.wrappedNative;
+    if (!wnative) {
       throw new Error('buildRouterSwapExecCalls: nativeOut plan needs opts.wrappedNative');
     }
-    calls.push({
-      to: opts.wrappedNative,
-      data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [rp.unwrapAmount] }),
-      value: 0n,
-    });
+    calls.push(unwrapCall(wnative, rp.unwrapAmount));
   }
   return calls;
 }
