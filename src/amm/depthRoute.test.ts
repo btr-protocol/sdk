@@ -4,8 +4,8 @@ import {
   aggregatePairDepth,
   aggregatePairDepthAsync,
   aggregateRouteDepthCurves,
-} from './depthRoute.js';
-import type { NamedPool } from './router.js';
+} from '../router/depth.js';
+import type { NamedPool } from '../router/route.js';
 
 const wire = {
   mark: 1,

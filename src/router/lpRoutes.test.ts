@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { buildLeg } from '../amm/aimm.js';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
-import type { NamedPool } from '../amm/router.js';
 import { type BuildOpts, buildDepositCalls, buildRedeemCalls } from './index';
 import { type LpRouteOpts, rankDeposit, rankRedeem } from './lpRoutes';
+import type { NamedPool } from './route.js';
 
 const P = STABLE_PROFILE;
 const SIG = sigmaSeed('stable');

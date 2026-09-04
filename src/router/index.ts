@@ -529,7 +529,43 @@ export function buildRedeemCalls(
 }
 
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
-export * from './lpRoutes.js';
+export type {
+  NamedPool,
+  RouteLeg,
+  Route,
+  LegFill,
+  RouteQuote,
+  SplitPart,
+  SwapPlan,
+} from './route.js';
+export { poolHas, poolHolding, enumerateRoutes } from './route.js';
+export type {
+  Row,
+  AggRow,
+  DepthPool,
+  AggregateDepthOpts,
+  AggregatedDepthBook,
+  BookPart,
+  PairDepthOpts,
+} from './depth.js';
+export {
+  niceStep,
+  stepLadder,
+  aggregate,
+  mergeAgg,
+  depthLevelsToRows,
+  bookPartFromCurve,
+  assembleAggBook,
+  aggregateDepthCurves,
+  aggregateRouteDepthCurves,
+  aggregatePairDepth,
+  fetchDepthBook,
+  aggregateDepthAsync,
+  aggregateDepthCurvesAsync,
+  aggregatePairDepthAsync,
+} from './depth.js';
+export type { LpRouteOpts, LpRouteStep, RankedLpRoute, RankedLpPlan } from './lpRoutes.js';
+export { hexToF64, toRawHex, wirePlanToSwap, rankDeposit, rankRedeem } from './lpRoutes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ON-CHAIN ROUTER

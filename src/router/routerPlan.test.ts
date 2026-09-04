@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import { ROUTER_ABI } from '../abis/Router.js';
-import type { SwapPlan } from '../amm/router.js';
 import type { Address } from '../eth/index.js';
 import {
   type RouterPlan,
@@ -11,6 +10,7 @@ import {
   planToRouterPlan,
   refloorRouterPlan,
 } from './index.js';
+import type { SwapPlan } from './route.js';
 
 const ROUTER = '0x00000000000000000000000000000000000000FF' as Address;
 const USER = '0x00000000000000000000000000000000000000AA' as Address;
