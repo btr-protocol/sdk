@@ -186,7 +186,7 @@ function inputCarver(
   };
 }
 
-/** Map a router plan (amm/router rankSwap `best`) → ExecLeg[], largest part first (so the
+/** Map a router plan (amm/router `best`) → ExecLeg[], largest part first (so the
  *  sequential fallback fills the biggest slice first). Direct part = 1 leg; cross part = 2 legs
  *  where leg2.amountIn = leg1.minOut (the exact bridged amount isn't known until leg1 executes).
  *  `nativeIn`/`nativeOut` flag the outer legs so the batch wraps/unwraps around them.

@@ -2,8 +2,7 @@
 //
 // A route is one intra-pool leg or two legs across pools sharing a token. Enumeration
 // (enumerateRoutes) duplicates no pricing law: it only names pool tags and shared tokens.
-// Every function that priced (quoteRoute, rankSwap, aggregateDepth) keeps its name and
-// throws: rank over POST /v1/route via routeAsync, depth over POST /v1/depth via
+// Ranking runs over POST /v1/route via routeAsync, depth over POST /v1/depth via
 // aggregateDepthAsync. `sdk/router` (planToLegs + buildSwapCalls) turns plans into calldata.
 
 import {
@@ -17,7 +16,7 @@ import {
   depthAsync,
   routeAsync,
 } from './aimm.js';
-import { type AggRow, type DepthPool, aggregateDepthCurvesAsync } from './depthAgg.js';
+import { type DepthPool, aggregateDepthCurvesAsync } from './depthAgg.js';
 
 export interface NamedPool {
   tag: string;
@@ -65,10 +64,7 @@ export interface SwapPlan {
   isSplit: boolean;
 }
 
-export interface RankedSwap {
-  best: SwapPlan;
-  singles: RouteQuote[];
-}
+/** Combined book for (from, to) across every pool that holds the pair, via POST /v1/depth. */
 
 const poolHas = (s: import('./aimm.js').PoolState, token: string): boolean =>
   token === s.base || token in s.legs;
@@ -142,40 +138,6 @@ function sharedTokens(
 ): string[] {
   const inA = new Set<string>([a.base, ...Object.keys(a.legs)]);
   return [b.base, ...Object.keys(b.legs)].filter((t) => inA.has(t));
-}
-
-const OFFLINE = 'aimm TS pricer deleted: rank over POST /v1/route via routeAsync (backend SSOT)';
-
-/** Priced server-side now; use routeAsync. */
-export function quoteRoute(): RouteQuote {
-  throw new Error(OFFLINE);
-}
-
-export interface SplitOpts {
-  slices?: number;
-  minGainBps?: number;
-  maxRoutes?: number;
-}
-
-/** Priced server-side now; use routeAsync. */
-export function rankSwap(): RankedSwap | null {
-  throw new Error(OFFLINE);
-}
-
-// ── Aggregated market depth across all pools (DepthPanel + chart bands) ───────────
-
-export interface AggDepth {
-  mid: number;
-  bids: AggRow[];
-  asks: AggRow[];
-  step: number;
-}
-
-/** Served by POST /v1/depth now; use aggregateDepthAsync. */
-export function aggregateDepth(): AggDepth {
-  throw new Error(
-    'aimm TS pricer deleted: depth over POST /v1/depth via aggregateDepthAsync (backend SSOT)',
-  );
 }
 
 /** Combined book for (from, to) across every pool that holds the pair, via POST /v1/depth. */
