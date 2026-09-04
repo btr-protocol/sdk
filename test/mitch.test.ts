@@ -63,7 +63,9 @@ describe('MITCH ticker codec', () => {
     expect(mitchInstrumentName(MITCH_INSTRUMENT.Spot)).toBe('Spot');
     expect(mitchInstrumentName(MITCH_INSTRUMENT.Perpetual)).toBe('Perpetual');
     expect(mitchInstrumentName(MITCH_INSTRUMENT.Fund)).toBe('Fund');
-    expect(mitchInstrumentName(0xa)).toContain('Unknown');
+    expect(mitchInstrumentName(MITCH_INSTRUMENT.Warrant)).toBe('Warrant');
+    expect(mitchInstrumentName(MITCH_INSTRUMENT.Structured)).toBe('Structured');
+    expect(mitchInstrumentName(0xe)).toContain('Unknown');
   });
 });
 
