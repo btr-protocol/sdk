@@ -43,11 +43,15 @@ export function poolStateFrom(
       f.kappaCovBps ?? 0,
     );
   }
+  // The hub is an ENDPOINT: its liabilities + wall toll a sell into it and its vega enters the
+  // path spread in BOTH directions, so all three travel together off the base's own feed.
+  const baseFeed = feedOf(base);
   const hub = baseAsset
     ? {
         res: baseRes,
         liab: toFloat(baseAsset.liabilities, baseAsset.decimals),
-        kappaCovBps: feedOf(base)?.kappaCovBps ?? 0,
+        vegaBps: baseFeed?.profile.vega ?? 0,
+        kappaCovBps: baseFeed?.kappaCovBps ?? 0,
       }
     : undefined;
   return { base, legs, hub };
