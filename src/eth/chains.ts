@@ -252,9 +252,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   // Testnets / Dev
   // ═══════════════════════════════════════════════════════════
 
-  // Testnets / Dev
-  // ═══════════════════════════════════════════════════════════
-
   31337: {
     id: 31337,
     name: 'Anvil',
@@ -405,7 +402,6 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
     testnet: true,
   },
-
 };
 
 // ─────────────────────────────────────────────────────────────
