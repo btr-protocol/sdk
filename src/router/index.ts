@@ -246,6 +246,13 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   const partInUnits = inputCarver(plan, parts.length, opts.amountInUnits);
   for (const [i, part] of parts.entries()) {
     const rl = part.route.legs;
+    // This builder encodes ONE or TWO legs; the `else` below reads `rl[0]` and `rl[1]` and nothing
+    // more. A longer part used to fall into it and be encoded as its first two legs, delivering the
+    // INTERMEDIATE token and calling it the swap. That is reachable now that `/route` takes
+    // `max_hops` as a request parameter, so it fails closed instead: null is "no plan", which every
+    // caller already handles, and `planToRouterPlan` takes any number of hops for callers that have
+    // the on-chain Router.
+    if (rl.length === 0 || rl.length > 2) return null;
     if (rl.length === 1) {
       const tin = opts.tokenOf(rl[0].tokenIn);
       const tout = opts.tokenOf(rl[0].tokenOut);
@@ -552,7 +559,7 @@ export type {
   SplitPart,
   SwapPlan,
 } from './route.js';
-export { poolHas, poolHolding, enumerateRoutes } from './route.js';
+export { poolHas, poolHolding } from './route.js';
 export type {
   Row,
   AggRow,
