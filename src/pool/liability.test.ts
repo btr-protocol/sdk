@@ -32,7 +32,7 @@ function balancedState(): PoolState {
       AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
       NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
     },
-    hub: { res: 2_000_000, liab: 2_000_000, kappaCovBps: 0 },
+    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
   };
 }
 

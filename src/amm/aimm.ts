@@ -232,9 +232,12 @@ export interface PoolLeg {
   staleExcess?: number;
 }
 
+/** The hub's own book. It is an ENDPOINT, not a spoke: it carries liabilities, a coverage wall
+ *  and a vega, and every one of them prices a swap that touches the base. */
 export interface HubBook {
   res: number;
   liab: number;
+  vegaBps: number;
   kappaCovBps: number;
 }
 
@@ -403,12 +406,33 @@ export interface SpokeWire {
   proto_share_pct: number;
   decimals?: number;
 }
+/**
+ * One ENDPOINT of a swap path: the wire form of the chain's `Pricing.EndpointCache`.
+ *
+ * A leg is not a path. `Pricing._quotePath` caches an endpoint per side and the settle tail reads
+ * two things off them that no leg carries:
+ * - `acc.vegaBps = max(cIn.vegaBps, cOut.vegaBps)` — the spread's vega is the ENDPOINT max.
+ * - `_covToll(cOut, …)` — the coverage toll is charged on whichever endpoint the swap DELIVERS,
+ *   which on a spoke→base sell is the hub. The base carries a wall like every other listed asset
+ *   (`PoolConfig.requireNeverDepletable` rejects κ=0 at every writer).
+ */
+export interface EndpointWire {
+  reserves: string;
+  liabilities: string;
+  vega_bps: number;
+  kappa_cov_bps: number;
+}
 export interface NamedPoolWire {
   tag: string;
   addr?: string | null;
   base: string;
   base_address?: string | null;
   base_reserves?: string | null;
+  /** The rest of the hub's endpoint book; without it the backend drops any leg delivering the
+   *  base rather than quote it toll-free. */
+  base_liabilities?: string | null;
+  base_vega_bps?: number | null;
+  base_kappa_cov_bps?: number | null;
   spokes: SpokeWire[];
 }
 export interface RouteRequestWire {
@@ -595,6 +619,9 @@ export interface QuoteRequestWire {
   mark: string;
   sigma_pbps: number;
   selling: boolean;
+  /** The swap's OTHER endpoint (see {@link EndpointWire}): the hub on a direct spoke↔base leg,
+   *  {@link INTERIOR_ENDPOINT} for a hop whose far token is interior to a longer path. */
+  counterparty: EndpointWire;
   confidence_bps: number;
   stale_excess: number;
   proto_share_pct: number;
@@ -612,12 +639,43 @@ export interface QuoteResponseWire {
   lp_fee: string;
 }
 
-/** One leg as a /quote body. `selling` = paying the spoke into the hub. */
+/**
+ * No endpoint on the far side: this leg's output is INTERIOR to a longer path (a cross's first
+ * hop), so it is neither `cIn` nor `cOut` and the chain neither tolls it nor takes its vega.
+ * NOT a placeholder for a hub book the caller did not fetch — that is the under-quote
+ * {@link EndpointWire} exists to close.
+ */
+export const INTERIOR_ENDPOINT: EndpointWire = {
+  reserves: '0x0',
+  liabilities: '0x0',
+  vega_bps: 0,
+  kappa_cov_bps: 0,
+};
+
+/** A pool's hub as a path endpoint, in the hub token's native raw scale. */
+export function hubEndpointWire(hub: HubBook, hubDecimals: number): EndpointWire {
+  return {
+    reserves: toU128Hex(hub.res * 10 ** hubDecimals),
+    liabilities: toU128Hex(hub.liab * 10 ** hubDecimals),
+    vega_bps: hub.vegaBps,
+    kappa_cov_bps: hub.kappaCovBps,
+  };
+}
+
+/**
+ * One leg as a /quote body. `selling` = paying the spoke into the hub.
+ *
+ * `counterparty` is the path's far endpoint and is REQUIRED (no default): a direct leg passes
+ * {@link hubEndpointWire}, a cross's interior hop passes {@link INTERIOR_ENDPOINT}. It was
+ * absent from the first cut of this wire and every spoke→base sell quoted a zero coverage toll
+ * the chain still charged, so there is deliberately nothing to omit.
+ */
 export function legToQuoteBody(
   leg: PoolLeg,
   amountInTok: number,
   selling: boolean,
   decimalsIn: number,
+  counterparty: EndpointWire,
 ): QuoteRequestWire {
   return {
     curve: curveToWire(leg.profile.curve),
@@ -631,24 +689,26 @@ export function legToQuoteBody(
     mark: toHex(BigInt(Math.round(leg.twap * 1e18))),
     sigma_pbps: leg.sigma,
     selling,
+    counterparty,
     confidence_bps: leg.confidence ?? 0,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoShare),
   };
 }
 
-/** Single-leg exact-in quote over POST /v1/quote. */
+/** Single-leg exact-in quote over POST /v1/quote. `counterparty`: see {@link legToQuoteBody}. */
 export function quoteLegAsync(
   leg: PoolLeg,
   amountInTok: number,
   selling: boolean,
   decimalsIn: number,
+  counterparty: EndpointWire,
   base?: string,
 ): Promise<QuoteResponseWire> {
   return post<QuoteResponseWire>(
     backendBase(base),
     '/quote',
-    legToQuoteBody(leg, amountInTok, selling, decimalsIn),
+    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty),
   );
 }
 
@@ -690,7 +750,15 @@ export function quoteFromWire(
   };
 }
 
-/** PoolState → NamedPoolWire for /route|depth. */
+/**
+ * PoolState → NamedPoolWire for /route|depth.
+ *
+ * The hub goes out as a full ENDPOINT, not just a balance: the backend charges the coverage toll
+ * on whichever endpoint a leg delivers and takes the spread's vega as the endpoint max, so a
+ * pool that reports only `base_reserves` has its sells dropped rather than under-quoted.
+ * `state.hub` is the source; `baseRes` (a per-leg copy of the same balance) is the fallback for
+ * the reserves alone.
+ */
 export function poolStateToWire(
   tag: string,
   addr: string | undefined,
@@ -699,12 +767,16 @@ export function poolStateToWire(
   hubDecimals: number,
 ): NamedPoolWire {
   const hubLeg = Object.values(state.legs).find((l) => l.baseRes > 0);
+  const hub = state.hub ? hubEndpointWire(state.hub, hubDecimals) : null;
   return {
     tag,
     addr: addr ?? null,
     base: state.base,
     base_address: meta.addressOf(state.base),
-    base_reserves: hubLeg ? toU128Hex(hubLeg.baseRes * 10 ** hubDecimals) : null,
+    base_reserves: hub?.reserves ?? (hubLeg ? toU128Hex(hubLeg.baseRes * 10 ** hubDecimals) : null),
+    base_liabilities: hub?.liabilities ?? null,
+    base_vega_bps: hub?.vega_bps ?? null,
+    base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
     spokes: Object.values(state.legs).map((leg) => ({
       token: leg.token,
       address: meta.addressOf(leg.token),

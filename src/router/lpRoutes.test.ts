@@ -31,7 +31,7 @@ function pool(
           P,
         ),
       },
-      hub: { res: 3_000_000, liab: 2_000_000, kappaCovBps: 0 },
+      hub: { res: 3_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
     },
   };
 }
@@ -364,7 +364,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     state: {
       base: 'USDC',
       legs,
-      hub: { res: 3_000_000, liab: 2_000_000, kappaCovBps: 0 },
+      hub: { res: 3_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
     },
   };
 }

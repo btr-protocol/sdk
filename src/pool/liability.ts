@@ -16,12 +16,14 @@
 // UI can show impact vs the 1:1-face baseline without hiding a binding clamp inside it.
 
 import {
+  INTERIOR_ENDPOINT,
   type PoolLeg,
   type PoolState,
   type Quote,
   type QuoteResponseWire,
   type RouteRequestWire,
   type WireMeta,
+  hubEndpointWire,
   poolStateToWire,
   premiumBps,
   quoteFromWire,
@@ -195,6 +197,9 @@ export function backendConvert(
   const decIn = inBase ? opts.baseDecimals : (state.legs[tokenIn]?.decimals ?? opts.baseDecimals);
   const legIn = state.legs[tokenIn];
   const legOut = state.legs[tokenOut];
+  // A leg that touches the hub is settled against the HUB's endpoint (its coverage wall tolls a
+  // sell into it, its vega enters the spread both ways). No hub book ⇒ no honest quote.
+  const hub = state.hub ? hubEndpointWire(state.hub, opts.baseDecimals) : null;
   const toU128 = (tok: number, dec: number): string => {
     if (!Number.isFinite(tok) || tok < 0) throw new Error('backendConvert: non-finite amount');
     const scaled = Math.round(tok * 10 ** dec);
@@ -203,11 +208,13 @@ export function backendConvert(
   };
   return async (fairIn: number): Promise<Quote> => {
     if (!inBase && outBase && legIn) {
-      const w = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
+      if (!hub) throw new Error('backendConvert: no hub book for a sell into the base');
+      const w = await quoteLegAsync(legIn, fairIn, true, decIn, hub, opts.backendBase);
       return quoteFromWire(w, decIn, opts.baseDecimals, [tokenIn, tokenOut], fairIn);
     }
     if (inBase && !outBase && legOut) {
-      const w = await quoteLegAsync(legOut, fairIn, false, decIn, opts.backendBase);
+      if (!hub) throw new Error('backendConvert: no hub book for a buy out of the base');
+      const w = await quoteLegAsync(legOut, fairIn, false, decIn, hub, opts.backendBase);
       return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (!inBase && !outBase && legIn && legOut) {
@@ -220,10 +227,25 @@ export function backendConvert(
       };
       const routed = await routeAsync(req, opts.backendBase);
       const amountOut = Number(BigInt(routed.best_amount_out)) / 10 ** legOut.decimals;
-      const w1 = await quoteLegAsync(legIn, fairIn, true, decIn, opts.backendBase);
+      // Cross: the hub is INTERIOR on both hops, never the path's delivering endpoint.
+      const w1 = await quoteLegAsync(
+        legIn,
+        fairIn,
+        true,
+        decIn,
+        INTERIOR_ENDPOINT,
+        opts.backendBase,
+      );
       const q1 = quoteFromWire(w1, decIn, opts.baseDecimals, [tokenIn, base], fairIn);
       const baseMid = q1.amountOut;
-      const w2 = await quoteLegAsync(legOut, baseMid, false, opts.baseDecimals, opts.backendBase);
+      const w2 = await quoteLegAsync(
+        legOut,
+        baseMid,
+        false,
+        opts.baseDecimals,
+        INTERIOR_ENDPOINT,
+        opts.backendBase,
+      );
       const q2 = quoteFromWire(w2, opts.baseDecimals, legOut.decimals, [base, tokenOut], baseMid);
       const avg = fairIn > 0 && amountOut > 0 ? amountOut / fairIn : 0;
       const mid = q1.midPrice * q2.midPrice;
