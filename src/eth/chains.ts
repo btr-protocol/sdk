@@ -142,21 +142,6 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  100: {
-    id: 100,
-    name: 'Gnosis',
-    rpcUrls: [
-      'https://rpc.gnosischain.com',
-      'https://rpc.ankr.com/gnosis',
-      'https://gnosis-mainnet.public.blastapi.io',
-      'https://1rpc.io/gnosis',
-    ],
-    nativeCurrency: { name: 'xDai', symbol: 'XDAI', decimals: 18 },
-    blockExplorerUrls: ['https://gnosisscan.io'],
-    wrappedNative: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
   137: {
     id: 137,
     name: 'Polygon',
@@ -192,21 +177,6 @@ export const CHAINS: Record<number, ChainConfig> = {
   // Layer 2s / Rollups
   // ═══════════════════════════════════════════════════════════
 
-  10: {
-    id: 10,
-    name: 'Optimism',
-    rpcUrls: [
-      'https://mainnet.optimism.io',
-      'https://rpc.ankr.com/optimism',
-      'https://optimism.llamarpc.com',
-      'https://1rpc.io/op',
-    ],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://optimistic.etherscan.io'],
-    wrappedNative: '0x4200000000000000000000000000000000000006',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
   42161: {
     id: 42161,
     name: 'Arbitrum One',
@@ -238,114 +208,9 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  59144: {
-    id: 59144,
-    name: 'Linea',
-    rpcUrls: ['https://rpc.linea.build', 'https://1rpc.io/linea', 'https://linea.drpc.org'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://lineascan.build'],
-    wrappedNative: '0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  5000: {
-    id: 5000,
-    name: 'Mantle',
-    rpcUrls: [
-      'https://rpc.mantle.xyz',
-      'https://rpc.ankr.com/mantle',
-      'https://mantle-mainnet.public.blastapi.io',
-      'https://1rpc.io/mantle',
-    ],
-    nativeCurrency: { name: 'Mantle', symbol: 'MNT', decimals: 18 },
-    blockExplorerUrls: ['https://mantlescan.xyz'],
-    wrappedNative: '0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  534352: {
-    id: 534352,
-    name: 'Scroll',
-    rpcUrls: [
-      'https://rpc.scroll.io',
-      'https://rpc.ankr.com/scroll',
-      'https://scroll-mainnet.public.blastapi.io',
-      'https://1rpc.io/scroll',
-    ],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://scrollscan.com'],
-    wrappedNative: '0x5300000000000000000000000000000000000004',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  324: {
-    id: 324,
-    name: 'zkSync Era',
-    rpcUrls: ['https://mainnet.era.zksync.io', 'https://zksync.drpc.org'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://explorer.zksync.io'],
-    wrappedNative: '0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
   // ═══════════════════════════════════════════════════════════
   // Alt L1s / Emerging Chains
   // ═══════════════════════════════════════════════════════════
-
-  14: {
-    id: 14,
-    name: 'Flare',
-    rpcUrls: ['https://flare-api.flare.network/ext/C/rpc'],
-    nativeCurrency: { name: 'Flare', symbol: 'FLR', decimals: 18 },
-    blockExplorerUrls: ['https://flare-explorer.flare.network'],
-    wrappedNative: '0x1D80c49BbBCd1C0911346656B529DF9E5C2F783d',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  130: {
-    id: 130,
-    name: 'Unichain',
-    rpcUrls: ['https://mainnet.unichain.org'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://uniscan.xyz'],
-    wrappedNative: '0x4200000000000000000000000000000000000006',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  143: {
-    id: 143,
-    name: 'Monad',
-    rpcUrls: ['https://rpc.monad.xyz'],
-    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
-    blockExplorerUrls: ['https://monadvision.com'],
-    wrappedNative: '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  146: {
-    id: 146,
-    name: 'Sonic',
-    rpcUrls: [
-      'https://rpc.soniclabs.com',
-      'https://rpc.ankr.com/sonic_mainnet',
-      'https://sonic.drpc.org',
-    ],
-    nativeCurrency: { name: 'Sonic', symbol: 'S', decimals: 18 },
-    blockExplorerUrls: ['https://sonicscan.org'],
-    wrappedNative: '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  480: {
-    id: 480,
-    name: 'World Chain',
-    iconSlug: 'worldchain',
-    rpcUrls: ['https://worldchain-mainnet.g.alchemy.com/public'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://worldscan.org'],
-    wrappedNative: '0x4200000000000000000000000000000000000006',
-    multicall3: MULTICALL3_ADDRESS,
-  },
 
   999: {
     id: 999,
@@ -358,59 +223,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  1329: {
-    id: 1329,
-    name: 'Sei',
-    rpcUrls: ['https://evm-rpc.sei-apis.com'],
-    nativeCurrency: { name: 'Sei', symbol: 'SEI', decimals: 18 },
-    blockExplorerUrls: ['https://seiscan.io'],
-    wrappedNative: '0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  2741: {
-    id: 2741,
-    name: 'Abstract',
-    rpcUrls: ['https://api.mainnet.abs.xyz'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://abscan.org'],
-    wrappedNative: '0x3439153eb7af838ad19d56e1571fbd09333c2809',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  9745: {
-    id: 9745,
-    name: 'Plasma',
-    iconSlug: 'plasma',
-    rpcUrls: ['https://rpc.plasma.to'],
-    nativeCurrency: { name: 'Plasma', symbol: 'XPL', decimals: 18 },
-    blockExplorerUrls: ['https://plasmascan.to'],
-    wrappedNative: '0x6100E367285b01F48D07953803A2d8dCA5D19873',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  42220: {
-    id: 42220,
-    name: 'Celo',
-    iconSlug: 'celo',
-    rpcUrls: ['https://forno.celo.org'],
-    nativeCurrency: { name: 'Celo', symbol: 'CELO', decimals: 18 },
-    blockExplorerUrls: ['https://celoscan.io'],
-    wrappedNative: '0x471EcE3750Da237f93B8E339c536989b8978a438',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  747474: {
-    id: 747474,
-    name: 'Katana',
-    iconSlug: 'katana',
-    rpcUrls: ['https://rpc.katana.network'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://katanascan.com'],
-    wrappedNative: '0xee7d8bcfb72bc1880d0cf19822eb0a2e6577ab62',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
+  // ═══════════════════════════════════════════════════════════
   196: {
     id: 196,
     name: 'X Layer',
@@ -436,6 +249,9 @@ export const CHAINS: Record<number, ChainConfig> = {
   },
 
   // ═══════════════════════════════════════════════════════════
+  // Testnets / Dev
+  // ═══════════════════════════════════════════════════════════
+
   // Testnets / Dev
   // ═══════════════════════════════════════════════════════════
 
@@ -491,21 +307,6 @@ export const CHAINS: Record<number, ChainConfig> = {
     nativeErc20: '0x3600000000000000000000000000000000000000',
     testnet: true,
   },
-
-  11155111: {
-    id: 11155111,
-    name: 'Ethereum Sepolia Testnet',
-    // publicnode first: tenderly 429s under any real load, and ankr answers
-    // every request with "Unauthorized: you must authenticate with an API key",
-    // so it was a guaranteed-dead second hop that starved every on-chain read.
-    rpcUrls: ['https://ethereum-sepolia.publicnode.com', 'https://sepolia.gateway.tenderly.co'],
-    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://sepolia.etherscan.io'],
-    wrappedNative: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
-    multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
-  },
-
   97: {
     id: 97,
     name: 'BNB Chain Testnet',
@@ -604,6 +405,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
     testnet: true,
   },
+
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -643,7 +445,6 @@ export function getExplorerUrl(chainId: number): string | undefined {
 
 /**
  * Get block explorer URL for a transaction hash on the given chain.
- * Sepolia (11155111) → https://sepolia.etherscan.io/tx/0x…
  */
 export function getExplorerTxUrl(chainId: number, hash: string): string | undefined {
   const base = getExplorerUrl(chainId);
