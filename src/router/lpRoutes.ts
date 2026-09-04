@@ -13,7 +13,6 @@ import {
   poolStateToWire,
   routeAsync,
 } from '../amm/aimm.js';
-import type { NamedPool, SwapPlan } from '../amm/router.js';
 import {
   type BackendConvertOpts,
   type LiabLeg,
@@ -22,6 +21,8 @@ import {
   haircutFace,
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
+import type { NamedPool, SwapPlan } from './route.js';
+import { poolHolding } from './route.js';
 
 export interface LpRouteOpts {
   slippageFrac?: number;
@@ -63,11 +64,6 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     haircutSuppressorBps: suppressor,
     indexWad,
   };
-}
-
-function poolHolding(pools: NamedPool[], a: string, b: string): NamedPool | undefined {
-  const has = (p: NamedPool, t: string) => t === p.state.base || t in p.state.legs;
-  return pools.find((p) => has(p, a) && has(p, b));
 }
 
 export interface LpRouteStep {
@@ -159,7 +155,7 @@ export function wirePlanToSwap(
   req: { tokenIn: string; tokenOut: string; amountIn: number },
   res: Awaited<ReturnType<typeof routeAsync>>,
   decOf: (sym: string) => number,
-): { plan: SwapPlan; singles: import('../amm/router.js').RouteQuote[] } {
+): { plan: SwapPlan; singles: import('./route.js').RouteQuote[] } {
   try {
     const addrOf = (tag: string) => pools.find((p) => p.tag === tag)?.addr;
     const toRoute = (legs: { pool_tag: string; token_in: string; token_out: string }[]) => {
@@ -174,7 +170,7 @@ export function wirePlanToSwap(
         if (tokens[tokens.length - 1] !== leg.tokenOut) tokens.push(leg.tokenOut);
       return { legs: rl, tokens, hops: rl.length };
     };
-    const toQuote = (q: QuoteRouteWire): import('../amm/router.js').RouteQuote => {
+    const toQuote = (q: QuoteRouteWire): import('./route.js').RouteQuote => {
       const r = toRoute(q.legs);
       const fills = q.legs.map((l, i) => ({
         leg: r.legs[i],
