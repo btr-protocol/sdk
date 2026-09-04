@@ -1,10 +1,10 @@
 /**
  * MITCH instrument ids, and the oracle feed identity derived from them.
  *
- * Layout canonical: `back/crates/common/src/mitch.rs` (richest: decode +
- * names + committed catalog) per `https://github.com/nxrates/mitch/blob/main/model/ticker.md`.
- * This module + `keepers/src/mitch.rs` are structural mirrors (decode/encode/
- * feed_id only); asset tables stay with the NXR resolver/generator.
+ * Layout canonical: `core/src/mitch.rs` (btr-core SSoT: decode + names +
+ * committed catalog) per `https://github.com/nxrates/mitch/blob/main/model/ticker.md`.
+ * This module + `back/crates/common/src/mitch.rs` + `keepers/src/mitch.rs` are thin
+ * structural mirrors (decode/encode/feed_id only); asset tables stay with the NXR resolver/generator.
  *
  * The oracle's feed identity is migrating from `keccak256(abi.encodePacked(token, USDC))` to the
  * MITCH ticker id, left-padded into a bytes32. keccak names a feed after a PAIR OF ADDRESSES, so
@@ -35,7 +35,7 @@ export interface MitchTicker {
   subType: number;
 }
 
-/** MITCH instrument types (bits 63-60). */
+/** MITCH instrument types (bits 63-60), mirroring `core/src/mitch.rs`. */
 export const MITCH_INSTRUMENT = {
   Spot: 0x0,
   Future: 0x1,
@@ -45,7 +45,12 @@ export const MITCH_INSTRUMENT = {
   Cfd: 0x5,
   Call: 0x6,
   Put: 0x7,
+  Digital: 0x8,
+  Barrier: 0x9,
+  Warrant: 0xa,
+  Prediction: 0xb,
   Fund: 0xc,
+  Structured: 0xd,
 } as const;
 
 const INSTRUMENT_NAMES: Record<number, string> = Object.fromEntries(
