@@ -1,6 +1,7 @@
 /**
- * Math utilities for rounding, precision, and numerical operations
- * Used across frontend, backend, and SDK for consistent number handling
+ * f64 UI helpers ONLY (rounding, stats, axis ticks, display precision).
+ * Canonical pricing law lives in `core/src/fixed.rs` + `core/src/pricing.rs`
+ * (served via backend `btr-quote`); never add fixed-point/quote math here.
  */
 
 // ─────────────────────────────────────────────────────────────

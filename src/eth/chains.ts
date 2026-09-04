@@ -1,6 +1,9 @@
 /**
- * Chain Configuration - Canonical Source of Truth
+ * Chain Configuration - Canonical Source of Truth for CHAIN METADATA
+ * (RPC URLs, explorers, native currency, icons).
  *
+ * Deployment facts (contracts, pools, feeds) live in `back`'s registry parsed
+ * from `dex-evm/deployments/`; keepers name chains by id in fleet TOMLs only.
  * This file is the single source of truth for chain metadata.
  * The frontend imports from here - do not duplicate in front/.
  */
