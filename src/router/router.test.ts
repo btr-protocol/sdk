@@ -309,6 +309,35 @@ describe('planToLegs', () => {
     expect(legs[1].wrapIn).toBeUndefined();
   });
 
+  // A part longer than this builder encodes used to be silently truncated to its first two legs,
+  // delivering the INTERMEDIATE token and calling it the swap. `/route` takes `max_hops` as a
+  // request parameter, so a 3-leg part is reachable; it must fail closed. `planToRouterPlan` is
+  // the path that encodes any number of hops.
+  test('a part with more legs than this builder encodes is refused, not truncated', () => {
+    const three = {
+      legs: [
+        { poolTag: 'a', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
+        { poolTag: 'b', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'BNB' },
+        { poolTag: 'c', poolAddr: POOL_S, tokenIn: 'BNB', tokenOut: 'USDC' },
+      ],
+      tokens: ['USDC', 'USDT', 'BNB', 'USDC'],
+      hops: 3,
+    };
+    const plan: SwapPlan = {
+      amountIn: 1000,
+      amountOut: 998,
+      isSplit: false,
+      parts: [
+        {
+          route: three,
+          fraction: 1,
+          quote: { route: three, amountIn: 1000, amountOut: 998, fills: [], maxIn: 1e6 },
+        },
+      ],
+    };
+    expect(planToLegs(plan, { slippageFrac: 0, tokenOf })).toBeNull();
+  });
+
   test('split parts emit largest first', () => {
     const rs = direct(POOL_S, 'USDC', 'USDT');
     const rv = direct(POOL_V, 'USDC', 'USDT');
