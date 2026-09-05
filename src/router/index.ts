@@ -22,7 +22,6 @@ import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
 import { applySlip } from '../utils/maths.js';
 import type { SwapPlan } from './route.js';
-export { applySlip };
 
 /** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
  *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
@@ -577,9 +576,6 @@ export {
   depthLevelsToRows,
   bookPartFromCurve,
   assembleAggBook,
-  aggregateDepthCurves,
-  aggregateRouteDepthCurves,
-  aggregatePairDepth,
   fetchDepthBook,
   aggregateDepthAsync,
   aggregateDepthCurvesAsync,

@@ -3,7 +3,6 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   type Row,
   aggregate,
-  aggregateDepthCurves,
   aggregateDepthCurvesAsync,
   mergeAgg,
   niceStep,
@@ -93,11 +92,7 @@ describe('mergeAgg', () => {
   });
 });
 
-describe('aggregateDepthCurves (backend SSOT)', () => {
-  test('sync entry point is deleted: throws instead of pricing locally', () => {
-    expect(() => aggregateDepthCurves()).toThrow();
-  });
-
+describe('aggregateDepthCurvesAsync (backend SSOT)', () => {
   const wire = {
     mark: 1,
     mid: 1.0001,

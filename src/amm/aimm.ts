@@ -7,8 +7,6 @@
 //   types + unit constants + pure struct/inventory helpers (buildLeg, computeSkew,
 //   premiumBps) + the integer curve codec (evalQ/areaQ/scaleY/buildCurve + caps,
 //   owned by the storage readers) + thin async fetchers over `POST /v1/quote|route|depth`.
-// The old sync quote entry points keep their names and throw: same import, loud failure,
-// never silent TS math.
 
 export const BPS = 1e4;
 export const PBPS = 1e6;
@@ -351,24 +349,6 @@ export function invertDepthCurve(c: DepthCurve): DepthCurve {
     maxTokAsk: asks[asks.length - 1]?.cumTok ?? 0,
     unit: c.unit,
   };
-}
-
-// ── Deleted quote law: same names, loud failure ───────────────────────────────
-
-const OFFLINE =
-  'aimm TS pricer deleted: backend SSOT at POST /v1/quote|route|depth (see quoteAsync/routeAsync/depthAsync)';
-
-/** The f64 quote replica is gone; use quoteAsync (POST /v1/quote|route). */
-export function quoteExactIn(): Quote {
-  throw new Error(OFFLINE);
-}
-/** Depth ladders are served by POST /v1/depth; use depthAsync. */
-export function depthCurve(): DepthCurve {
-  throw new Error(OFFLINE);
-}
-/** Depth ladders are served by POST /v1/depth; use depthAsync. */
-export function virtualMarketDepth(): DepthCurve {
-  throw new Error(OFFLINE);
 }
 
 // ── Backend wire (mirror of btr-quote serde structs) ─────────────────────────
