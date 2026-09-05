@@ -1,10 +1,102 @@
 // AIMM adapter surface: types + backend fetchers. Quotes route over POST /v1/quote|route,
 // depth over POST /v1/depth (btr-quote, btr-core SSOT). The f64 replica is deleted.
+//
+// Single pipeline: route shapes + depth books live in `router/` (route/depth) and are
+// re-exported here explicitly — one name, one owner, no star diamonds — so `@sdk/amm`
+// deep imports keep resolving to the canonical modules.
 
-export * from './aimm.js';
-export * from './depthAgg.js';
-export * from './depthRoute.js';
-export * from './router.js';
+export type {
+  QuarticSeg,
+  QuarticCurve,
+  AimmProfile,
+  PoolLeg,
+  HubBook,
+  PoolState,
+  Quote,
+  DepthLevel,
+  DepthCurve,
+  LegRisk,
+  SegWire,
+  CurveWire,
+  PricingWire,
+  SpokeWire,
+  EndpointWire,
+  NamedPoolWire,
+  RouteRequestWire,
+  LegWire,
+  SplitPartWire,
+  QuoteRouteWire,
+  RouteResponseWire,
+  DepthRowWire,
+  DepthBookWire,
+  DepthRequestWire,
+  WireMeta,
+  QuoteRequestWire,
+  QuoteResponseWire,
+} from './aimm.js';
+export {
+  BPS,
+  PBPS,
+  MAX_SEGS,
+  CURVE_FLAG_REQUIRES_WALL,
+  evalQ,
+  areaQ,
+  scaleY,
+  buildCurve,
+  INTERIOR_SWING_CAP_PBPS,
+  MAX_DISPERSION_PBPS,
+  curveSpanQ,
+  dispersionCap,
+  sanitizeDispersion,
+  premiumBps,
+  computeSkew,
+  buildLeg,
+  invertDepthCurve,
+  backendBase,
+  noteQuote429,
+  quoteAsync,
+  routeAsync,
+  depthAsync,
+  curveToWire,
+  INTERIOR_ENDPOINT,
+  hubEndpointWire,
+  legToQuoteBody,
+  quoteLegAsync,
+  quoteFromWire,
+  poolStateToWire,
+} from './aimm.js';
+export type {
+  NamedPool,
+  RouteLeg,
+  Route,
+  LegFill,
+  RouteQuote,
+  SplitPart,
+  SwapPlan,
+} from '../router/route.js';
+export { poolHas, poolHolding } from '../router/route.js';
+export type {
+  Row,
+  AggRow,
+  DepthPool,
+  AggregateDepthOpts,
+  AggregatedDepthBook,
+  BookPart,
+  PairDepthOpts,
+} from '../router/depth.js';
+export {
+  niceStep,
+  stepLadder,
+  aggregate,
+  mergeAgg,
+  depthLevelsToRows,
+  bookPartFromCurve,
+  assembleAggBook,
+  fetchDepthBook,
+  aggregateDepthAsync,
+  aggregateDepthCurvesAsync,
+  aggregatePairDepthAsync,
+} from '../router/depth.js';
 
 import type { PoolAsset } from '../pool/index.js';
 import { formatUnits } from '../utils/format.js';

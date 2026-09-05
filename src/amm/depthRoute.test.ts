@@ -1,10 +1,6 @@
 // bun test: route-composed depth is backend SSOT (hub pairs via POST /v1/depth).
 import { afterEach, describe, expect, test } from 'bun:test';
-import {
-  aggregatePairDepth,
-  aggregatePairDepthAsync,
-  aggregateRouteDepthCurves,
-} from '../router/depth.js';
+import { aggregatePairDepthAsync } from '../router/depth.js';
 import type { NamedPool } from '../router/route.js';
 
 const wire = {
@@ -33,13 +29,6 @@ const pools = (): NamedPool[] => [
 afterEach(() => {
   // @ts-expect-error restore the real fetch
   globalThis.fetch = undefined;
-});
-
-describe('deleted local composition', () => {
-  test('sync entry points throw instead of pricing locally', () => {
-    expect(() => aggregateRouteDepthCurves()).toThrow();
-    expect(() => aggregatePairDepth()).toThrow();
-  });
 });
 
 describe('aggregatePairDepthAsync', () => {

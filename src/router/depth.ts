@@ -3,14 +3,9 @@
 //
 // aggregate/mergeAgg/niceStep/stepLadder/depthLevelsToRows/bookPartFromCurve/
 // assembleAggBook duplicate no pricing law: they bucket rows the backend
-// priced. aggregateDepthCurves keeps its name and throws (its input was a local
-// curve); use aggregateDepthCurvesAsync. Routed composition threw with the
-// pricer: aggregateRouteDepthCurves/aggregatePairDepth keep their names as loud
-// stubs, aggregatePairDepthAsync dispatches direct pools via POST /v1/depth
-// (routed pairs resolve to null; the backend sweep serves hub pairs only).
-// All three async entry points (aggregateDepthAsync, aggregateDepthCurvesAsync,
-// aggregatePairDepthAsync) funnel through fetchDepthBook: one depthAsync call
-// site, no duplicated fetch logic.
+// priced. All three async entry points (aggregateDepthAsync,
+// aggregateDepthCurvesAsync, aggregatePairDepthAsync) funnel through
+// fetchDepthBook: one depthAsync call site, no duplicated fetch logic.
 
 import {
   type DepthBookWire,
@@ -394,25 +389,6 @@ export function assembleAggBook(
     ladder: opts?.step != null && opts.step > 0 ? null : ladder,
     poolCount: parts.length,
   };
-}
-
-// ── Deleted quote law: same names, loud failure ──────────────────────────────
-
-/** Local-curve aggregation is gone (its input was the deleted pricer); use the async variant. */
-export function aggregateDepthCurves(): AggregatedDepthBook | null {
-  throw new Error(
-    'aimm TS pricer deleted: aggregate over POST /v1/depth via aggregateDepthCurvesAsync',
-  );
-}
-
-/** Composed books were priced locally; the backend serves hub pairs only. */
-export function aggregateRouteDepthCurves(): AggregatedDepthBook | null {
-  throw new Error('aimm TS pricer deleted: routed depth has no backend book (hub pairs only)');
-}
-
-/** Sync dispatch is gone with the local pricer; use aggregatePairDepthAsync. */
-export function aggregatePairDepth(): AggregatedDepthBook | null {
-  throw new Error('aimm TS pricer deleted: depth over POST /v1/depth via aggregatePairDepthAsync');
 }
 
 // ── Single-sourced async dispatch (the only depthAsync call site) ────────────
