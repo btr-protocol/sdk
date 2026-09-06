@@ -3,6 +3,7 @@
  *
  *   bun run scripts/fetch-seed-marks.ts            # arc (default) → 5042002.seed-marks.json
  *   bun run scripts/fetch-seed-marks.ts arc        # same, explicit
+ *   bun run scripts/fetch-seed-marks.ts bnb        # bnb → 56.seed-marks.json
  *   CHAIN=arc bun run scripts/fetch-seed-marks.ts  # same, via env
  *
  * Both halves of the ceremony read this file: <Chain>OracleDeploy seeds every feed from it, and
@@ -51,6 +52,11 @@ import {
  *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
 const CHAINS = {
   arc: { chainId: 5_042_002, risk: 'arc-risk-params.json', basis: 'USDC' },
+  // A chain earns a row the moment its risk manifest exists, BEFORE its oracle ceremony: the
+  // broadcast seeds every feed from this script's output, so a missing row is a chain that cannot
+  // be seeded at all. Nothing else about the chain is restated here - the roster, the seed size and
+  // the chainId assertion all come out of the manifest, which is why the row is three fields.
+  bnb: { chainId: 56, risk: 'bnb-risk-params.json', basis: 'USDC' },
 } as const satisfies Record<string, { chainId: number; risk: string; basis: MarkBasis }>;
 
 const chainArg = (process.argv[2] || process.env.CHAIN || 'arc').toLowerCase();

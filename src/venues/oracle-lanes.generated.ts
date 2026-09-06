@@ -1,6 +1,7 @@
-// Oracle lane maps for the packed-slot push oracles (V2/V3/V4), per chain.
-// GENERATED from dex-evm/deployments/arc-oracle-{v2,v3,v4}-lanes.json - do not hand-edit values.
-// Regenerate: sdk/scripts/gen-oracle-lanes.py (reads the dex-evm lane JSONs).
+// Oracle lane maps for the packed-slot push oracles, per chain.
+// GENERATED from the dex-evm lane records (<slug>-oracle-v<n>-lanes.json) - never hand-edited.
+// Regenerate: sdk/scripts/gen-oracle-lanes.py - it emits EVERY deployed chain, so a bare run is
+// always the whole table; an optional chain-id argument only filters it for inspection.
 //
 // A feed is addressed by its globalIndex: slotId = gi / lanesPerSlot, lane = gi % lanesPerSlot.
 // `expBias` governs the lane price decode (mantissa << (exp + bias)); it is per encode class up to
@@ -8,7 +9,7 @@
 // is corrected on-chain via setFeedExpBias, so a drifted bias means REGENERATING this file.
 // Lane symbol -> on-chain feed name: `<SYM>-USDC` for every spoke, `USDC-USD` for the reference.
 //
-// Each generation appears TWICE, once per deployed instance (`role`): the primary every pool leg
+// A generation appears TWICE, once per deployed instance (`role`): the primary every pool leg
 // reads, and the reference that prices non-base spokes. Generations overlap during a cutover, so
 // more than one map can be live at a time - always join on the ADDRESS, never on the wire tag.
 
@@ -50,150 +51,6 @@ export interface OracleLaneMap {
 }
 
 export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
-  {
-    chainId: 5042002,
-    wire: 'v2',
-    role: 'primary',
-    oracle: '0xcd7d5d0fCd08f08570D95bdd159eB148e453aB37',
-    lanesPerSlot: 8,
-    domainName: 'BTR ExternalOracleV2',
-    feeds: {
-      USDT: { globalIndex: 0, expBias: 22, cls: 'stable' },
-      USDS: { globalIndex: 1, expBias: 22, cls: 'stable' },
-      USD1: { globalIndex: 2, expBias: 22, cls: 'stable' },
-      PYUSD: { globalIndex: 3, expBias: 22, cls: 'stable' },
-      'USDC-USD': { globalIndex: 4, expBias: 22, cls: 'stable', ref: true },
-      EURC: { globalIndex: 8, expBias: 16, cls: 'fx' },
-      QCAD: { globalIndex: 9, expBias: 16, cls: 'fx' },
-      AUDF: { globalIndex: 10, expBias: 16, cls: 'fx' },
-      JPYC: { globalIndex: 11, expBias: 16, cls: 'fx' },
-      KRW1: { globalIndex: 12, expBias: 16, cls: 'fx' },
-      WETH: { globalIndex: 16, expBias: 32, cls: 'volatile' },
-      WBTC: { globalIndex: 17, expBias: 32, cls: 'volatile' },
-      CBBTC: { globalIndex: 18, expBias: 32, cls: 'volatile' },
-      BNB: { globalIndex: 19, expBias: 32, cls: 'volatile' },
-      XAUT: { globalIndex: 20, expBias: 32, cls: 'volatile' },
-      PAXG: { globalIndex: 21, expBias: 32, cls: 'volatile' },
-      INTC: { globalIndex: 24, expBias: 32, cls: 'volatile' },
-      AMD: { globalIndex: 25, expBias: 32, cls: 'volatile' },
-      NVDA: { globalIndex: 26, expBias: 32, cls: 'volatile' },
-      ASML: { globalIndex: 27, expBias: 32, cls: 'volatile' },
-      SPCX: { globalIndex: 28, expBias: 32, cls: 'volatile' },
-      AVGO: { globalIndex: 29, expBias: 32, cls: 'volatile' },
-      TSLA: { globalIndex: 30, expBias: 32, cls: 'volatile' },
-      MSFT: { globalIndex: 31, expBias: 32, cls: 'volatile' },
-      ORCL: { globalIndex: 32, expBias: 32, cls: 'volatile' },
-      META: { globalIndex: 33, expBias: 32, cls: 'volatile' },
-    },
-  },
-  {
-    chainId: 5042002,
-    wire: 'v2',
-    role: 'reference',
-    oracle: '0xebc298A8d2d98114C5b448EC9e1f96e176aBF0d5',
-    lanesPerSlot: 8,
-    domainName: 'BTR ExternalOracleV2',
-    feeds: {
-      USDT: { globalIndex: 0, expBias: 22, cls: 'stable' },
-      USDS: { globalIndex: 1, expBias: 22, cls: 'stable' },
-      USD1: { globalIndex: 2, expBias: 22, cls: 'stable' },
-      PYUSD: { globalIndex: 3, expBias: 22, cls: 'stable' },
-      'USDC-USD': { globalIndex: 4, expBias: 22, cls: 'stable', ref: true },
-      EURC: { globalIndex: 8, expBias: 16, cls: 'fx' },
-      QCAD: { globalIndex: 9, expBias: 16, cls: 'fx' },
-      AUDF: { globalIndex: 10, expBias: 16, cls: 'fx' },
-      JPYC: { globalIndex: 11, expBias: 16, cls: 'fx' },
-      KRW1: { globalIndex: 12, expBias: 16, cls: 'fx' },
-      WETH: { globalIndex: 16, expBias: 32, cls: 'volatile' },
-      WBTC: { globalIndex: 17, expBias: 32, cls: 'volatile' },
-      CBBTC: { globalIndex: 18, expBias: 32, cls: 'volatile' },
-      BNB: { globalIndex: 19, expBias: 32, cls: 'volatile' },
-      XAUT: { globalIndex: 20, expBias: 32, cls: 'volatile' },
-      PAXG: { globalIndex: 21, expBias: 32, cls: 'volatile' },
-      INTC: { globalIndex: 24, expBias: 32, cls: 'volatile' },
-      AMD: { globalIndex: 25, expBias: 32, cls: 'volatile' },
-      NVDA: { globalIndex: 26, expBias: 32, cls: 'volatile' },
-      ASML: { globalIndex: 27, expBias: 32, cls: 'volatile' },
-      SPCX: { globalIndex: 28, expBias: 32, cls: 'volatile' },
-      AVGO: { globalIndex: 29, expBias: 32, cls: 'volatile' },
-      TSLA: { globalIndex: 30, expBias: 32, cls: 'volatile' },
-      MSFT: { globalIndex: 31, expBias: 32, cls: 'volatile' },
-      ORCL: { globalIndex: 32, expBias: 32, cls: 'volatile' },
-      META: { globalIndex: 33, expBias: 32, cls: 'volatile' },
-    },
-  },
-  {
-    chainId: 5042002,
-    wire: 'v3',
-    role: 'primary',
-    oracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
-    lanesPerSlot: 10,
-    domainName: 'BTR ExternalOracleV3',
-    feeds: {
-      USDT: { globalIndex: 0, expBias: 34, cls: 'stable' },
-      USDS: { globalIndex: 1, expBias: 34, cls: 'stable' },
-      USD1: { globalIndex: 2, expBias: 34, cls: 'stable' },
-      PYUSD: { globalIndex: 3, expBias: 34, cls: 'stable' },
-      'USDC-USD': { globalIndex: 4, expBias: 34, cls: 'stable', ref: true },
-      EURC: { globalIndex: 10, expBias: 30, cls: 'fx' },
-      QCAD: { globalIndex: 11, expBias: 30, cls: 'fx' },
-      AUDF: { globalIndex: 12, expBias: 30, cls: 'fx' },
-      JPYC: { globalIndex: 13, expBias: 30, cls: 'fx' },
-      KRW1: { globalIndex: 14, expBias: 30, cls: 'fx' },
-      WETH: { globalIndex: 20, expBias: 47, cls: 'volatile' },
-      WBTC: { globalIndex: 21, expBias: 47, cls: 'volatile' },
-      CBBTC: { globalIndex: 22, expBias: 47, cls: 'volatile' },
-      BNB: { globalIndex: 23, expBias: 47, cls: 'volatile' },
-      XAUT: { globalIndex: 24, expBias: 47, cls: 'volatile' },
-      PAXG: { globalIndex: 25, expBias: 47, cls: 'volatile' },
-      INTC: { globalIndex: 30, expBias: 43, cls: 'volatile' },
-      AMD: { globalIndex: 31, expBias: 43, cls: 'volatile' },
-      NVDA: { globalIndex: 32, expBias: 43, cls: 'volatile' },
-      ASML: { globalIndex: 33, expBias: 43, cls: 'volatile' },
-      SPCX: { globalIndex: 34, expBias: 43, cls: 'volatile' },
-      AVGO: { globalIndex: 35, expBias: 43, cls: 'volatile' },
-      TSLA: { globalIndex: 36, expBias: 43, cls: 'volatile' },
-      MSFT: { globalIndex: 37, expBias: 43, cls: 'volatile' },
-      ORCL: { globalIndex: 38, expBias: 43, cls: 'volatile' },
-      META: { globalIndex: 39, expBias: 43, cls: 'volatile' },
-    },
-  },
-  {
-    chainId: 5042002,
-    wire: 'v3',
-    role: 'reference',
-    oracle: '0x8523ce6EBc563b1C69aAE7558Eb775DfEE89Fbd0',
-    lanesPerSlot: 10,
-    domainName: 'BTR ExternalOracleV3',
-    feeds: {
-      USDT: { globalIndex: 0, expBias: 34, cls: 'stable' },
-      USDS: { globalIndex: 1, expBias: 34, cls: 'stable' },
-      USD1: { globalIndex: 2, expBias: 34, cls: 'stable' },
-      PYUSD: { globalIndex: 3, expBias: 34, cls: 'stable' },
-      'USDC-USD': { globalIndex: 4, expBias: 34, cls: 'stable', ref: true },
-      EURC: { globalIndex: 10, expBias: 30, cls: 'fx' },
-      QCAD: { globalIndex: 11, expBias: 30, cls: 'fx' },
-      AUDF: { globalIndex: 12, expBias: 30, cls: 'fx' },
-      JPYC: { globalIndex: 13, expBias: 30, cls: 'fx' },
-      KRW1: { globalIndex: 14, expBias: 30, cls: 'fx' },
-      WETH: { globalIndex: 20, expBias: 47, cls: 'volatile' },
-      WBTC: { globalIndex: 21, expBias: 47, cls: 'volatile' },
-      CBBTC: { globalIndex: 22, expBias: 47, cls: 'volatile' },
-      BNB: { globalIndex: 23, expBias: 47, cls: 'volatile' },
-      XAUT: { globalIndex: 24, expBias: 47, cls: 'volatile' },
-      PAXG: { globalIndex: 25, expBias: 47, cls: 'volatile' },
-      INTC: { globalIndex: 30, expBias: 43, cls: 'volatile' },
-      AMD: { globalIndex: 31, expBias: 43, cls: 'volatile' },
-      NVDA: { globalIndex: 32, expBias: 43, cls: 'volatile' },
-      ASML: { globalIndex: 33, expBias: 43, cls: 'volatile' },
-      SPCX: { globalIndex: 34, expBias: 43, cls: 'volatile' },
-      AVGO: { globalIndex: 35, expBias: 43, cls: 'volatile' },
-      TSLA: { globalIndex: 36, expBias: 43, cls: 'volatile' },
-      MSFT: { globalIndex: 37, expBias: 43, cls: 'volatile' },
-      ORCL: { globalIndex: 38, expBias: 43, cls: 'volatile' },
-      META: { globalIndex: 39, expBias: 43, cls: 'volatile' },
-    },
-  },
   {
     chainId: 5042002,
     wire: 'v5',
@@ -272,7 +129,8 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
 export const oracleFeedName = (laneSymbol: string): string =>
   laneSymbol.includes('-') ? laneSymbol : `${laneSymbol}-USDC`;
 
-/** The lane map addressing `oracle` on `chainId`, or null (V1 / unknown oracle has no lanes). */
+/** The lane map addressing `oracle` on `chainId`, or null (a retired or unknown oracle has no
+ *  lanes here - callers must treat null as "cannot decode", never as "no feeds"). */
 export function oracleLaneMap(chainId: number, oracle: string): OracleLaneMap | null {
   const key = oracle.toLowerCase();
   return (

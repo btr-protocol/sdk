@@ -9,6 +9,21 @@
  * `registry.ts` throws on an absent chain rather than falling back, so a bot pointed at a chain
  * BTR is not deployed on cannot silently quote another chain's addresses.
  *
+ * MAINTAINED BY HAND. There is NO generator for this file and the `.generated` in its name is
+ * historical - `gen-oracle-lanes.py` writes `oracle-lanes.generated.ts`, nothing writes this one.
+ * Do not write one either: the records are not sufficient to reproduce it. `contracts.poolImpl`
+ * here is the LIVE beacon implementation (0x136bC3A7…, read off Arc's PoolFactory), which matches
+ * neither `poolImpl` nor `pendingPoolImpl` in `dex-evm/deployments/5042002.pools.json` - a later
+ * upgrade landed and the record is stale. A generator sourced from that record would quietly
+ * regress a live address, which is the exact failure this file exists to prevent.
+ *
+ * To add or update a chain, transcribe from `dex-evm/deployments/`, checking each address against
+ * the chain: `contracts` + `tokens` + `feedIds` from `<chainId>.deploy.json` (`feed_<SYM>` keys),
+ * `tickerIds` from `<slug>-mitch-tickers.json`, `rosters` from `<slug>-risk-params.json`, `pools`
+ * and `refFeeds` from `<chainId>.pools.json` (`<class>Pool` / `<class>PoolRefFeeds`). A wrong address
+ * is still an address: nothing downstream fails to parse, it just executes against the wrong
+ * contract (keepers/bots/bots.arc.toml records what that cost on 2026-08-14).
+ *
  * `feedIds` is keyed by feed NAME and ORDERED by on-chain ordinal: entry `n` is `feedIds[n]`, the
  * index every NXR-signed record carries. Arc's record states that order (`.feedOrder`). The chain
  * itself remains the authority: `keepers/src/oracle/startup.rs` reads `feedIds(idx)` and refuses to
@@ -62,12 +77,11 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       oracle: '0x842c2736F072A8A7b523D23bd3Ef21F21AC24d5C',
       poolFactory: '0xaF5Dfa6F3f549bAb1598Ff24d15c0cF9aCaA6Df7',
       poolImpl: '0x136bC3A713DB3C8da6836244923F7bdA401F1b27',
-      // The reference oracle every non-base spoke still prices against is STILL the V3 instance:
-      // its repoint is a second timelock round that has not executed. `refOracleV4` is deployed
-      // and fed but not yet pointed at, so both generations are live at once and a client that
-      // reads marks must decode BOTH wires. Join a lane map on the ADDRESS, never on the tag.
+      // The reference oracle every non-base spoke prices against. Its own timelock round has
+      // EXECUTED, so both tiers are ExternalOracleV4 (wire v5) and only one generation is live.
+      // Join a lane map on the ADDRESS, never on the tag: the two tiers are separate instances
+      // of the same generation, and the next cutover puts two generations here at once again.
       refOracle: '0xC17920b2cC4Ac028c7F8bdB46E952Fb2d2a172a6',
-      refOracleV4: '0xC17920b2cC4Ac028c7F8bdB46E952Fb2d2a172a6',
       // The superseded V3 primary. Kept named so historical `SlotsPushed` logs stay attributable.
       prevOracle: '0x0bef57B54631004Efc83636678cd95884C772ad4',
     },

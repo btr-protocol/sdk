@@ -1,31 +1,48 @@
 #!/usr/bin/env python3
-"""Regenerate src/venues/oracle-lanes.generated.ts from the dex-evm lane JSONs.
+"""Regenerate src/venues/oracle-lanes.generated.ts from the dex-evm lane records.
 
-Inputs (SoT): dex-evm/deployments/arc-oracle-{v2,v3,v4}-lanes.json + the deployed oracle
-addresses (5042002.deploy.v{2,3,4}[ref].json). Run from sdk/: python3 scripts/gen-oracle-lanes.py
+Inputs (SoT): dex-evm/deployments/<slug>-oracle-v<n>-lanes.json - the exact name the ceremony
+writes (`OracleLaneDeployBase._lanesPath`, off `.chain.slug`) - plus that chain's deployed oracle
+addresses (<chainId>.deploy.v<n>[ref].json). Run from sdk/: python3 scripts/gen-oracle-lanes.py
+
+THE CHAIN LIST IS DATA, NOT A CONSTANT IN THIS FILE. The output is rewritten whole, so a hard-coded
+default list is a script that silently DELETES every chain it does not happen to name. A bare run
+takes every lane record present on disk - which is exactly the set of fleets that have been
+deployed - so landing a second chain needs no edit here and cannot drop the first. An argument
+FILTERS that set by chain id (for inspecting one fleet); a chain named with no lane record is an
+error, never an empty output.
 
 Every generation deploys TWO instances off one lane layout - the PRIMARY every pool leg reads and
-the REFERENCE that prices the non-base spokes - so each lane JSON emits two maps, one per address.
-The pair is not a copy: `oracleLaneMap` joins on the address, and the two generations run side by
-side during a cutover (V4 primary live while the V3 reference awaits its timelock round).
+the REFERENCE that prices the non-base spokes - so each lane record emits two maps, one per
+address. The pair is not a copy: `oracleLaneMap` joins on the address, which is what lets both
+instances of a generation, and two generations mid-cutover, coexist with no code change.
 """
 
+import glob
 import json
 import os
+import sys
 
 DEX = os.path.join(os.path.dirname(__file__), "../../dex-evm/deployments")
 OUT = os.path.join(os.path.dirname(__file__), "../src/venues/oracle-lanes.generated.ts")
 
-# wire tag -> (lane JSON, deploy-record stem, lanes/slot, EIP-712 domain name)
+# wire tag -> (deploy-record stem, lanes/slot, EIP-712 domain name). A generation earns a row only
+# while some address a client can be pointed at still speaks it; V2/V3 were dropped when the last
+# Arc leg was repointed off them (5042002.pools.json records V4 for both primary and reference).
 GENERATIONS = [
-    ("v2", "arc-oracle-v2-lanes.json", "v2", 8, "BTR ExternalOracleV2"),
-    ("v3", "arc-oracle-v3-lanes.json", "v3", 10, "BTR ExternalOracleV3"),
-    ("v5", "arc-oracle-v4-lanes.json", "v4", 8, "BTR ExternalOracleV4"),
+    ("v5", "v4", 8, "BTR ExternalOracleV4"),
 ]
 
 
-def load(name):
-    with open(os.path.join(DEX, name)) as f:
+def lane_records(stem):
+    """Every deployed chain's lane record for one generation, sorted so the output order is stable.
+    The slug in the name is the ceremony's and nothing here needs to know it: each record states
+    its own `chainId`, which is what the maps and the deploy-record names are keyed on."""
+    return sorted(glob.glob(os.path.join(DEX, f"*-oracle-{stem}-lanes.json")))
+
+
+def load(path):
+    with open(path) as f:
         return json.load(f)
 
 
@@ -57,20 +74,43 @@ def map_ts(wire, lanes, addr, per_slot, domain, role):
   }},"""
 
 
+want = set(sys.argv[1:])
+seen = set()
+
 maps = []
-for wire, lane_file, stem, per_slot, domain in GENERATIONS:
-    lanes = load(lane_file)
-    for role, suffix in (("primary", ""), ("reference", "ref")):
-        rec = f"5042002.deploy.{stem}{suffix}.json"
-        if not os.path.exists(os.path.join(DEX, rec)):
+for wire, stem, per_slot, domain in GENERATIONS:
+    by_chain = {}
+    for path in lane_records(stem):
+        lanes = load(path)
+        chain = str(lanes["chainId"])
+        # Two records claiming one chain would emit two maps for the same addresses, and the
+        # `oracleLaneMap` lookup would silently answer with whichever sorted first.
+        if chain in by_chain:
+            raise SystemExit(
+                f"{os.path.basename(path)} and {os.path.basename(by_chain[chain])} both declare chainId {chain}"
+            )
+        by_chain[chain] = path
+        if want and chain not in want:
             continue
-        maps.append(map_ts(wire, lanes, load(rec)["oracle"], per_slot, domain, role))
+        seen.add(chain)
+        for role, suffix in (("primary", ""), ("reference", "ref")):
+            rec = os.path.join(DEX, f"{chain}.deploy.{stem}{suffix}.json")
+            if not os.path.exists(rec):
+                continue
+            maps.append(map_ts(wire, lanes, load(rec)["oracle"], per_slot, domain, role))
+
+# An unmatched filter would quietly rewrite the file with fewer chains than the operator asked for.
+if want - seen:
+    raise SystemExit(f"no lane record in {DEX} for chain(s) {', '.join(sorted(want - seen))}")
+if not maps:
+    raise SystemExit(f"no lane records in {DEX} - refusing to write an empty map table")
 
 body = "\n".join(maps)
 
-out = f"""// Oracle lane maps for the packed-slot push oracles (V2/V3/V4), per chain.
-// GENERATED from dex-evm/deployments/arc-oracle-{{v2,v3,v4}}-lanes.json - do not hand-edit values.
-// Regenerate: sdk/scripts/gen-oracle-lanes.py (reads the dex-evm lane JSONs).
+out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
+// GENERATED from the dex-evm lane records (<slug>-oracle-v<n>-lanes.json) - never hand-edited.
+// Regenerate: sdk/scripts/gen-oracle-lanes.py - it emits EVERY deployed chain, so a bare run is
+// always the whole table; an optional chain-id argument only filters it for inspection.
 //
 // A feed is addressed by its globalIndex: slotId = gi / lanesPerSlot, lane = gi % lanesPerSlot.
 // `expBias` governs the lane price decode (mantissa << (exp + bias)); it is per encode class up to
@@ -78,7 +118,7 @@ out = f"""// Oracle lane maps for the packed-slot push oracles (V2/V3/V4), per c
 // is corrected on-chain via setFeedExpBias, so a drifted bias means REGENERATING this file.
 // Lane symbol -> on-chain feed name: `<SYM>-USDC` for every spoke, `USDC-USD` for the reference.
 //
-// Each generation appears TWICE, once per deployed instance (`role`): the primary every pool leg
+// A generation appears TWICE, once per deployed instance (`role`): the primary every pool leg
 // reads, and the reference that prices non-base spokes. Generations overlap during a cutover, so
 // more than one map can be live at a time - always join on the ADDRESS, never on the wire tag.
 
@@ -127,7 +167,8 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
 export const oracleFeedName = (laneSymbol: string): string =>
   laneSymbol.includes('-') ? laneSymbol : `${{laneSymbol}}-USDC`;
 
-/** The lane map addressing `oracle` on `chainId`, or null (V1 / unknown oracle has no lanes). */
+/** The lane map addressing `oracle` on `chainId`, or null (a retired or unknown oracle has no
+ *  lanes here - callers must treat null as "cannot decode", never as "no feeds"). */
 export function oracleLaneMap(chainId: number, oracle: string): OracleLaneMap | null {{
   const key = oracle.toLowerCase();
   return (
@@ -144,4 +185,4 @@ export function laneSymbolByGi(map: OracleLaneMap): Map<number, string> {{
 """
 with open(OUT, "w") as f:
     f.write(out)
-print(f"wrote {OUT} ({len(out)} bytes)")
+print(f"wrote {OUT} ({len(out)} bytes, {len(maps)} maps: {', '.join(sorted(seen))})")
