@@ -413,6 +413,9 @@ export interface NamedPoolWire {
   base_liabilities?: string | null;
   base_vega_bps?: number | null;
   base_kappa_cov_bps?: number | null;
+  /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
+   *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
+  base_decimals?: number | null;
   spokes: SpokeWire[];
 }
 export interface RouteRequestWire {
@@ -757,6 +760,7 @@ export function poolStateToWire(
     base_liabilities: hub?.liabilities ?? null,
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
+    base_decimals: hubDecimals,
     spokes: Object.values(state.legs).map((leg) => ({
       token: leg.token,
       address: meta.addressOf(leg.token),
