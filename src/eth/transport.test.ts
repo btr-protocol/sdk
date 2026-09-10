@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { testRpc } from './chains';
+import { getHealthyRpc, testRpc } from './chains';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
 const realFetch = globalThis.fetch;
@@ -194,6 +194,34 @@ describe('testRpc attests the chain, not just the HTTP status', () => {
     try {
       expect(await testRpc('http://x', 1)).toBe(true);
       expect(await testRpc('http://x', 5_042_002)).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test('getHealthyRpc fails closed when no endpoint attests the chain', async () => {
+    // Chain 999 has one endpoint; it answers as Ethereum. Returning it anyway is the poisoned
+    // endpoint the selection was supposed to exclude.
+    const restore = stub((m) => ({
+      jsonrpc: '2.0',
+      id: 1,
+      result: m === 'eth_chainId' ? '0x1' : '0x64',
+    }));
+    try {
+      expect(await getHealthyRpc(999)).toBeUndefined();
+    } finally {
+      restore();
+    }
+  });
+
+  test('getHealthyRpc returns an endpoint that attests the chain', async () => {
+    const restore = stub((m) => ({
+      jsonrpc: '2.0',
+      id: 1,
+      result: m === 'eth_chainId' ? '0x3e7' : '0x64',
+    }));
+    try {
+      expect(await getHealthyRpc(999)).toBe('https://rpc.hyperliquid.xyz/evm');
     } finally {
       restore();
     }

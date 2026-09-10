@@ -520,7 +520,9 @@ export async function getHealthyRpc(chainId: number): Promise<string | undefined
   for (const rpc of rpcs) {
     if (await testRpc(rpc, chainId)) return rpc;
   }
-  return rpcs[0];
+  // None attested the chain. Returning the first anyway would hand back exactly the unattested
+  // endpoint this function exists to reject, so fail closed and let the caller decide.
+  return undefined;
 }
 
 /**
