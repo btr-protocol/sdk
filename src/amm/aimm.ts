@@ -214,20 +214,6 @@ export interface AimmProfile {
   minDisp: number;
   protoFeeBps: number;
   curve: QuarticCurve;
-  /** @deprecated Use minFeePbps. 1-release shim. */
-  minFee?: number;
-  /** @deprecated Use protoFeeBps. 1-release shim; `protoShare` is the wire's percent. */
-  protoShare?: number;
-}
-
-/** 1-release shim reader: prefers minFeePbps, falls back to deprecated minFee. */
-export function profileMinFeePbps(p: AimmProfile): number {
-  return p.minFeePbps ?? p.minFee ?? 0;
-}
-
-/** 1-release shim reader: prefers protoFeeBps (bps), falls back to deprecated percent `protoShare`. */
-export function profileProtoFeeBps(p: AimmProfile): number {
-  return p.protoFeeBps ?? (p.protoShare ?? 0) * 100;
 }
 
 export interface PoolLeg {
@@ -715,7 +701,7 @@ export function legToQuoteBody(
     curve: curveToWire(leg.profile.curve),
     min_dispersion_pbps: leg.profile.minDisp,
     vega_bps: leg.profile.vega,
-    min_fee_pbps: profileMinFeePbps(leg.profile),
+    min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
     amount_in: toU128Hex(amountInTok * 10 ** decimalsIn),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
@@ -726,7 +712,7 @@ export function legToQuoteBody(
     counterparty,
     confidence_bps: leg.confidence ?? 0,
     stale_excess: leg.staleExcess ?? 0,
-    proto_share_pct: Math.round(profileProtoFeeBps(leg.profile) / 100),
+    proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
   };
 }
 
@@ -818,7 +804,7 @@ export function poolStateToWire(
         curve: curveToWire(leg.profile.curve),
         min_dispersion_pbps: leg.profile.minDisp,
         vega_bps: leg.profile.vega,
-        min_fee_pbps: profileMinFeePbps(leg.profile),
+        min_fee_pbps: leg.profile.minFeePbps,
         kappa_cov_bps: leg.kappaCovBps,
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),
@@ -827,7 +813,7 @@ export function poolStateToWire(
       sigma_pbps: leg.sigma,
       confidence_bps: leg.confidence ?? 0,
       stale_excess: leg.staleExcess ?? 0,
-      proto_share_pct: Math.round(profileProtoFeeBps(leg.profile) / 100),
+      proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
       decimals: leg.decimals,
     })),
   };

@@ -21,7 +21,7 @@ export type AssetFields =
 export type DepositResultFields = 'lpAmount' | 'actualDeposit' | 'deadLp';
 
 export type FeedDataFields =
-  | 'lastPriceB64'
+  | 'mark1e18'
   | 'sigmaPbps'
   | 'updatedAtSecs'
   | 'ttlSecs'

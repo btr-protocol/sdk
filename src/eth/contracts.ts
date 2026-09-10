@@ -7,7 +7,7 @@
  * PLACEHOLDER REGISTRY. This is not the source of truth for deployed addresses and nothing
  * should be wired to it: there is no 5042002 key, so CONTRACTS[5042002] is undefined on the
  * only chain BTR is deployed to, and every DEX address on the chains listed below is
- * ZERO_ADDRESS. The real source of truth for deployed addresses is the backend venues API
+ * zeroAddress. The real source of truth for deployed addresses is the backend venues API
  * (`GET {api}/v1/venues`), which the front end consumes directly.
  *
  * There is no CREATE3 anywhere in the stack. Pool proxies are ERC-1967 beacon proxies pointing at
@@ -18,11 +18,6 @@
 
 import type { Address } from './types';
 import { zeroAddress } from './types';
-
-/**
- * @deprecated use `zeroAddress` (viem-style) from `@btr-protocol/sdk/eth`. Kept as alias.
- */
-export const ZERO_ADDRESS: Address = zeroAddress;
 
 /**
  * Canonical LiFi Diamond address: same on all supported EVM chains (LiFi deployment doctrine).
@@ -38,87 +33,87 @@ export const LIFI_DIAMOND: Address = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE
 export const CONTRACTS = {
   // Localhost (Anvil) - placeholder addresses, not deployed
   31337: {
-    BTR: ZERO_ADDRESS,
+    BTR: zeroAddress,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: ZERO_ADDRESS,
+    BRIDGE: zeroAddress,
     POOL_ZERO: '0xb7127AE785907441BFBC6C7bDAcC339CD7e2b712' as Address,
     POOL_STABLE: '0xb712dCA09c4327daC7789EA34574783dC554b712' as Address,
     // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-    ORACLE: ZERO_ADDRESS,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: ZERO_ADDRESS,
+    POOL_FACTORY: zeroAddress,
+    ADMIN: zeroAddress,
+    ACCESS_CONTROL: zeroAddress,
+    ORACLE: zeroAddress,
+    STAKING: zeroAddress,
+    DISTRIBUTOR: zeroAddress,
+    FAUCET: zeroAddress,
   },
 
   // Ethereum Mainnet - placeholder addresses, not deployed (to be deployed)
   1: {
-    BTR: ZERO_ADDRESS,
+    BTR: zeroAddress,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: ZERO_ADDRESS,
-    POOL_STABLE: ZERO_ADDRESS,
+    BRIDGE: zeroAddress,
+    POOL_ZERO: zeroAddress,
+    POOL_STABLE: zeroAddress,
     // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-    ORACLE: ZERO_ADDRESS,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: ZERO_ADDRESS,
+    POOL_FACTORY: zeroAddress,
+    ADMIN: zeroAddress,
+    ACCESS_CONTROL: zeroAddress,
+    ORACLE: zeroAddress,
+    STAKING: zeroAddress,
+    DISTRIBUTOR: zeroAddress,
+    FAUCET: zeroAddress,
   },
 
   // BNB Chain - placeholder addresses, not deployed (to be deployed)
   56: {
-    BTR: ZERO_ADDRESS,
+    BTR: zeroAddress,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: ZERO_ADDRESS,
-    POOL_STABLE: ZERO_ADDRESS,
+    BRIDGE: zeroAddress,
+    POOL_ZERO: zeroAddress,
+    POOL_STABLE: zeroAddress,
     // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-    ORACLE: ZERO_ADDRESS,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: ZERO_ADDRESS,
+    POOL_FACTORY: zeroAddress,
+    ADMIN: zeroAddress,
+    ACCESS_CONTROL: zeroAddress,
+    ORACLE: zeroAddress,
+    STAKING: zeroAddress,
+    DISTRIBUTOR: zeroAddress,
+    FAUCET: zeroAddress,
   },
 
   // Base - placeholder addresses, not deployed (to be deployed)
   8453: {
-    BTR: ZERO_ADDRESS,
+    BTR: zeroAddress,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: ZERO_ADDRESS,
-    POOL_STABLE: ZERO_ADDRESS,
+    BRIDGE: zeroAddress,
+    POOL_ZERO: zeroAddress,
+    POOL_STABLE: zeroAddress,
     // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-    ORACLE: ZERO_ADDRESS,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: ZERO_ADDRESS,
+    POOL_FACTORY: zeroAddress,
+    ADMIN: zeroAddress,
+    ACCESS_CONTROL: zeroAddress,
+    ORACLE: zeroAddress,
+    STAKING: zeroAddress,
+    DISTRIBUTOR: zeroAddress,
+    FAUCET: zeroAddress,
   },
 
   // Arbitrum - placeholder addresses, not deployed (to be deployed)
   42161: {
-    BTR: ZERO_ADDRESS,
+    BTR: zeroAddress,
     TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
-    BRIDGE: ZERO_ADDRESS,
-    POOL_ZERO: ZERO_ADDRESS,
-    POOL_STABLE: ZERO_ADDRESS,
+    BRIDGE: zeroAddress,
+    POOL_ZERO: zeroAddress,
+    POOL_STABLE: zeroAddress,
     // TODO: real deployment addresses
-    POOL_FACTORY: ZERO_ADDRESS,
-    ADMIN: ZERO_ADDRESS,
-    ACCESS_CONTROL: ZERO_ADDRESS,
-    ORACLE: ZERO_ADDRESS,
-    STAKING: ZERO_ADDRESS,
-    DISTRIBUTOR: ZERO_ADDRESS,
-    FAUCET: ZERO_ADDRESS,
+    POOL_FACTORY: zeroAddress,
+    ADMIN: zeroAddress,
+    ACCESS_CONTROL: zeroAddress,
+    ORACLE: zeroAddress,
+    STAKING: zeroAddress,
+    DISTRIBUTOR: zeroAddress,
+    FAUCET: zeroAddress,
   },
 } as const;
 

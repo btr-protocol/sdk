@@ -7,10 +7,10 @@ import {
   type Address,
   ERC20_ABI,
   type Eip1193Provider,
-  type Hex,
+  type   Hex,
   RpcRevertError,
-  ZERO_ADDRESS,
   encodeFn,
+  zeroAddress,
 } from '../eth/index.js';
 import { type MulticallResult, multicall } from '../eth/multicall.js';
 import { POOL_ABI, type SwapQuote, defaultDeadline } from '../pool/index.js';
@@ -121,7 +121,7 @@ export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuot
   // Guard the value the type system cannot: `recipient` is required, but a caller
   // threading through an unset address still lands here. Swap output sent to address(0)
   // is unrecoverable, so refuse to BUILD the calldata rather than let it be signed.
-  if (!recipient || eqAddr(recipient, ZERO_ADDRESS as Address)) {
+  if (!recipient || eqAddr(recipient, zeroAddress)) {
     throw new Error('quoteAllExactIn: recipient must be a non-zero address');
   }
   if (minOut < 0n) throw new Error('quoteAllExactIn: minOut must be >= 0');

@@ -1,5 +1,5 @@
 /**
- * `IOracle.FeedData`: what `ExternalOracle.getFeed(feedId)` returns.
+ * `IOracle.FeedData`: what `ExternalOracleV4.getFeed(feedId)` returns.
  *
  * Mirrored as a named interface so consumers stop typing the decode result `as any`. The SDK's
  * decoder keys a tuple by ABI component name (`eth/abi.ts`), so a stale field name does not
@@ -11,9 +11,10 @@
 import type { Assert, FeedDataFields, FieldsMatch } from '../abis/structs.generated.js';
 
 export interface FeedData {
-  /** Packed B64 decimal float (mantissa 52 | decimals 5 | exp+bias 7), NOT value x 2^64.
-   *  Decode with `decodeB64`; dividing the word by 2^64 reads USDC as 0.222. */
-  lastPriceB64: bigint;
+  /** Fresh mark, 1e18 WAD. 0 = STALE sentinel: registered but awaiting its first accepted push
+   *  (or invalidated by a rebias). Consumers fail closed on it, a UI shows "awaiting first push",
+   *  never $0. */
+  mark1e18: bigint;
   /** Keeper-signed volatility, PBPS (1e6 = 100%). */
   sigmaPbps: number;
   /** Chain clock of the last accepted push, seconds. */
@@ -32,17 +33,6 @@ export interface FeedData {
 
 /** Fails the typecheck if `FeedData` and the ABI's struct stop agreeing on field names. */
 export type _FeedDataMatchesAbi = Assert<FieldsMatch<FeedData, FeedDataFields>>;
-
-/**
- * `IOracle.FeedData` as the packed-slot oracles (V2/V3) return it: the mark is a plain 1e18 WAD
- * (`mark1e18`), no B64 packing. Every other field keeps the V1 name and meaning. `mark1e18 == 0`
- * is the STALE sentinel: registered but awaiting its first accepted push (or invalidated by a
- * rebias) - consumers fail closed on it, a UI shows "awaiting first push", never $0.
- */
-export interface FeedDataV2 extends Omit<FeedData, 'lastPriceB64'> {
-  /** Fresh mark, 1e18 WAD. 0 = STALE sentinel (never a price). */
-  mark1e18: bigint;
-}
 
 /**
  * Freshness clock the contract gates on: `min(sourceTs, updatedAt)`, falling back to `updatedAt`

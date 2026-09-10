@@ -38,7 +38,7 @@ export function recoverAddress(signature: Hex, message: string): Address {
   const msgHash = keccak256(new Uint8Array([...prefix, ...msgBytes]));
 
   // Noble @noble/curves v2: Signature.fromBytes(…, 'compact') → addRecoveryBit → recoverPublicKey
-  // (same path as sdk/oracle/verify.recoverDigestSigner). The top-level
+  // (same path as sdk/oracle/eip712.recoverDigestSigner). The top-level
   // `secp256k1.recoverPublicKey` takes a `recovery||r||s` blob and sha256-prehashes by default,
   // so the Signature path is used instead: msgHash is already keccak256 and must not be re-hashed.
   const publicKey = secp256k1.Signature.fromBytes(new Uint8Array([...r, ...s]), 'compact')
