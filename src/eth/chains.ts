@@ -136,7 +136,7 @@ export const CHAINS: Record<number, ChainConfig> = {
       'https://binance.llamarpc.com',
       'https://bsc-mainnet.public.blastapi.io',
     ],
-    nativeCurrency: { name: 'Build N Build', symbol: 'BNB', decimals: 18 },
+    nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
     blockExplorerUrls: ['https://bscscan.com'],
     wrappedNative: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     multicall3: MULTICALL3_ADDRESS,
