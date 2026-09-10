@@ -100,20 +100,14 @@ export function isAddress(value: string): value is Address {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
-/** Canonical key spelling for an address: lowercase hex. Single owner for
+/** Canonical key spelling for an address: trimmed lowercase hex. Single owner for
  *  address equality — compare via this or `eqAddr`, never inline toLowerCase. */
 export function normalizeAddress<A extends string>(address: A): string {
-  return address.toLowerCase();
+  return address.trim().toLowerCase();
 }
 
 export function isHex(value: string): value is Hex {
   return /^0x[a-fA-F0-9]*$/.test(value);
-}
-
-export function checksumAddress(address: string): Address {
-  const lower = address.toLowerCase();
-  if (!isAddress(lower)) throw new Error('Invalid address');
-  return lower as Address;
 }
 
 // ─────────────────────────────────────────────────────────────
