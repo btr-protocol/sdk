@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { recoverDigestSigner } from '../oracle/verify';
+import { recoverDigestSigner } from '../oracle/eip712';
 import {
   type AbiEvent,
   type AbiFunction,

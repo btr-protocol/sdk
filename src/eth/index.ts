@@ -104,7 +104,6 @@ export {
   CONTRACT_KEYS,
   CONTRACT_ENV_VARS,
   CONTRACT_VITE_ENV_VARS,
-  ZERO_ADDRESS,
   LIFI_DIAMOND,
   getContractAddress,
   isChainSupported,
@@ -252,8 +251,6 @@ export {
   numberToHex,
   hexToBigInt,
   bigIntToHex,
-  encodeB64,
-  decodeB64,
 } from '../utils/encoding.js';
 
 // ─────────────────────────────────────────────────────────────

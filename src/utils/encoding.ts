@@ -1,77 +1,7 @@
 /**
  * Encoding utilities: Hex and Compact Formats
  * Keccak256 is exported from @sdk/eth (uses @noble/hashes)
- *
- * B64 layout canonical: `core/src/b64.rs` mirroring `B64Lib.sol`.
- * `encodeB64`/`decodeB64` below are the TS mirror for off-chain codecs;
- * parity vectors: USDC 1.0 = 4096000000000002371, WETH 1885.03 = 7721082880000002374.
  */
-
-// ─────────────────────────────────────────────────────────────
-// B64 Encoding/Decoding (52/5/7 format)
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Custom encoding used for compact amount representation
- */
-
-const B64_MANTISSA_BITS = 52n;
-const B64_MAX_MANTISSA = (1n << B64_MANTISSA_BITS) - 1n;
-const EXPONENT_BIAS = 64n;
-
-/**
- * Encode amount to B64 format (52-bit mantissa, 5-bit decimals, 7-bit exponent)
- * @param amount - Raw token amount as bigint
- * @param decimals - Token decimals (0-31)
- * @returns B64 encoded value as bigint (fits in uint64)
- */
-export function encodeB64(amount: bigint, decimals: number): bigint {
-  if (amount === 0n) throw new Error('Cannot encode zero');
-  if (decimals > 31) throw new Error('Decimals must be <= 31');
-
-  let mant = amount;
-  let exponent = 0n;
-
-  // Normalize mantissa to fit in 52 bits
-  while (mant > B64_MAX_MANTISSA) {
-    mant = (mant + 5n) / 10n; // Round
-    exponent++;
-  }
-
-  // Scale up if too small
-  const minMantissa = B64_MAX_MANTISSA / 10n;
-  while (mant < minMantissa && exponent > -64n) {
-    mant *= 10n;
-    exponent--;
-  }
-
-  if (exponent < -64n || exponent > 63n) throw new Error('Exponent overflow');
-
-  // Pack: mantissa(52) | decimals(5) | biasedExp(7)
-  const biasedExp = exponent + EXPONENT_BIAS;
-  return (mant << 12n) | (BigInt(decimals) << 7n) | biasedExp;
-}
-
-/**
- * Decode B64 to raw amount
- * @param packed - B64 encoded value
- * @param targetDecimals - Target decimal precision
- * @returns Decoded amount as bigint
- */
-export function decodeB64(packed: bigint, targetDecimals: number): bigint {
-  if (packed === 0n) throw new Error('Cannot decode zero');
-
-  const mant = packed >> 12n;
-  const storedDecimals = Number((packed >> 7n) & 0x1fn);
-  const exponent = (packed & 0x7fn) - EXPONENT_BIAS;
-
-  const totalShift = exponent + BigInt(targetDecimals - storedDecimals);
-
-  if (totalShift >= 0n) {
-    return mant * 10n ** totalShift;
-  }
-  return mant / 10n ** -totalShift;
-}
 
 // ─────────────────────────────────────────────────────────────
 // Hex Encoding/Decoding

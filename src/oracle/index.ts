@@ -1,4 +1,4 @@
 export * from './feed';
 export * from './mitch';
-export * from './verify';
+export * from './eip712';
 export * from './wire';
