@@ -23,7 +23,12 @@ import {
   deployedChainIds,
   staticVenuePools,
 } from '../src/venues/registry';
-import { buildVenueExecCalls, quoteAllExactIn } from '../src/venues/router';
+import {
+  buildVenueApprovalCalls,
+  buildVenueExecCalls,
+  buildVenueSwapExecCalls,
+  quoteAllExactIn,
+} from '../src/venues/router';
 
 /** Arc testnet: the only chain BTR is deployed on. */
 const ARC = 5_042_002;
@@ -454,6 +459,34 @@ describe('the venue swap deadline is a send-time window, not a quote-time one', 
     const stale = 1_000n; // long expired
     const [call] = buildVenueExecCalls(quote(stale), { needsApproval: () => false });
     expect(tailWord(call.data)).toBeGreaterThan(BigInt(Math.floor(Date.now() / 1000)));
+  });
+
+  test('a swap built AFTER the approval is re-stamped then, not frozen at approval build', () => {
+    const q = quote(1_000n);
+    // Phase 1: approvals carry no deadline, so they can be built/sent well ahead.
+    const approvals = buildVenueApprovalCalls(q, { approveMax: true });
+    expect(approvals.length).toBe(1);
+    expect(approvals[0].data.slice(0, 10)).toBe('0x095ea7b3'); // approve(token, pool)
+    expect(approvals[0].to).toBe(TOKEN_A);
+    // Phase 2: the swap is built at send time and gets the deadline chosen then.
+    const [swap] = buildVenueSwapExecCalls(q, { deadline: 7_777n });
+    expect(tailWord(swap.data)).toBe(7_777n);
+    // Unmocked, the window starts at the swap build, not at approval build.
+    const [fresh] = buildVenueSwapExecCalls(q);
+    expect(tailWord(fresh.data)).toBeGreaterThan(BigInt(Math.floor(Date.now() / 1000)));
+  });
+
+  test('buildVenueExecCalls composes the two phases', () => {
+    const q = quote(1_000n);
+    const both = buildVenueExecCalls(q, { approveMax: true });
+    expect(both.length).toBe(2);
+    expect(both[0].data.slice(0, 10)).toBe('0x095ea7b3'); // approve
+    expect(both[1].to).toBe(q.pool);
+    expect(both[1].data.slice(0, 10)).toBe(q.calldata.slice(0, 10)); // swap
+  });
+
+  test('a negative deadline is refused, not encoded as an invalid word', () => {
+    expect(() => buildVenueSwapExecCalls(quote(1_000n), { deadline: -1n })).toThrow(/deadline/);
   });
 
   test('everything except the deadline word survives byte-for-byte', () => {

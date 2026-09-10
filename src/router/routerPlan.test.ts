@@ -413,11 +413,48 @@ describe('buildRouterSwapExecCalls', () => {
         nativeOut: true,
       }),
     );
-    const calls = buildRouterSwapExecCalls(ROUTER, rp, { recipient: USER, wrappedNative: WNATIVE });
+    // No sender → the account behind `msg.sender` is unknown, so `recipient` must not be
+    // silently taken as it. Refuse before any calldata exists.
+    expect(() =>
+      buildRouterSwapExecCalls(ROUTER, rp, { recipient: USER, wrappedNative: WNATIVE }),
+    ).toThrow(/sender is required/);
+    const calls = buildRouterSwapExecCalls(ROUTER, rp, {
+      recipient: USER,
+      sender: USER,
+      wrappedNative: WNATIVE,
+    });
     expect(calls.length).toBe(2);
     expect(calls[1].to).toBe(WNATIVE);
     expect(calls[1].data.startsWith(WITHDRAW_SEL)).toBe(true);
     expect(BigInt(`0x${calls[1].data.slice(10)}`)).toBe(2_000_000_000_000_000_000n);
+  });
+
+  test('a nativeOut plan refuses to unwrap when recipient is not the sender', () => {
+    const rt = route([P1], ['USDC', 'BNB']);
+    const rp = must(
+      planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+        nativeOut: true,
+      }),
+    );
+    // Router.swap pays wrapped native to `recipient`; WNATIVE.withdraw burns from `msg.sender`.
+    // Paying one account and withdrawing from another reverts empty or spends the sender's own
+    // prior balance, so the mismatch must never reach calldata.
+    expect(() =>
+      buildRouterSwapExecCalls(ROUTER, rp, {
+        recipient: USER,
+        sender: P3,
+        wrappedNative: WNATIVE,
+      }),
+    ).toThrow(/recipient must be the sender/);
+    const calls = buildRouterSwapExecCalls(ROUTER, rp, {
+      recipient: USER,
+      sender: USER,
+      wrappedNative: WNATIVE,
+    });
+    expect(calls.length).toBe(2);
   });
 
   test('the deadline is read at call time, not baked in earlier', () => {
@@ -757,6 +794,40 @@ describe('planToLegs', () => {
   // delivering the INTERMEDIATE token and calling it the swap. `/route` takes `max_hops` as a
   // request parameter, so a 3-leg part is reachable; it must fail closed. `planToRouterPlan` is
   // the path that encodes any number of hops.
+  test('a cross part whose first hop quotes nothing is refused, not encoded as a zero leg', () => {
+    // `leg1MinOut` would be 0n, funding hop 2 with nothing and flooring it at 0: a guaranteed
+    // `ZeroValue`/`ThresholdViolation` with no protection. Fail closed.
+    const rt = {
+      legs: [
+        { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
+        { poolTag: 's', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
+      ],
+      tokens: ['BNB', 'USDC', 'USDT'],
+      hops: 2,
+    };
+    const plan: SwapPlan = {
+      amountIn: 1,
+      amountOut: 0,
+      isSplit: false,
+      parts: [
+        {
+          route: rt,
+          fraction: 1,
+          quote: {
+            route: rt,
+            amountIn: 1,
+            amountOut: 0,
+            fills: [
+              { leg: rt.legs[0], amountIn: 1, amountOut: 0 },
+              { leg: rt.legs[1], amountIn: 0, amountOut: 0 },
+            ],
+          },
+        },
+      ],
+    };
+    expect(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool })).toBeNull();
+  });
+
   test('a part with more legs than this builder encodes is refused, not truncated', () => {
     const three = {
       legs: [
