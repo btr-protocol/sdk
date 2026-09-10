@@ -169,7 +169,11 @@ describe('buildSwapCalls', () => {
         unwrapOut: true,
       },
     ];
-    const calls = buildSwapCalls(legs, { recipient: USER, wrappedNative: WNATIVE });
+    const calls = buildSwapCalls(legs, {
+      recipient: USER,
+      sender: USER,
+      wrappedNative: WNATIVE,
+    });
     const last = calls[calls.length - 1];
     expect(last.to).toBe(WNATIVE);
     expect(last.data.startsWith(WITHDRAW_SEL)).toBe(true);

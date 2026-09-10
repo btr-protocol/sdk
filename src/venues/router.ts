@@ -7,7 +7,7 @@ import {
   type Address,
   ERC20_ABI,
   type Eip1193Provider,
-  type   Hex,
+  type Hex,
   RpcRevertError,
   encodeFn,
   zeroAddress,
@@ -214,6 +214,9 @@ const SWAP_CALLDATA_LEN = 2 + 8 + 6 * 64;
  *  floor, same recipient. Anything that is not exactly this call is returned untouched. */
 function restamped(data: Hex, deadline?: bigint): Hex {
   if (data.length !== SWAP_CALLDATA_LEN || !data.startsWith(SWAP_SELECTOR)) return data;
+  if (deadline !== undefined && deadline < 0n) {
+    throw new Error('restamped: deadline must be >= 0');
+  }
   const d = (deadline ?? defaultDeadline()).toString(16).padStart(64, '0');
   return `${data.slice(0, data.length - 64)}${d}` as Hex;
 }
@@ -227,20 +230,9 @@ function approveCall(token: Address, spender: Address, amount: bigint): VenueExe
   };
 }
 
-/**
- * Build sequential exec calls for a quote: approve pool, then pool.swap.
- * Hub 2-hop: flatten both legs (second leg amountIn = first amountOut).
- */
-export function buildVenueExecCalls(
-  quote: BestVenueQuote,
-  opts: {
-    approveMax?: boolean;
-    needsApproval?: (token: Address, spender: Address) => boolean;
-    /** Override the swap deadline; default is `DEFAULT_DEADLINE_S` from NOW, read here. */
-    deadline?: bigint;
-  } = {},
-): VenueExecCall[] {
-  const legs: VenueLegQuote[] = quote.legs?.length
+/** Flatten a quote to its executable legs: a hub quote carries two, a single carries itself. */
+function quoteLegs(quote: BestVenueQuote): VenueLegQuote[] {
+  return quote.legs?.length
     ? quote.legs
     : [
         {
@@ -254,17 +246,62 @@ export function buildVenueExecCalls(
           calldata: quote.calldata,
         },
       ];
+}
 
-  const out: VenueExecCall[] = [];
+/** [approvals…]: one per leg, to that leg's pool. No deadline involved, so this phase is safe to
+ *  build and send well ahead of the swap. */
+export function buildVenueApprovalCalls(
+  quote: BestVenueQuote,
+  opts: {
+    approveMax?: boolean;
+    needsApproval?: (token: Address, spender: Address) => boolean;
+  } = {},
+): VenueExecCall[] {
   const approveAmt = (n: bigint) => (opts.approveMax ? MAX_UINT256 : n);
   const need = opts.needsApproval ?? (() => true);
-
-  for (const leg of legs) {
+  const out: VenueExecCall[] = [];
+  for (const leg of quoteLegs(quote)) {
     if (!leg.calldata) continue;
     if (need(leg.tokenIn, leg.pool)) {
       out.push(approveCall(leg.tokenIn, leg.pool, approveAmt(leg.amountIn)));
     }
+  }
+  return out;
+}
+
+/** [swaps…]: deadline read HERE, at call time.
+ *
+ *  Call this immediately before the send. The deadline is a validity window on the SEND, not the
+ *  quote; built during an earlier approval wait it can already be spent and the swap then reverts
+ *  `DeadlineExpired` after paying gas. The approval phase carries no deadline, so a non-atomic
+ *  approve-then-send flow builds the two phases separately, the second right before the send. */
+export function buildVenueSwapExecCalls(
+  quote: BestVenueQuote,
+  opts: { deadline?: bigint } = {},
+): VenueExecCall[] {
+  const out: VenueExecCall[] = [];
+  for (const leg of quoteLegs(quote)) {
+    if (!leg.calldata) continue;
     out.push({ to: leg.pool, data: restamped(leg.calldata, opts.deadline) });
   }
   return out;
+}
+
+/**
+ * Build sequential exec calls for a quote: approve pool, then pool.swap.
+ * Hub 2-hop: flatten both legs (second leg amountIn = first amountOut).
+ *
+ * One build, one shared deadline: correct for an atomic batch. A flow that mines the approval as
+ * its own transaction should instead call `buildVenueApprovalCalls` + `buildVenueSwapExecCalls`
+ * separately, the second right before the swap send.
+ */
+export function buildVenueExecCalls(
+  quote: BestVenueQuote,
+  opts: {
+    approveMax?: boolean;
+    needsApproval?: (token: Address, spender: Address) => boolean;
+    deadline?: bigint;
+  } = {},
+): VenueExecCall[] {
+  return [...buildVenueApprovalCalls(quote, opts), ...buildVenueSwapExecCalls(quote, opts)];
 }

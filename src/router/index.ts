@@ -111,8 +111,8 @@ export interface BuildOpts {
    *  the pool (and `Router.swap`) pays the wrapped native to `recipient`, while `WNATIVE.withdraw`
    *  burns from `msg.sender`. With `recipient !== sender` the wrapped output lands with the
    *  recipient and the withdraw either reverts or silently spends the SENDER's own prior balance.
-   *  Supply it and the mismatch is refused here; omit it and `recipient` is taken as the sender,
-   *  which is the contract every caller has always relied on. */
+   *  Required whenever a leg unwraps native: with no sender there is nothing to compare `recipient`
+   *  against, so the build refuses rather than assume the two are the same account. */
   sender?: Address;
 }
 
@@ -309,6 +309,10 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         return null;
       }
       const leg1Quoted = toUnits(part.quote.fills[0].amountOut, tmid.decimals);
+      // A zero first-hop quote cannot fund hop 2: `leg1MinOut` is 0, so hop 2 would be encoded
+      // with `amountIn: 0n` and a floor that scales to 0 (`ThresholdViolation`/`ZeroValue`), the
+      // whole point of planning being to never emit a leg with no floor. Fail closed.
+      if (leg1Quoted <= 0n) return null;
       const leg1MinOut = applySlip(leg1Quoted, slip);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
       // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE. `part.quote.amountOut` is what the
@@ -333,7 +337,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut: applySlip(leg1Quoted > 0n ? (leg2Quoted * leg1MinOut) / leg1Quoted : 0n, slip),
+        minOut: applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
         unwrapOut: opts.nativeOut,
         chained: true,
       });
@@ -388,9 +392,14 @@ function validateLegs(
   return { wrapValue, unwrapAmount };
 }
 
-/** The unwrap burns from `msg.sender`; the swap pays `recipient`. They must be the same account. */
+/** The unwrap burns from `msg.sender`; the swap pays `recipient`. They must be the same account,
+ *  so an unknown sender is refused — defaulting `recipient` to it is how the wrong account gets
+ *  paid. */
 function assertUnwrapSelfDirected(opts: Pick<BuildOpts, 'recipient' | 'sender'>): void {
-  if (opts.sender && opts.sender.toLowerCase() !== opts.recipient.toLowerCase()) {
+  if (!opts.sender) {
+    throw new Error('nativeOut plan: sender is required (WNATIVE.withdraw burns from msg.sender)');
+  }
+  if (opts.sender.toLowerCase() !== opts.recipient.toLowerCase()) {
     throw new Error(
       'nativeOut plan: recipient must be the sender (WNATIVE.withdraw burns from msg.sender)',
     );
