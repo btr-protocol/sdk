@@ -212,15 +212,22 @@ export interface AimmProfile {
   vega: number;
   minFeePbps: number;
   minDisp: number;
-  protoShare: number;
+  protoFeeBps: number;
   curve: QuarticCurve;
   /** @deprecated Use minFeePbps. 1-release shim. */
   minFee?: number;
+  /** @deprecated Use protoFeeBps. 1-release shim; `protoShare` is the wire's percent. */
+  protoShare?: number;
 }
 
 /** 1-release shim reader: prefers minFeePbps, falls back to deprecated minFee. */
 export function profileMinFeePbps(p: AimmProfile): number {
   return p.minFeePbps ?? p.minFee ?? 0;
+}
+
+/** 1-release shim reader: prefers protoFeeBps (bps), falls back to deprecated percent `protoShare`. */
+export function profileProtoFeeBps(p: AimmProfile): number {
+  return p.protoFeeBps ?? (p.protoShare ?? 0) * 100;
 }
 
 export interface PoolLeg {
@@ -719,7 +726,7 @@ export function legToQuoteBody(
     counterparty,
     confidence_bps: leg.confidence ?? 0,
     stale_excess: leg.staleExcess ?? 0,
-    proto_share_pct: Math.round(leg.profile.protoShare),
+    proto_share_pct: Math.round(profileProtoFeeBps(leg.profile) / 100),
   };
 }
 
@@ -820,7 +827,7 @@ export function poolStateToWire(
       sigma_pbps: leg.sigma,
       confidence_bps: leg.confidence ?? 0,
       stale_excess: leg.staleExcess ?? 0,
-      proto_share_pct: Math.round(leg.profile.protoShare),
+      proto_share_pct: Math.round(profileProtoFeeBps(leg.profile) / 100),
       decimals: leg.decimals,
     })),
   };

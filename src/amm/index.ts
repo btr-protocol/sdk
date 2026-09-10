@@ -51,6 +51,7 @@ export {
   premiumBps,
   computeSkew,
   profileMinFeePbps,
+  profileProtoFeeBps,
   buildLeg,
   invertDepthCurve,
   backendBase,
