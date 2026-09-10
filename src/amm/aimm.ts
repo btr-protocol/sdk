@@ -210,10 +210,17 @@ export function sanitizeDispersion(minDispersion: number, cap: number): number {
 
 export interface AimmProfile {
   vega: number;
-  minFee: number;
+  minFeePbps: number;
   minDisp: number;
   protoShare: number;
   curve: QuarticCurve;
+  /** @deprecated Use minFeePbps. 1-release shim. */
+  minFee?: number;
+}
+
+/** 1-release shim reader: prefers minFeePbps, falls back to deprecated minFee. */
+export function profileMinFeePbps(p: AimmProfile): number {
+  return p.minFeePbps ?? p.minFee ?? 0;
 }
 
 export interface PoolLeg {
@@ -281,7 +288,7 @@ export interface DepthCurve {
 
 export interface LegRisk {
   sigma: number;
-  minFee: number;
+  minFeePbps: number;
   confidence?: number;
   staleExcess?: number;
 }
@@ -701,7 +708,7 @@ export function legToQuoteBody(
     curve: curveToWire(leg.profile.curve),
     min_dispersion_pbps: leg.profile.minDisp,
     vega_bps: leg.profile.vega,
-    min_fee_pbps: leg.profile.minFee,
+    min_fee_pbps: profileMinFeePbps(leg.profile),
     kappa_cov_bps: leg.kappaCovBps,
     amount_in: toU128Hex(amountInTok * 10 ** decimalsIn),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
@@ -804,7 +811,7 @@ export function poolStateToWire(
         curve: curveToWire(leg.profile.curve),
         min_dispersion_pbps: leg.profile.minDisp,
         vega_bps: leg.profile.vega,
-        min_fee_pbps: leg.profile.minFee,
+        min_fee_pbps: profileMinFeePbps(leg.profile),
         kappa_cov_bps: leg.kappaCovBps,
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),

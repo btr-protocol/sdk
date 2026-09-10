@@ -22,7 +22,7 @@ const RISK = {
 /** Stable: tight preset-2 curve + tight dispersion (peg book). */
 export const STABLE_PROFILE: AimmProfile = {
   ...RISK,
-  minFee: 10,
+  minFeePbps: 10,
   minDisp: 500,
   curve: BOOTSTRAP_STABLE_CURVE,
 };
@@ -33,7 +33,7 @@ export const STABLE_PROFILE: AimmProfile = {
 const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
-  minFee: 1_000,
+  minFeePbps: 1_000,
   minDisp: VOL_CAP / 5,
   curve: BOOTSTRAP_VOLATILE_CURVE,
 };

@@ -50,6 +50,7 @@ export {
   sanitizeDispersion,
   premiumBps,
   computeSkew,
+  profileMinFeePbps,
   buildLeg,
   invertDepthCurve,
   backendBase,
