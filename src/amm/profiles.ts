@@ -16,7 +16,7 @@ export const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
 
 const RISK = {
   vega: 10_000,
-  protoShare: 20,
+  protoFeeBps: 2_000,
 };
 
 /** Stable: tight preset-2 curve + tight dispersion (peg book). */
