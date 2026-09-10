@@ -11,10 +11,10 @@
 
 import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../src/abis/Pool';
-import { type AbiError, encodeErrorResult } from '../src/eth/abi';
+import { type AbiError, encodeErrorResult, encodeFn } from '../src/eth/abi';
 import { RpcRevertError } from '../src/eth/transport';
 import type { Address, Eip1193Provider } from '../src/eth/types';
-import { planToLegs } from '../src/router/index';
+import { buildSwapCalls, planToLegs } from '../src/router/index';
 import {
   activeFeedId,
   activeOracle,
@@ -23,7 +23,7 @@ import {
   deployedChainIds,
   staticVenuePools,
 } from '../src/venues/registry';
-import { quoteAllExactIn } from '../src/venues/router';
+import { buildVenueExecCalls, quoteAllExactIn } from '../src/venues/router';
 
 /** Arc testnet: the only chain BTR is deployed on. */
 const ARC = 5_042_002;
@@ -161,6 +161,8 @@ const meta: Record<string, { address: Address; decimals: number }> = {
   C: { address: ALICE, decimals: 18 },
 };
 const tokenOf = (s: string) => meta[s];
+/** Every pool in these fixtures is the factory's; the allowlist itself is tested separately. */
+const isOfficialPool = () => true;
 
 const directPlan = (amountIn: number, amountOut: number) =>
   ({
@@ -177,26 +179,32 @@ const directPlan = (amountIn: number, amountOut: number) =>
 describe('planToLegs validates slippage and derives minOut in bigint space', () => {
   test('slippageFrac >= 1 throws instead of yielding minOut = 0', () => {
     // The pre-fix path computed amountOut * (1 - 1) = 0 and shipped a batch with no floor.
-    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: 1, tokenOf })).toThrow(
-      /\[0, 1\)/,
-    );
-    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: 1.5, tokenOf })).toThrow();
+    expect(() =>
+      planToLegs(directPlan(100, 100), { slippageFrac: 1, tokenOf, isOfficialPool }),
+    ).toThrow(/\[0, 1\)/);
+    expect(() =>
+      planToLegs(directPlan(100, 100), { slippageFrac: 1.5, tokenOf, isOfficialPool }),
+    ).toThrow();
   });
 
   test('a negative or NaN slippageFrac throws', () => {
-    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: -0.01, tokenOf })).toThrow();
-    expect(() => planToLegs(directPlan(100, 100), { slippageFrac: NaN, tokenOf })).toThrow();
+    expect(() =>
+      planToLegs(directPlan(100, 100), { slippageFrac: -0.01, tokenOf, isOfficialPool }),
+    ).toThrow();
+    expect(() =>
+      planToLegs(directPlan(100, 100), { slippageFrac: NaN, tokenOf, isOfficialPool }),
+    ).toThrow();
   });
 
   test('slippageFrac = 0 is legal and leaves minOut at the full quote', () => {
-    const legs = planToLegs(directPlan(100, 100), { slippageFrac: 0, tokenOf });
+    const legs = planToLegs(directPlan(100, 100), { slippageFrac: 0, tokenOf, isOfficialPool });
     expect(legs?.[0].minOut).toBe(100n * 10n ** 18n);
   });
 
   test('minOut survives above 1e21 units, where toFixed used to go exponential', () => {
     // 1e6 tokens at 18 decimals = 1e24 units. The old float+toFixed path produced "1e+24"
     // and parseUnits could not read it, so the floor came out garbage.
-    const legs = planToLegs(directPlan(1e6, 1e6), { slippageFrac: 0.005, tokenOf });
+    const legs = planToLegs(directPlan(1e6, 1e6), { slippageFrac: 0.005, tokenOf, isOfficialPool });
     const expected = (1_000_000n * 10n ** 18n * 995_000n) / 1_000_000n;
     expect(legs?.[0].minOut).toBe(expected);
     expect(legs?.[0].minOut.toString()).not.toContain('e');
@@ -204,7 +212,7 @@ describe('planToLegs validates slippage and derives minOut in bigint space', () 
   });
 
   test('minOut rounds DOWN, never above what the quote promised', () => {
-    const legs = planToLegs(directPlan(1, 1), { slippageFrac: 0.005, tokenOf });
+    const legs = planToLegs(directPlan(1, 1), { slippageFrac: 0.005, tokenOf, isOfficialPool });
     expect(legs?.[0].minOut).toBeLessThan(10n ** 18n);
     expect(legs?.[0].minOut).toBe((10n ** 18n * 995_000n) / 1_000_000n);
   });
@@ -279,5 +287,193 @@ describe('chain resolution refuses to guess', () => {
     const id = ARC;
     expect(activeFeedId(id, 'USDC')).toBe(chainVenue(id).feedIds['USDC-USD']!);
     expect(chainVenue(id).feedIds['USDC-USDC']).toBeUndefined();
+  });
+});
+
+// ── Pool-address provenance, chained floors, unwrap direction ─────────────────
+
+const ROGUE = '0x6666666666666666666666666666666666666666';
+
+/** Direct part whose pool is `poolAddr`, so the allowlist is the only thing under test. */
+const planOnPool = (poolAddr: string) =>
+  ({
+    amountIn: 100,
+    parts: [
+      {
+        fraction: 1,
+        route: { legs: [{ tokenIn: 'A', tokenOut: 'B', poolAddr }] },
+        quote: { amountOut: 99, fills: [{ amountOut: 99 }] },
+      },
+    ],
+  }) as never;
+
+/** Cross part: A→B on POOL, then B→C on POOL2. */
+const POOL2 = '0x3333333333333333333333333333333333333333';
+const crossPlan = () =>
+  ({
+    amountIn: 100,
+    parts: [
+      {
+        fraction: 1,
+        route: {
+          legs: [
+            { tokenIn: 'A', tokenOut: 'B', poolAddr: POOL },
+            { tokenIn: 'B', tokenOut: 'C', poolAddr: POOL2 },
+          ],
+        },
+        quote: { amountOut: 98, fills: [{ amountOut: 99 }, { amountOut: 98 }] },
+      },
+    ],
+  }) as never;
+
+describe('planToLegs routes only through pools the caller vouches for', () => {
+  const officialOnly = (p: Address) => p.toLowerCase() === POOL.toLowerCase();
+
+  test('a pool outside the allowlist yields no plan at all', () => {
+    expect(
+      planToLegs(planOnPool(ROGUE), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool: officialOnly,
+      }),
+    ).toBeNull();
+  });
+
+  test('the same plan on an allowlisted pool builds', () => {
+    const legs = planToLegs(planOnPool(POOL), {
+      slippageFrac: 0,
+      tokenOf,
+      isOfficialPool: officialOnly,
+    });
+    expect(legs?.length).toBe(1);
+    expect(legs?.[0].pool.toLowerCase()).toBe(POOL.toLowerCase());
+  });
+
+  test('one rejected hop of a cross kills the WHOLE plan, never just that hop', () => {
+    // Fails closed: a partial plan would deliver the intermediate asset and call it the swap.
+    expect(
+      planToLegs(crossPlan(), { slippageFrac: 0, tokenOf, isOfficialPool: officialOnly }),
+    ).toBeNull();
+  });
+});
+
+describe('a chained second hop is floored on what hop 1 actually delivers', () => {
+  test("leg 2's floor is scaled by the ratio hop 1 was floored by", () => {
+    const slip = 0.01;
+    const legs = planToLegs(crossPlan(), { slippageFrac: slip, tokenOf, isOfficialPool });
+    expect(legs?.length).toBe(2);
+    const [l1, l2] = legs as NonNullable<typeof legs>;
+    expect(l2.amountIn).toBe(l1.minOut);
+    // Hop 2 is handed l1.minOut, not l1.quotedOut, so its floor must sit at or below
+    // applySlip(quote * l1.minOut / l1.quotedOut) — never at applySlip(quote).
+    const naive = (l2.quotedOut * 99n) / 100n;
+    expect(l2.minOut).toBeLessThan(naive);
+    const scaled = (l2.quotedOut * l1.minOut) / l1.quotedOut;
+    expect(l2.minOut).toBe((scaled * 99n) / 100n);
+    // And the displayed number is untouched: quotedOut is still the quote the user read.
+    expect(l2.quotedOut).toBe(98n * 10n ** 18n);
+  });
+
+  test('the old floor was unmeetable: hop 2 got less input than its floor assumed', () => {
+    const legs = planToLegs(crossPlan(), { slippageFrac: 0, tokenOf, isOfficialPool });
+    const [l1, l2] = legs as NonNullable<typeof legs>;
+    // At zero slippage the ratio is 1, so nothing changes — the fix only bites where a
+    // tolerance exists to be eaten.
+    expect(l1.minOut).toBe(l1.quotedOut);
+    expect(l2.minOut).toBe(l2.quotedOut);
+  });
+});
+
+describe('toUnits refuses a scale it cannot represent', () => {
+  test('>18 decimals throws instead of silently clamping to 18', () => {
+    const bad = { ...meta, B: { address: TOKEN_B, decimals: 24 } };
+    expect(() =>
+      planToLegs(planOnPool(POOL), {
+        slippageFrac: 0,
+        tokenOf: (s: string) => bad[s],
+        isOfficialPool,
+      }),
+    ).toThrow(/\[0, 18\]/);
+  });
+});
+
+describe('a nativeOut batch refuses to unwrap on someone else s behalf', () => {
+  const WNATIVE = '0x4444444444444444444444444444444444444444' as Address;
+  const BOB = '0x5555555555555555555555555555555555555555' as Address;
+  const unwrapLeg = [
+    {
+      pool: POOL as Address,
+      tokenIn: TOKEN_A,
+      tokenOut: WNATIVE,
+      amountIn: 10n,
+      minOut: 9n,
+      quotedOut: 10n,
+      unwrapOut: true,
+    },
+  ];
+
+  test('recipient != sender throws: the swap pays recipient, the withdraw burns from sender', () => {
+    expect(() =>
+      buildSwapCalls(unwrapLeg, { recipient: BOB, sender: ALICE, wrappedNative: WNATIVE }),
+    ).toThrow(/recipient must be the sender/);
+  });
+
+  test('recipient == sender builds the unwrap', () => {
+    const calls = buildSwapCalls(unwrapLeg, {
+      recipient: ALICE,
+      sender: ALICE,
+      wrappedNative: WNATIVE,
+    });
+    expect(calls[calls.length - 1].to.toLowerCase()).toBe(WNATIVE.toLowerCase());
+  });
+});
+
+describe('the venue swap deadline is a send-time window, not a quote-time one', () => {
+  // `quoteAllExactIn` bakes `defaultDeadline()` into the calldata it returns. That window is then
+  // spent on everything between the quote and the broadcast — an approval mining first, a wallet
+  // prompt, an operator reading the numbers — and the swap reverts `DeadlineExpired` after paying
+  // gas. `buildVenueExecCalls` re-stamps it, so the window starts when the call is BUILT.
+  const quote = (deadline: bigint) => ({
+    venue: 'btr' as const,
+    pool: staticVenuePools(ARC)[0].address,
+    tag: staticVenuePools(ARC)[0].tag,
+    tokenIn: TOKEN_A,
+    tokenOut: TOKEN_B,
+    amountIn: 1_000_000n,
+    amountOut: 999_000n,
+    calldata: encodeFn({
+      abi: POOL_ABI,
+      functionName: 'swap',
+      args: [TOKEN_A, TOKEN_B, 1_000_000n, 990_000n, ALICE, deadline],
+    }),
+  });
+
+  const tailWord = (d: string) => BigInt(`0x${d.slice(-64)}`);
+
+  test('a stale quote-time deadline is replaced at build', () => {
+    const stale = 1_000n; // long expired
+    const [call] = buildVenueExecCalls(quote(stale), { needsApproval: () => false });
+    expect(tailWord(call.data)).toBeGreaterThan(BigInt(Math.floor(Date.now() / 1000)));
+  });
+
+  test('everything except the deadline word survives byte-for-byte', () => {
+    const q = quote(1_000n);
+    const [call] = buildVenueExecCalls(q, { needsApproval: () => false });
+    const head = (d: string) => d.slice(0, d.length - 64);
+    expect(head(call.data)).toBe(head(q.calldata));
+    expect(call.to).toBe(q.pool);
+  });
+
+  test('an explicit deadline is honoured, and foreign calldata is left alone', () => {
+    const [call] = buildVenueExecCalls(quote(1_000n), {
+      needsApproval: () => false,
+      deadline: 42n,
+    });
+    expect(tailWord(call.data)).toBe(42n);
+
+    // Not a `Pool.swap`: nothing is rewritten.
+    const foreign = { ...quote(1_000n), calldata: '0xdeadbeef' as const };
+    const [other] = buildVenueExecCalls(foreign, { needsApproval: () => false });
+    expect(other.data).toBe('0xdeadbeef');
   });
 });

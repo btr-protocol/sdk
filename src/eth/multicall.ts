@@ -8,6 +8,15 @@
  * fanned back out positionally. The transport's JSON-RPC batcher still coalesces whatever
  * separate eth_calls remain (different providers / pinned blocks).
  *
+ * SNAPSHOT GUARANTEE. One aggregate3 is one eth_call, so a batch that fits in a single chunk is
+ * atomic against a block by construction. A batch that does NOT fit is split into concurrent
+ * eth_calls, and those would otherwise straddle a block boundary and return a torn snapshot —
+ * reserves from block N, marks from N+1 — so the split path resolves a block number first and
+ * pins every chunk to it (`runBatch`). Callers that need several SEPARATE multicall() calls to
+ * agree with each other must pass the same `opt.block`; coalescing keys on it, so batches with
+ * different pins never merge. What is not pinned, and cannot be from here, is the endpoint
+ * itself: a load-balanced RPC may answer a pinned read from a lagging replica.
+ *
  * Zero dependencies, works with optimized ABI coder.
  */
 
@@ -149,9 +158,46 @@ export async function multicall(
   });
 }
 
+/** Is Multicall3 actually deployed at `addr`? Probed once per (provider, address) and cached.
+ *
+ *  `getMulticall3` answers with the canonical address for any chain it does not know, and the
+ *  canonical address is only canonical where someone deployed it. On a chain where nobody did,
+ *  `eth_call` returns `0x`, the aggregate3 decode throws on empty data, and EVERY waiter in the
+ *  merged batch rejects with an ABI error that names neither the chain nor the missing contract.
+ *  One probe turns that into the sentence the caller needs. There is deliberately no serial
+ *  fallback: silently issuing N separate eth_calls hides a misconfigured chain behind an
+ *  N-times-more-expensive read path. */
+const MC3_CODE = new WeakMap<Eip1193Provider, Map<string, Promise<boolean>>>();
+
+function hasMulticall3(p: Eip1193Provider, addr: Address): Promise<boolean> {
+  let byAddr = MC3_CODE.get(p);
+  if (!byAddr) MC3_CODE.set(p, (byAddr = new Map()));
+  const key = addr.toLowerCase();
+  let probe = byAddr.get(key);
+  if (!probe) {
+    probe = (async () => {
+      const code = await (p as { request: (a: unknown) => Promise<unknown> }).request({
+        method: 'eth_getCode',
+        params: [addr, 'latest'],
+      });
+      return typeof code === 'string' && code.length > 2;
+    })().catch(() => {
+      // A failed probe is a transport problem, not a verdict: do not cache it, and do not let it
+      // decide. The batch proceeds and fails (or succeeds) on its own terms.
+      byAddr.delete(key);
+      return true;
+    });
+    byAddr.set(key, probe);
+  }
+  return probe;
+}
+
 /** Execute one merged prepared batch and fan the results back out positionally. */
 async function runBatch(p: Eip1193Provider, entry: Batch): Promise<void> {
   try {
+    if (!(await hasMulticall3(p, entry.addr))) {
+      throw new Error(`No Multicall3 deployed at ${entry.addr} on this chain`);
+    }
     // Split oversized batches; chunks run concurrently and are re-joined in order.
     // Clamped at 1: chunkSize 0 would satisfy `length > chunk` and never advance.
     const chunk = Math.max(1, entry.chunkSize ?? MC3_CHUNK);

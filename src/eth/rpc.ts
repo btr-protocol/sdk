@@ -29,7 +29,15 @@ const toBig = BigInt;
 
 export const requestAccounts = (p: Eip1193Provider) => cmd<Address[]>(p, 'eth_requestAccounts');
 export const getAccounts = (p: Eip1193Provider) => cmd<Address[]>(p, 'eth_accounts');
-export const getChainId = (p: Eip1193Provider) => cmd<string>(p, 'eth_chainId').then(toInt);
+/** Chain id as a NUMBER, and exact or not at all: `parseInt` silently caps a >2^53 id at
+ *  MAX_SAFE_INTEGER, which would make two distinct chains compare equal to every guard that reads
+ *  this. Parse in bigint space and refuse the value instead of narrowing it. */
+export const getChainId = (p: Eip1193Provider) =>
+  cmd<string>(p, 'eth_chainId').then((h) => {
+    const n = BigInt(h);
+    if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`chainId ${n} exceeds 2^53-1`);
+    return Number(n);
+  });
 export const getGasPrice = (p: Eip1193Provider) => cmd<string>(p, 'eth_gasPrice').then(toBig);
 export const getBlockNumber = (p: Eip1193Provider) => cmd<string>(p, 'eth_blockNumber').then(toBig);
 
@@ -75,15 +83,24 @@ export const signMessage = (p: Eip1193Provider, address: Address, msg: string) =
   return cmd<Hex>(p, 'personal_sign', [hexMsg, address]);
 };
 
+/** `JSON.stringify` THROWS on a bigint, and `TypedDataDomain.chainId` is typed `number | bigint`
+ *  — so the documented shape crashed before it ever reached the wallet. EIP-712 numeric fields go
+ *  on the wire as JSON numbers or decimal strings; a decimal string is exact at any width, which
+ *  a JSON number is not, so bigints serialise as strings. */
+const bigintSafe = (_k: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
+
 export const signTypedData = (p: Eip1193Provider, address: Address, data: TypedData) =>
   cmd<Hex>(p, 'eth_signTypedData_v4', [
     address,
-    JSON.stringify({
-      domain: data.domain,
-      types: data.types,
-      primaryType: data.primaryType,
-      message: data.message,
-    }),
+    JSON.stringify(
+      {
+        domain: data.domain,
+        types: data.types,
+        primaryType: data.primaryType,
+        message: data.message,
+      },
+      bigintSafe,
+    ),
   ]);
 
 // ─────────────────────────────────────────────────────────────

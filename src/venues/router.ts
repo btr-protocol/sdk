@@ -2,7 +2,7 @@
 // Winner-take-all: best single-hop, else simple USDC-hub 2-hop.
 // Does NOT replace the off-chain AIMM router (../router): on-chain quotes only.
 
-import { decodeErrorResult } from '../eth/abi.js';
+import { decodeErrorResult, getFunctionSignature, getSelector } from '../eth/abi.js';
 import {
   type Address,
   ERC20_ABI,
@@ -30,6 +30,8 @@ export interface VenueLegQuote {
   tokenOut: Address;
   amountIn: bigint;
   amountOut: bigint;
+  /** Swap calldata as of the QUOTE. Its deadline is re-stamped at send by
+   *  `buildVenueExecCalls`; see `restamped`. */
   calldata?: Hex;
 }
 
@@ -167,14 +169,53 @@ export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuot
         tokenOut,
         amountIn,
         amountOut: q.amountOut,
-        calldata: encodeFn({
-          abi: POOL_ABI,
-          functionName: 'swap',
-          args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
-        }),
+        calldata: swapCalldata(tokenIn, tokenOut, amountIn, minOut, recipient),
       },
     ];
   });
+}
+
+const swapCalldata = (
+  tokenIn: Address,
+  tokenOut: Address,
+  amountIn: bigint,
+  minOut: bigint,
+  recipient: Address,
+): Hex =>
+  encodeFn({
+    abi: POOL_ABI,
+    functionName: 'swap',
+    args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
+  });
+
+/** Selector and byte length of `swap(address,address,uint256,uint256,address,uint256)`. */
+const SWAP_SELECTOR = getSelector(
+  getFunctionSignature({
+    name: 'swap',
+    inputs: [
+      { type: 'address' },
+      { type: 'address' },
+      { type: 'uint256' },
+      { type: 'uint256' },
+      { type: 'address' },
+      { type: 'uint256' },
+    ],
+  }),
+);
+const SWAP_CALLDATA_LEN = 2 + 8 + 6 * 64;
+
+/** Re-stamp the deadline of quote-time `Pool.swap` calldata.
+ *
+ *  ! The deadline is a validity window on the SEND, not on the quote. It was baked when the
+ *  quote was built, so it is spent on everything that happens before broadcast — a wallet prompt,
+ *  an approval mining first, an operator reading the numbers — and the swap then reverts
+ *  `DeadlineExpired` after paying gas. All six `swap` arguments are static words, so the deadline
+ *  is the LAST one and rewriting it in place changes nothing else: same pool, same amounts, same
+ *  floor, same recipient. Anything that is not exactly this call is returned untouched. */
+function restamped(data: Hex, deadline?: bigint): Hex {
+  if (data.length !== SWAP_CALLDATA_LEN || !data.startsWith(SWAP_SELECTOR)) return data;
+  const d = (deadline ?? defaultDeadline()).toString(16).padStart(64, '0');
+  return `${data.slice(0, data.length - 64)}${d}` as Hex;
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;
@@ -195,6 +236,8 @@ export function buildVenueExecCalls(
   opts: {
     approveMax?: boolean;
     needsApproval?: (token: Address, spender: Address) => boolean;
+    /** Override the swap deadline; default is `DEFAULT_DEADLINE_S` from NOW, read here. */
+    deadline?: bigint;
   } = {},
 ): VenueExecCall[] {
   const legs: VenueLegQuote[] = quote.legs?.length
@@ -221,7 +264,7 @@ export function buildVenueExecCalls(
     if (need(leg.tokenIn, leg.pool)) {
       out.push(approveCall(leg.tokenIn, leg.pool, approveAmt(leg.amountIn)));
     }
-    out.push({ to: leg.pool, data: leg.calldata });
+    out.push({ to: leg.pool, data: restamped(leg.calldata, opts.deadline) });
   }
   return out;
 }

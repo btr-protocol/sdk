@@ -43,7 +43,6 @@ export interface RouteQuote {
   amountIn: number;
   amountOut: number;
   fills: LegFill[];
-  maxIn: number;
 }
 
 export interface SplitPart {

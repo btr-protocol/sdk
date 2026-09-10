@@ -258,7 +258,6 @@ export interface Quote {
   lpFeeBps: number;
   protoFeeBps: number;
   covTollBps: number;
-  maxIn: number;
   route: string[];
 }
 
@@ -555,6 +554,18 @@ const toHex = (v: bigint): string => `0x${v.toString(16)}`;
 const TWO_256 = 1n << 256n;
 const i256Hex = (v: bigint): string => toHex(v < 0n ? TWO_256 + v : v);
 const MAX_U128 = (1n << 128n) - 1n;
+/** Base-unit amount as hex.
+ *
+ *  ! LOSSY ABOVE 2^53, BY CONSTRUCTION. Callers hand this `humanFloat * 10**decimals`, so an
+ *  18-decimal token passes 1e18 for one unit and the double has already spent its mantissa before
+ *  `Math.round` runs: the value that goes on the wire is the nearest representable double, off by
+ *  up to ~1e-7 RELATIVE (~0.001 bps) and shrinking as a fraction as the number grows. That is the
+ *  replica's float data model, not a bug in this codec — `hexToF64`/`toRawHex` in `router/lpRoutes`
+ *  throw past 2^53 because they work in TOKEN units, where exceeding it means something is wrong.
+ *  Here it is normal. It is also why nothing quoted through this path is a settlement number: the
+ *  chain prices the neighbouring state exactly, in integers, and its answer is the one that
+ *  settles. Removing the approximation means moving reserves/liabilities/amounts to bigint
+ *  end-to-end through the replica, not tightening a bound here. */
 const toU128Hex = (v: number): string => {
   if (!Number.isFinite(v) || v < 0) throw new Error(`toU128Hex out of range: ${v}`);
   const b = BigInt(Math.round(v));
@@ -562,13 +573,39 @@ const toU128Hex = (v: number): string => {
   return `0x${b.toString(16)}`;
 };
 
-/** Pack an SDK QuarticCurve into the CurveWire header (median pinned at BPS/2 = 5000). */
+/** The DENSITY MEDIAN: the first x where y(x) ≥ 0, then whichever neighbour has the smaller |y|.
+ *
+ *  A mirror of `NUQuartic._median` (and `core::quartic::median`) — the same search over the same
+ *  `evalQ`, so the centre this SDK puts on the wire is the centre the chain would have found.
+ *  It is the only x at which the curve quotes the mark itself, and `Pricing._skewToDepth` anchors
+ *  zero inventory skew on it. On an antisymmetric curve it IS exactly BPS/2, which is why pinning
+ *  5000 went unnoticed: every live preset is symmetric. An asymmetric one moved the centre and the
+ *  wire kept saying 5000. */
+export function medianQ(c: QuarticCurve): number {
+  let lo = 0;
+  let hi = BPS;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (evalQ(c, mid) < 0n) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo === 0) return 0;
+  const below = evalQ(c, lo - 1); // < 0 by the search
+  return -below <= evalQ(c, lo) ? lo - 1 : lo;
+}
+
+/** Pack an SDK QuarticCurve into the CurveWire header. */
 export function curveToWire(c: QuarticCurve): CurveWire {
   let header = BigInt(c.m);
-  c.boundaries.forEach((b, i) => {
+  // ! ONLY THE m-1 INTERIOR BOUNDARIES. `boundaries` carries a trailing `BPS` sentinel that the
+  // local `frame` uses as the last segment's right edge; the wire directory derives that edge and
+  // has no slot for it. Writing it shifted the sentinel into the slot after the last real
+  // boundary — dead space up to m = 13, and at m = 14 (MAX_SEGS) that slot IS bits 216-231, the
+  // median field, which then read as `10000 | median` and put the centre outside [0, BPS].
+  c.boundaries.slice(0, c.m - 1).forEach((b, i) => {
     header |= BigInt(b) << BigInt(8 + 16 * i);
   });
-  header |= 5000n << 216n;
+  header |= BigInt(medianQ(c)) << 216n;
   header |= BigInt(c.dispRef) << 232n;
   header |= BigInt(c.flags) << 248n;
   return {
@@ -728,7 +765,6 @@ export function quoteFromWire(
     lpFeeBps: feeBps(w.lp_fee),
     protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
-    maxIn: Number.POSITIVE_INFINITY,
     route,
   };
 }

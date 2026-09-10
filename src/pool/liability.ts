@@ -67,6 +67,19 @@ export function haircutFace(
   if (!(haircutSuppressorBps >= 0 && haircutSuppressorBps <= HAIRCUT_SUPPRESSOR_FULL_BPS)) {
     throw new RangeError('haircutSuppressorBps outside [0, HAIRCUT_SUPPRESSOR_FULL_BPS]');
   }
+  // The chain does this in integers; this mirror does it in doubles. Below 2^53 the two agree to
+  // the dust the `ceil` deliberately keeps, and above it the double's own spacing exceeds one
+  // unit — `ceil` stops meaning "round up by less than one" and the preview quietly diverges from
+  // what settles. Refuse rather than print a number that is not the pool's.
+  for (const [k, v] of [
+    ['amount', amount],
+    ['reserves', reserves],
+    ['liabilities', liabilities],
+  ] as const) {
+    if (!Number.isFinite(v) || Math.abs(v) > Number.MAX_SAFE_INTEGER) {
+      throw new RangeError(`haircutFace: ${k}=${v} is outside exact double range`);
+    }
+  }
   if (!(liabilities > 0) || reserves >= liabilities) return { actual: amount, haircut: 0 };
   // deficit ∈ [0,1], factor ∈ [0,1] (full suppressor = no haircut), ratio capped at 100%.
   const deficit = (liabilities - reserves) / liabilities;
@@ -263,7 +276,6 @@ export function backendConvert(
         lpFeeBps: q1.lpFeeBps + q2.lpFeeBps,
         protoFeeBps: 0,
         covTollBps: q2.covTollBps,
-        maxIn: Number.POSITIVE_INFINITY,
         route: [tokenIn, base, tokenOut],
       };
     }

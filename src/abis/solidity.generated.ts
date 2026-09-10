@@ -5,9 +5,12 @@
  * Solidity enum ordinals and internal constants
  * @module @btr-protocol/sdk/abis
  *
- * solc keeps neither in the ABI, so both are parsed out of the declaring `.sol` file. Never
- * hand-write an ordinal: `OpType` is grouped by timelock tier and `Resource` by meaning, so both
- * renumber whenever a member joins a group.
+ * solc keeps neither in the ABI, so neither can be fetched the way `POOL_ABI` is: this file is
+ * MAINTAINED BY HAND against the declaring `.sol`. What keeps it honest is
+ * `test/solidity-mirror.test.ts`, which parses those files and fails on any divergence — it is
+ * how `SWEEP` and `BACKFILL_LEGS` were found missing. Never hand-write an ordinal without running
+ * it: `OpType` is grouped by timelock tier and `Resource` by meaning, so both renumber whenever a
+ * member joins a group.
  */
 
 /** Second arg of `Admin.requestOp` / `execute` / `cancelTimelock`. Grouped by timelock tier, so a member added to a group SHIFTS every ordinal after it.
@@ -25,6 +28,11 @@ export const OpType = {
   UPDATE_PROFILE: 9,
   UPDATE_CURVE: 10,
   UPDATE_ASSET_PARAMS: 11,
+  /** Payload = the token address only; the amount is recomputed at execute. Pays out to
+   *  `treasury()`, so `Admin._tier` puts it on the HIGH (treasury-custody) lane. */
+  SWEEP: 12,
+  /** One-shot per pool: arms pool-level solvency by writing the leg roster. CRITICAL lane. */
+  BACKFILL_LEGS: 13,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 

@@ -37,6 +37,8 @@ const META: Record<string, TokenMeta> = {
   GHOST: { address: SENTINEL, decimals: 18 },
 };
 const tokenOf = (s: string) => META[s];
+/** Every pool in these fixtures is the factory's; the allowlist itself is tested separately. */
+const isOfficialPool = () => true;
 
 /** A route through `pools`, visiting `tokens` — tokens.length === pools.length + 1. */
 const route = (pools: (Address | undefined)[], tokens: string[]) => ({
@@ -54,7 +56,7 @@ type Rt = ReturnType<typeof route>;
 const part = (rt: Rt, fraction: number, amountIn: number, amountOut: number) => ({
   route: rt,
   fraction,
-  quote: { route: rt, amountIn, amountOut, fills: [], maxIn: 1e9 },
+  quote: { route: rt, amountIn, amountOut, fills: [] },
 });
 
 const plan = (amountIn: number, amountOut: number, parts: ReturnType<typeof part>[]): SwapPlan => ({
@@ -76,7 +78,11 @@ describe('planToRouterPlan', () => {
   test('a direct part becomes one part, one hop, floored on the quote', () => {
     const rt = route([P1], ['USDC', 'USDT']);
     const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0.25, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0.25,
+        tokenOf,
+        isOfficialPool,
+      }),
     );
     expect(rp.parts.length).toBe(1);
     expect(rp.parts[0].tokenIn).toBe(USDC);
@@ -90,7 +96,11 @@ describe('planToRouterPlan', () => {
   test('a three-hop route is carried whole — the two-hop cap of the leg path is gone', () => {
     const rt = route([P1, P2, P3], ['USDC', 'DAI', 'BNB', 'USDT']);
     const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     );
     expect(rp.parts.length).toBe(1);
     expect(rp.parts[0].hops.map((h) => h.pool)).toEqual([P1, P2, P3]);
@@ -107,6 +117,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(1000, 990, [part(a, 0.7, 700, 693), part(b, 0.3, 300, 297)]), {
         slippageFrac: 0.5,
         tokenOf,
+        isOfficialPool,
       }),
     );
     expect(rp.parts.length).toBe(2);
@@ -121,6 +132,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(1000, 990, [part(a, 0.6, 600, 594), part(b, 0.4, 400, 396)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
       }),
     );
     expect(rp.floors.length).toBe(2);
@@ -134,6 +146,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(1000, 990, [part(small, 0.25, 250, 247), part(big, 0.75, 750, 743)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
       }),
     );
     expect(rp.parts[0].hops[0].pool).toBe(P2);
@@ -153,7 +166,7 @@ describe('planToRouterPlan', () => {
           part(b, 1 / 3, 10.35, 33),
           part(c, 1 / 3, 10.35, 33),
         ]),
-        { slippageFrac: 0, tokenOf, amountInUnits: exact },
+        { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: exact },
       ),
     );
     expect(rp.parts.reduce((s, p) => s + p.amountIn, 0n)).toBe(exact);
@@ -162,40 +175,62 @@ describe('planToRouterPlan', () => {
   test('a missing pool address refuses the whole plan rather than dropping a hop', () => {
     const rt = route([P1, undefined], ['USDC', 'DAI', 'USDT']);
     expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     ).toBeNull();
   });
 
   test('an unknown token symbol refuses the plan', () => {
     const rt = route([P1], ['USDC', 'NOPE']);
     expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     ).toBeNull();
   });
 
   test('the native sentinel is refused — it is not a contract to transferFrom', () => {
     const rt = route([P1], ['GHOST', 'USDT']);
     expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     ).toBeNull();
     const out = route([P1], ['USDC', 'GHOST']);
     expect(
-      planToRouterPlan(plan(100, 99, [part(out, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(out, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     ).toBeNull();
   });
 
   test('an empty plan is null, not an empty call', () => {
-    expect(planToRouterPlan(plan(100, 99, []), { slippageFrac: 0, tokenOf })).toBeNull();
+    expect(
+      planToRouterPlan(plan(100, 99, []), { slippageFrac: 0, tokenOf, isOfficialPool }),
+    ).toBeNull();
   });
 
   test('a slippage outside [0,1) throws rather than silently flooring at zero', () => {
     const rt = route([P1], ['USDC', 'USDT']);
     const p = plan(100, 99, [part(rt, 1, 100, 99)]);
-    expect(() => planToRouterPlan(p, { slippageFrac: 1, tokenOf })).toThrow(/slippageFrac/);
-    expect(() => planToRouterPlan(p, { slippageFrac: -0.1, tokenOf })).toThrow(/slippageFrac/);
-    expect(() => planToRouterPlan(p, { slippageFrac: Number.NaN, tokenOf })).toThrow(
+    expect(() => planToRouterPlan(p, { slippageFrac: 1, tokenOf, isOfficialPool })).toThrow(
       /slippageFrac/,
     );
+    expect(() => planToRouterPlan(p, { slippageFrac: -0.1, tokenOf, isOfficialPool })).toThrow(
+      /slippageFrac/,
+    );
+    expect(() =>
+      planToRouterPlan(p, { slippageFrac: Number.NaN, tokenOf, isOfficialPool }),
+    ).toThrow(/slippageFrac/);
   });
 
   test('nativeIn sets the wrap value to the whole input', () => {
@@ -205,6 +240,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(3, 99, [part(a, 2 / 3, 2, 66), part(b, 1 / 3, 1, 33)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeIn: true,
         amountInUnits: 3_000_000_000_000_000_000n,
       }),
@@ -219,6 +255,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
         slippageFrac: 0.5,
         tokenOf,
+        isOfficialPool,
         nativeOut: true,
       }),
     );
@@ -234,6 +271,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(100, 99, [part(a, 0.5, 50, 49), part(b, 0.5, 50, 50)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeIn: true,
       }),
     ).toBeNull();
@@ -244,6 +282,7 @@ describe('planToRouterPlan', () => {
       planToRouterPlan(plan(100, 99, [part(c, 0.5, 50, 1), part(d, 0.5, 50, 49)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeOut: true,
       }),
     ).toBeNull();
@@ -257,6 +296,7 @@ describe('buildRouterApprovalCalls', () => {
       {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
       },
     ),
   );
@@ -289,6 +329,7 @@ describe('buildRouterApprovalCalls', () => {
       planToRouterPlan(plan(100, 99, [part(a, 0.5, 50, 49), part(b, 0.5, 50, 50)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
       }),
     );
     const calls = buildRouterApprovalCalls(ROUTER, rp, {});
@@ -310,6 +351,7 @@ describe('buildRouterApprovalCalls', () => {
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -330,6 +372,7 @@ describe('buildRouterApprovalCalls', () => {
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -342,7 +385,11 @@ describe('buildRouterSwapExecCalls', () => {
   test('the whole route is ONE call to the router', () => {
     const rt = route([P1, P2, P3], ['USDC', 'DAI', 'BNB', 'USDT']);
     const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     );
     const calls = buildRouterSwapExecCalls(ROUTER, rp, { recipient: USER });
     expect(calls.length).toBe(1);
@@ -357,6 +404,7 @@ describe('buildRouterSwapExecCalls', () => {
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeOut: true,
       }),
     );
@@ -370,7 +418,11 @@ describe('buildRouterSwapExecCalls', () => {
   test('the deadline is read at call time, not baked in earlier', () => {
     const rt = route([P1], ['USDC', 'USDT']);
     const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     );
     // `parts` and `floors` are dynamic, so their contents sit at the TAIL and only their offsets
     // are in the head: deadline is head word 4, not the last word of the calldata.
@@ -394,6 +446,7 @@ describe('buildRouterCalls', () => {
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -410,7 +463,11 @@ describe('buildRouterCalls', () => {
 describe('refloorRouterPlan', () => {
   const rt = route([P1], ['USDC', 'USDT']);
   const base = must(
-    planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+    planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
+      slippageFrac: 0,
+      tokenOf,
+      isOfficialPool,
+    }),
   );
 
   test('moves the floor to a fresh quote and leaves the ROUTE alone', () => {
@@ -437,6 +494,7 @@ describe('refloorRouterPlan', () => {
       planToRouterPlan(plan(100, 2, [part(nrt, 1, 100, 2)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeOut: true,
       }),
     );
@@ -466,6 +524,7 @@ describe('audit regressions', () => {
       planToRouterPlan(plan(100, 99, [part(a, 0.7, 70, 69), part(b, 0.3, 30, 30)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         amountInUnits: 1n,
       }),
     );
@@ -486,6 +545,7 @@ describe('audit regressions', () => {
         {
           slippageFrac: 0,
           tokenOf,
+          isOfficialPool,
         },
       ),
     ).toBeNull();
@@ -503,7 +563,11 @@ describe('audit regressions', () => {
       hops: 2,
     };
     expect(
-      planToRouterPlan(plan(100, 99, [part(broken, 1, 100, 99)]), { slippageFrac: 0, tokenOf }),
+      planToRouterPlan(plan(100, 99, [part(broken, 1, 100, 99)]), {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+      }),
     ).toBeNull();
   });
 
@@ -513,6 +577,7 @@ describe('audit regressions', () => {
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
         slippageFrac: 0,
         tokenOf,
+        isOfficialPool,
         nativeOut: true,
       }),
     );

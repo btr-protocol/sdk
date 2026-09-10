@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { testRpc } from './chains';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
 const realFetch = globalThis.fetch;
@@ -154,5 +155,47 @@ describe('httpTransport resilience', () => {
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcNetworkError,
     );
+  });
+});
+
+describe('testRpc attests the chain, not just the HTTP status', () => {
+  // `res.ok` was the whole test. A gateway answering 200 with a JSON-RPC error, or an endpoint
+  // re-pointed at another network, read as healthy and then answered every read.
+  const stub = (handler: (method: string) => unknown) => {
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (_u: string, init: { body: string }) => {
+      const { method } = JSON.parse(init.body) as { method: string };
+      const body = handler(method);
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = orig;
+    };
+  };
+
+  test('a 200 carrying a JSON-RPC error is not healthy', async () => {
+    const restore = stub(() => ({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'no' } }));
+    try {
+      expect(await testRpc('http://x')).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test('an endpoint on the wrong chain is refused', async () => {
+    const restore = stub((m) => ({
+      jsonrpc: '2.0',
+      id: 1,
+      result: m === 'eth_chainId' ? '0x1' : '0x64',
+    }));
+    try {
+      expect(await testRpc('http://x', 1)).toBe(true);
+      expect(await testRpc('http://x', 5_042_002)).toBe(false);
+    } finally {
+      restore();
+    }
   });
 });

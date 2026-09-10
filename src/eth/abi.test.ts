@@ -240,3 +240,114 @@ describe('multi-output decode is positional', () => {
     expect(decoded.hi).toBe(9n);
   });
 });
+
+describe('the encoder refuses what it cannot represent', () => {
+  // `pad()` keeps the LAST 32 bytes of whatever it is handed, so an over-long value used to be
+  // silently TRUNCATED into a different address, a different amount, a different hash. The
+  // calldata came out well formed, so nothing downstream could tell.
+  const abi = [
+    {
+      type: 'function',
+      name: 'f',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'a', type: 'address' }],
+      outputs: [],
+    },
+    {
+      type: 'function',
+      name: 'g',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'n', type: 'uint8' }],
+      outputs: [],
+    },
+    {
+      type: 'function',
+      name: 'h',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'b', type: 'bytes4' }],
+      outputs: [],
+    },
+    {
+      type: 'function',
+      name: 'i',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'n', type: 'int8' }],
+      outputs: [],
+    },
+  ] as never;
+
+  test('a 21-byte address is rejected, not truncated to its last 20', () => {
+    const over = `0x${'11'.repeat(21)}`;
+    expect(() => encodeFn({ abi, functionName: 'f', args: [over] })).toThrow(/encode address/);
+    // What it used to encode: the tail, i.e. a completely different account.
+    expect(encodeFn({ abi, functionName: 'f', args: [`0x${'11'.repeat(20)}`] })).toContain(
+      '11'.repeat(20),
+    );
+  });
+
+  test('uint8 = 300 is rejected, not wrapped to 44', () => {
+    expect(() => encodeFn({ abi, functionName: 'g', args: [300n] })).toThrow(/out of range/);
+    expect(() => encodeFn({ abi, functionName: 'g', args: [-1n] })).toThrow(/out of range/);
+    expect(encodeFn({ abi, functionName: 'g', args: [255n] })).toEndWith('ff');
+  });
+
+  test('int8 keeps its signed range and still two-complements inside it', () => {
+    expect(() => encodeFn({ abi, functionName: 'i', args: [128n] })).toThrow(/out of range/);
+    expect(encodeFn({ abi, functionName: 'i', args: [-128n] })).toEndWith('80');
+  });
+
+  test('bytes4 longer than 4 bytes is rejected', () => {
+    expect(() => encodeFn({ abi, functionName: 'h', args: ['0x1122334455'] })).toThrow(
+      /encode bytes4/,
+    );
+    expect(encodeFn({ abi, functionName: 'h', args: ['0x11223344'] })).toContain('11223344');
+  });
+});
+
+describe('getPlan dispatch', () => {
+  const overloaded = [
+    {
+      type: 'function',
+      name: 'isFeedFresh',
+      stateMutability: 'view',
+      inputs: [{ name: 'feedId', type: 'bytes32' }],
+      outputs: [{ name: '', type: 'bool' }],
+    },
+    {
+      type: 'function',
+      name: 'isFeedFresh',
+      stateMutability: 'view',
+      inputs: [
+        { name: 'feedId', type: 'bytes32' },
+        { name: 'maxAge', type: 'uint32' },
+      ],
+      outputs: [{ name: '', type: 'bool' }],
+    },
+  ] as never;
+
+  test('an overloaded bare name is refused, not resolved by declaration order', () => {
+    expect(() => getPlan(overloaded, 'isFeedFresh')).toThrow(/Ambiguous/);
+  });
+
+  test('the full canonical signature selects one member', () => {
+    const a = getPlan(overloaded, 'isFeedFresh(bytes32)');
+    const b = getPlan(overloaded, 'isFeedFresh(bytes32,uint32)');
+    expect(a.selector).not.toBe(b.selector);
+    expect(a.fn.inputs?.length).toBe(1);
+    expect(b.fn.inputs?.length).toBe(2);
+  });
+
+  test('an event never answers for a function of the same name', () => {
+    const mixed = [
+      { type: 'event', name: 'Swap', inputs: [{ name: 'x', type: 'uint256' }] },
+      {
+        type: 'function',
+        name: 'Swap',
+        stateMutability: 'nonpayable',
+        inputs: [{ name: 'y', type: 'address' }],
+        outputs: [],
+      },
+    ] as never;
+    expect(getPlan(mixed, 'Swap').fn.inputs?.[0].type).toBe('address');
+  });
+});
