@@ -105,6 +105,15 @@ export interface BuildOpts {
   deadline?: bigint;
   /** Chain's wrapped-native (WETH9) address. Required as soon as any leg sets wrapIn/unwrapOut. */
   wrappedNative?: Address;
+  /** The account these calls are sent FROM.
+   *
+   *  Only the unwrap needs it, and it needs it because the two halves point at different accounts:
+   *  the pool (and `Router.swap`) pays the wrapped native to `recipient`, while `WNATIVE.withdraw`
+   *  burns from `msg.sender`. With `recipient !== sender` the wrapped output lands with the
+   *  recipient and the withdraw either reverts or silently spends the SENDER's own prior balance.
+   *  Supply it and the mismatch is refused here; omit it and `recipient` is taken as the sender,
+   *  which is the contract every caller has always relied on. */
+  sender?: Address;
 }
 
 const MAX_UINT256 = (1n << 256n) - 1n;
@@ -117,6 +126,19 @@ export interface TokenMeta {
 export interface PlanLegOpts {
   slippageFrac: number; // per-leg slippage floor (0.005 = 0.5%)
   tokenOf: (symbol: string) => TokenMeta | undefined; // route symbols → on-chain meta
+  /** Is this pool address one the caller is willing to hand tokens to? REQUIRED, and required to
+   *  fail closed: a plan naming any pool this rejects produces NO plan at all.
+   *
+   *  `PoolFactory.createPool` is PERMISSIONLESS, so a pool address is no longer self-authenticating
+   *  — anyone can deploy a contract that looks like a BTR pool, and a quote source that names it
+   *  gets an `approve` and a `swap` from the user's own account. On the legacy path that approval
+   *  is granted PER POOL, so one rogue address in one part is a standing allowance against the
+   *  user's balance (`approveMax` makes it unbounded).
+   *
+   *  Feed it `PoolFactory.isOfficialPool` — the factory's asserted-official index — or a set
+   *  derived from it. `tokenOf` is the same shape and the same contract: the caller owns the
+   *  universe, this module only encodes what the caller already trusts. */
+  isOfficialPool: (pool: Address) => boolean;
   /** User pays the gas token: the first leg of every part wraps before it swaps. The plan itself is
    *  always expressed in the WRAPPED symbol, so routing and pricing stay wrap-agnostic (1:1). */
   nativeIn?: boolean;
@@ -145,10 +167,17 @@ const isSentinel = (a: Address): boolean => a.toLowerCase() === SENTINEL;
  *  Rounds DOWN, so a `minOut` built from this is never rounded up past what the quote saw. */
 const toUnits = (v: number, decimals: number): bigint => {
   if (!Number.isFinite(v) || v <= 0) return 0n;
+  // >18 decimals used to be silently clamped to 18, which is a 10^(d-18) UNDERSTATEMENT of every
+  // amount built from it - an input leg the wallet under-pays and a floor the user never agreed
+  // to. Listing already reverts above 18 on chain, so no live token can reach this; refuse it here
+  // too rather than encode a number that means something else.
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+    throw new Error(`toUnits: decimals must be an integer in [0, 18], got ${decimals}`);
+  }
   const [mant, exp] = v.toExponential(15).split('e');
   const digits = mant.replace('.', '');
   // toExponential(15) is always one integer digit plus 15 fractional ones.
-  const shift = Number(exp) - (digits.length - 1) + Math.min(decimals, 18);
+  const shift = Number(exp) - (digits.length - 1) + decimals;
   const n = BigInt(digits);
   return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
 };
@@ -256,6 +285,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tin = opts.tokenOf(rl[0].tokenIn);
       const tout = opts.tokenOf(rl[0].tokenOut);
       if (!rl[0].poolAddr || !tin || !tout) return null;
+      if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
       const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
       legs.push({
         pool: rl[0].poolAddr as Address,
@@ -272,9 +302,22 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tmid = opts.tokenOf(rl[0].tokenOut);
       const t2out = opts.tokenOf(rl[1].tokenOut);
       if (!rl[0].poolAddr || !rl[1].poolAddr || !t1in || !tmid || !t2out) return null;
+      if (
+        !opts.isOfficialPool(rl[0].poolAddr as Address) ||
+        !opts.isOfficialPool(rl[1].poolAddr as Address)
+      ) {
+        return null;
+      }
       const leg1Quoted = toUnits(part.quote.fills[0].amountOut, tmid.decimals);
       const leg1MinOut = applySlip(leg1Quoted, slip);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
+      // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE. `part.quote.amountOut` is what the
+      // path delivers when hop 1 delivers its full quoted output; hop 2 is actually handed
+      // `leg1MinOut`, which is `slip` below that. Flooring hop 2 on the un-scaled quote leaves it
+      // ZERO margin - a floor it can only meet if hop 1 comes in perfect - so ordinary noise
+      // reverts the batch with `ThresholdViolation` after hop 1 has already mined. Scaling the
+      // quote by the same ratio hop 1 was floored by is conservative in the safe direction: pool
+      // output is concave in input, so the linear scale sits at or below the true output.
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
@@ -290,7 +333,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut: applySlip(leg2Quoted, slip),
+        minOut: applySlip(leg1Quoted > 0n ? (leg2Quoted * leg1MinOut) / leg1Quoted : 0n, slip),
         unwrapOut: opts.nativeOut,
         chained: true,
       });
@@ -316,6 +359,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
 function validateLegs(
   legs: ExecLeg[],
   wnative: string | undefined,
+  opts: Pick<BuildOpts, 'recipient' | 'sender'>,
 ): { wrapValue: bigint; unwrapAmount: bigint } {
   let wrapValue = 0n;
   let unwrapAmount = 0n;
@@ -340,14 +384,24 @@ function validateLegs(
       unwrapAmount += leg.minOut;
     }
   }
+  if (unwrapAmount > 0n) assertUnwrapSelfDirected(opts);
   return { wrapValue, unwrapAmount };
+}
+
+/** The unwrap burns from `msg.sender`; the swap pays `recipient`. They must be the same account. */
+function assertUnwrapSelfDirected(opts: Pick<BuildOpts, 'recipient' | 'sender'>): void {
+  if (opts.sender && opts.sender.toLowerCase() !== opts.recipient.toLowerCase()) {
+    throw new Error(
+      'nativeOut plan: recipient must be the sender (WNATIVE.withdraw burns from msg.sender)',
+    );
+  }
 }
 
 /** [wrap?, approvals…]: funds and clears allowance for the swap phase. No deadline involved: safe
  *  to build and send well ahead of the swap calls. */
 export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
-  const { wrapValue } = validateLegs(legs, wnative);
+  const { wrapValue } = validateLegs(legs, wnative, opts);
   const exactByKey = new Map<string, bigint>();
   for (const leg of legs) {
     const key = `${leg.tokenIn.toLowerCase()}:${leg.pool.toLowerCase()}`;
@@ -378,7 +432,7 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
  *  immediately before the send so a deadline built during an earlier approval wait cannot expire it. */
 export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
-  const { unwrapAmount } = validateLegs(legs, wnative);
+  const { unwrapAmount } = validateLegs(legs, wnative, opts);
   const deadline = swapDeadline(opts);
   const swaps: ExecCall[] = legs.map((leg) => ({
     to: leg.pool,
@@ -700,6 +754,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
       if (h > 0 && leg.tokenIn !== legs[h - 1].tokenOut) return null;
       const tout = opts.tokenOf(leg.tokenOut);
       if (!leg.poolAddr || !tout || isSentinel(tout.address)) return null;
+      if (!opts.isOfficialPool(leg.poolAddr as Address)) return null;
       hops.push({ pool: leg.poolAddr as Address, tokenOut: tout.address });
       terminal = tout;
     }
@@ -840,6 +895,8 @@ export function buildRouterSwapExecCalls(
     if (!wnative) {
       throw new Error('buildRouterSwapExecCalls: nativeOut plan needs opts.wrappedNative');
     }
+    // `Router.swap` pays the wrapped native to `recipient`; this withdraw burns from `msg.sender`.
+    assertUnwrapSelfDirected(opts);
     calls.push(unwrapCall(wnative, rp.unwrapAmount));
   }
   return calls;

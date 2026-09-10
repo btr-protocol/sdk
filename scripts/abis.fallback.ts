@@ -53,16 +53,6 @@ const err = (name: string, inputs: { name: string; type: string }[]): unknown =>
   name,
   inputs,
 });
-const FEED_DATA_V1 = [
-  T('lastPriceB64', 'uint64'),
-  T('sigmaPbps', 'uint32'),
-  T('updatedAtSecs', 'uint32'),
-  T('ttlSecs', 'uint16'),
-  T('confidenceBps', 'uint16'),
-  T('flags', 'uint16'),
-  T('maxDeviationBps', 'uint16'),
-  T('sourceTsMs', 'uint48'),
-];
 
 export const ABI_FALLBACKS: Record<string, unknown[]> = {
   Pool: [
@@ -173,16 +163,5 @@ export const ABI_FALLBACKS: Record<string, unknown[]> = {
       [],
       'nonpayable',
     ),
-  ],
-  ExternalOracle: [
-    fn('batchPushSigned', [T('blob', 'bytes'), T('sigs', 'bytes')], [], 'nonpayable'),
-    fn(
-      'getFeed',
-      [T('feedId', 'bytes32')],
-      [{ name: 'data', type: 'tuple', components: FEED_DATA_V1 }],
-      'view',
-    ),
-    fn('isFeedFresh', [T('feedId', 'bytes32')], [T('', 'bool')], 'view'),
-    fn('isFeedFresh', [T('feedId', 'bytes32'), T('maxAge', 'uint32')], [T('', 'bool')], 'view'),
   ],
 };

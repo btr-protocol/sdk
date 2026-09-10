@@ -6,17 +6,26 @@ TypeScript SDK for BTR — a thin client over the BTR backend.
 ships no contract source and no build pipeline for one: it talks to the deployed protocol through
 the backend API and standard EVM JSON-RPC.
 
-## ABIs come from the backend
+## ABIs come from the backend, pinned at build time
 
-ABIs are **fetched at runtime from the backend**, not bundled as a source of truth:
+The backend's getAbi service is the source of truth, and `bun run fetch-abis` bakes its answer
+into `src/abis/` before every typecheck, test and build. What makes that safe is `abis.lock.json`:
+a normalised content hash per ABI, and nothing is written that misses its pin — not the backend's
+answer, not a sibling checkout, not the file already on disk.
 
-- `fetchAbi('Pool')` → `GET {api}/v1/abis/{name}` (hot + cold cached).
+- `fetchAbi('Pool' | 'Admin')` → the build-pinned copy, no network, no `localStorage`.
+- `fetchAbi(other)` → `GET {api}/v1/abis/{name}`, cached for the session only.
 - `fetchVenues()` → `GET {api}/v1/venues` for chains and deployed addresses.
 - Quoting / routing → `POST {api}/quote` · `POST {api}/route`.
 - Point at your own deployment with `setApiRoot()`.
 
-Static copies of the interfaces under `@btr-protocol/sdk/abis` exist only for offline typing;
-the wire contract is whatever the backend serves.
+After a deliberate contract release, re-pin and **review the lock diff** — it is the whole trust
+anchor:
+
+```bash
+BTR_ABI_UPDATE=1 bun run fetch-abis     # re-pin
+BTR_ABI_ALLOW_STALE=1 bun run fetch-abis # offline build against the vendored STALE fallback
+```
 
 ## Install
 

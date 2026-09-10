@@ -2,11 +2,20 @@ import { describe, expect, test } from 'bun:test';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { recoverDigestSigner } from '../oracle/verify';
-import { type AbiEvent, type AbiFunction, encodeEventTopics, getEventSignature } from './abi';
+import {
+  type AbiEvent,
+  type AbiFunction,
+  encodeEventTopics,
+  getEventSignature,
+  getSelector,
+} from './abi';
 import { privateKeyToAddress, signDigest } from './client';
+import { Contract, ContractRevertError } from './contract';
 import { checksumAddress, keccak256Input } from './index';
 import { type Call, MC3_ADDR, multicall, multicallStrict } from './multicall';
 import { rlpEncode } from './rlp';
+import { getChainId, signTypedData } from './rpc';
+import { RpcRevertError } from './transport';
 import type { Address, Eip1193Provider } from './types';
 
 describe('rlpEncode (hex string handling)', () => {
@@ -146,6 +155,10 @@ describe('multicall batching', () => {
     return { seen, provider };
   };
 
+  /** A real 20-byte address: the encoder refuses a short one, because `pad()` keeps the LAST 32
+   *  bytes and an over-long value would encode as a DIFFERENT address with no way to tell. */
+  const addr = (n: number): Address => `0x${n.toString(16).padStart(40, '0')}` as Address;
+
   test('two concurrent multicall() calls share ONE aggregate3', async () => {
     const { seen, provider } = mc3Provider();
     const mk = (to: string): Call => ({
@@ -154,8 +167,8 @@ describe('multicall batching', () => {
       functionName: 'getBlockNumber',
     });
     const [a, b] = await Promise.all([
-      multicall(provider, [mk('0x1'), mk('0x2')]), // component A batches its two reads
-      multicall(provider, [mk('0x3'), mk('0x4'), mk('0x5')]), // component B, same tick
+      multicall(provider, [mk(addr(1)), mk(addr(2))]), // component A batches its two reads
+      multicall(provider, [mk(addr(3)), mk(addr(4)), mk(addr(5))]), // component B, same tick
     ]);
     expect(seen.filter((m) => m === 'eth_call').length).toBe(1);
     // Positional fan-out: each caller gets exactly its own legs back, decoded normally.
@@ -180,8 +193,8 @@ describe('multicall batching', () => {
     });
     // Same tick -> one merged aggregate3; the lenient caller keeps its result even though the
     // strict caller's leg reverted (allowFailure=false would have nuked the whole batch).
-    const lenientP = multicall(provider, [mk('0xok')]);
-    const strictP = multicallStrict(provider, [mk('0xbad')]);
+    const lenientP = multicall(provider, [mk(addr(0xdd))]);
+    const strictP = multicallStrict(provider, [mk(addr(0xbad))]);
     const lenient = await lenientP;
     await expect(strictP).rejects.toThrow(/Multicall error/);
     expect(lenient[0].success).toBe(true);
@@ -226,5 +239,118 @@ describe('signDigest (noble-curves v2 prehash trap)', () => {
       'recovered',
     );
     expect(recoverDigestSigner(DIGEST, rsv(wrong))).not.toBe(ADDR);
+  });
+});
+
+describe('multicall names a missing Multicall3', () => {
+  test('empty code at the multicall address rejects with the chain problem, not an ABI error', async () => {
+    // `getMulticall3` hands back the canonical address for any chain it does not know, so on a
+    // chain where nobody deployed it `eth_call` returns `0x` and the aggregate3 decode used to
+    // throw an ABI error naming neither the chain nor the contract.
+    const provider: Eip1193Provider = {
+      request: async ({ method }: { method: string }) => {
+        if (method === 'eth_getCode') return '0x';
+        if (method === 'eth_call') return '0x';
+        throw new Error(`unexpected ${method}`);
+      },
+    } as unknown as Eip1193Provider;
+    const call: Call = {
+      address: `0x${'11'.repeat(20)}` as Address,
+      abi: PROBE_ABI,
+      functionName: 'getBlockNumber',
+    };
+    await expect(multicall(provider, [call])).rejects.toThrow(/No Multicall3 deployed at/);
+  });
+});
+
+describe('Contract surfaces the protocol reason for a revert', () => {
+  // `decodeErrorResult` shipped with the coder and nothing on the Contract path called it, so a
+  // deliberate refusal ("this leg is halted") reached the caller as "execution reverted".
+  const ABI = [
+    {
+      type: 'function',
+      name: 'swap',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'to', type: 'address' }],
+      outputs: [{ name: '', type: 'uint256' }],
+    },
+    { type: 'error', name: 'FeatureDisabled', inputs: [{ name: 'resource', type: 'uint8' }] },
+  ] as never;
+
+  /** `FeatureDisabled(uint8)` with resource = 0 (ASSET), as the pool returns it. */
+  const revertData = `${getSelector('FeatureDisabled(uint8)')}${'0'.repeat(64)}`;
+  const reverting: Eip1193Provider = {
+    request: async () => {
+      throw new RpcRevertError('execution reverted', 3, revertData);
+    },
+  } as unknown as Eip1193Provider;
+
+  test('read() names the custom error and carries its args', async () => {
+    const c = new Contract({
+      address: `0x${'11'.repeat(20)}` as Address,
+      abi: ABI,
+      provider: reverting,
+    });
+    const err = (await c
+      .read('swap', [`0x${'22'.repeat(20)}`])
+      .catch((e) => e)) as ContractRevertError;
+    expect(err).toBeInstanceOf(ContractRevertError);
+    expect(err.errorName).toBe('FeatureDisabled');
+    expect(err.errorArgs[0]).toBe(0n);
+    expect(err.message).toBe('swap reverted: FeatureDisabled(0)');
+  });
+
+  test('an undecodable revert passes through untouched', async () => {
+    const opaque: Eip1193Provider = {
+      request: async () => {
+        throw new RpcRevertError('execution reverted', 3, '0xdeadbeef');
+      },
+    } as unknown as Eip1193Provider;
+    const c = new Contract({
+      address: `0x${'11'.repeat(20)}` as Address,
+      abi: ABI,
+      provider: opaque,
+    });
+    const err = await c.read('swap', [`0x${'22'.repeat(20)}`]).catch((e) => e);
+    expect(err).toBeInstanceOf(RpcRevertError);
+    expect(err).not.toBeInstanceOf(ContractRevertError);
+  });
+});
+
+describe('chain id and typed data survive values JSON cannot hold', () => {
+  const answer = (result: unknown): Eip1193Provider =>
+    ({ request: async () => result }) as unknown as Eip1193Provider;
+
+  test('a chainId past 2^53 is refused, not silently capped', async () => {
+    // `parseInt` clamps at MAX_SAFE_INTEGER, which makes two DIFFERENT chains compare equal to
+    // every guard that reads this number.
+    await expect(getChainId(answer('0x20000000000000'))).rejects.toThrow(/exceeds 2\^53-1/);
+    expect(await getChainId(answer('0x4cef52'))).toBe(5_042_002);
+  });
+
+  test('signTypedData serialises a bigint chainId instead of throwing on it', async () => {
+    // `TypedDataDomain.chainId` is typed `number | bigint`, and `JSON.stringify` THROWS on a
+    // bigint — so the documented shape crashed before it ever reached the wallet.
+    let sent: string | undefined;
+    const p = {
+      request: async ({ params }: { params?: unknown[] }) => {
+        sent = (params as [string, string])[1];
+        return '0x00';
+      },
+    } as unknown as Eip1193Provider;
+    await signTypedData(
+      p,
+      `0x${'11'.repeat(20)}` as Address,
+      {
+        domain: { name: 'BTR', chainId: 5_042_002n },
+        types: { M: [{ name: 'x', type: 'uint256' }] },
+        primaryType: 'M',
+        message: { x: 2n ** 90n },
+      } as never,
+    );
+    const parsed = JSON.parse(sent as string);
+    // Decimal strings: exact at any width, which a JSON number is not.
+    expect(parsed.domain.chainId).toBe('5042002');
+    expect(parsed.message.x).toBe((2n ** 90n).toString());
   });
 });

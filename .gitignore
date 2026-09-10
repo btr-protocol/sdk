@@ -8,5 +8,4 @@ coverage/
 # Backend-owned ABIs: build artifacts via `bun run fetch-abis`, never committed.
 src/abis/Pool.ts
 src/abis/Admin.ts
-src/abis/ExternalOracle.ts
 

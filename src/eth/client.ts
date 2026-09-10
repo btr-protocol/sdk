@@ -101,16 +101,49 @@ export function signDigest(digest: Hex, privateKey: Hex) {
   );
 }
 
+/** EIP-1559/2930 `accessList` when there is none. An RLP LIST, so it encodes 0xc0. */
+const EMPTY_ACCESS_LIST: readonly never[] = [];
+
+/** Serialised nonce allocation per (provider, sender).
+ *
+ *  `eth_getTransactionCount` is in the transport's DEDUPE set, so two `signTransaction` calls in
+ *  the same tick share ONE reply and sign the SAME nonce: the second transaction replaces the
+ *  first instead of following it. Even undeduped, two reads before either send returns the same
+ *  count. So the allocation is serialised here and monotone per sender: each caller waits for the
+ *  previous one, and the issued nonce is `max(chainCount, lastIssued + 1)`. */
+const NONCE_LOCKS = new WeakMap<object, Map<string, Promise<bigint>>>();
+
+function nextNonce(provider: Eip1193Provider, from: Address): Promise<bigint> {
+  let byAccount = NONCE_LOCKS.get(provider);
+  if (!byAccount) {
+    byAccount = new Map();
+    NONCE_LOCKS.set(provider, byAccount);
+  }
+  const key = from.toLowerCase();
+  const prev = byAccount.get(key);
+  const next = (async () => {
+    const last = await prev?.catch(() => undefined);
+    const onChain = BigInt(await getNonce(provider, from));
+    return last !== undefined && last + 1n > onChain ? last + 1n : onChain;
+  })();
+  byAccount.set(key, next);
+  return next;
+}
+
 /**
- * Sign a transaction with private key
+ * Sign a transaction with a private key, returning the raw signed transaction.
+ *
+ * Exported so the encoder is testable without a network: `test/tx-vectors.test.ts` signs the
+ * EIP-155 spec vector and asserts the bytes. Nothing pinned this before, which is how the
+ * EIP-1559 `accessList` shipped as `0x80` instead of `0xc0`.
  */
-async function signTransaction(
+export async function signTransaction(
   provider: Eip1193Provider,
   tx: TransactionRequest,
   privateKey: Hex,
 ): Promise<Hex> {
   const chainId = await getChainId(provider);
-  const nonce = tx.nonce ?? (await getNonce(provider, tx.from as Address));
+  const nonce = tx.nonce ?? (await nextNonce(provider, tx.from as Address));
   const gasLimit = tx.gas ?? (await estimateGas(provider, tx));
 
   // Quantity fields arrive as JSON-RPC hex strings (often odd-nibble like 0x0 / 0x5).
@@ -130,7 +163,9 @@ async function signTransaction(
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      '0x', // accessList (empty)
+      // accessList: an EMPTY LIST (0xc0), never the empty string (0x80). EIP-1559 signs over a
+      // list here, so `'0x'` produced a different preimage and every signed tx was rejected.
+      EMPTY_ACCESS_LIST,
     ];
 
     // Hash the transaction
@@ -153,7 +188,7 @@ async function signTransaction(
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      '0x', // accessList (empty)
+      EMPTY_ACCESS_LIST,
       yParity,
       r,
       s,
@@ -206,9 +241,26 @@ async function signTransaction(
  * Create a client from a private key (for backend use)
  * Can sign transactions without user approval
  */
-export function createPrivateKeyClient(rpcUrl: string, privateKey: Hex): Client {
+export function createPrivateKeyClient(
+  rpcUrl: string,
+  privateKey: Hex,
+  /** Refuse to sign anything unless the endpoint reports THIS chain. The signing preimage carries
+   *  the chain id the endpoint claims, so an endpoint on the wrong (or a forked) chain silently
+   *  produces a valid transaction for a chain the caller never meant to touch. Checked before
+   *  every send and cached per client; omit only for a caller that genuinely does not know. */
+  expectedChainId?: number,
+): Client {
   const provider = createHttpProvider(rpcUrl);
   const account = privateKeyToAddress(privateKey);
+  let chainChecked = false;
+  const assertChain = async () => {
+    if (chainChecked || expectedChainId === undefined) return;
+    const live = await getChainId(provider);
+    if (live !== expectedChainId) {
+      throw new Error(`chain mismatch: endpoint reports ${live}, expected ${expectedChainId}`);
+    }
+    chainChecked = true;
+  };
 
   return {
     provider,
@@ -217,6 +269,7 @@ export function createPrivateKeyClient(rpcUrl: string, privateKey: Hex): Client 
       return ethCall(provider, to, data);
     },
     sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
+      await assertChain();
       // Sign and send transaction
       const signedTx = await signTransaction(
         provider,

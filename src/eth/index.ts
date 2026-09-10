@@ -181,7 +181,13 @@ export { recoverAddress, verifySignature } from './signature';
 
 // Contract
 export type { ContractConfig, ReadOptions, WriteOptions } from './contract';
-export { Contract, getContract, readContract, writeContract } from './contract';
+export {
+  Contract,
+  ContractRevertError,
+  getContract,
+  readContract,
+  writeContract,
+} from './contract';
 
 // Multicall
 export type { Call } from './multicall';

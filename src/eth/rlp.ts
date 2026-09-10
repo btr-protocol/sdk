@@ -13,9 +13,16 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
  * Encode a single item (string, number, bigint, or Uint8Array)
  */
 /** One RLP-encodable scalar. */
-export type RlpItem = string | number | bigint | Uint8Array;
+export type RlpScalar = string | number | bigint | Uint8Array;
+/** A scalar or a (recursively nested) list. `[]` is the EMPTY LIST, `0x80` is the empty string. */
+export type RlpItem = RlpScalar | readonly RlpItem[];
 
 function encodeItem(input: RlpItem): Uint8Array {
+  // A nested list is a list, not a string: an empty accessList MUST encode as 0xc0. Encoding it
+  // as the empty string 0x80 is a different preimage, so the signature is over a payload no node
+  // reconstructs and the transaction is rejected (A-636).
+  if (Array.isArray(input)) return encodeList(input as readonly RlpItem[]);
+
   // Convert to bytes
   let bytes: Uint8Array;
 
@@ -35,7 +42,7 @@ function encodeItem(input: RlpItem): Uint8Array {
       bytes = hexToBytes(hex.length % 2 ? `0${hex}` : hex);
     }
   } else {
-    bytes = input;
+    bytes = input as Uint8Array;
   }
 
   // Empty string
@@ -91,20 +98,19 @@ function encodeLength(length: number): Uint8Array {
 }
 
 /**
- * Main RLP encode function. A top-level array encodes as an RLP list; its items
- * are scalars (an empty array is the one nested shape callers pass, the empty
- * accessList, and encodes as the empty string `0x80`, as before).
+ * Main RLP encode function. Arrays encode as RLP lists at any depth, so a typed-transaction
+ * payload can carry its `accessList` as the list the spec requires.
  */
-export function rlpEncode(input: RlpItem | readonly RlpItem[]): Uint8Array {
+export function rlpEncode(input: RlpItem): Uint8Array {
   if (Array.isArray(input)) {
     return encodeList(input as readonly RlpItem[]);
   }
-  return encodeItem(input as RlpItem);
+  return encodeItem(input);
 }
 
 /**
  * RLP encode and return hex string
  */
-export function rlpEncodeHex(input: RlpItem | readonly RlpItem[]): `0x${string}` {
+export function rlpEncodeHex(input: RlpItem): `0x${string}` {
   return `0x${bytesToHex(rlpEncode(input))}`;
 }

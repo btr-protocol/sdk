@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { areaQ, evalQ } from '../src/amm/aimm';
+import { areaQ, curveToWire, evalQ } from '../src/amm/aimm';
 import type { Address, Eip1193Provider, Hex } from '../src/eth/types';
 import { CURVE_SEG_SLOTS, readCurve } from '../src/pool/storage';
 import FIXTURE from './fixtures/curve-storage.json';
@@ -148,5 +148,32 @@ describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
         `word ${w} bit ${bit}`,
       ).not.toBe(JSON.stringify(base, (_k, v) => (typeof v === 'bigint' ? `${v}` : v)));
     }
+  });
+});
+
+describe('curveToWire rebuilds the header Solidity wrote', () => {
+  // The strongest available check on the packer: take the words `NUQuartic.set` produced for this
+  // deliberately ASYMMETRIC curve, decode them, re-pack, and demand the same 32 bytes back.
+  test('the round-trip is byte-exact', async () => {
+    const c = (await read()) as NonNullable<Awaited<ReturnType<typeof readCurve>>>;
+    expect(BigInt(curveToWire(c).header)).toBe(BigInt(fx.words[0]));
+  });
+
+  test("the median is the curve's own root, not a pinned BPS/2", () => {
+    // Solidity put 4235 in this header. The packer used to write 5000 unconditionally, which is
+    // right only for an antisymmetric curve — i.e. for every preset anyone had tried.
+    const solidityMedian = (BigInt(fx.words[0]) >> 216n) & 0xffffn;
+    expect(solidityMedian).toBe(4235n);
+    expect(solidityMedian).not.toBe(5000n);
+  });
+
+  test('only the m-1 INTERIOR boundaries reach the directory', async () => {
+    const c = (await read()) as NonNullable<Awaited<ReturnType<typeof readCurve>>>;
+    // `boundaries` ends with the BPS sentinel the local `frame` needs and the wire derives. At
+    // m = MAX_SEGS (14) its slot is bits 216-231 — the median field — so writing it corrupted the
+    // centre. Here (m = 5) the slot after the last interior boundary must simply be empty.
+    const header = BigInt(curveToWire(c).header);
+    expect((header >> BigInt(8 + 16 * (c.m - 1))) & 0xffffn).toBe(0n);
+    expect(c.boundaries[c.m - 1]).toBe(10_000);
   });
 });

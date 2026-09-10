@@ -240,6 +240,8 @@ describe('planToLegs', () => {
     BNB: { address: WNATIVE, decimals: 18 },
   };
   const tokenOf = (s: string) => META[s];
+  /** Every pool in these fixtures is the factory's; the allowlist itself is tested separately. */
+  const isOfficialPool = () => true;
   const direct = (poolAddr: string | undefined, tokenIn: string, tokenOut: string) => ({
     legs: [{ poolTag: 't', poolAddr, tokenIn, tokenOut }],
     tokens: [tokenIn, tokenOut],
@@ -260,11 +262,11 @@ describe('planToLegs', () => {
         {
           route,
           fraction: 1,
-          quote: { route, amountIn: 100, amountOut: 99, fills: [], maxIn: 1e6 },
+          quote: { route, amountIn: 100, amountOut: 99, fills: [] },
         },
       ],
     };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0.25, tokenOf }));
+    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0.25, tokenOf, isOfficialPool }));
     expect(legs.length).toBe(1);
     expect(legs[0].amountIn).toBe(100_000_000n); // 100 USDC @ 6 decimals
     expect(legs[0].minOut).toBe(74_250_000_000_000_000_000n); // 99·0.75 @ 18 decimals
@@ -296,12 +298,13 @@ describe('planToLegs', () => {
               { leg: route.legs[0], amountIn: 1, amountOut: 600 },
               { leg: route.legs[1], amountIn: 600, amountOut: 599 },
             ],
-            maxIn: 10,
           },
         },
       ],
     };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, nativeIn: true }));
+    const legs = mustLegs(
+      planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, nativeIn: true }),
+    );
     expect(legs.length).toBe(2);
     expect(legs[0].wrapIn).toBe(true);
     expect(legs[0].minOut).toBe(600_000_000n); // bridged USDC @ 6 decimals
@@ -331,11 +334,11 @@ describe('planToLegs', () => {
         {
           route: three,
           fraction: 1,
-          quote: { route: three, amountIn: 1000, amountOut: 998, fills: [], maxIn: 1e6 },
+          quote: { route: three, amountIn: 1000, amountOut: 998, fills: [] },
         },
       ],
     };
-    expect(planToLegs(plan, { slippageFrac: 0, tokenOf })).toBeNull();
+    expect(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool })).toBeNull();
   });
 
   test('split parts emit largest first', () => {
@@ -349,16 +352,16 @@ describe('planToLegs', () => {
         {
           route: rv,
           fraction: 0.25,
-          quote: { route: rv, amountIn: 250, amountOut: 249, fills: [], maxIn: 1e6 },
+          quote: { route: rv, amountIn: 250, amountOut: 249, fills: [] },
         },
         {
           route: rs,
           fraction: 0.75,
-          quote: { route: rs, amountIn: 750, amountOut: 749, fills: [], maxIn: 1e6 },
+          quote: { route: rs, amountIn: 750, amountOut: 749, fills: [] },
         },
       ],
     };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }));
+    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }));
     expect(legs.map((l) => l.pool)).toEqual([POOL_S, POOL_V]);
     expect(legs[0].amountIn).toBe(750_000_000n);
   });
@@ -382,19 +385,21 @@ describe('planToLegs', () => {
         {
           route: rs,
           fraction: 1,
-          quote: { route: rs, amountIn: FLOAT_IN, amountOut: 31, fills: [], maxIn: 1e6 },
+          quote: { route: rs, amountIn: FLOAT_IN, amountOut: 31, fills: [] },
         },
       ],
     };
 
     test('the f64 path overshoots the balance - the bug this pins', () => {
-      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }));
+      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }));
       expect(legs[0].amountIn).toBe(31_050_000_000_000_000_000n);
       expect(legs[0].amountIn).toBeGreaterThan(BALANCE); // → TransferFromFailed()
     });
 
     test('exact units → amountIn IS the balance, and the approval covers exactly it', () => {
-      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }));
+      const legs = mustLegs(
+        planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
+      );
       expect(legs[0].amountIn).toBe(BALANCE);
       expect(legs[0].amountIn).toBeLessThanOrEqual(BALANCE);
       const approves = buildSwapCalls(legs, { recipient: USER }).filter((c) =>
@@ -416,7 +421,7 @@ describe('planToLegs', () => {
           {
             route: rv,
             fraction: third,
-            quote: { route: rv, amountIn: FLOAT_IN * third, amountOut: 10, fills: [], maxIn: 1e6 },
+            quote: { route: rv, amountIn: FLOAT_IN * third, amountOut: 10, fills: [] },
           },
           {
             route: rs,
@@ -426,13 +431,12 @@ describe('planToLegs', () => {
               amountIn: FLOAT_IN * (1 - third),
               amountOut: 21,
               fills: [],
-              maxIn: 1e6,
             },
           },
         ],
       };
       const legs = mustLegs(
-        planToLegs(splitPlan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }),
+        planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
       );
       expect(legs.length).toBe(2);
       const total = legs.reduce((s, l) => s + l.amountIn, 0n);
@@ -470,24 +474,25 @@ describe('planToLegs', () => {
                 { leg: cross.legs[0], amountIn: FLOAT_IN, amountOut: 0.5 },
                 { leg: cross.legs[1], amountIn: 0.5, amountOut: 31 },
               ],
-              maxIn: 1e6,
             },
           },
         ],
       };
       const legs = mustLegs(
-        planToLegs(crossPlan, { slippageFrac: 0, tokenOf, amountInUnits: BALANCE }),
+        planToLegs(crossPlan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
       );
       expect(legs[0].amountIn).toBe(BALANCE);
       expect(legs[1].amountIn).toBe(legs[0].minOut); // hop 2 spends the bridged floor, not the wallet
     });
 
     test('an absent or zero exact total leaves the float path alone', () => {
-      expect(mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf }))[0].amountIn).toBe(
-        31_050_000_000_000_000_000n,
-      );
       expect(
-        mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, amountInUnits: 0n }))[0].amountIn,
+        mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }))[0].amountIn,
+      ).toBe(31_050_000_000_000_000_000n);
+      expect(
+        mustLegs(
+          planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: 0n }),
+        )[0].amountIn,
       ).toBe(31_050_000_000_000_000_000n);
     });
   });
@@ -498,18 +503,18 @@ describe('planToLegs', () => {
     const part = (route: typeof noAddr) => ({
       route,
       fraction: 1,
-      quote: { route, amountIn: 1, amountOut: 1, fills: [], maxIn: 1 },
+      quote: { route, amountIn: 1, amountOut: 1, fills: [] },
     });
     expect(
       planToLegs(
         { amountIn: 1, amountOut: 1, isSplit: false, parts: [part(noAddr)] },
-        { slippageFrac: 0, tokenOf },
+        { slippageFrac: 0, tokenOf, isOfficialPool },
       ),
     ).toBeNull();
     expect(
       planToLegs(
         { amountIn: 1, amountOut: 1, isSplit: false, parts: [part(noMeta)] },
-        { slippageFrac: 0, tokenOf },
+        { slippageFrac: 0, tokenOf, isOfficialPool },
       ),
     ).toBeNull();
   });

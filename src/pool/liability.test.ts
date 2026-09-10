@@ -69,6 +69,19 @@ describe('haircutFace (applyHaircut mirror)', () => {
       expect(() => haircutFace(1_000, 0, 1_000, bad)).toThrow(RangeError);
     }
   });
+
+  test('an operand past 2^53 is refused, not previewed', () => {
+    // The chain settles this in integers. Past MAX_SAFE_INTEGER a double's own spacing is more
+    // than one unit, so `ceil` no longer rounds up by less than a unit and the preview diverges
+    // from what settles - silently, and always in the same direction.
+    const big = Number.MAX_SAFE_INTEGER + 2;
+    expect(() => haircutFace(big, 800_000, 1_000_000, 0)).toThrow(RangeError);
+    expect(() => haircutFace(1_000, big, 1_000_000, 0)).toThrow(RangeError);
+    expect(() => haircutFace(1_000, 800_000, big, 0)).toThrow(RangeError);
+    expect(() => haircutFace(Number.NaN, 800_000, 1_000_000, 0)).toThrow(RangeError);
+    // The boundary itself still works.
+    expect(() => haircutFace(Number.MAX_SAFE_INTEGER, 800_000, 1_000_000, 0)).not.toThrow();
+  });
 });
 
 describe('liabilitySwapEnabled (flag bit gate)', () => {
@@ -105,7 +118,6 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
         lpFeeBps: 0,
         protoFeeBps: 0,
         covTollBps: 0,
-        maxIn: Number.POSITIVE_INFINITY,
         route: ['AUDF', 'USDC', 'NZDF'],
       };
     };

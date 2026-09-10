@@ -165,15 +165,36 @@ export function encode(
   }
 
   // 3b. Static Types
+  //
+  // ! EVERY BRANCH BELOW USED TO ACCEPT ANYTHING. A 21-byte address, a `bytes32` given 40 bytes,
+  // `uint8` given 300, a negative into a `uint` — each produced a word, and `pad()` keeps only the
+  // LAST 32 bytes, so an over-long value is silently TRUNCATED and encodes as a different address
+  // or a different amount. Nothing downstream can tell: the calldata is well formed. Failing here
+  // is the only place the caller's intent still exists.
   let hex = '';
-  if (base === 'address') hex = clean(val as string);
-  else if (base === 'bool') hex = val ? '1' : '0';
-  else if (base === 'bytes')
-    hex = clean(val as string).padEnd(64, '0'); // bytesN
-  else {
-    // uint/int
+  if (base === 'address') {
+    hex = clean(val as string);
+    if (!/^[0-9a-fA-F]{40}$/.test(hex)) throw new Error(`encode address: bad value ${String(val)}`);
+  } else if (base === 'bool') {
+    if (typeof val !== 'boolean') throw new Error(`encode bool: bad value ${String(val)}`);
+    hex = val ? '1' : '0';
+  } else if (base === 'bytes') {
+    // bytesN — N bytes exactly, left-aligned.
+    hex = clean(val as string);
+    const want = Number(sizeStr) * 2;
+    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length > want) {
+      throw new Error(`encode bytes${sizeStr}: expected <=${want} hex chars, got ${hex.length}`);
+    }
+    hex = hex.padEnd(64, '0');
+  } else if (base === 'uint' || base === 'int') {
+    const bits = BN(sizeStr || 256);
     const n = BN(val as string | number | bigint | boolean);
-    hex = numToHex(n < 0n ? n + (1n << BN(sizeStr || 256)) : n);
+    const lo = base === 'uint' ? 0n : -(1n << (bits - 1n));
+    const hi = base === 'uint' ? (1n << bits) - 1n : (1n << (bits - 1n)) - 1n;
+    if (n < lo || n > hi) throw new Error(`encode ${type}: ${n} out of range [${lo}, ${hi}]`);
+    hex = numToHex(n < 0n ? n + (1n << bits) : n);
+  } else {
+    throw new Error(`encode: unsupported type ${type}`);
   }
 
   return { h: pad(hex), t: '' };
@@ -330,10 +351,34 @@ export function getPlan(abi: Abi, functionName: string): FnPlan {
   }
   let p = m.get(functionName);
   if (!p) {
-    // Only function-shaped entries are callable; events/errors/generator extras
-    // either miss on name or are cast away, same as the previous untyped lookup.
-    const fn = abi.find((i) => i.name === functionName) as AbiFunction | undefined;
+    // Only function-shaped entries are callable. `type` is absent on the SDK's hand-written
+    // minimal ABIs (MC3_ABI), present on everything the backend serves; an entry that names its
+    // type as something else is an event or an error and must never be dispatched to.
+    const callable = abi.filter(
+      (i) =>
+        i.name === functionName && ((i as { type?: string }).type ?? 'function') === 'function',
+    ) as AbiFunction[];
+    // `functionName` may be a full canonical signature — the only way to name one member of an
+    // overload set unambiguously.
+    const bySig = functionName.includes('(')
+      ? (abi.find(
+          (i) =>
+            ((i as { type?: string }).type ?? 'function') === 'function' &&
+            typeof i.name === 'string' &&
+            getFunctionSignature(i as AbiFunction) === functionName,
+        ) as AbiFunction | undefined)
+      : undefined;
+    const fn = bySig ?? callable[0];
     if (!fn) throw new Error(`Fn not found: ${functionName}`);
+    // OVERLOADS: `abi.find` took the first entry with the name, which is a coin flip between two
+    // different selectors — `isFeedFresh(bytes32)` and `isFeedFresh(bytes32,uint32)` differ by an
+    // argument the caller supplied and the encoder would have silently dropped. Refuse instead:
+    // the caller names the exact signature, or nothing is encoded.
+    if (!bySig && callable.length > 1) {
+      throw new Error(
+        `Ambiguous fn ${functionName}: ${callable.map((f) => getFunctionSignature(f)).join(', ')} — name the full signature`,
+      );
+    }
     p = { fn, selector: getSelector(getFunctionSignature(fn)) };
     m.set(functionName, p);
   }

@@ -206,7 +206,6 @@ export function wirePlanToSwap(
         amountIn: hexToF64(q.amount_in, decOf(r.legs[0].tokenIn)),
         amountOut: hexToF64(q.amount_out, decOf(r.legs[r.legs.length - 1].tokenOut)),
         fills,
-        maxIn: Number.POSITIVE_INFINITY,
       };
     };
     const parts = res.best_parts.map((p) => {

@@ -1,6 +1,7 @@
-// Pool/Admin/ExternalOracle are gitignored build artifacts (`bun run fetch-abis`, backend
-// getAbi SSoT); the rest below are static offline-trust surfaces (ExternalOracleV4 reads the
-// chain with zero server trust).
+// Pool/Admin are gitignored build artifacts (`bun run fetch-abis`, backend getAbi SSoT, content-
+// pinned by `abis.lock.json`); the rest below are static offline-trust surfaces (ExternalOracleV4
+// reads the chain with zero server trust). The V1 `EXTERNAL_ORACLE_ABI` is gone: the deployed
+// fleet is V4 and nothing imported it.
 /**
  * Contract ABIs
  * @module @btr-protocol/sdk/abis
@@ -11,7 +12,6 @@
 
 export * from './AccessControl.js';
 export * from './Admin.js';
-export * from './ExternalOracle.js';
 export * from './ExternalOracleV4.js';
 export * from './Flash.js';
 export * from './IPoolHooks.js';

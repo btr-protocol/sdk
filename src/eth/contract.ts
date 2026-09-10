@@ -4,8 +4,9 @@
  */
 
 import type { Abi, AbiFunction } from './abi';
-import { decodeFn, encodeFn } from './abi';
+import { decodeErrorResult, decodeFn, encodeFn } from './abi';
 import { estimateGas, ethCall, sendTransaction } from './rpc';
+import { RpcRevertError } from './transport';
 import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -35,6 +36,45 @@ export interface WriteOptions {
 // Contract Class
 // ─────────────────────────────────────────────────────────────
 
+/** A revert carrying decoded custom-error data.
+ *
+ *  `decodeErrorResult` has existed since the coder was written and nothing on the Contract path
+ *  called it, so every revert surfaced as the transport's generic "execution reverted" — the
+ *  protocol's own `FeatureDisabled(ASSET)` / `ThresholdViolation(...)` reached the caller as an
+ *  opaque hex blob. Reverts are how this protocol says WHY it refused; dropping the reason turns
+ *  every deliberate refusal into an unexplained failure. */
+export class ContractRevertError extends RpcRevertError {
+  constructor(
+    /** Custom-error name from the contract's own ABI, e.g. `FeatureDisabled`. */
+    readonly errorName: string,
+    /** Its decoded arguments, in declaration order. */
+    readonly errorArgs: readonly unknown[],
+    message: string,
+    code?: number,
+    data?: unknown,
+  ) {
+    super(message, code, data);
+  }
+}
+
+/** Re-throw a revert with its custom error decoded against `abi`; anything else passes through. */
+function withDecodedRevert(abi: Abi, fn: string, e: unknown): never {
+  if (e instanceof RpcRevertError && typeof e.data === 'string') {
+    const d = decodeErrorResult(abi, e.data);
+    if (d) {
+      const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
+      throw new ContractRevertError(
+        d.name,
+        d.args,
+        `${fn} reverted: ${d.name}${args}`,
+        e.code,
+        e.data,
+      );
+    }
+  }
+  throw e;
+}
+
 export class Contract {
   readonly address: Address;
   readonly abi: Abi;
@@ -63,8 +103,12 @@ export class Contract {
     options: ReadOptions = {},
   ): Promise<T> {
     const data = encodeFn({ abi: this.abi, functionName, args });
-    const result = await ethCall(this.provider, this.address, data, options.blockTag || 'latest');
-    return decodeFn({ abi: this.abi, functionName, data: result }) as T;
+    try {
+      const result = await ethCall(this.provider, this.address, data, options.blockTag || 'latest');
+      return decodeFn({ abi: this.abi, functionName, data: result }) as T;
+    } catch (e) {
+      return withDecodedRevert(this.abi, functionName, e);
+    }
   }
 
   async write(
@@ -85,7 +129,11 @@ export class Contract {
     if (options.maxPriorityFeePerGas !== undefined)
       tx.maxPriorityFeePerGas = `0x${options.maxPriorityFeePerGas.toString(16)}`;
 
-    return sendTransaction(this.provider, tx);
+    try {
+      return await sendTransaction(this.provider, tx);
+    } catch (e) {
+      return withDecodedRevert(this.abi, functionName, e);
+    }
   }
 
   async simulate(
@@ -99,8 +147,11 @@ export class Contract {
     const tx: Partial<TransactionRequest> = { from: this.account, to: this.address, data };
     if (options.value !== undefined) tx.value = `0x${options.value.toString(16)}`;
 
-    const gas = await estimateGas(this.provider, tx);
-    return { gas };
+    try {
+      return { gas: await estimateGas(this.provider, tx) };
+    } catch (e) {
+      return withDecodedRevert(this.abi, functionName, e);
+    }
   }
 
   encodeData(functionName: string, args: readonly unknown[] = []): Hex {
