@@ -56,6 +56,11 @@ describe('poolStateToWire', () => {
     // The per-leg balance copy still fills reserves: it is a capacity number, not an endpoint.
     expect(w.base_reserves).toBe('0x2e90edd000');
   });
+
+  test('unknown confidence goes out null, never a fail-open zero', () => {
+    const w = poolStateToWire('p', undefined, state(HUB), meta, 6);
+    expect(w.spokes[0].confidence_bps).toBeNull();
+  });
 });
 
 describe('legToQuoteBody', () => {
@@ -80,5 +85,10 @@ describe('legToQuoteBody', () => {
       vega_bps: 0,
       kappa_cov_bps: 0,
     });
+  });
+
+  test('unknown confidence goes out null, never a fail-open zero', () => {
+    const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6));
+    expect(b.confidence_bps).toBeNull();
   });
 });

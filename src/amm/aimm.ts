@@ -380,7 +380,7 @@ export interface SpokeWire {
   liabilities: string;
   mark: string;
   sigma_pbps: number;
-  confidence_bps: number;
+  confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
   decimals?: number;
@@ -642,7 +642,7 @@ export interface QuoteRequestWire {
   /** The swap's OTHER endpoint (see {@link EndpointWire}): the hub on a direct spoke↔base leg,
    *  {@link INTERIOR_ENDPOINT} for a hop whose far token is interior to a longer path. */
   counterparty: EndpointWire;
-  confidence_bps: number;
+  confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
 }
@@ -710,7 +710,7 @@ export function legToQuoteBody(
     sigma_pbps: leg.sigma,
     selling,
     counterparty,
-    confidence_bps: leg.confidence ?? 0,
+    confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
   };
@@ -811,7 +811,7 @@ export function poolStateToWire(
       liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
       mark: toHex(BigInt(Math.round(leg.twap * 1e18))),
       sigma_pbps: leg.sigma,
-      confidence_bps: leg.confidence ?? 0,
+      confidence_bps: leg.confidence ?? null,
       stale_excess: leg.staleExcess ?? 0,
       proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
       decimals: leg.decimals,

@@ -141,8 +141,21 @@ export async function signTransaction(
   provider: Eip1193Provider,
   tx: TransactionRequest,
   privateKey: Hex,
+  /** Refuse to build the preimage unless the endpoint reports THIS chain. The signed tx embeds the
+   *  chain id the endpoint claimed, so a mismatched endpoint yields a valid transaction for a
+   *  chain the caller never meant. Checked HERE, at the preimage, so an endpoint that rotates
+   *  underneath a client cannot slip past a cached outer check. */
+  expectedChainId?: number,
 ): Promise<Hex> {
   const chainId = await getChainId(provider);
+  if (expectedChainId !== undefined && chainId !== expectedChainId) {
+    throw new Error(`chain mismatch: endpoint reports ${chainId}, expected ${expectedChainId}`);
+  }
+  if (tx.chainId !== undefined && BigInt(tx.chainId) !== BigInt(chainId)) {
+    throw new Error(
+      `chain mismatch: tx requests ${BigInt(tx.chainId)}, endpoint reports ${chainId}`,
+    );
+  }
   const nonce = tx.nonce ?? (await nextNonce(provider, tx.from as Address));
   const gasLimit = tx.gas ?? (await estimateGas(provider, tx));
 
@@ -246,21 +259,12 @@ export function createPrivateKeyClient(
   privateKey: Hex,
   /** Refuse to sign anything unless the endpoint reports THIS chain. The signing preimage carries
    *  the chain id the endpoint claims, so an endpoint on the wrong (or a forked) chain silently
-   *  produces a valid transaction for a chain the caller never meant to touch. Checked before
-   *  every send and cached per client; omit only for a caller that genuinely does not know. */
+   *  produces a valid transaction for a chain the caller never meant to touch. Enforced inside
+   *  `signTransaction` at the preimage; omit only for a caller that genuinely does not know. */
   expectedChainId?: number,
 ): Client {
   const provider = createHttpProvider(rpcUrl);
   const account = privateKeyToAddress(privateKey);
-  let chainChecked = false;
-  const assertChain = async () => {
-    if (chainChecked || expectedChainId === undefined) return;
-    const live = await getChainId(provider);
-    if (live !== expectedChainId) {
-      throw new Error(`chain mismatch: endpoint reports ${live}, expected ${expectedChainId}`);
-    }
-    chainChecked = true;
-  };
 
   return {
     provider,
@@ -269,12 +273,12 @@ export function createPrivateKeyClient(
       return ethCall(provider, to, data);
     },
     sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
-      await assertChain();
       // Sign and send transaction
       const signedTx = await signTransaction(
         provider,
         { ...tx, from: account } as TransactionRequest,
         privateKey,
+        expectedChainId,
       );
       return (await provider.request({
         method: 'eth_sendRawTransaction',

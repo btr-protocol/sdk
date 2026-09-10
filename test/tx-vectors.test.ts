@@ -161,6 +161,39 @@ describe('EIP-1559 signing produces the preimage a node re-derives', () => {
   });
 });
 
+describe('signing refuses a chain the caller did not mean', () => {
+  const base = {
+    from: privateKeyToAddress(KEY_01),
+    to: '0x3535353535353535353535353535353535353535',
+    value: 0n,
+    gas: 21000n,
+    maxFeePerGas: 1000000000n,
+    maxPriorityFeePerGas: 1000000n,
+    nonce: 0n,
+    data: '0x',
+  } as unknown as TransactionRequest;
+
+  test('a mismatch throws before any preimage is built', async () => {
+    await expect(signTransaction(stub(8453, 0), base, KEY_01, 1)).rejects.toThrow(/chain mismatch/);
+  });
+
+  test('the expected chain still signs', async () => {
+    const signed = await signTransaction(stub(8453, 0), base, KEY_01, 8453);
+    expect(signed.startsWith('0x02')).toBe(true);
+  });
+
+  test('an explicit tx.chainId the endpoint disagrees with throws', async () => {
+    const tx = { ...base, chainId: '0x1' } as unknown as TransactionRequest;
+    await expect(signTransaction(stub(8453, 0), tx, KEY_01)).rejects.toThrow(/chain mismatch/);
+  });
+
+  test('a tx.chainId matching the endpoint signs', async () => {
+    const tx = { ...base, chainId: '0x2105' } as unknown as TransactionRequest;
+    const signed = await signTransaction(stub(8453, 0), tx, KEY_01);
+    expect(signed.startsWith('0x02')).toBe(true);
+  });
+});
+
 describe('concurrent signing does not reuse a nonce', () => {
   test('two same-tick signs get n and n+1', async () => {
     const p = stub(8453, 12);
