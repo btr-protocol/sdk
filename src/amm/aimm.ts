@@ -435,6 +435,8 @@ export interface LegWire {
   token_out: string;
   amount_in: string;
   amount_out: string;
+  /** A-188: clamped at the delivering book's coverage argmax; `amount_out` is not a price. */
+  saturated: boolean;
 }
 export interface SplitPartWire {
   legs: LegWire[];
