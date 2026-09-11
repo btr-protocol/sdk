@@ -13,6 +13,7 @@ import type {
 import { decodeFn, encodeFn } from '../eth/abi';
 import { multicallStrict } from '../eth/multicall';
 import type { Address, Eip1193Provider, Hex } from '../eth/types';
+import { toAsset } from './asset.js';
 
 // ─────────────────────────────────────────────────────────────
 // Pool ABI (View Functions Only)
@@ -49,6 +50,8 @@ export interface Asset {
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
 export type _AssetMatchesAbi = Assert<FieldsMatch<Asset, AssetFields>>;
+
+export { toAsset } from './asset.js';
 
 export interface SwapQuote {
   amountOut: bigint;
@@ -107,7 +110,7 @@ export async function getAsset(
     params: [{ to: poolAddress, data: calldata }, 'latest'],
   })) as Hex;
 
-  return decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: result });
+  return toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: result }));
 }
 
 /**
@@ -235,12 +238,12 @@ export async function getPoolData(
   );
 
   const assets: PoolAsset[] = tokens.map((token, i) => {
-    const asset = res[i * 2] as Asset;
+    const asset = toAsset(res[i * 2]);
     return {
       token: token.address,
       symbol: token.symbol,
       name: token.name,
-      decimals: Number(asset.decimals),
+      decimals: asset.decimals,
       reserves: asset.reserves,
       liabilities: asset.liabilities,
       coverage: res[i * 2 + 1] as bigint,
