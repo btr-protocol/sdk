@@ -274,6 +274,13 @@ describe('the encoder refuses what it cannot represent', () => {
       inputs: [{ name: 'n', type: 'int8' }],
       outputs: [],
     },
+    {
+      type: 'function',
+      name: 'j',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'a', type: 'uint256[2]' }],
+      outputs: [],
+    },
   ] as never;
 
   test('a 21-byte address is rejected, not truncated to its last 20', () => {
@@ -301,6 +308,19 @@ describe('the encoder refuses what it cannot represent', () => {
       /encode bytes4/,
     );
     expect(encodeFn({ abi, functionName: 'h', args: ['0x11223344'] })).toContain('11223344');
+  });
+
+  test('bytes4 SHORTER than 4 bytes is rejected, not right-padded into a different word (A-641)', () => {
+    // 0x112233 padded to 0x11223300 is a different selector/feed id, and the calldata is well formed.
+    expect(() => encodeFn({ abi, functionName: 'h', args: ['0x112233'] })).toThrow(/encode bytes4/);
+  });
+
+  test('a fixed array T[N] refuses any element count but N (A-641)', () => {
+    expect(() => encodeFn({ abi, functionName: 'j', args: [[1n]] })).toThrow(/uint256\[2\]/);
+    expect(() => encodeFn({ abi, functionName: 'j', args: [[1n, 2n, 3n]] })).toThrow(
+      /uint256\[2\]/,
+    );
+    expect(encodeFn({ abi, functionName: 'j', args: [[1n, 2n]] })).toHaveLength(2 + 8 + 128);
   });
 });
 

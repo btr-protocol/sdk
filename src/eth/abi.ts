@@ -115,6 +115,12 @@ export function encode(
     const base = type.slice(0, -arrayMatch[1].length);
     const arr = val as readonly unknown[];
     const isStatic = arrayMatch[1] !== '[]'; // [N] is static, [] is dynamic
+    // T[N] has no length word: a wrong count shifts every later argument and still decodes.
+    if (isStatic && arr.length !== Number(arrayMatch[1].slice(1, -1))) {
+      throw new Error(
+        `encode ${type}: expected ${arrayMatch[1].slice(1, -1)} elements, got ${arr.length}`,
+      );
+    }
     const res = processList(
       arr.map((v) => encode(base, v, components)),
       !isStatic,
@@ -179,11 +185,12 @@ export function encode(
     if (typeof val !== 'boolean') throw new Error(`encode bool: bad value ${String(val)}`);
     hex = val ? '1' : '0';
   } else if (base === 'bytes') {
-    // bytesN — N bytes exactly, left-aligned.
+    // bytesN — N bytes exactly, left-aligned. A SHORT value is refused too: right-padding it yields
+    // a different word (another feed id, another selector) in perfectly well-formed calldata.
     hex = clean(val as string);
     const want = Number(sizeStr) * 2;
-    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length > want) {
-      throw new Error(`encode bytes${sizeStr}: expected <=${want} hex chars, got ${hex.length}`);
+    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length !== want) {
+      throw new Error(`encode bytes${sizeStr}: expected ${want} hex chars, got ${hex.length}`);
     }
     hex = hex.padEnd(64, '0');
   } else if (base === 'uint' || base === 'int') {
@@ -555,6 +562,14 @@ export function decodeErrorResult(
 
   if (!error) return undefined;
 
-  const args = decodeAbiParameters(error.inputs || [], data.slice(10));
+  // A selector with clipped argument words is NOT a decodable revert: the args section must be a
+  // whole number of 32-byte words, and every declared input needs at least its one head word. A
+  // partial word read as zero fabricates an argument the contract never emitted; returning
+  // undefined here keeps the caller's original revert instead of a mislabelled custom error.
+  const inputs = error.inputs || [];
+  const words = data.slice(10);
+  if (words.length % 64 !== 0 || words.length < inputs.length * 64) return undefined;
+
+  const args = decodeAbiParameters(inputs, words);
   return { name: error.name, args };
 }
