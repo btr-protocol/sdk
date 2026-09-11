@@ -118,6 +118,24 @@ export interface BuildOpts {
 
 const MAX_UINT256 = (1n << 256n) - 1n;
 
+/**
+ * Trust boundary for a server-authored floor. `/v2` returns `tol_pbps` and `min_out` derived from
+ * the same `SwapQuote` as `amount_out`; this checks the two invariants rather than trusting them,
+ * and throws instead of quietly lowering the floor.
+ */
+export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bigint): void {
+  if (minOut > amountOut) {
+    throw new Error(`server floor ${minOut} exceeds amount_out ${amountOut}`);
+  }
+  const expected = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+  const diff = expected > minOut ? expected - minOut : minOut - expected;
+  if (diff > 1n) {
+    throw new Error(
+      `server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`,
+    );
+  }
+}
+
 export interface TokenMeta {
   address: Address;
   decimals: number;
@@ -155,6 +173,11 @@ export interface PlanLegOpts {
    *  swap. The approval is built from the same inflated sum, so it matches and hides the cause.
    *  Split parts are carved from this bigint and sum back to it EXACTLY. */
   amountInUnits?: bigint;
+  /** Server-authored end-to-end floors from `/v2/quote|route`, keyed by lowercase output token.
+   *  When present the builder encodes THAT floor (verified with {@link assertServerFloor}) and
+   *  never picks a tolerance itself. A two-leg part still scales its intermediate hop; only the
+   *  delivered token's floor is server-authored. */
+  serverFloors?: Record<string, { minOut: bigint; tolPbps: number }>;
 }
 
 /** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
@@ -287,13 +310,15 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       if (!rl[0].poolAddr || !tin || !tout) return null;
       if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
       const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
+      const server = opts.serverFloors?.[tout.address.toLowerCase()];
+      if (server) assertServerFloor(quotedOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
         amountIn: partInUnits(part.fraction, i, tin.decimals),
         quotedOut,
-        minOut: applySlip(quotedOut, slip),
+        minOut: server ? server.minOut : applySlip(quotedOut, slip),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
       });
@@ -331,13 +356,17 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
       });
+      const server = opts.serverFloors?.[t2out.address.toLowerCase()];
+      if (server) assertServerFloor(leg2Quoted, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[1].poolAddr as Address,
         tokenIn: tmid.address,
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut: applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
+        minOut: server
+          ? server.minOut
+          : applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
         unwrapOut: opts.nativeOut,
         chained: true,
       });
@@ -787,10 +816,14 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   }
   if (parts.length === 0) return null;
 
-  const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => ({
-    token,
-    minOut: applySlip(amount, slip),
-  }));
+  const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => {
+    const server = opts.serverFloors?.[token.toLowerCase()];
+    if (server) {
+      assertServerFloor(amount, server.tolPbps, server.minOut);
+      return { token, minOut: server.minOut };
+    }
+    return { token, minOut: applySlip(amount, slip) };
+  });
 
   // A gas-token swap is single-asset on that side by definition — the user pays or is paid in the
   // one native token. More than one input (or output) with the flag set means the plan and the
