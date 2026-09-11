@@ -16,7 +16,8 @@ export type AssetFields =
   | 'decimals'
   | 'deadSeedPow10'
   | 'flags'
-  | 'kappaCovBps';
+  | 'kappaCovBps'
+  | 'maxLiabWeightBps';
 
 export type DepositResultFields = 'lpAmount' | 'actualDeposit' | 'deadLp';
 

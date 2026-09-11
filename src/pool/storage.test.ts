@@ -75,6 +75,7 @@ test('packed field offsets match the Solidity struct packing', () => {
       deadSeedPow10: [2, 25],
       flags: [2, 26],
       kappaCovBps: [2, 28],
+      maxLiabWeightBps: [2, 30],
     },
     // Quote-source half (feedId, primary, mode, quoteUnit) then the breaker half.
     OracleConfig: {

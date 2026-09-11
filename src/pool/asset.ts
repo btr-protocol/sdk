@@ -10,6 +10,7 @@ const ASSET_NUMBER_FIELDS = [
   'deadSeedPow10',
   'flags',
   'kappaCovBps',
+  'maxLiabWeightBps',
 ] as const satisfies readonly (keyof Asset)[];
 
 /** A decoded `getAsset` tuple, shaped as `Asset` says. The ABI decoder returns EVERY uint as a

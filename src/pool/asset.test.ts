@@ -18,11 +18,12 @@ const row = {
   presetId: 5n,
   minFeePbps: 90n,
   vegaBps: 4000n,
-  haircutSuppressorBps: 0n,
+  depositCapCode: 0n,
   decimals: 6n,
   deadSeedPow10: 3n,
   flags: 7n,
   kappaCovBps: 1500n,
+  maxLiabWeightBps: 0n,
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 
@@ -39,6 +40,7 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says (A-104)
   test('every small field becomes a number; the 96/128-bit books stay bigint', () => {
     const a = toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: encoded }));
     expect(a.kappaCovBps).toBe(1500);
+    expect(a.maxLiabWeightBps).toBe(0);
     expect(a.flags).toBe(7);
     expect(a.decimals).toBe(6);
     expect(a.presetId).toBe(5);
