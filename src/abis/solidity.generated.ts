@@ -96,7 +96,7 @@ export const HOOK_PRE_OUTFLOW = 1;
 export const HOOK_POST_INFLOW = 2;
 
 // On-chain library constants.
-export const STALE_Z = 100;
+export const STALE_Z = 472;
 export const STALE_GRACE_CAP_SECS = 30;
 
 /**
