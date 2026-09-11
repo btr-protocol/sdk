@@ -45,6 +45,19 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'STORAGE_VERSION',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'beacon',
     inputs: [],
     outputs: [
@@ -272,6 +285,25 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'isSpawn',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'officialPools',
     inputs: [
       {
@@ -298,6 +330,50 @@ export const POOL_FACTORY_ABI = [
         name: '',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'poolAuthority',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'spawn',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'listed',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'official',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'admin_',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'treasury',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'sealed_',
+        type: 'bool',
+        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
@@ -349,6 +425,24 @@ export const POOL_FACTORY_ABI = [
   },
   {
     type: 'function',
+    name: 'setOfficial',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'official',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'setPoolBaseToken',
     inputs: [
       {
@@ -366,6 +460,19 @@ export const POOL_FACTORY_ABI = [
     inputs: [
       {
         name: 'newDeployer',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'syncOfficial',
+    inputs: [
+      {
+        name: 'pool',
         type: 'address',
         internalType: 'address',
       },
@@ -442,6 +549,31 @@ export const POOL_FACTORY_ABI = [
     inputs: [
       {
         name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'PoolOfficialSet',
+    inputs: [
+      {
+        name: 'pool',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'official',
+        type: 'bool',
+        indexed: false,
+        internalType: 'bool',
+      },
+      {
+        name: 'by',
         type: 'address',
         indexed: true,
         internalType: 'address',
