@@ -194,10 +194,11 @@ describe('readCurve (NUQuartic.Curve storage decode)', () => {
 describe('readSolvencyState — slot 14 lastGoodCWad', () => {
   const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
   const word = (hex: string) => `0x${hex.padStart(64, '0')}` as `0x${string}`;
-  const providerWith = (slots: Map<bigint, string>): Eip1193Provider => ({
-    request: async ({ params }: { params: unknown[] }) =>
-      slots.get(BigInt(params[1] as string)) ?? word('0'),
-  }) as unknown as Eip1193Provider;
+  const providerWith = (slots: Map<bigint, string>): Eip1193Provider =>
+    ({
+      request: async ({ params }: { params: unknown[] }) =>
+        slots.get(BigInt(params[1] as string)) ?? word('0'),
+    }) as unknown as Eip1193Provider;
 
   test('a stamped rate', async () => {
     const slots = new Map<bigint, string>([[14n, word((970n * 10n ** 15n).toString(16))]]);
