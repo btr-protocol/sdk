@@ -28,6 +28,7 @@ function pool(
           3_000_000,
           6,
           P,
+          0,
         ),
         NZDF: buildLeg(
           'NZDF',
@@ -38,6 +39,7 @@ function pool(
           3_000_000,
           6,
           P,
+          0,
         ),
       },
       hub: { res: o?.hubRes ?? 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
@@ -380,7 +382,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
 }
 
 const leg = (sym: string, res = 1_000_000, liab = 1_000_000) =>
-  buildLeg(sym, 1, SIG, res, liab, 3_000_000, 6, P);
+  buildLeg(sym, 1, SIG, res, liab, 3_000_000, 6, P, 0);
 
 describe('same-asset direct paths', () => {
   test('rankDeposit(X, X): single direct-deposit route, face 1:1, no price guard', async () => {

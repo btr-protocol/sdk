@@ -311,7 +311,7 @@ export function buildLeg(
   baseRes: number,
   decimals: number,
   profile: AimmProfile,
-  kappaCovBps = 0,
+  kappaCovBps: number,
   feed?: { confidence?: number; staleExcess?: number },
 ): PoolLeg {
   return {

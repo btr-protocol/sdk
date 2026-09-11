@@ -44,7 +44,8 @@ export interface Asset {
   deadSeedPow10: number;
   /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */
   flags: number;
-  /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). Was `RiskConfig.kappaCovBps`. */
+  /** κ (bps): convex coverage-wall strength. Every listed leg carries 50 ≤ κ ≤ BPS.
+   *  Was `RiskConfig.kappaCovBps`. */
   kappaCovBps: number;
   /** Per-leg ceiling on this leg's share of the pool claim book (bps of B). 0 = disabled (default). */
   maxLiabWeightBps: number;
