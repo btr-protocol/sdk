@@ -45,6 +45,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'MAX_TREASURY_OWNER_VETOES',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'MIN_GUARDIANS',
     inputs: [],
     outputs: [
@@ -311,6 +324,19 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     type: 'function',
+    name: 'previousTreasury',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'queueRole',
     inputs: [
       {
@@ -484,6 +510,25 @@ export const ACCESS_CONTROL_ABI = [
         name: '',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'treasuryOwnerVetoes',
+    inputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'enum AccessControl.Role',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint8',
+        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
@@ -716,6 +761,11 @@ export const ACCESS_CONTROL_ABI = [
   {
     type: 'error',
     name: 'AlreadyInitialized',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'AlreadyPending',
     inputs: [],
   },
   {
