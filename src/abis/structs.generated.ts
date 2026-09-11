@@ -12,7 +12,7 @@ export type AssetFields =
   | 'presetId'
   | 'minFeePbps'
   | 'vegaBps'
-  | 'haircutSuppressorBps'
+  | 'depositCapCode'
   | 'decimals'
   | 'deadSeedPow10'
   | 'flags'
@@ -44,7 +44,7 @@ export type OracleConfigFields =
   | 'refFeedId'
   | 'refPrimary';
 
-export type RiskConfigFields = 'flags' | 'kappaCovBps';
+export type RiskConfigFields = 'flags' | 'kappaCovBps' | 'depositCapCode' | 'maxLiabWeightBps';
 
 export type RiskFencesFields =
   | 'minFeeHardMinPbps'

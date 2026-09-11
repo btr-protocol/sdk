@@ -23,7 +23,7 @@ const ASSET = [
   T('presetId', 'uint16'),
   T('minFeePbps', 'uint16'),
   T('vegaBps', 'uint16'),
-  T('haircutSuppressorBps', 'uint16'),
+  T('depositCapCode', 'uint16'),
   T('decimals', 'uint8'),
   T('deadSeedPow10', 'uint8'),
   T('flags', 'uint16'),
