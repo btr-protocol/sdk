@@ -59,6 +59,10 @@ export * from './router/index.js';
 // Off-chain AIMM adapter: state assembly + backend fetchers (POST /v1/quote|route|depth)
 export * from './amm/index.js';
 
+// Chain-mode `/v2` client: typed errors, monotonic block, server-authored floors
+export * from './v2/quote.js';
+export * from './v2/errors.js';
+
 // Deployed-venue registry + on-chain exact-in router
 export * from './venues/index.js';
 
