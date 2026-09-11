@@ -60,7 +60,14 @@ export class ContractRevertError extends RpcRevertError {
 /** Re-throw a revert with its custom error decoded against `abi`; anything else passes through. */
 function withDecodedRevert(abi: Abi, fn: string, e: unknown): never {
   if (e instanceof RpcRevertError && typeof e.data === 'string') {
-    const d = decodeErrorResult(abi, e.data);
+    // Clipped revert data (a selector with a partial word) throws in the decoder; the revert is
+    // still the answer, so keep it rather than surface a coder exception in its place.
+    let d: ReturnType<typeof decodeErrorResult>;
+    try {
+      d = decodeErrorResult(abi, e.data);
+    } catch {
+      throw e;
+    }
     if (d) {
       const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
       throw new ContractRevertError(

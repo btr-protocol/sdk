@@ -315,6 +315,30 @@ describe('Contract surfaces the protocol reason for a revert', () => {
     expect(err).toBeInstanceOf(RpcRevertError);
     expect(err).not.toBeInstanceOf(ContractRevertError);
   });
+
+  test('a known selector with truncated args keeps the revert, not a decoder exception', async () => {
+    // A node that clips revert data hands back the selector and a partial word. Decoding that
+    // read the partial word as a zero and surfaced it as a custom error: the caller lost the
+    // revert and gained a fabricated argument the contract never emitted.
+    const clipped: Eip1193Provider = {
+      request: async () => {
+        throw new RpcRevertError(
+          'execution reverted',
+          3,
+          `${getSelector('FeatureDisabled(uint8)')}00`,
+        );
+      },
+    } as unknown as Eip1193Provider;
+    const c = new Contract({
+      address: `0x${'11'.repeat(20)}` as Address,
+      abi: ABI,
+      provider: clipped,
+    });
+    const err = (await c.read('swap', [`0x${'22'.repeat(20)}`]).catch((e) => e)) as Error;
+    expect(err).toBeInstanceOf(RpcRevertError);
+    expect(err).not.toBeInstanceOf(ContractRevertError);
+    expect(err.message).toBe('execution reverted');
+  });
 });
 
 describe('chain id and typed data survive values JSON cannot hold', () => {
