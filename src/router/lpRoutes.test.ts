@@ -12,14 +12,23 @@ const SIG = sigmaSeed('stable');
 /** Star pool: USDC hub + AUDF/NZDF spokes. NZDF can be made thin (under-covered). */
 function pool(
   tag: string,
-  o?: { audfRes?: number; nzdfRes?: number; nzdfLiab?: number },
+  o?: { audfRes?: number; nzdfRes?: number; nzdfLiab?: number; hubRes?: number; audfMark?: number },
 ): NamedPool {
   return {
     tag,
     state: {
       base: 'USDC',
       legs: {
-        AUDF: buildLeg('AUDF', 1, SIG, o?.audfRes ?? 1_000_000, 1_000_000, 3_000_000, 6, P),
+        AUDF: buildLeg(
+          'AUDF',
+          o?.audfMark ?? 1,
+          SIG,
+          o?.audfRes ?? 1_000_000,
+          1_000_000,
+          3_000_000,
+          6,
+          P,
+        ),
         NZDF: buildLeg(
           'NZDF',
           1,
@@ -31,10 +40,11 @@ function pool(
           P,
         ),
       },
-      hub: { res: 3_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: { res: o?.hubRes ?? 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
     },
   };
 }
+/** C = 1: every route's economics compare on the conversion alone. */
 const healthyPool = () => pool('core');
 
 const BE: LpRouteOpts = {
@@ -364,7 +374,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     state: {
       base: 'USDC',
       legs,
-      hub: { res: 3_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
     },
   };
 }
@@ -496,5 +506,58 @@ describe('audit regressions', () => {
     expect(indexed.best?.steps[0].amountIn).toBeCloseTo(5_000, 6);
     // 5k shares @ idx 1.2 = 6k face in, identity backend quotes it straight through.
     expect(indexed.best?.out).toBeCloseTo(6_000, 6);
+  });
+});
+
+/** LEDA-7. The chain settles LP entry and exit at POOL-LEVEL C (LED-A); the per-leg haircut these
+ *  routes used to price is gone from the contracts. Hub 2M/2M + AUDF/NZDF at mark 1. */
+describe('LP routes settle at pool C, not at a per-leg haircut', () => {
+  test('same-asset exit pays min(c_leg, C): a covered leg in a short pool is capped at C', async () => {
+    // hub 1.6M/2M, legs 1M/1M: C = 3.6M / 4M = 0.9. AUDF itself is fully covered.
+    const r = await rankRedeem([pool('core', { hubRes: 1_600_000 })], 'AUDF', 'AUDF', 5_000, BE);
+    expect(r.best?.out).toBeCloseTo(4_500, 6);
+  });
+
+  test('same-asset exit on a short leg in a whole pool is bounded by the leg, not taxed twice', async () => {
+    // AUDF 0.5M/1M but hub 2.5M/2M: C = (2.5 + 0.5 + 1) / 4 = 1. In-kind delivery = c_leg = 0.5.
+    const r = await rankRedeem(
+      [pool('core', { audfRes: 500_000, hubRes: 2_500_000 })],
+      'AUDF',
+      'AUDF',
+      5_000,
+      BE,
+    );
+    expect(r.best?.out).toBeCloseTo(2_500, 6);
+  });
+
+  test('cross exit converts face · C and never haircuts the destination leg', async () => {
+    // C = 0.9 (short hub); NZDF destination is itself under-covered: no second cut.
+    const pools = [pool('core', { hubRes: 1_600_000, nzdfRes: 500_000 })];
+    // C = (1.6 + 1 + 0.5) / 4 = 0.775
+    const r = await rankRedeem(pools, 'AUDF', 'NZDF', 5_000, BE);
+    const cross = r.routes.find((x) => x.id === 'cross-exit');
+    expect(cross?.out).toBeCloseTo(5_000 * 0.775, 6);
+  });
+
+  test('a mark the pool cannot price leaves no rate: mints and cross exits refuse, same-asset stays open', async () => {
+    const dark = [pool('core', { audfMark: 0 })];
+    const cross = await rankRedeem(dark, 'NZDF', 'AUDF', 5_000, BE);
+    expect(cross.routes.every((x) => !x.feasible)).toBe(true);
+    expect(cross.routes.find((x) => x.id === 'cross-exit')?.reason).toBe('feed-unavailable');
+    const dep = await rankDeposit(dark, 'NZDF', 'NZDF', 5_000, BE);
+    expect(dep.best).toBeNull();
+    expect(dep.routes[0]?.reason).toBe('feed-unavailable');
+    // Degraded same-asset: min(c_leg, min(1, lastGoodC)).
+    const same = await rankRedeem(dark, 'NZDF', 'NZDF', 5_000, {
+      ...BE,
+      lastGoodCWad: () => 960_000_000_000_000_000n,
+    });
+    expect(same.best?.out).toBeCloseTo(4_800, 6);
+  });
+
+  test('a deposit mints face amt / C', async () => {
+    // hub 2.4M/2M: C = 4.4 / 4 = 1.1, so 5,500 buys 5,000 face.
+    const dep = await rankDeposit([pool('core', { hubRes: 2_400_000 })], 'AUDF', 'AUDF', 5_500, BE);
+    expect(dep.best?.out).toBeCloseTo(5_000, 6);
   });
 });

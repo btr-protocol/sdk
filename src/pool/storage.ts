@@ -300,3 +300,12 @@ export async function readOracleConfig(
     refPrimary: addressAt(refWord, f.refPrimary[1]),
   };
 }
+
+/** `PoolStorage.lastGoodCWad` (slot 14): the degraded same-asset exit cap (`exitCap`); 0 until an
+ *  LP entrypoint has observed a rate. */
+export async function readSolvencyState(
+  provider: Eip1193Provider,
+  pool: Address,
+): Promise<{ lastGoodCWad: bigint }> {
+  return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, POOL_STORAGE.lastGoodCWad)) };
+}

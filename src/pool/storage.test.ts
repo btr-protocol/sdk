@@ -13,6 +13,7 @@ import {
   mappingBase,
   mappingBaseU16,
   readCurve,
+  readSolvencyState,
   u8At,
   u16At,
   u32At,
@@ -29,6 +30,7 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     protoSharePct: 0n,
     flashFeePbps: 0n,
     flowCooldownSecs: 0n,
+    solvencyArmed: 0n,
     wnative: 1n,
     treasury: 2n,
     factory: 3n,
@@ -39,7 +41,9 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     assetHooks: 8n,
     invested: 9n,
     lpTokens: 10n,
-    poolAdmin: 11n,
+    // 11 and 12 are RESERVED (per-pool authority); LED-A appended the roster and the fallback.
+    legs: 13n,
+    lastGoodCWad: 14n,
   });
 });
 
@@ -51,10 +55,10 @@ test('packed field offsets match the Solidity struct packing', () => {
       protoSharePct: [0, 21],
       flashFeePbps: [0, 22],
       flowCooldownSecs: [0, 24],
+      solvencyArmed: [0, 26],
       wnative: [1, 0],
       treasury: [2, 0],
       factory: [3, 0],
-      poolAdmin: [11, 0],
     },
     Asset: {
       reserves: [0, 0],
@@ -183,5 +187,26 @@ describe('readCurve (NUQuartic.Curve storage decode)', () => {
 
   test('unset preset (header 0) returns null', async () => {
     expect(await readCurve(providerFor(new Map()), POOL, 3)).toBeNull();
+  });
+});
+
+/** LEDA-7: the eth_getStorageAt reader for slot 14, over a mock that answers by slot. */
+describe('readSolvencyState — slot 14 lastGoodCWad', () => {
+  const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
+  const word = (hex: string) => `0x${hex.padStart(64, '0')}` as `0x${string}`;
+  const providerWith = (slots: Map<bigint, string>): Eip1193Provider => ({
+    request: async ({ params }: { params: unknown[] }) =>
+      slots.get(BigInt(params[1] as string)) ?? word('0'),
+  }) as unknown as Eip1193Provider;
+
+  test('a stamped rate', async () => {
+    const slots = new Map<bigint, string>([[14n, word((970n * 10n ** 15n).toString(16))]]);
+    const st = await readSolvencyState(providerWith(slots), POOL);
+    expect(st).toEqual({ lastGoodCWad: 970n * 10n ** 15n });
+  });
+
+  test('a never-observed rate reads 0', async () => {
+    const st = await readSolvencyState(providerWith(new Map()), POOL);
+    expect(st).toEqual({ lastGoodCWad: 0n });
   });
 });

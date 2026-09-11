@@ -140,12 +140,14 @@ export type {
   SwapLiabilityQuote,
 } from './liability.js';
 export {
-  HAIRCUT_SUPPRESSOR_FULL_BPS,
   LIABILITY_SWAP_ENABLED_BIT,
   WAD as WAD_F,
-  haircutFace,
+  exitCap,
+  exitValue,
+  legCoverage,
   liabilitySwapEnabled,
   minLpAmountOut,
+  poolSolvency,
   quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
