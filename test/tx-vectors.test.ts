@@ -11,7 +11,7 @@
 import { describe, expect, test } from 'bun:test';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { privateKeyToAddress, signTransaction } from '../src/eth/client';
+import { privateKeyToAddress, releaseNonce, signTransaction } from '../src/eth/client';
 import { keccak256 } from '../src/eth/index';
 import { rlpEncode, rlpEncodeHex } from '../src/eth/rlp';
 import type { Eip1193Provider, Hex, TransactionRequest } from '../src/eth/types';
@@ -217,5 +217,31 @@ describe('concurrent signing does not reuse a nonce', () => {
       raw.includes('8221050c') ? 12 : raw.includes('8221050d') ? 13 : -1,
     );
     expect(seen.slice().sort()).toEqual([12, 13]);
+  });
+});
+
+describe('a released nonce heals the lane instead of stranding it (A-925)', () => {
+  test('the tip did not advance while the nonce was allocated: release reissues it', async () => {
+    const p = stub(8453, 12);
+    const from = privateKeyToAddress(KEY_01);
+    const tx = {
+      from,
+      to: '0x3535353535353535353535353535353535353535',
+      value: 0n,
+      gas: 21000n,
+      maxFeePerGas: 1000000000n,
+      maxPriorityFeePerGas: 1000000n,
+      data: '0x',
+    } as unknown as TransactionRequest;
+    const first = await signTransaction(p, tx, KEY_01); // chain count 12, tip 12
+    releaseNonce(p, from, 12n);
+    const reissued = await signTransaction(p, tx, KEY_01);
+    // Same allocated nonce ⇒ same preimage ⇒ byte-identical signed tx. Without the release this
+    // second sign jumped to 13 and nonce 12 never mined.
+    expect(reissued).toBe(first);
+    expect(reissued.includes('8221050c')).toBe(true);
+    // The release is consumed once: now the tip advances to 13, never back to the hole.
+    const next = await signTransaction(p, tx, KEY_01);
+    expect(next.includes('8221050d')).toBe(true);
   });
 });
