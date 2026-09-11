@@ -110,24 +110,60 @@ const EMPTY_ACCESS_LIST: readonly never[] = [];
  *  the same tick share ONE reply and sign the SAME nonce: the second transaction replaces the
  *  first instead of following it. Even undeduped, two reads before either send returns the same
  *  count. So the allocation is serialised here and monotone per sender: each caller waits for the
- *  previous one, and the issued nonce is `max(chainCount, lastIssued + 1)`. */
-const NONCE_LOCKS = new WeakMap<object, Map<string, Promise<bigint>>>();
+ *  previous one, and the issued nonce is `max(chainCount, lastIssued + 1)`.
+ *
+ *  A nonce whose transaction never reached a mempool (estimate or raw-tx send failed) is RELEASED,
+ *  and the lowest released nonce at or above the chain count is issued before the tip advances.
+ *  The tip is monotone, so without that the hole was permanent and every later transaction from
+ *  the sender queued behind it (A-925, a regression of the A-637 lock). */
+type NonceLane = { tip: Promise<bigint | undefined>; free: Set<bigint> };
+const NONCE_LANES = new WeakMap<object, Map<string, NonceLane>>();
 
-function nextNonce(provider: Eip1193Provider, from: Address): Promise<bigint> {
-  let byAccount = NONCE_LOCKS.get(provider);
+function laneOf(provider: Eip1193Provider, from: Address): NonceLane {
+  let byAccount = NONCE_LANES.get(provider);
   if (!byAccount) {
     byAccount = new Map();
-    NONCE_LOCKS.set(provider, byAccount);
+    NONCE_LANES.set(provider, byAccount);
   }
   const key = from.toLowerCase();
-  const prev = byAccount.get(key);
-  const next = (async () => {
-    const last = await prev?.catch(() => undefined);
+  let lane = byAccount.get(key);
+  if (!lane) {
+    lane = { tip: Promise.resolve(undefined), free: new Set() };
+    byAccount.set(key, lane);
+  }
+  return lane;
+}
+
+function nextNonce(provider: Eip1193Provider, from: Address): Promise<bigint> {
+  const lane = laneOf(provider, from);
+  const prev = lane.tip;
+  const issued = (async () => {
+    const last = await prev;
     const onChain = BigInt(await getNonce(provider, from));
-    return last !== undefined && last + 1n > onChain ? last + 1n : onChain;
+    let reuse: bigint | undefined;
+    for (const n of lane.free) {
+      if (n < onChain) lane.free.delete(n);
+      else if (reuse === undefined || n < reuse) reuse = n;
+    }
+    if (reuse !== undefined) {
+      lane.free.delete(reuse);
+      return { nonce: reuse, tip: last };
+    }
+    const nonce = last !== undefined && last + 1n > onChain ? last + 1n : onChain;
+    return { nonce, tip: nonce };
   })();
-  byAccount.set(key, next);
-  return next;
+  lane.tip = issued.then(
+    (r) => r.tip,
+    () => prev,
+  );
+  return issued.then((r) => r.nonce);
+}
+
+/** Return a nonce to its lane after the transaction signed for it never reached a mempool. The tip
+ *  does not move; the next allocation reissues the lowest free nonce at or above the chain count,
+ *  so a failed estimate or send heals the lane instead of stranding every later send (A-925). */
+export function releaseNonce(provider: Eip1193Provider, from: Address, nonce: bigint): void {
+  laneOf(provider, from).free.add(nonce);
 }
 
 /**
@@ -273,17 +309,26 @@ export function createPrivateKeyClient(
       return ethCall(provider, to, data);
     },
     sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
-      // Sign and send transaction
-      const signedTx = await signTransaction(
-        provider,
-        { ...tx, from: account } as TransactionRequest,
-        privateKey,
-        expectedChainId,
-      );
-      return (await provider.request({
-        method: 'eth_sendRawTransaction',
-        params: [signedTx],
-      })) as Hex;
+      // Allocate here, not inside signTransaction, so a failure at ANY step between allocation and
+      // broadcast (estimateGas, signing, the raw-tx send) returns the nonce to the lane. Left at
+      // the tip, one such failure stranded every later send behind a hole that never healed (A-925).
+      const explicit = tx.nonce !== undefined;
+      const nonce = tx.nonce !== undefined ? BigInt(tx.nonce) : await nextNonce(provider, account);
+      try {
+        const signedTx = await signTransaction(
+          provider,
+          { ...tx, from: account, nonce: `0x${nonce.toString(16)}` as Hex } as TransactionRequest,
+          privateKey,
+          expectedChainId,
+        );
+        return (await provider.request({
+          method: 'eth_sendRawTransaction',
+          params: [signedTx],
+        })) as Hex;
+      } catch (e) {
+        if (!explicit) releaseNonce(provider, account, nonce);
+        throw e;
+      }
     },
     estimateGas: async (tx: Omit<TransactionRequest, 'from'>) => {
       return estimateGas(provider, { ...tx, from: account } as TransactionRequest);
