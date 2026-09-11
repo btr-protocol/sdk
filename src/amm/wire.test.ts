@@ -2,10 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import {
   INTERIOR_ENDPOINT,
   type PoolState,
+  type QuoteResponseWire,
   buildLeg,
   hubEndpointWire,
   legToQuoteBody,
   poolStateToWire,
+  quoteFromWire,
 } from './aimm';
 import { STABLE_PROFILE } from './profiles';
 
@@ -90,5 +92,32 @@ describe('legToQuoteBody', () => {
   test('unknown confidence goes out null, never a fail-open zero', () => {
     const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6));
     expect(b.confidence_bps).toBeNull();
+  });
+});
+
+describe('quoteFromWire', () => {
+  const wire = (saturated?: boolean): QuoteResponseWire =>
+    ({
+      amount_out: '0x3e8',
+      gross_out: '0x3e8',
+      avg_price: '0xde0b6b3a7640000',
+      mid_price: '0xde0b6b3a7640000',
+      mark_price: '0xde0b6b3a7640000',
+      spread_pbps: 0,
+      cov_toll: '0x0',
+      proto_fee: '0x0',
+      lp_fee: '0x0',
+      saturated,
+    }) as QuoteResponseWire;
+
+  // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
+  // flag survives the wire.
+  test('carries the saturation flag, so a flat top is never shown as a price', () => {
+    expect(quoteFromWire(wire(true), 18, 18, [], 1).saturated).toBe(true);
+    expect(quoteFromWire(wire(false), 18, 18, [], 1).saturated).toBe(false);
+  });
+
+  test('a backend that predates the flag reads unsaturated, never undefined', () => {
+    expect(quoteFromWire(wire(undefined), 18, 18, [], 1).saturated).toBe(false);
   });
 });

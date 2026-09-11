@@ -258,6 +258,9 @@ export interface Quote {
   lpFeeBps: number;
   protoFeeBps: number;
   covTollBps: number;
+  /** The delivering leg's gross was clamped at the coverage-wall argmax (A-188): `amountOut` is the
+   *  flat top of the wall, not a price, so refuse the size rather than display it. */
+  saturated?: boolean;
   route: string[];
 }
 
@@ -657,6 +660,8 @@ export interface QuoteResponseWire {
   cov_toll: string;
   proto_fee: string;
   lp_fee: string;
+  /** Gross clamped at the coverage argmax (A-188); a size past the overshoot band is an error. */
+  saturated: boolean;
 }
 
 /**
@@ -765,6 +770,7 @@ export function quoteFromWire(
     lpFeeBps: feeBps(w.lp_fee),
     protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
+    saturated: w.saturated === true,
     route,
   };
 }

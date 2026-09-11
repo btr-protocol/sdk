@@ -276,6 +276,7 @@ export function backendConvert(
         lpFeeBps: q1.lpFeeBps + q2.lpFeeBps,
         protoFeeBps: 0,
         covTollBps: q2.covTollBps,
+        saturated: q1.saturated || q2.saturated,
         route: [tokenIn, base, tokenOut],
       };
     }
