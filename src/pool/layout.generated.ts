@@ -65,6 +65,7 @@ export const POOL_STRUCTS = {
     deadSeedPow10: [2, 25],
     flags: [2, 26],
     kappaCovBps: [2, 28],
+    maxLiabWeightBps: [2, 30],
   },
   OracleConfig: {
     feedId: [0, 0],

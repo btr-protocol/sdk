@@ -46,6 +46,8 @@ export interface Asset {
   flags: number;
   /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). Was `RiskConfig.kappaCovBps`. */
   kappaCovBps: number;
+  /** Per-leg ceiling on this leg's share of the pool claim book (bps of B). 0 = disabled (default). */
+  maxLiabWeightBps: number;
 }
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
