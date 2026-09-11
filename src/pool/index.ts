@@ -39,7 +39,8 @@ export interface Asset {
   presetId: number;
   minFeePbps: number;
   vegaBps: number;
-  haircutSuppressorBps: number;
+  /** GEN-4 deposit cap: `m<<4|e` whole base tokens. 0 = legacy uncapped. */
+  depositCapCode: number;
   decimals: number;
   deadSeedPow10: number;
   /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */

@@ -18,10 +18,7 @@ import {
   type LiabLeg,
   WAD,
   backendConvert,
-  exitCap,
-  exitValue,
-  legCoverage,
-  poolSolvency,
+  haircutFace,
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
 import type { NamedPool, SwapPlan } from './route.js';
@@ -32,9 +29,6 @@ export interface LpRouteOpts {
   liabilityEnabled?: (symbol: string) => boolean;
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
-  /** `PoolStorage.lastGoodCWad` per pool tag: the degraded same-asset exit cap when a mark is
-   *  unusable. Absent reads as never-observed (1), the chain's own fallback for a zero slot. */
-  lastGoodCWad?: (poolTag: string) => bigint | undefined;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: BackendConvertOpts & { meta: WireMeta };
 }
@@ -307,10 +301,6 @@ async function marketMint(
     );
   }
   const first = steps[0];
-  // The deposit MINTS AT C (`PoolLiquidity.deposit`: face = amt·WAD/C) and refuses without a rate.
-  const depositPool = pools.find((p) => p.tag === first?.poolTag);
-  const c = depositPool ? poolSolvency(depositPool.state) : null;
-  if (c === null) return unfeasible(MARKET_DEAD, 'feed-unavailable');
   steps.push({
     kind: 'deposit',
     poolTag: first?.poolTag ?? '',
@@ -325,7 +315,7 @@ async function marketMint(
   return {
     id: 'market-first',
     label: 'market swap, then deposit',
-    out: plan.amountOut / c,
+    out: plan.amountOut,
     hops: steps.length,
     steps,
     feasible: true,
@@ -379,19 +369,13 @@ async function transferMint(
   if (flagged) return flagged;
   const gated = seasonGate(shell, xToken, amountIn, opts);
   if (!gated.feasible) return gated;
-  const c = poolSolvency(holder.state);
-  if (c === null) return unfeasible(shell, 'feed-unavailable');
-  // The deposit mints face `amountIn / C`; that face is what the liability swap then burns.
-  const faceIn = amountIn / c;
-  shell.steps[1].amountIn = faceIn;
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
   try {
     q = await quoteSwapLiabilityCoreAsync(
       inLeg,
       outLeg,
-      faceIn,
-      c,
+      amountIn,
       backendConvert(holder.state, xToken, targetSym, b),
     );
   } catch {
@@ -415,14 +399,11 @@ export async function rankDeposit(
   if (xToken === targetSym) {
     const holder = poolHolding(pools, xToken, xToken);
     if (!holder) return { best: null, routes: [] };
-    // Face minted at C (`PoolLiquidity.deposit`); no rate ⇒ the chain refuses the mint.
-    const c = poolSolvency(holder.state);
     const direct: RankedLpRoute = {
       id: 'market-first',
       label: 'direct deposit',
-      feasible: c !== null,
-      ...(c === null ? { reason: 'feed-unavailable' } : {}),
-      out: c === null ? 0 : amountIn / c,
+      feasible: true,
+      out: amountIn,
       hops: 1,
       steps: [
         {
@@ -437,7 +418,7 @@ export async function rankDeposit(
         },
       ],
     };
-    return { best: direct.feasible ? direct : null, routes: [direct] };
+    return { best: direct, routes: [direct] };
   }
   const wires = wiresOf(pools, needBackend(opts));
   const market = await marketMint(pools, wires, xToken, targetSym, amountIn, opts);
@@ -463,11 +444,12 @@ async function crossExit(
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
 
-  // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
-  const c = poolSolvency(holder.state);
-  if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
-  const fair = withdrawValue * c;
+  const { actual: fair } = haircutFace(
+    withdrawValue,
+    fromLeg.reserves,
+    fromLeg.liabilities,
+  );
   const convert = backendConvert(holder.state, targetSym, outToken, b);
   let q: Awaited<ReturnType<typeof convert>> | null;
   try {
@@ -478,9 +460,13 @@ async function crossExit(
   if (!q || !(q.amountOut > 0)) {
     return unfeasible(CROSS_DEAD, 'no-route');
   }
-  // Lemma B mark cap, and NO output-leg haircut: the claim was settled at C on the way in.
   const markCap = fair * q.markPrice;
-  const out = q.amountOut > markCap ? markCap : q.amountOut;
+  const conv = q.amountOut > markCap ? markCap : q.amountOut;
+  const { actual: out } = haircutFace(
+    conv,
+    toLeg.reserves,
+    toLeg.liabilities,
+  );
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -550,8 +536,6 @@ async function transferExit(
   if (flagged) return flagged;
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
   if (!gated.feasible) return gated;
-  const c = poolSolvency(holder.state);
-  if (c === null) return unfeasible(shell, 'feed-unavailable');
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
   try {
@@ -559,7 +543,6 @@ async function transferExit(
       fromLeg,
       toLeg,
       lpFaceIn,
-      c,
       backendConvert(holder.state, targetSym, outToken, b),
     );
   } catch {
@@ -567,11 +550,10 @@ async function transferExit(
   }
   if (!q) return unfeasible(shell, 'no-route');
 
-  // Same-asset exit of the credited face: `min(c_leg, C)` on the destination leg AFTER the credit.
-  const exitOut = exitValue(
+  const { actual: exitOut } = haircutFace(
     q.liabOut,
-    legCoverage(toLeg.reserves, toLeg.liabilities + q.liabOut),
-    exitCap(c),
+    toLeg.reserves,
+    toLeg.liabilities,
   );
   shell.steps[0].amountOut = q.lpAmountOut;
   shell.steps[0].minOut = q.lpAmountOut * (1 - slip);
@@ -615,10 +597,11 @@ export async function rankRedeem(
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
     const slip = opts.slippageFrac ?? DEFAULT_SLIP;
-    // `exitMu`: in-kind at `min(c_leg, cap)`, where the cap degrades to `lastGoodCWad` (never a
-    // bare 1) when a mark is unusable. The same-asset hatch stays open in that state.
-    const cap = exitCap(poolSolvency(holder.state), opts.lastGoodCWad?.(holder.tag));
-    const actual = exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap);
+    const { actual } = haircutFace(
+      lpFaceIn,
+      leg.reserves,
+      leg.liabilities,
+    );
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;

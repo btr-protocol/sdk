@@ -60,7 +60,7 @@ export const POOL_STRUCTS = {
     presetId: [2, 16],
     minFeePbps: [2, 18],
     vegaBps: [2, 20],
-    haircutSuppressorBps: [2, 22],
+    depositCapCode: [2, 22],
     decimals: [2, 24],
     deadSeedPow10: [2, 25],
     flags: [2, 26],

@@ -65,13 +65,9 @@ export type Resource = (typeof Resource)[keyof typeof Resource];
 /** Index into the packed `AccessControl.GOV_DELAYS()` word (8 x uint32 seconds). See `govDelays` in src/governance.
  */
 export const Tier = {
-  CRITICAL: 0,
-  HIGH: 1,
-  BASE: 2,
-  LOW: 3,
-  UPGRADE: 4,
-  ROTATION: 5,
-  FACTORY: 6,
+  GOVERNANCE: 0,
+  LISTING: 1,
+  TUNING: 2,
 } as const;
 export type Tier = (typeof Tier)[keyof typeof Tier];
 
@@ -82,6 +78,8 @@ export const Role = {
   FACTORY: 1,
   TREASURY: 2,
   TREASURY_OWNER: 3,
+  OWNER: 4,
+  RISK_STEWARD: 5,
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
