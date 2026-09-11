@@ -25,7 +25,7 @@ const state = (hub?: PoolState['hub']): PoolState => ({
     USDT: buildLeg('USDT', 1, 300, 1_000_000, 1_000_000, 200_000, 18, {
       ...STABLE_PROFILE,
       vega: 3_000,
-    }),
+    }, 0),
   },
   hub,
 });

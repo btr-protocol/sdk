@@ -106,7 +106,9 @@ export interface LegFeed {
   twap: number;
   sigma: number;
   profile: AimmProfile;
-  kappaCovBps?: number;
+  /// Required: every listed leg carries κ≥MIN_KAPPA_COV_BPS on chain. A feed without it is
+  /// dropped rather than priced with a zero wall (A-929 fail-open under-quote).
+  kappaCovBps: number;
 }
 
 const toFloat = (v: bigint, decimals: number): number => Number(formatUnits(v, decimals));
@@ -122,7 +124,7 @@ export function poolStateFrom(
   for (const a of assets) {
     if (a.symbol === base) continue;
     const f = feedOf(a.symbol);
-    if (!f) continue;
+    if (!f || f.kappaCovBps === undefined) continue;
     legs[a.symbol] = buildLeg(
       a.symbol,
       f.twap,
@@ -132,18 +134,18 @@ export function poolStateFrom(
       baseRes,
       a.decimals,
       f.profile,
-      f.kappaCovBps ?? 0,
+      f.kappaCovBps,
     );
   }
   // The hub is an ENDPOINT: its liabilities + wall toll a sell into it and its vega enters the
   // path spread in BOTH directions, so all three travel together off the base's own feed.
   const baseFeed = feedOf(base);
-  const hub = baseAsset
+  const hub = baseAsset && baseFeed && baseFeed.kappaCovBps !== undefined
     ? {
         res: baseRes,
         liab: toFloat(baseAsset.liabilities, baseAsset.decimals),
-        vegaBps: baseFeed?.profile.vega ?? 0,
-        kappaCovBps: baseFeed?.kappaCovBps ?? 0,
+        vegaBps: baseFeed.profile.vega,
+        kappaCovBps: baseFeed.kappaCovBps,
       }
     : undefined;
   return { base, legs, hub };

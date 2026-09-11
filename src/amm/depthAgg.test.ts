@@ -133,6 +133,7 @@ describe('aggregateDepthCurvesAsync (backend SSOT)', () => {
               1_000_000,
               18,
               STABLE_PROFILE,
+              0,
             ),
           },
         },

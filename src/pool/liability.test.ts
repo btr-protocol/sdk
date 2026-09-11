@@ -30,8 +30,8 @@ function balancedState(): PoolState {
   return {
     base: 'USDC',
     legs: {
-      AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
-      NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
+      AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
+      NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
     },
     hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
   };
@@ -41,7 +41,7 @@ describe('LEDA-7: the ONE off-chain replica of pool-level settlement', () => {
   // A USDC hub (mark 1) and a spoke at mark 2: C = (R_hub + R_x·2) / (L_hub + L_x·2).
   const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
     base: 'USDC',
-    legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE) },
+    legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE, 0) },
     hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0 },
   });
 

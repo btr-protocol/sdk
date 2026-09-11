@@ -91,7 +91,9 @@ describe('poolStateFrom (on-chain bigint reads → PoolState)', () => {
       asset('WOOF', 18, 10n ** 18n, 10n ** 18n),
     ];
     const state = poolStateFrom(assets, BASE, (sym) =>
-      sym === 'USDT' ? { twap: 1, sigma: sigmaSeed('stable'), profile: STABLE_PROFILE } : undefined,
+      sym === 'USDT'
+        ? { twap: 1, sigma: sigmaSeed('stable'), profile: STABLE_PROFILE, kappaCovBps: 600 }
+        : undefined,
     );
     expect(state.base).toBe(BASE);
     expect(Object.keys(state.legs)).toEqual(['USDT']);
@@ -99,8 +101,17 @@ describe('poolStateFrom (on-chain bigint reads → PoolState)', () => {
     expect(state.legs.USDT.liab).toBeCloseTo(400_000, 6);
     expect(state.legs.USDT.baseRes).toBeCloseTo(1_000_000, 6);
     expect(state.legs.USDT.decimals).toBe(18);
-    expect(state.legs.USDT.kappaCovBps).toBe(0);
+    expect(state.legs.USDT.kappaCovBps).toBe(600);
     // the converted state carries the leg for the backend wire build
     expect(state.legs.USDT.profile.curve.m).toBeGreaterThan(0);
+  });
+
+  test('a feed read without the wall drops the leg instead of pricing a zero toll', () => {
+    const assets = [asset(BASE, 6, 1_000_000_000_000n, 900_000_000_000n), asset('USDT', 18, 500_000n * 10n ** 18n, 400_000n * 10n ** 18n)];
+    const state = poolStateFrom(assets, BASE, (sym) =>
+      // @ts-expect-error the wall is required; this models a stale backend feed that omits it
+      sym === 'USDT' ? { twap: 1, sigma: sigmaSeed('stable'), profile: STABLE_PROFILE } : undefined,
+    );
+    expect(Object.keys(state.legs)).toEqual([]);
   });
 });
