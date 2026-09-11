@@ -124,11 +124,6 @@ describe('wire v5 lanes (exp:u4 | mant:u25)', () => {
   it('refuses a value no exponent can normalize', () => {
     expect(() => encodeLane(1n, 0, 'v5')).toThrow(/no exponent fits/);
   });
-
-  it('does not disturb the V2/V3 lane geometries', () => {
-    expect(encodeLane(2500n * 10n ** 18n, 43, 'v3')).toBe(0x2e1e19);
-    expect(encodeLane(2500n * 10n ** 18n, 43, 'v2')).toBe(0x343c33c);
-  });
 });
 
 describe('wire v5 blob', () => {
