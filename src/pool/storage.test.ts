@@ -39,6 +39,7 @@ test('PoolStorage absolute slots match dex PoolStorageLayout.t.sol', () => {
     assetHooks: 8n,
     invested: 9n,
     lpTokens: 10n,
+    poolAdmin: 11n,
   });
 });
 
@@ -53,6 +54,7 @@ test('packed field offsets match the Solidity struct packing', () => {
       wnative: [1, 0],
       treasury: [2, 0],
       factory: [3, 0],
+      poolAdmin: [11, 0],
     },
     Asset: {
       reserves: [0, 0],
