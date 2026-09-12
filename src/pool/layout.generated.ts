@@ -18,6 +18,7 @@ export const POOL_STORAGE = {
   assetHooks: 8n,
   invested: 9n,
   lpTokens: 10n,
+  poolAdmin: 11n,
 } as const;
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
@@ -45,6 +46,7 @@ export const POOL_STRUCTS = {
     wnative: [1, 0],
     treasury: [2, 0],
     factory: [3, 0],
+    poolAdmin: [11, 0],
   },
   Asset: {
     reserves: [0, 0],
