@@ -33,9 +33,9 @@ export const OpType = {
   SWEEP: 12,
   /** One-shot per pool: arms pool-level solvency by writing the leg roster. CRITICAL lane. */
   BACKFILL_LEGS: 13,
-  /** A LOWERING of the anti-JIT cooldown, payload `uint16 cooldownSecs`, LOW lane, pool-scoped.
-   *  Consumed by `Admin.setFlowCooldown` with the same value; a raise never queues. */
-  FLOW_COOLDOWN: 14,
+  /** Seat handover (GEN-1). Pool-level key, GOVERNANCE tier; payload = the next seat.
+   *  Staging the live owner is normalised to the sentinel donation at request time. */
+  UPDATE_POOL_ADMIN: 14,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 
@@ -109,5 +109,5 @@ export const POOL_SCOPED_OPS: readonly OpType[] = [
   OpType.MIGRATE_BASE_TOKEN,
   OpType.UPDATE_TREASURY,
   OpType.UPDATE_FEES,
-  OpType.FLOW_COOLDOWN,
+  OpType.UPDATE_POOL_ADMIN,
 ];

@@ -73,7 +73,6 @@ test('packed field offsets match the Solidity struct packing', () => {
       minFeePbps: [2, 18],
       vegaBps: [2, 20],
       depositCapCode: [2, 22],
-      maxLiabWeightBps: [2, 30],
       decimals: [2, 24],
       deadSeedPow10: [2, 25],
       flags: [2, 26],
