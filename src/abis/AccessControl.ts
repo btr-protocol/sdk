@@ -10,849 +10,1068 @@
 
 export const ACCESS_CONTROL_ABI = [
   {
-    type: 'constructor',
     inputs: [
       {
+        internalType: 'address',
         name: 'owner_',
         type: 'address',
-        internalType: 'address',
       },
       {
+        internalType: 'address',
         name: 'treasury_',
         type: 'address',
-        internalType: 'address',
       },
       {
+        internalType: 'uint256',
         name: 'govDelays_',
         type: 'uint256',
-        internalType: 'uint256',
       },
     ],
     stateMutability: 'nonpayable',
+    type: 'constructor',
   },
   {
-    type: 'function',
-    name: 'GOV_DELAYS',
     inputs: [],
+    name: 'GOV_DELAYS',
     outputs: [
       {
+        internalType: 'uint256',
         name: '',
         type: 'uint256',
-        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
+    inputs: [],
     name: 'MAX_TREASURY_OWNER_VETOES',
-    inputs: [],
     outputs: [
       {
+        internalType: 'uint8',
         name: '',
         type: 'uint8',
-        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
+    inputs: [],
     name: 'MIN_GUARDIANS',
-    inputs: [],
     outputs: [
       {
+        internalType: 'uint8',
         name: '',
         type: 'uint8',
-        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'armQuorumPolicy',
     inputs: [
       {
+        internalType: 'address[]',
         name: 'guardians',
         type: 'address[]',
-        internalType: 'address[]',
       },
     ],
+    name: 'armQuorumPolicy',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'bootstrapRole',
     inputs: [
       {
+        internalType: 'enum AccessControl.Role',
         name: 'role',
         type: 'uint8',
-        internalType: 'enum AccessControl.Role',
       },
       {
+        internalType: 'address',
         name: 'a',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'bootstrapRole',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'cancelOwnershipHandover',
     inputs: [],
+    name: 'cancelGuardianGrant',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'cancelGuardianRevoke',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'cancelOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'cancelRole',
     inputs: [
       {
+        internalType: 'enum AccessControl.Role',
         name: 'role',
         type: 'uint8',
-        internalType: 'enum AccessControl.Role',
       },
     ],
+    name: 'cancelRole',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'completeOwnershipHandover',
     inputs: [
       {
+        internalType: 'address',
         name: 'pendingOwner',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'completeOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'executeRole',
-    inputs: [
-      {
-        name: 'role',
-        type: 'uint8',
-        internalType: 'enum AccessControl.Role',
-      },
-    ],
+    inputs: [],
+    name: 'executeGuardianGrant',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'factory',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'guardianCount',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'guardianQuorumMax',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isGuardian',
     inputs: [
       {
-        name: '',
-        type: 'address',
-        internalType: 'address',
+        internalType: 'enum AccessControl.Role',
+        name: 'role',
+        type: 'uint8',
       },
     ],
+    name: 'executeRole',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'factory',
     outputs: [
       {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'guardianCount',
+    outputs: [
+      {
+        internalType: 'uint8',
+        name: '',
+        type: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'guardianQuorumMax',
+    outputs: [
+      {
+        internalType: 'uint8',
+        name: '',
+        type: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    name: 'isDepositor',
+    outputs: [
+      {
+        internalType: 'bool',
         name: '',
         type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'isGuardianOrAuth',
     inputs: [
       {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    name: 'isGuardian',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
         name: 'sender',
         type: 'address',
-        internalType: 'address',
       },
       {
+        internalType: 'address',
         name: 'auth',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'isGuardianOrAuth',
     outputs: [
       {
+        internalType: 'bool',
         name: '',
         type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
+    inputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
     name: 'isKeeper',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
     outputs: [
       {
+        internalType: 'bool',
         name: '',
         type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
+    inputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
     name: 'isRiskSteward',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
     outputs: [
       {
+        internalType: 'bool',
         name: '',
         type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'owner',
     inputs: [],
+    name: 'owner',
     outputs: [
       {
+        internalType: 'address',
         name: 'result',
         type: 'address',
-        internalType: 'address',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'ownershipHandoverExpiresAt',
     inputs: [
       {
+        internalType: 'address',
         name: 'pendingOwner',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'ownershipHandoverExpiresAt',
     outputs: [
       {
+        internalType: 'uint256',
         name: 'result',
         type: 'uint256',
-        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'pendingRole',
-    inputs: [
-      {
-        name: '',
-        type: 'uint8',
-        internalType: 'enum AccessControl.Role',
-      },
-    ],
+    inputs: [],
+    name: 'pendingGuardian',
     outputs: [
       {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'pendingGuardianOp',
+    outputs: [
+      {
+        internalType: 'uint96',
+        name: '',
+        type: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'pendingGuardianRevoke',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'pendingGuardianRevokeOp',
+    outputs: [
+      {
+        internalType: 'uint96',
+        name: '',
+        type: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'enum AccessControl.Role',
+        name: '',
+        type: 'uint8',
+      },
+    ],
+    name: 'pendingRole',
+    outputs: [
+      {
+        internalType: 'address',
         name: 'addr',
         type: 'address',
-        internalType: 'address',
       },
       {
+        internalType: 'uint64',
         name: 'eta',
         type: 'uint64',
-        internalType: 'uint64',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'previousTreasury',
     inputs: [],
+    name: 'previousTreasury',
     outputs: [
       {
+        internalType: 'address',
         name: '',
         type: 'address',
-        internalType: 'address',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'queueRole',
     inputs: [
       {
+        internalType: 'enum AccessControl.Role',
         name: 'role',
         type: 'uint8',
-        internalType: 'enum AccessControl.Role',
       },
       {
+        internalType: 'address',
         name: 'a',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'queueRole',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'quorumPolicyArmed',
     inputs: [],
+    name: 'quorumPolicyArmed',
     outputs: [
       {
+        internalType: 'bool',
         name: '',
         type: 'bool',
-        internalType: 'bool',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'quorumStatus',
     inputs: [],
+    name: 'quorumStatus',
     outputs: [
       {
+        internalType: 'bool',
         name: 'armed',
         type: 'bool',
-        internalType: 'bool',
       },
       {
+        internalType: 'bool',
         name: 'ownerOk',
         type: 'bool',
-        internalType: 'bool',
       },
       {
+        internalType: 'bool',
         name: 'treasuryOwnerOk',
         type: 'bool',
-        internalType: 'bool',
       },
       {
+        internalType: 'uint8',
         name: 'guardians',
         type: 'uint8',
-        internalType: 'uint8',
       },
     ],
     stateMutability: 'view',
+    type: 'function',
   },
   {
-    type: 'function',
+    inputs: [],
     name: 'renounceOwnership',
-    inputs: [],
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'requestOwnershipHandover',
-    inputs: [],
-    outputs: [],
-    stateMutability: 'payable',
-  },
-  {
-    type: 'function',
-    name: 'setGuardian',
     inputs: [
       {
+        internalType: 'address',
         name: 'g',
         type: 'address',
+      },
+    ],
+    name: 'requestGuardianGrant',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'address',
-      },
-      {
-        name: 's',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'setGuardianQuorumMax',
-    inputs: [
-      {
-        name: 'max',
-        type: 'uint8',
-        internalType: 'uint8',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'setKeeper',
-    inputs: [
-      {
-        name: 'k',
+        name: 'g',
         type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 's',
-        type: 'bool',
-        internalType: 'bool',
       },
     ],
+    name: 'requestGuardianRevoke',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'setRiskSteward',
-    inputs: [
-      {
-        name: 's',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'ok',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'transferOwnership',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
+    inputs: [],
+    name: 'requestOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
   },
   {
-    type: 'function',
-    name: 'treasury',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'treasuryOwner',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'treasuryOwnerVetoes',
     inputs: [
       {
-        name: '',
-        type: 'uint8',
-        internalType: 'enum AccessControl.Role',
+        internalType: 'address',
+        name: 'd',
+        type: 'address',
+      },
+      {
+        internalType: 'bool',
+        name: 'ok',
+        type: 'bool',
       },
     ],
-    outputs: [
+    name: 'setDepositor',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
       {
-        name: '',
-        type: 'uint8',
+        internalType: 'address',
+        name: 'g',
+        type: 'address',
+      },
+      {
+        internalType: 'bool',
+        name: 's',
+        type: 'bool',
+      },
+    ],
+    name: 'setGuardian',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'uint8',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'event',
-    name: 'GuardianQuorumMaxUpdated',
-    inputs: [
-      {
         name: 'max',
         type: 'uint8',
+      },
+    ],
+    name: 'setGuardianQuorumMax',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'k',
+        type: 'address',
+      },
+      {
+        internalType: 'bool',
+        name: 's',
+        type: 'bool',
+      },
+    ],
+    name: 'setKeeper',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 's',
+        type: 'address',
+      },
+      {
+        internalType: 'bool',
+        name: 'ok',
+        type: 'bool',
+      },
+    ],
+    name: 'setRiskSteward',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'treasury',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'treasuryOwner',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'enum AccessControl.Role',
+        name: '',
+        type: 'uint8',
+      },
+    ],
+    name: 'treasuryOwnerVetoes',
+    outputs: [
+      {
+        internalType: 'uint8',
+        name: '',
+        type: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'depositor',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'bool',
+        name: 'allowed',
+        type: 'bool',
+      },
+    ],
+    name: 'DepositorUpdated',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+    ],
+    name: 'GuardianGrantCancelled',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint48',
+        name: 'eta',
+        type: 'uint48',
+      },
+    ],
+    name: 'GuardianGrantRequested',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
         indexed: false,
         internalType: 'uint8',
+        name: 'max',
+        type: 'uint8',
       },
     ],
-    anonymous: false,
+    name: 'GuardianQuorumMaxUpdated',
+    type: 'event',
   },
   {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+    ],
+    name: 'GuardianRevokeCancelled',
     type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint48',
+        name: 'eta',
+        type: 'uint48',
+      },
+    ],
+    name: 'GuardianRevokeRequested',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'bool',
+        name: 'ok',
+        type: 'bool',
+      },
+    ],
     name: 'GuardianUpdated',
-    inputs: [
-      {
-        name: 'who',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'ok',
-        type: 'bool',
-        indexed: false,
-        internalType: 'bool',
-      },
-    ],
-    anonymous: false,
+    type: 'event',
   },
   {
-    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'who',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'bool',
+        name: 'ok',
+        type: 'bool',
+      },
+    ],
     name: 'KeeperUpdated',
-    inputs: [
-      {
-        name: 'who',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-      {
-        name: 'ok',
-        type: 'bool',
-        indexed: false,
-        internalType: 'bool',
-      },
-    ],
-    anonymous: false,
+    type: 'event',
   },
   {
-    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'pendingOwner',
+        type: 'address',
+      },
+    ],
     name: 'OwnershipHandoverCanceled',
-    inputs: [
-      {
-        name: 'pendingOwner',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
+    type: 'event',
   },
   {
-    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'pendingOwner',
+        type: 'address',
+      },
+    ],
     name: 'OwnershipHandoverRequested',
-    inputs: [
-      {
-        name: 'pendingOwner',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'OwnershipTransferred',
+    anonymous: false,
     inputs: [
       {
+        indexed: true,
+        internalType: 'address',
         name: 'oldOwner',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
       {
+        indexed: true,
+        internalType: 'address',
         name: 'newOwner',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
     ],
-    anonymous: false,
+    name: 'OwnershipTransferred',
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'QuorumPolicyArmed',
+    anonymous: false,
     inputs: [],
-    anonymous: false,
+    name: 'QuorumPolicyArmed',
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'RiskStewardUpdated',
+    anonymous: false,
     inputs: [
       {
+        indexed: true,
+        internalType: 'address',
         name: 'who',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
       {
-        name: 'ok',
-        type: 'bool',
         indexed: false,
         internalType: 'bool',
+        name: 'ok',
+        type: 'bool',
       },
     ],
-    anonymous: false,
+    name: 'RiskStewardUpdated',
+    type: 'event',
   },
   {
-    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'enum AccessControl.Role',
+        name: 'role',
+        type: 'uint8',
+      },
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'addr',
+        type: 'address',
+      },
+    ],
     name: 'RoleCancelled',
-    inputs: [
-      {
-        name: 'role',
-        type: 'uint8',
-        indexed: true,
-        internalType: 'enum AccessControl.Role',
-      },
-      {
-        name: 'addr',
-        type: 'address',
-        indexed: true,
-        internalType: 'address',
-      },
-    ],
-    anonymous: false,
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'RoleQueued',
+    anonymous: false,
     inputs: [
       {
-        name: 'role',
-        type: 'uint8',
         indexed: true,
         internalType: 'enum AccessControl.Role',
+        name: 'role',
+        type: 'uint8',
       },
       {
-        name: 'addr',
-        type: 'address',
         indexed: true,
         internalType: 'address',
+        name: 'addr',
+        type: 'address',
       },
       {
-        name: 'eta',
-        type: 'uint64',
         indexed: false,
         internalType: 'uint64',
+        name: 'eta',
+        type: 'uint64',
       },
     ],
-    anonymous: false,
+    name: 'RoleQueued',
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'RoleUpdated',
+    anonymous: false,
     inputs: [
       {
-        name: 'role',
-        type: 'uint8',
         indexed: true,
         internalType: 'enum AccessControl.Role',
+        name: 'role',
+        type: 'uint8',
       },
       {
+        indexed: true,
+        internalType: 'address',
         name: 'addr',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
     ],
-    anonymous: false,
+    name: 'RoleUpdated',
+    type: 'event',
   },
   {
-    type: 'event',
-    name: 'ZeroDelayGovernance',
+    anonymous: false,
     inputs: [
       {
+        indexed: true,
+        internalType: 'address',
         name: 'deployer',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
       {
+        indexed: true,
+        internalType: 'address',
         name: 'owner',
         type: 'address',
-        indexed: true,
-        internalType: 'address',
       },
       {
-        name: 'schedule',
-        type: 'uint256',
         indexed: false,
         internalType: 'uint256',
+        name: 'schedule',
+        type: 'uint256',
       },
     ],
-    anonymous: false,
+    name: 'ZeroDelayGovernance',
+    type: 'event',
   },
   {
-    type: 'error',
-    name: 'AlreadyConfigured',
     inputs: [
       {
+        internalType: 'enum ErrLib.Resource',
         name: 'resource',
         type: 'uint8',
-        internalType: 'enum ErrLib.Resource',
       },
       {
+        internalType: 'address',
         name: 'target',
         type: 'address',
-        internalType: 'address',
       },
     ],
+    name: 'AlreadyConfigured',
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'AlreadyInitialized',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'AlreadyPending',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'BadConfig',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'Expired',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
-    name: 'FeatureDisabled',
     inputs: [
       {
+        internalType: 'enum ErrLib.Resource',
         name: 'resource',
         type: 'uint8',
-        internalType: 'enum ErrLib.Resource',
       },
     ],
+    name: 'FeatureDisabled',
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'InvalidInput',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'InvalidState',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NewOwnerIsZeroAddress',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NoHandoverRequest',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NoPending',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NotAuth',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NotCode',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'NotReady',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
-    name: 'ThresholdViolation',
     inputs: [
       {
+        internalType: 'uint256',
         name: 'value',
         type: 'uint256',
-        internalType: 'uint256',
       },
       {
+        internalType: 'uint256',
         name: 'threshold',
         type: 'uint256',
-        internalType: 'uint256',
       },
     ],
+    name: 'ThresholdViolation',
+    type: 'error',
   },
   {
-    type: 'error',
+    inputs: [],
     name: 'Unauthorized',
-    inputs: [],
+    type: 'error',
   },
   {
-    type: 'error',
-    name: 'ZeroAddr',
     inputs: [],
+    name: 'ZeroAddr',
+    type: 'error',
   },
-];
+]];
