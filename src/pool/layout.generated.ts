@@ -19,6 +19,7 @@ export const POOL_STORAGE = {
   assetHooks: 8n,
   invested: 9n,
   lpTokens: 10n,
+  poolAdmin: 11n,
   legs: 13n,
   lastGoodCWad: 14n,
 } as const;
@@ -49,6 +50,7 @@ export const POOL_STRUCTS = {
     wnative: [1, 0],
     treasury: [2, 0],
     factory: [3, 0],
+    poolAdmin: [11, 0],
   },
   Asset: {
     reserves: [0, 0],
