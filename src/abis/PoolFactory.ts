@@ -726,4 +726,4 @@ export const POOL_FACTORY_ABI = [
     name: 'ZeroAddr',
     type: 'error',
   },
-]];
+];

@@ -1074,4 +1074,4 @@ export const ACCESS_CONTROL_ABI = [
     name: 'ZeroAddr',
     type: 'error',
   },
-]];
+];
