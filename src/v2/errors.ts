@@ -15,7 +15,8 @@ export type V2ErrorKind =
   | 'refused'
   | 'transport'
   | 'floor_violation'
-  | 'stale_block';
+  | 'stale_block'
+  | 'not_implemented';
 
 export class V2Error extends Error {
   readonly kind: V2ErrorKind;
@@ -58,11 +59,13 @@ export function parseV2Error(status: number, body: string, retryAfterSecs?: numb
         ? 'rpc_unavailable'
         : status === 504
           ? 'deadline'
-          : status === 422
-            ? 'no_route'
-            : status === 400
-              ? 'bad_request'
-              : 'transport';
+          : status === 501
+            ? 'not_implemented'
+            : status === 422
+              ? 'no_route'
+              : status === 400
+                ? 'bad_request'
+                : 'transport';
   const message = code || detail || `BTR v2 API ${status}`;
   return new V2Error(kind, message, { status, retryAfterSecs, detail });
 }
