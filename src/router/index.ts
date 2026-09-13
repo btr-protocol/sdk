@@ -120,8 +120,9 @@ const MAX_UINT256 = (1n << 256n) - 1n;
 
 /**
  * Trust boundary for a server-authored floor. `/v2` returns `tol_pbps` and `min_out` derived from
- * the same `SwapQuote` as `amount_out`; this checks the two invariants rather than trusting them,
- * and throws instead of quietly lowering the floor.
+ * the same `SwapQuote` as `amount_out`; the ONE formula, for both spread and relative modes, is
+ * `min_out = amount_out·(1e6 − tol_pbps)/1e6` (`back/crates/quote/src/slippage.rs`). This checks
+ * it rather than trusting it, and throws instead of quietly lowering the floor.
  */
 export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bigint): void {
   if (minOut > amountOut) {
