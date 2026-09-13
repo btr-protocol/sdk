@@ -1,4 +1,5 @@
 {
   "Pool": "0xa699e1ef348425be849f932ea499053863791f3c081ac39c8f2f057746513c0b",
-  "Admin": "0xfecf7b8ef08711410953b39ea4fff8a320c4bbca0caec60e243989729f84c1bd"
+  "Admin": "0xfecf7b8ef08711410953b39ea4fff8a320c4bbca0caec60e243989729f84c1bd",
+  "PoolFactory": "0xea9f9c262a4c1fccdb9522aa9430b951e1c4edcb6bd6fcbe4570dcb699eb6194"
 }
