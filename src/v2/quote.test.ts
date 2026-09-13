@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { V2Error } from './errors.js';
-import { type QuoteResponseV2, quoteV2, resetV2ClientState, routeV2 } from './quote.js';
+import {
+  type QuoteResponseV2,
+  cooldownRemainingSecs,
+  quoteV2,
+  resetV2ClientState,
+  routeV2,
+} from './quote.js';
 
 const realFetch = globalThis.fetch;
 
@@ -111,6 +117,7 @@ describe('v2 quote client', () => {
       kind: 'rate_limited',
       retryAfterSecs: 7,
     });
+    expect(cooldownRemainingSecs()).toBeGreaterThan(0);
     // The second call is refused locally: fetch would still answer 429, so count invocations.
     let calls = 0;
     globalThis.fetch = (async () => {
@@ -145,6 +152,7 @@ describe('v2 quote client', () => {
     }
     expect(err?.kind).toBe('not_implemented');
     expect(err?.status).toBe(501);
+    expect(cooldownRemainingSecs()).toBe(0);
   });
 
   test('checks route floors the same way', async () => {
@@ -153,19 +161,7 @@ describe('v2 quote client', () => {
       block: { number: 5, timestamp: 1 },
       source: 'chain',
       best: {
-        parts: [
-          {
-            hops: [
-              {
-                pool: 'btr-stable',
-                token_in: 'a',
-                token_out: 'b',
-                amount_in: '0x1',
-                amount_out: '0x2',
-              },
-            ],
-          },
-        ],
+        parts: [{ hops: [{ pool: 'btr-stable', token_in: 'a', token_out: 'b', amount_in: '0x1', amount_out: '0x2' }] }],
         floors: [
           {
             token: '0x0000000000000000000000000000000000000002',
