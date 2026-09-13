@@ -1,19 +1,22 @@
 // Liability-swap pipeline over the backend quoter (POST /v1/quote|route).
 // Same style as front/src/lib/lpMath.ts: f64 in, f64 out, no chain reads. State inputs come from
-// getAsset (sdk/pool/index.ts); conversion is backend SSOT (quoteLegAsync / routeAsync), never
+// getAsset (sdk/pool/index.ts); conversion is backend SSOT (quoteLegAsync / POST /v1/route), never
 // the deleted TS curve replica.
 //
-// Pipeline (contract order, PoolLiquidity.sol:428-464):
-//   1. liabIn     = lpAmountIn * idxIn / WAD                          (:428)
-//   2. haircutIn  = applyHaircut(liabIn, R_in, L_in, suppressor_in)    (:93, :435)
-//   3. conv       = backendConvert(in -> out, fairIn); spread/toll/skew embedded (:437)
-//   4. markCap    = fairIn * q.markPrice   [Lemma B cap, _markCap :379]; conv clamped (:442)
-//   5. haircutOut applied to the converted amount                      (:454)
-//   6. lpAmountOut = liabOut / idxOut (deadOut ~ 0 on any seeded live leg) (:458-464)
+// LP settlement is POOL-LEVEL (LED-A, PoolSolvency.sol): `C = Σ R_k·m_k / Σ L_k·m_k`. There is no
+// per-leg haircut anywhere on the chain any more; this module is the ONE off-chain replica of it.
 //
-// Protocol-fee EXEMPT and no accrueLpFee booking on-chain (:446-453): the swapper pays the full
-// embedded spread only; no reserves move. The decomposition below surfaces each component so the
-// UI can show impact vs the 1:1-face baseline without hiding a binding clamp inside it.
+// swapLiability pipeline (PoolLiquidity.swapLiability):
+//   1. liabIn      = lpAmountIn * idxIn / WAD
+//   2. fairIn      = liabIn * C                     (mintRate: refuses when a mark is unusable)
+//   3. conv        = backendConvert(in -> out, fairIn); spread/toll/skew embedded
+//   4. markCap     = fairIn * q.markPrice   [Lemma B cap, _markCap]; conv clamped
+//   5. liabOut     = conv / C (quote output is a TOKEN amount, `liabilities` is a FACE book;
+//                    dividing by C re-denominates to face_in·m_in/m_out - no second haircut)
+//   6. lpAmountOut = liabOut / idxOut (deadOut ~ 0 on any seeded live leg)
+//
+// Protocol-fee EXEMPT and no accrueLpFee booking on-chain: the swapper pays the full embedded
+// spread only; no reserves move.
 
 import {
   INTERIOR_ENDPOINT,
@@ -34,7 +37,7 @@ import { applySlip } from '../utils/maths.js';
 
 /** SC.WAD */
 export const WAD = 1e18;
-/** PoolConstantsLib.sol:15: bit 2 of asset flags. Both legs must carry it (:425-426). */
+/** PoolConstantsLib.sol:15: bit 2 of asset flags. Both legs must carry it. */
 export const LIABILITY_SWAP_ENABLED_BIT = 1 << 2;
 
 /** The slice of IPool.Asset the liability math reads. Build from getAsset output. Face units. */
@@ -52,59 +55,74 @@ const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
 export const liabilitySwapEnabled = (flags: number): boolean =>
   (flags & LIABILITY_SWAP_ENABLED_BIT) !== 0;
 
-/** Exact mirror of PoolLiquidity.applyHaircut (:93-112) in face units.
- *  deficit = (L-R)/L scaled by (1 - suppressor/FULL), capped at 100%; haircut rounds UP so the
- *  dust stays with the pool. Identity when L == 0 or covered. */
-export function haircutFace(
-  amount: number,
-  reserves: number,
-  liabilities: number,
-): { actual: number; haircut: number } {
-  // The chain does this in integers; this mirror does it in doubles. Below 2^53 the two agree to
-  // the dust the `ceil` deliberately keeps, and above it the double's own spacing exceeds one
-  // unit — `ceil` stops meaning "round up by less than one" and the preview quietly diverges from
-  // what settles. Refuse rather than print a number that is not the pool's.
-  for (const [k, v] of [
-    ['amount', amount],
-    ['reserves', reserves],
-    ['liabilities', liabilities],
-  ] as const) {
-    if (!Number.isFinite(v) || Math.abs(v) > Number.MAX_SAFE_INTEGER) {
-      throw new RangeError(`haircutFace: ${k}=${v} is outside exact double range`);
-    }
+/** `PoolSolvency.solvency` over a `PoolState`: `C = Σ R·m / Σ L·m`, marks in base per token (the hub
+ *  is the base, mark 1). Null is the chain's `ok == false`: a leg whose mark is unusable leaves no
+ *  rate, so a mint or a cross conversion refuses (`mintRate` reverts `FeedUnavailable`). A 0/0 leg
+ *  is skipped BEFORE its mark is read (A-1121: a dead feed on an emptied leg must not freeze the
+ *  pool). An empty claim book reads 1 only when nothing is stranded; zero claim over value is no
+ *  rate (A-1304). Indicative: the chain also caps each leg's reserves at its physical backing
+ *  (`_backedReserves`), which pool state cannot see. */
+export function poolSolvency(state: PoolState): number | null {
+  let nav = state.hub?.res ?? 0;
+  let claim = state.hub?.liab ?? 0;
+  for (const leg of Object.values(state.legs)) {
+    if (leg.res === 0 && leg.liab === 0) continue;
+    if (!(Number.isFinite(leg.twap) && leg.twap > 0)) return null;
+    nav += leg.res * leg.twap;
+    claim += leg.liab * leg.twap;
   }
-  if (!(liabilities > 0) || reserves >= liabilities) return { actual: amount, haircut: 0 };
-  // deficit ∈ [0,1], ratio capped at 100%.
-  const deficit = (liabilities - reserves) / liabilities;
-  const ratio = Math.min(deficit, 1);
-  const haircut = Math.ceil(amount * ratio);
-  return { actual: amount - haircut, haircut };
+  if (!(claim > 0)) return nav > 0 ? null : 1;
+  const c = nav / claim;
+  return Number.isFinite(c) ? c : null;
 }
+
+/** `PoolSolvency.previewCap`: the live rate when there is one, else the degraded fallback
+ *  `min(1, lastGoodC)` with a never-observed (0) slot reading 1. Never a bare 1 over a known
+ *  `lastGoodCWad < 1`: that would pay MORE for an oracle outage than for a healthy pool. */
+export function exitCap(c: number | null, lastGoodCWad?: bigint): number {
+  if (c !== null) return c;
+  const g = lastGoodCWad === undefined ? 0 : Number(lastGoodCWad) / WAD;
+  return g === 0 || g > 1 ? 1 : g;
+}
+
+/** `PoolLiquidity.exitMu` in face units: the SAME-ASSET payout `face · min(c_leg, cap)`.
+ *  `cap` is the pool rate (`exitCap`); `c_leg = R/L` is the in-kind DELIVERY bound, not a fence -
+ *  the full `face · C` claim stays reachable through a cross exit. A leg with no book pays `cap`. */
+export function exitValue(face: number, cLeg: number, cap: number): number {
+  return face * Math.min(cLeg, cap);
+}
+
+/** `c_leg = R/L`; a leg with no liabilities is unbounded (exitMu returns the cap there). */
+export const legCoverage = (reserves: number, liabilities: number): number =>
+  liabilities > 0 ? reserves / liabilities : Number.POSITIVE_INFINITY;
 
 export interface SwapLiabilityQuote {
   /** Face burned on the in leg (shares · idxIn). */
   liabIn: number;
+  /** `max(liabIn − fairIn, 0)`: what settling at C < 1 takes on the way in (the event's `haircut`). */
   haircutIn: number;
+  /** liabIn · C: the claim value that converts. */
   fairIn: number;
+  /** The pool rate the burn settled at. */
+  poolC: number;
   /** Quoted conversion net of embedded spread/toll/skew, before the Lemma B clamp. */
   convQuoted: number;
-  /** fairIn · markPrice: Lemma B re-denomination bound (_markCap :379). Decimal adjustment is
+  /** fairIn · markPrice: Lemma B re-denomination bound (_markCap). Decimal adjustment is
    *  implicit: both amounts and the WAD ratio here live in token units. */
   markCap: number;
   /** min(convQuoted, markCap): what actually converts. */
   conv: number;
   /** True when adaptive dispersion pushed the quoted conversion past the oracle mark. */
   markCapBinding: boolean;
-  haircutOut: number;
-  /** Final credited face on the out leg. */
+  /** Final credited face on the out leg: `conv / poolC`, the conversion re-denominated from
+   *  token amount to face at the same rate C. Crediting raw `conv` over-mints by a factor C. */
   liabOut: number;
   /** liabOut / idxOut: shares minted post-dead-seed (deadOut ~ 0 on a seeded live leg). */
   lpAmountOut: number;
   /** 1 − received/redeemed-equivalent vs the 1:1-face baseline, bps of face moved. */
   impactBps: number;
-  /** Decomposition, bps of the respective base: real components of impactBps. */
+  /** Settlement discount at C, bps of liabIn: real component of impactBps (0 when C ≥ 1). */
   haircutInBps: number;
-  haircutOutBps: number;
   /** Half-spread actually deducted from the conversion output (path model). */
   convSpreadBps: number;
   /** Pure-curve movement along the fill. */
@@ -121,35 +139,30 @@ export function quoteSwapLiabilityCore(): SwapLiabilityQuote | null {
   );
 }
 
-/** Async mirror of the core pipeline with the conversion injected (backend quoter). */
+/** Async mirror of `swapLiability` with the conversion injected (backend quoter). `poolC` is the
+ *  pool rate (`poolSolvency`); a non-finite or non-positive rate is the chain's `FeedUnavailable`. */
 export async function quoteSwapLiabilityCoreAsync(
   inLeg: LiabLeg,
   outLeg: LiabLeg,
   lpAmountIn: number,
+  poolC: number,
   convert: (fairIn: number) => Promise<Quote>,
 ): Promise<SwapLiabilityQuote | null> {
-  if (!(lpAmountIn > 0)) return null;
+  if (!(lpAmountIn > 0) || !(Number.isFinite(poolC) && poolC > 0)) return null;
   const idxIn = idxOf(inLeg);
   const idxOut = idxOf(outLeg);
   const liabIn = (lpAmountIn * idxIn) / WAD;
   if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
 
-  const { actual: fairIn, haircut: haircutIn } = haircutFace(
-    liabIn,
-    inLeg.reserves,
-    inLeg.liabilities,
-  );
+  const fairIn = liabIn * poolC;
+  const haircutIn = liabIn > fairIn ? liabIn - fairIn : 0;
 
   const q = await convert(fairIn);
   const markCap = fairIn * q.markPrice;
   const markCapBinding = q.amountOut > markCap;
   const conv = markCapBinding ? markCap : q.amountOut;
 
-  const { actual: liabOut, haircut: haircutOut } = haircutFace(
-    conv,
-    outLeg.reserves,
-    outLeg.liabilities,
-  );
+  const liabOut = conv / poolC;
   const lpAmountOut = (liabOut * WAD) / idxOut;
   if (!(lpAmountOut > 0)) return null;
 
@@ -159,16 +172,15 @@ export async function quoteSwapLiabilityCoreAsync(
     liabIn,
     haircutIn,
     fairIn,
+    poolC,
     convQuoted: q.amountOut,
     markCap,
     conv,
     markCapBinding,
-    haircutOut,
     liabOut,
     lpAmountOut,
     impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
     haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
-    haircutOutBps: conv > 0 ? (haircutOut / conv) * 1e4 : 0,
     convSpreadBps: q.spreadBps / 2,
     convImpactBps: q.priceImpactBps,
     markClampBps:
@@ -266,6 +278,7 @@ export function backendConvert(
         lpFeeBps: q1.lpFeeBps + q2.lpFeeBps,
         protoFeeBps: 0,
         covTollBps: q2.covTollBps,
+        saturated: q1.saturated || q2.saturated,
         route: [tokenIn, base, tokenOut],
       };
     }
@@ -273,18 +286,22 @@ export function backendConvert(
   };
 }
 
-/** Backend-priced liability swap: same pipeline as the core, conversion over POST /v1/quote. */
-export function quoteSwapLiabilityAsync(
+/** Backend-priced liability swap: same pipeline as the core, rate off `state`, conversion over
+ *  POST /v1/quote. Null when the pool has no rate (a mark is unusable: the chain reverts). */
+export async function quoteSwapLiabilityAsync(
   state: PoolState,
   inLeg: LiabLeg,
   outLeg: LiabLeg,
   lpAmountIn: number,
   opts: BackendConvertOpts,
 ): Promise<SwapLiabilityQuote | null> {
+  const c = poolSolvency(state);
+  if (c === null) return null;
   return quoteSwapLiabilityCoreAsync(
     inLeg,
     outLeg,
     lpAmountIn,
+    c,
     backendConvert(state, inLeg.symbol, outLeg.symbol, opts),
   );
 }

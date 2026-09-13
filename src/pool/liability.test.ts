@@ -1,14 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { type PoolState, buildLeg } from '../amm/aimm.js';
-// bun test: pins the swapLiability mirror against fixture numbers derived from the contract
-// source (PoolLiquidity.sol applyHaircut :93 / swapLiability :411, PoolConstantsLib.sol:15/:106).
+// bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
+// PoolSolvency.solvency/previewCap, PoolLiquidity.exitMu and swapLiability.
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   LIABILITY_SWAP_ENABLED_BIT,
   WAD,
-  haircutFace,
+  exitCap,
+  exitValue,
+  legCoverage,
   liabilitySwapEnabled,
   minLpAmountOut,
+  poolSolvency,
   quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
@@ -27,48 +30,62 @@ function balancedState(): PoolState {
   return {
     base: 'USDC',
     legs: {
-      AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
-      NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p),
+      AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
+      NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
     },
     hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
   };
 }
 
-describe('haircutFace (exit haircut mirror)', () => {
-  // Hand-derived from PoolLiquidity.sol: R=800k L=1M => deficit 0.2. The per-leg suppressor lane is
-  // gone (CAPS-4); the haircut is the full deficit, rounded up so the dust stays with the pool.
-  test('a 20% deficit takes exactly 20% of face', () => {
-    const { actual, haircut } = haircutFace(1_000_000, 800_000, 1_000_000);
-    expect(haircut).toBe(200_000);
-    expect(actual).toBe(800_000);
+describe('LEDA-7: the ONE off-chain replica of pool-level settlement', () => {
+  // A USDC hub (mark 1) and a spoke at mark 2: C = (R_hub + R_x·2) / (L_hub + L_x·2).
+  const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
+    base: 'USDC',
+    legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE, 0) },
+    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0 },
   });
 
-  test('haircut rounds UP so the dust stays with the pool', () => {
-    const { actual, haircut } = haircutFace(333_333, 800_000, 1_000_000);
-    expect(haircut).toBe(66_667); // ceil(66666.6)
-    expect(actual).toBe(333_333 - 66_667);
+  test('poolSolvency is Σ R·m / Σ L·m, marks in base per token', () => {
+    expect(poolSolvency(stateAt(1_000, 1_000, 500, 500))).toBe(1);
+    // NAV 900 + 400·2 = 1700 over claims 1000 + 500·2 = 2000.
+    expect(poolSolvency(stateAt(900, 1_000, 400, 500))).toBeCloseTo(0.85, 12);
+    // Surplus nets into C for every LP: 1100 + 600·2 over 2000.
+    expect(poolSolvency(stateAt(1_100, 1_000, 600, 500))).toBeCloseTo(1.15, 12);
   });
 
-  test('identity when covered or liabilities empty', () => {
-    expect(haircutFace(500, 1_000_000, 1_000_000)).toEqual({ actual: 500, haircut: 0 });
-    expect(haircutFace(500, 900, 0)).toEqual({ actual: 500, haircut: 0 });
+  test('an unusable mark leaves NO rate (the chain reverts FeedUnavailable); an empty book reads 1', () => {
+    expect(poolSolvency(stateAt(1_000, 1_000, 500, 500, 0))).toBeNull();
+    expect(poolSolvency(stateAt(1_000, 1_000, 500, 500, Number.NaN))).toBeNull();
+    expect(poolSolvency(stateAt(0, 0, 0, 0))).toBe(1);
   });
 
-  test('a wiped leg haircuts the whole face', () => {
-    expect(haircutFace(1_000, 0, 1_000).haircut).toBe(1_000);
+  test('A-1121: a 0/0 leg is skipped before its mark is read', () => {
+    expect(poolSolvency(stateAt(900, 1_000, 0, 0, 0))).toBeCloseTo(0.9, 12);
   });
 
-  test('an operand past 2^53 is refused, not previewed', () => {
-    // The chain settles this in integers. Past MAX_SAFE_INTEGER a double's own spacing is more
-    // than one unit, so `ceil` no longer rounds up by less than a unit and the preview diverges
-    // from what settles - silently, and always in the same direction.
-    const big = Number.MAX_SAFE_INTEGER + 2;
-    expect(() => haircutFace(big, 800_000, 1_000_000)).toThrow(RangeError);
-    expect(() => haircutFace(1_000, big, 1_000_000)).toThrow(RangeError);
-    expect(() => haircutFace(1_000, 800_000, big)).toThrow(RangeError);
-    expect(() => haircutFace(Number.NaN, 800_000, 1_000_000)).toThrow(RangeError);
-    // The boundary itself still works.
-    expect(() => haircutFace(Number.MAX_SAFE_INTEGER, 800_000, 1_000_000)).not.toThrow();
+  test('A-1304: zero claim over stranded value is no rate', () => {
+    expect(poolSolvency(stateAt(1_000, 0, 500, 0))).toBeNull();
+  });
+
+  test('exitValue = face · min(c_leg, cap) for C < 1, C == 1 and C > 1', () => {
+    // C < 1 binds a leg that is covered on its own books.
+    expect(exitValue(1_000, legCoverage(1_200, 1_000), 0.9)).toBeCloseTo(900, 9);
+    // C == 1 on a covered leg pays face.
+    expect(exitValue(1_000, legCoverage(1_000, 1_000), 1)).toBe(1_000);
+    // C > 1: in-kind delivery is still bounded by the leg's own coverage…
+    expect(exitValue(1_000, legCoverage(800, 1_000), 1.1)).toBeCloseTo(800, 9);
+    // …and a leg holding more than face·C pays face·C, the claim.
+    expect(exitValue(1_000, legCoverage(2_000, 1_000), 1.1)).toBeCloseTo(1_100, 9);
+    // No liabilities: `exitMu` returns the cap.
+    expect(exitValue(1_000, legCoverage(5, 0), 0.95)).toBeCloseTo(950, 9);
+  });
+
+  test('the degraded cap is min(1, lastGoodC), never a bare 1 over a known shortfall', () => {
+    expect(exitCap(1.07)).toBe(1.07);
+    expect(exitCap(null, 970_000_000_000_000_000n)).toBeCloseTo(0.97, 12);
+    expect(exitCap(null, 1_050_000_000_000_000_000n)).toBe(1);
+    expect(exitCap(null, 0n)).toBe(1);
+    expect(exitCap(null)).toBe(1);
   });
 });
 
@@ -113,7 +130,7 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
   }
 
   test('balanced legs at mark: no haircuts, conversion passes through unclamped', async () => {
-    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, makeConvert(9_990));
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(9_990));
     expect(q).not.toBeNull();
     expect(q?.liabIn).toBe(10_000);
     expect(q?.fairIn).toBe(10_000);
@@ -125,51 +142,60 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
     // Impact vs the 1:1-face baseline is exactly the conversion shortfall.
     expect(q?.impactBps).toBeCloseTo((1 - 9_990 / 10_000) * 1e4, 6);
     expect(q?.haircutInBps).toBe(0);
-    expect(q?.haircutOutBps).toBe(0);
   });
 
   test('Lemma B clamp: conv quoted past the oracle mark is capped at fairIn·markPrice (:442)', async () => {
     // 2% skew premium quoted over a 1.0 mark ⇒ cap binds at 1% over face... here mark 1.0, fair 10k.
-    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, makeConvert(10_400, 1));
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(10_400, 1));
     expect(q?.markCapBinding).toBe(true);
     expect(q?.conv).toBe(10_000); // fairIn · markPrice
     expect(q?.liabOut).toBe(10_000);
     expect(q?.markClampBps).toBeCloseTo(((10_400 - 10_000) / 10_400) * 1e4, 6);
   });
 
-  test('in-leg haircut applies BEFORE conversion and pricing (:435-437)', async () => {
-    const shortIn = { ...inLeg, reserves: 800_000 }; // 20% deficit, suppressor 0 ⇒ 20% haircut
+  test('the burn settles at pool C BEFORE conversion, never at c_leg', async () => {
+    // A 20% under-covered in-leg in a pool at C = 0.95 settles at 0.95: the leg's own deficit is
+    // inventory location, not loss.
+    const shortIn = { ...inLeg, reserves: 800_000 };
     let sawFairIn = 0;
-    const q = await quoteSwapLiabilityCoreAsync(shortIn, outLeg, 10_000, async (fairIn) => {
+    const q = await quoteSwapLiabilityCoreAsync(shortIn, outLeg, 10_000, 0.95, async (fairIn) => {
       sawFairIn = fairIn;
-      return makeConvert(9_990)(fairIn);
+      return makeConvert(9_490)(fairIn);
     });
-    expect(q?.haircutIn).toBe(2_000);
-    expect(q?.fairIn).toBe(8_000);
-    // Conversion saw the POST-haircut face only.
-    expect(sawFairIn).toBe(8_000);
+    expect(q?.fairIn).toBeCloseTo(9_500, 9);
+    expect(sawFairIn).toBeCloseTo(9_500, 9);
+    expect(q?.haircutIn).toBeCloseTo(500, 9);
+    expect(q?.poolC).toBe(0.95);
+    // A-1000: the out leg is a FACE book, so the token conversion is re-denominated: conv / C.
+    expect(q?.liabOut).toBeCloseTo(9_490 / 0.95, 6);
   });
 
-  test('out-leg haircut applies AGAIN after the mark cap (:454)', async () => {
-    const shortOut = { ...outLeg, reserves: 750_000 }; // 25% deficit, suppressor 0
-    const q = await quoteSwapLiabilityCoreAsync(inLeg, shortOut, 10_000, makeConvert(9_990));
-    expect(q?.haircutOut).toBe(2_498); // ceil(9990 · 0.25 = 2497.5)
-    expect(q?.liabOut).toBeCloseTo(9_990 - 2_498, 6);
+  test('at C > 1 there is no haircut and the burn converts its surplus-backed claim', async () => {
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1.02, makeConvert(10_190));
+    expect(q?.fairIn).toBeCloseTo(10_200, 9);
+    expect(q?.haircutIn).toBe(0);
+    expect(q?.liabOut).toBeCloseTo(10_190 / 1.02, 6);
   });
 
-  test('zero-output guard: fully hair-cut out-leg reverts to null (:468)', async () => {
-    const deadOut = { ...outLeg, reserves: 0 }; // R=0, suppressor 0 ⇒ 100% haircut
+  test('NO output-leg haircut: an under-covered destination is credited at C, not token-face', async () => {
+    const shortOut = { ...outLeg, reserves: 750_000 };
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, shortOut, 10_000, 1, makeConvert(9_990));
+    expect(q?.liabOut).toBe(9_990);
+  });
+
+  test('zero-output guard and a missing rate both resolve null', async () => {
+    expect(await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(0))).toBeNull();
     expect(
-      await quoteSwapLiabilityCoreAsync(inLeg, deadOut, 10_000, makeConvert(9_990)),
+      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, Number.NaN, makeConvert(9_990)),
     ).toBeNull();
   });
 
   test('burn past live liabilities reverts to null (:429)', async () => {
     expect(
-      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, inLeg.liabilities + 1, makeConvert(1)),
+      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, inLeg.liabilities + 1, 1, makeConvert(1)),
     ).toBeNull();
     expect(
-      await quoteSwapLiabilityCoreAsync({ ...inLeg, liabilities: 0 }, outLeg, 1, makeConvert(1)),
+      await quoteSwapLiabilityCoreAsync({ ...inLeg, liabilities: 0 }, outLeg, 1, 1, makeConvert(1)),
     ).toBeNull();
   });
 
@@ -179,6 +205,7 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
       { ...inLeg, indexWad: idx },
       { ...outLeg, indexWad: idx },
       10_000, // shares
+      1,
       makeConvert(10_450), // 10k face · 1.05 → face out
     );
     expect(q?.liabIn).toBeCloseTo(10_500, 6); // 10_000 · 1.05
@@ -237,15 +264,14 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       expect(q?.markCapBinding).toBe(false);
       expect(q?.convQuoted).toBeCloseTo(5_000, 6);
       expect(q?.haircutIn).toBe(0);
-      expect(q?.haircutOut).toBe(0);
     } finally {
       // @ts-expect-error restore the real fetch
       globalThis.fetch = undefined;
     }
   });
 
-  test('under-covered in-leg: haircut-in dominates before the backend conversion', async () => {
-    const outs = [5_940_000_000n, 5_934_000_000n];
+  test('an under-covered in-leg in a whole pool settles at C = 1, not at its own 60%', async () => {
+    const outs = [10_000_000_000n, 9_990_000_000n];
     // @ts-expect-error stub fetch
     globalThis.fetch = async (url: string, init: { body?: string }) => {
       if (String(url).endsWith('/route')) {
@@ -263,14 +289,13 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       return { ok: true, json: async () => quoteWire(outs.shift() ?? 0n) };
     };
     try {
-      const state = balancedState();
-      const inLeg = legOf('AUDF', 600_000, 1_000_000); // 40% deficit
+      const state = balancedState(); // C = 1 across the pool
+      const inLeg = legOf('AUDF', 600_000, 1_000_000); // the leg alone is 40% short
       const outLeg = legOf('NZDF', 1_000_000, 1_000_000);
       const q = await quoteSwapLiabilityAsync(state, inLeg, outLeg, 10_000, backendOpts);
-      const { haircut } = haircutFace(10_000, 600_000, 1_000_000);
-      expect(q?.haircutIn).toBe(haircut);
-      expect(q?.haircutInBps).toBeCloseTo(4_000, 6);
-      expect(q?.fairIn).toBe(6_000);
+      expect(q?.poolC).toBe(1);
+      expect(q?.haircutIn).toBe(0);
+      expect(q?.fairIn).toBe(10_000);
     } finally {
       // @ts-expect-error restore the real fetch
       globalThis.fetch = undefined;
