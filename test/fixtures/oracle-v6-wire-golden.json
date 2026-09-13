@@ -1,0 +1,34 @@
+{
+  "wire": 6,
+  "domainName": "BTR ExternalOracleV4",
+  "domainVersion": "1",
+  "batchTypehash": "BatchQuoteV4(bytes32 blobHash)",
+  "note": "Byte-exact v6 blob pinned by test/unit/ExternalOracleV5.t.sol and cross-checked by keepers/src/oracle/signed_v6.rs. Header ver|seq|tsDs|nP|nS|nC = 11B, entries 5/5/3. nC == nP; price and conf gi sequences are identical. exp7 is absolute: mark = mant << (exp7 - 16).",
+  "blobHex": "0x0600000001046564020102007f0f0cf0017d9bff2f00000186a0000007010009",
+  "header": {
+    "version": 6,
+    "seq": 1,
+    "sourceTsDs": 288100,
+    "nPrice": 2,
+    "nSigma": 1,
+    "nConf": 2
+  },
+  "expects": [
+    {
+      "gi": 0,
+      "feedId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "mark1e18": "2499999944549077090304",
+      "sigmaPbps": 100000,
+      "confidenceBps": 7,
+      "obsSecs": "1800000010"
+    },
+    {
+      "gi": 1,
+      "feedId": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "mark1e18": "1899999932524550684672",
+      "sigmaPbps": 100000,
+      "confidenceBps": 9,
+      "obsSecs": "1800000010"
+    }
+  ]
+}

@@ -1,11 +1,16 @@
 /**
- * Wire codecs + EIP-712 digests for the ExternalOracleV4 push path.
+ * Wire codecs + EIP-712 digests for the ExternalOracleV4/V5 push path.
  *
  * V5 (`ExternalOracleV4.pushV4` / `pushSignedV4`): 8 x 29-bit lanes, wire v5 DIFF blobs, 11-byte
  * header, 5-byte price entries, `tsDs` = deciseconds since midnight UTC (cyclic, no epoch).
  *
- * Byte-contract is LOCKED against the shared four-codec fixture
- * dex-evm/test/fixtures/oracle-v5-wire-golden.json (keccak = 0x66151804…9b35).
+ * V6 (`ExternalOracleV5.push`): same 11-byte header and 5/5/3-byte sections, but the price lane is
+ * a self-describing u32 (`exp7:u7 | mant:u25`, `mark = mant << (exp7 - 16)`, no per-feed bias) and
+ * `nC == nP` is mandatory: price and conf are walked in lockstep on the same `gi` sequence.
+ *
+ * Byte-contract is LOCKED against the shared fixtures
+ * dex-evm/test/fixtures/oracle-v5-wire-golden.json (keccak = 0x66151804…9b35) and
+ * dex-evm/test/fixtures/oracle-v6-wire-golden.json.
  * Signature recovery + k-of-n quorum live in `eip712.ts` (`recoverSigners` / `verifyQuorum`) -
  * one recovery path, no parity drift.
  */
@@ -15,8 +20,8 @@ import type { Hex } from '../eth/types';
 import { concat, numberToHex, pad } from '../utils/encoding';
 import { EIP712_DOMAIN_TYPEHASH, type Eip712Domain } from './eip712';
 
-/** The only live wire generation: v5 blobs carry the version byte 5. */
-export type PushWire = 'v5';
+/** Live wire generations: v5 blobs carry version byte 5, v6 blobs version byte 6. */
+export type PushWire = 'v5' | 'v6';
 
 /** keccak256("BatchQuoteV4(bytes32 blobHash)") - the wire-v5 push typehash (ExternalOracleV4). */
 export const BATCH_TYPEHASH_V4 = keccak256Input('BatchQuoteV4(bytes32 blobHash)');
@@ -39,9 +44,19 @@ export const V5_MANT_MSB = 1 << 24;
 /** Deciseconds in a day: the modulus of the v5 `tsDs` field (u20 value, zero-padded to u24). */
 export const V5_DAY_DS = 864_000;
 
-/** V5 lane geometry. lane = exp:u4 | mant:u25, mant MSB set when live. */
+/** The only live v6 header/section geometry is identical to v5; only the lane and `nC` differ. */
+export const V6_BLOB_VERSION = 6;
+/** ExternalOracleV5.LANES_PER_SLOT - 4, down from V5's 8 (absolute exp7 widens the clock word). */
+export const V6_LANES_PER_SLOT = 4;
+/** `mark = mant << (exp7 - 16)`: the self-describing exponent is absolute, no per-feed bias. */
+export const V6_EXP_OFFSET = 16;
+/** 7 significant exponent bits in the u32 lane; the top bits are no longer reserved. */
+export const V6_EXP_MASK = 0x7f;
+
+/** V5 lane geometry `exp:u4 | mant:u25` (caller-supplied bias) and v6 `exp7:u7 | mant:u25`. */
 const LANE_SPEC: Record<PushWire, { mantBits: number; expBits: number }> = {
   v5: { mantBits: 25, expBits: 4 },
+  v6: { mantBits: 25, expBits: 7 },
 };
 
 const toBytes = (b: Hex | Uint8Array): Uint8Array => {
@@ -63,14 +78,17 @@ function writeUint(bytes: Uint8Array, off: number, len: number, value: bigint): 
   for (let i = len - 1; i >= 0; i--, v >>= 8n) bytes[off + i] = Number(v & 0xffn);
 }
 
-const checkGi = (gi: number, last: number, section: string): void => {
-  if (!Number.isInteger(gi) || gi < 0 || gi > 255) throw new Error(`V5 ${section} gi ${gi} not u8`);
+const checkGi = (version: number, gi: number, last: number, section: string): void => {
+  if (!Number.isInteger(gi) || gi < 0 || gi > 255)
+    throw new Error(`V${version} ${section} gi ${gi} not u8`);
   if (gi <= last)
-    throw new Error(`V5 ${section} entries not ascending by gi (${gi} after ${last})`);
+    throw new Error(`V${version} ${section} entries not ascending by gi (${gi} after ${last})`);
 };
 
 /**
- * Decode one V5 packed price lane to mark1e18: exp:u4 (bits 25..28) | mant:u25 (bits 0..24).
+ * Decode one packed price lane to mark1e18.
+ *  - v5 `exp:u4 | mant:u25`: `exp = raw + expBias`; the caller carries the per-feed bias.
+ *  - v6 `exp7:u7 | mant:u25`: SELF-DESCRIBING, `exp = raw - 16`; `expBias` is ignored.
  * The all-zero lane (and any lane with the mantissa MSB unset) is the STALE sentinel -> 0n,
  * exactly the fail-closed value `getFeed` serves.
  */
@@ -79,13 +97,16 @@ export function decodeLane(lane: bigint | number, expBias: number, wire: PushWir
   const { mantBits } = LANE_SPEC[wire];
   const mant = l & ((1n << BigInt(mantBits)) - 1n);
   if ((mant & (1n << BigInt(mantBits - 1))) === 0n) return 0n; // STALE sentinel
-  const exp = Number(l >> BigInt(mantBits)) + expBias;
+  const raw = Number(l >> BigInt(mantBits));
+  const exp = wire === 'v6' ? raw - V6_EXP_OFFSET : raw + expBias;
   return exp >= 0 ? mant << BigInt(exp) : mant >> BigInt(-exp);
 }
 
 /**
  * Normalize a 1e18 value into a lane (test/golden mirror of the Solidity `_lane` helpers).
  * Floor-encode: mantissa lands in [2^(mantBits-1), 2^mantBits). Throws when no exponent fits.
+ * v6 ignores `expBias` and derives the absolute `exp7` (so the contract and keeper read it back
+ * without knowing the feed's original bias).
  */
 export function encodeLane(value1e18: bigint, expBias: number, wire: PushWire): number {
   const { mantBits, expBits } = LANE_SPEC[wire];
@@ -93,7 +114,7 @@ export function encodeLane(value1e18: bigint, expBias: number, wire: PushWire): 
   const lo = 1n << BigInt(mantBits - 1);
   const hi = 1n << BigInt(mantBits);
   for (let e = 0; e < expMax; e++) {
-    const shift = e + expBias;
+    const shift = wire === 'v6' ? e - V6_EXP_OFFSET : e + expBias;
     const m = shift >= 0 ? value1e18 >> BigInt(shift) : value1e18 << BigInt(-shift);
     if (m >= lo && m < hi) return (e << mantBits) | Number(m);
   }
@@ -159,7 +180,7 @@ export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
   let last = -1;
   for (let i = 0; i < nP; i++, o += V5_PRICE_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(gi, last, 'price');
+    checkGi(V5_BLOB_VERSION, gi, last, 'price');
     last = gi;
     const lane = Number(readUint(b, o + 1, 4));
     if (lane > V5_LANE_MASK) throw new Error(`V5 lane ${lane} sets a reserved top bit (gi ${gi})`);
@@ -171,14 +192,14 @@ export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
   last = -1;
   for (let i = 0; i < nS; i++, o += V5_SIGMA_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(gi, last, 'sigma');
+    checkGi(V5_BLOB_VERSION, gi, last, 'sigma');
     last = gi;
     sigmas.push({ gi, sigmaPbps: Number(readUint(b, o + 1, 4)) });
   }
   last = -1;
   for (let i = 0; i < nC; i++, o += V5_CONF_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(gi, last, 'conf');
+    checkGi(V5_BLOB_VERSION, gi, last, 'conf');
     last = gi;
     confs.push({ gi, confBps: Number(readUint(b, o + 1, 2)) });
   }
@@ -217,7 +238,7 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   let o = V5_HEADER_BYTES;
   let last = -1;
   for (const p of prices) {
-    checkGi(p.gi, last, 'price');
+    checkGi(V5_BLOB_VERSION, p.gi, last, 'price');
     last = p.gi;
     if (p.lane < 0 || p.lane > V5_LANE_MASK) {
       throw new Error(`V5 lane ${p.lane} outside 29 bits (gi ${p.gi})`);
@@ -233,7 +254,7 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   }
   last = -1;
   for (const s of sigmas) {
-    checkGi(s.gi, last, 'sigma');
+    checkGi(V5_BLOB_VERSION, s.gi, last, 'sigma');
     last = s.gi;
     if (s.sigmaPbps < 0 || s.sigmaPbps > 0xffffffff) {
       throw new Error(`V5 sigmaPbps ${s.sigmaPbps} outside u32 (gi ${s.gi})`);
@@ -244,7 +265,7 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   }
   last = -1;
   for (const c of confs) {
-    checkGi(c.gi, last, 'conf');
+    checkGi(V5_BLOB_VERSION, c.gi, last, 'conf');
     last = c.gi;
     if (c.confBps < 0 || c.confBps > 0xffff) {
       throw new Error(`V5 confBps ${c.confBps} outside u16 (gi ${c.gi})`);
@@ -256,8 +277,98 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   return out;
 }
 
+// ── wire v6 (ExternalOracleV5): same header/sections, self-describing exp7 lane, nC == nP ─────
+
+/** A v6 price entry: `gi:u8 | lane:u32` where the payload is `exp7:u7 | mant:u25` (all 32 bits). */
+export interface V6PriceEntry {
+  gi: number;
+  /** raw u32 lane; `(mant & bit24) == 0` = STALE/skipped. Decode with {@link decodeLane}. */
+  lane: number;
+}
+
+export interface V6Blob {
+  /** Always 6. */
+  version: number;
+  seq: number;
+  /** DECISECONDS SINCE MIDNIGHT UTC, [0, 864000). Cyclic - no epoch. See {@link reconSecsFromDs}. */
+  tsDs: number;
+  prices: V6PriceEntry[];
+  sigmas: Array<{ gi: number; sigmaPbps: number }>;
+  /** Exactly one per price entry, same `gi` sequence (the chain's `nC == nP` lockstep). */
+  confs: Array<{ gi: number; confBps: number }>;
+}
+
 /**
- * Absolute seconds for a v5 `tsDs`, the client mirror of `ExternalOracleV4._recon`: pick the
+ * Decode a wire-v6 DIFF blob: header 11B (`ver:u8=6 | seq:u32 | tsDs:u24 | nP:u8 | nS:u8 | nC:u8`),
+ * then nP x 5B price entries (gi u8 | lane u32), nS x 5B sigma entries, nC x 3B conf entries.
+ *
+ * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `tsDs >= 864000`,
+ * all-empty blob, length disagreeing with section counts, non-ascending `gi`), plus a `nC != nP`
+ * or a price/conf `gi` sequence that is not identical. The lane's absolute `exp7` uses all 32 bits,
+ * so there is NO reserved-top-bit rule; a nonzero lane with the mantissa MSB clear is the
+ * sentinel-write `_applyLane` SKIPS (returns false) rather than reverts, so the decoder keeps it
+ * and `decodeLane` reads it as the stale 0n.
+ *
+ * `dayMod` is NOT read here: it is a storage-only tag the contract derives from the reconstructed
+ * source day, never a wire field (unchanged from v5).
+ */
+export function decodeBlobV6(blob: Hex | Uint8Array): V6Blob {
+  const b = toBytes(blob);
+  if (b.length < V5_HEADER_BYTES) throw new Error(`V6 blob length ${b.length} shorter than header`);
+  if (b[0] !== V6_BLOB_VERSION) throw new Error(`V6 blob version ${b[0]} != ${V6_BLOB_VERSION}`);
+  const tsDs = Number(readUint(b, 5, 3));
+  if (tsDs >= V5_DAY_DS) throw new Error(`V6 tsDs ${tsDs} outside [0, ${V5_DAY_DS})`);
+  const nP = b[8];
+  const nS = b[9];
+  const nC = b[10];
+  if (nP === 0 && nS === 0 && nC === 0) throw new Error('V6 blob carries no entries');
+  if (nC !== nP)
+    throw new Error(`V6 blob nC ${nC} != nP ${nP} (conf is mandatory per price entry)`);
+  const want =
+    V5_HEADER_BYTES +
+    nP * V5_PRICE_ENTRY_BYTES +
+    nS * V5_SIGMA_ENTRY_BYTES +
+    nC * V5_CONF_ENTRY_BYTES;
+  if (b.length !== want) {
+    throw new Error(`V6 blob length ${b.length} != sections (${nP}p ${nS}s ${nC}c => ${want})`);
+  }
+  const prices: V6Blob['prices'] = [];
+  const sigmas: V6Blob['sigmas'] = [];
+  const confs: V6Blob['confs'] = [];
+  let o = V5_HEADER_BYTES;
+  let last = -1;
+  for (let i = 0; i < nP; i++, o += V5_PRICE_ENTRY_BYTES) {
+    const gi = b[o];
+    checkGi(V6_BLOB_VERSION, gi, last, 'price');
+    last = gi;
+    prices.push({ gi, lane: Number(readUint(b, o + 1, 4)) });
+  }
+  last = -1;
+  for (let i = 0; i < nS; i++, o += V5_SIGMA_ENTRY_BYTES) {
+    const gi = b[o];
+    checkGi(V6_BLOB_VERSION, gi, last, 'sigma');
+    last = gi;
+    sigmas.push({ gi, sigmaPbps: Number(readUint(b, o + 1, 4)) });
+  }
+  last = -1;
+  for (let i = 0; i < nC; i++, o += V5_CONF_ENTRY_BYTES) {
+    const gi = b[o];
+    checkGi(V6_BLOB_VERSION, gi, last, 'conf');
+    last = gi;
+    confs.push({ gi, confBps: Number(readUint(b, o + 1, 2)) });
+  }
+  for (let i = 0; i < nP; i++) {
+    if (prices[i].gi !== confs[i].gi) {
+      throw new Error(
+        `V6 price/conf gi mismatch: price gi ${prices[i].gi} vs conf gi ${confs[i].gi}`,
+      );
+    }
+  }
+  return { version: b[0], seq: Number(readUint(b, 1, 4)), tsDs, prices, sigmas, confs };
+}
+
+/**
+ * Absolute seconds for a v5/v6 `tsDs`, the client mirror of `ExternalOracleV4/V5._recon`: pick the
  * nearest candidate day around `nowSecs`. Unambiguous for any true age under +/-12h; a caller
  * MUST still bound the result (the contract rejects anything outside
  * [now - MAX_RECON_AGE, now + SOURCE_TS_FUTURE_SKEW]) before trusting it.
