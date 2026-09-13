@@ -9,6 +9,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
 import { abiHash } from '../src/abis/hash';
 
 const repo = join(import.meta.dir, '..');
@@ -16,6 +17,12 @@ const POOL_ABI_JSON = JSON.parse(
   readFileSync(join(repo, '..', 'back', 'abis', 'Pool.json'), 'utf8'),
 );
 const POOL_ABI = (Array.isArray(POOL_ABI_JSON) ? POOL_ABI_JSON : POOL_ABI_JSON.abi) as unknown[];
+const POOL_FACTORY_ABI_JSON = JSON.parse(
+  readFileSync(join(repo, '..', 'back', 'abis', 'PoolFactory.json'), 'utf8'),
+);
+const POOL_FACTORY_BACK = (
+  Array.isArray(POOL_FACTORY_ABI_JSON) ? POOL_FACTORY_ABI_JSON : POOL_FACTORY_ABI_JSON.abi
+) as unknown[];
 
 // ── the hash itself ──────────────────────────────────────────────────────────
 
@@ -56,6 +63,34 @@ describe('abiHash pins content, not shape', () => {
   test('the committed lock matches what the backend bakes', () => {
     const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
     expect(lock.Pool).toBe(abiHash(POOL_ABI));
+  });
+});
+
+// A-1131: PoolFactory is a consumer surface too, and it drifted once already (pinned without
+// `executeOfficial`/`cancelOfficial`, still carrying the removed `setProtocolDeployer`). The
+// committed SDK snapshot, the backend's `back/abis/PoolFactory.json` and the lock must agree, and
+// the official-grant surface must be the current one.
+describe('PoolFactory parity is pinned across repos', () => {
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+
+  test('the lock pins the committed SDK snapshot', () => {
+    expect(lock.PoolFactory).toBe(abiHash(POOL_FACTORY_ABI));
+  });
+
+  test('the backend ABI is the same surface as the SDK snapshot', () => {
+    expect(abiHash(POOL_FACTORY_BACK)).toBe(lock.PoolFactory);
+  });
+
+  test('the official-grant surface is present and setProtocolDeployer is gone', () => {
+    const names = new Set(
+      (POOL_FACTORY_ABI as { type?: string; name?: string }[])
+        .filter((e) => e.type === 'function')
+        .map((e) => e.name),
+    );
+    for (const fn of ['setOfficial', 'executeOfficial', 'cancelOfficial', 'syncOfficial']) {
+      expect(names.has(fn)).toBe(true);
+    }
+    expect(names.has('setProtocolDeployer')).toBe(false);
   });
 });
 

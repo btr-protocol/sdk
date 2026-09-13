@@ -65,6 +65,19 @@ export const POOL_FACTORY_ABI = [
     type: 'function',
   },
   {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+    ],
+    name: 'cancelOfficial',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'cancelReferenceUpgrade',
     outputs: [],
@@ -109,6 +122,19 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     name: 'deregisterPool',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+    ],
+    name: 'executeOfficial',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -311,6 +337,25 @@ export const POOL_FACTORY_ABI = [
         internalType: 'address',
         name: '',
         type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+    ],
+    name: 'pendingOfficial',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: 'executeAt',
+        type: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -541,6 +586,44 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     name: 'PoolDeregistered',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'canceller',
+        type: 'address',
+      },
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+    ],
+    name: 'PoolOfficialGrantCancelled',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'executeAt',
+        type: 'uint256',
+      },
+    ],
+    name: 'PoolOfficialGrantRequested',
     type: 'event',
   },
   {
