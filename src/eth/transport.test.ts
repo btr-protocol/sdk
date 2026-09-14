@@ -207,6 +207,23 @@ describe('httpTransport attests every endpoint before its first use', () => {
     expect(probes.filter((u) => u === 'http://right').length).toBe(1); // attested once, cached
   });
 
+  test('concurrent posts sharing one failed verdict evict the wrong endpoint once', async () => {
+    // Both posts await the same cached probe and both see false; the second `indexOf` is -1 and
+    // `splice(-1, 1)` used to evict the LAST endpoint, the healthy one, bricking the ring.
+    const { reads } = byUrl({ 'http://wrong': '0x64', 'http://good': '0x1' });
+    const p = httpTransport(['http://wrong', 'http://good'], {
+      chainId: 1,
+      retryDelay: 1,
+      batch: false,
+    });
+    const rs = await Promise.all([
+      p.request({ method: 'eth_call', params: ['a'] }),
+      p.request({ method: 'eth_call', params: ['b'] }),
+    ]);
+    expect(rs).toEqual(['0xok', '0xok']);
+    expect(reads).toEqual(['http://good', 'http://good']);
+  });
+
   test('no chainId given: the first attested endpoint pins the ring', async () => {
     const { reads } = byUrl({ 'http://a': '0x1', 'http://b': '0x64' });
     const p = httpTransport(['http://a', 'http://b'], { retryDelay: 1 });

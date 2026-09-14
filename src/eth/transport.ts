@@ -166,7 +166,10 @@ export function httpTransport(
       const url = endpoints[attempt % endpoints.length];
       try {
         if (!(await attest(url))) {
-          endpoints.splice(endpoints.indexOf(url), 1);
+          // Concurrent posts share one cached verdict; only the first still finds the url
+          // (indexOf -1 would splice the LAST, healthy, endpoint).
+          const k = endpoints.indexOf(url);
+          if (k >= 0) endpoints.splice(k, 1);
           throw new RpcNetworkError(`${url} is not chain ${chain}`);
         }
         return await fetchRpc(url, body);
