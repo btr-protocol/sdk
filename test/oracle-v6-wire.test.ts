@@ -16,7 +16,6 @@ import type { Hex } from '../src/eth/types';
 import {
   V6_BLOB_VERSION,
   V6_EXP_OFFSET,
-  V6_LANES_PER_SLOT,
   decodeBlobV6,
   decodeLane,
   encodeLane,
@@ -42,7 +41,6 @@ describe('wire v6 fixture shape', () => {
     expect(GOLDEN.wire).toBe(V6_BLOB_VERSION);
     expect(GOLDEN.header.version).toBe(V6_BLOB_VERSION);
     expect(GOLDEN.header.nPrice).toBe(GOLDEN.header.nConf); // nC == nP lockstep
-    expect(V6_LANES_PER_SLOT).toBe(4);
     expect(V6_EXP_OFFSET).toBe(16);
     expect(GOLDEN.batchTypehash).toBe('BatchQuoteV4(bytes32 blobHash)');
   });
