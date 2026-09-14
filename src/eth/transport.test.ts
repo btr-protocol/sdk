@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { getHealthyRpc, testRpc } from './chains';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
 const realFetch = globalThis.fetch;
@@ -33,16 +32,22 @@ function mock(
   const calls: { url: string; body: MockBody }[] = [];
   useFetch(async (url, init) => {
     const body = JSON.parse(String(init?.body)) as MockBody;
-    calls.push({ url: String(url), body });
+    // The one-time eth_chainId attestation is not a read; only reads are counted.
+    if (Array.isArray(body) || body.method !== 'eth_chainId')
+      calls.push({ url: String(url), body });
     const out = handler(String(url), body);
     if (out?.__status)
       return new Response(JSON.stringify(out.json ?? null), {
         status: out.__status,
         statusText: 'x',
       });
-    // default: echo per-request result = 0x<method>
+    // default: the attestation probe answers as chain 1; every other method echoes 0x<method>
     const respond = (r: MockRequest) =>
-      r.__override ?? { jsonrpc: '2.0', id: r.id, result: `0x${r.method}` };
+      r.__override ?? {
+        jsonrpc: '2.0',
+        id: r.id,
+        result: r.method === 'eth_chainId' ? '0x1' : `0x${r.method}`,
+      };
     const json = Array.isArray(body)
       ? body.map(respond)
       : (handler(String(url), body)?.json ?? respond(body));
@@ -52,6 +57,15 @@ function mock(
 }
 
 const jsonBody = (init?: RequestInit): MockBody => JSON.parse(String(init?.body)) as MockBody;
+const ok = (body: MockRequest, result = '0xok'): Response =>
+  new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id: body.id,
+      result: body.method === 'eth_chainId' ? '0x1' : result,
+    }),
+    { status: 200 },
+  );
 
 describe('httpTransport batching', () => {
   test('coalesces same-tick requests into one HTTP batch', async () => {
@@ -89,10 +103,7 @@ describe('httpTransport resilience', () => {
     useFetch(async (url, init) => {
       hits++;
       if (String(url).includes('bad')) throw new TypeError('boom');
-      const body = jsonBody(init) as MockRequest;
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0xok' }), {
-        status: 200,
-      });
+      return ok(jsonBody(init) as MockRequest);
     });
     const p = httpTransport(['http://bad', 'http://good'], { retryDelay: 1 });
     const r = await p.request({ method: 'eth_call', params: [] });
@@ -104,10 +115,9 @@ describe('httpTransport resilience', () => {
     let n = 0;
     useFetch(async (_url, init) => {
       const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
       if (n++ === 0) return new Response(null, { status: 429, statusText: 'Too Many' });
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0xok' }), {
-        status: 200,
-      });
+      return ok(body);
     });
     const p = httpTransport('http://rpc', { retryDelay: 1 });
     expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
@@ -117,8 +127,9 @@ describe('httpTransport resilience', () => {
   test('surfaces revert as RpcRevertError (not retried)', async () => {
     let n = 0;
     useFetch(async (_url, init) => {
-      n++;
       const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
+      n++;
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
@@ -137,6 +148,8 @@ describe('httpTransport resilience', () => {
 
   test('times out and rejects with RpcTimeoutError', async () => {
     useFetch((_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return Promise.resolve(ok(body));
       return new Promise<Response>((_res, rej) => {
         init?.signal?.addEventListener('abort', () => {
           rej(Object.assign(new Error('aborted'), { name: 'AbortError' }));
@@ -150,7 +163,11 @@ describe('httpTransport resilience', () => {
   });
 
   test('non-ok HTTP surfaces RpcNetworkError after retries', async () => {
-    useFetch(async () => new Response(null, { status: 500, statusText: 'ISE' }));
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
+      return new Response(null, { status: 500, statusText: 'ISE' });
+    });
     const p = httpTransport('http://rpc', { retries: 1, retryDelay: 1 });
     await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
       RpcNetworkError,
@@ -158,72 +175,75 @@ describe('httpTransport resilience', () => {
   });
 });
 
-describe('testRpc attests the chain, not just the HTTP status', () => {
-  // `res.ok` was the whole test. A gateway answering 200 with a JSON-RPC error, or an endpoint
-  // re-pointed at another network, read as healthy and then answered every read.
-  const stub = (handler: (method: string) => unknown) => {
-    const orig = globalThis.fetch;
-    globalThis.fetch = (async (_u: string, init: { body: string }) => {
-      const { method } = JSON.parse(init.body) as { method: string };
-      const body = handler(method);
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }) as unknown as typeof fetch;
-    return () => {
-      globalThis.fetch = orig;
-    };
+describe('httpTransport attests every endpoint before its first use', () => {
+  // A public RPC URL has no identity. `res.ok` was the whole test, so an endpoint re-pointed at
+  // another network (or a gateway answering 200 with a JSON-RPC error) read as healthy and then
+  // answered every read as truth. Now each endpoint answers eth_chainId ONCE before it is used.
+  const byUrl = (chainOf: Record<string, string>) => {
+    const probes: string[] = [];
+    const reads: string[] = [];
+    useFetch(async (url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      const u = String(url);
+      if (body.method === 'eth_chainId') {
+        probes.push(u);
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: chainOf[u] }), {
+          status: 200,
+        });
+      }
+      reads.push(u);
+      return ok(body);
+    });
+    return { probes, reads };
   };
 
-  test('a 200 carrying a JSON-RPC error is not healthy', async () => {
-    const restore = stub(() => ({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'no' } }));
-    try {
-      expect(await testRpc('http://x')).toBe(false);
-    } finally {
-      restore();
-    }
+  test('an endpoint on the wrong chain is evicted, never read from', async () => {
+    const { probes, reads } = byUrl({ 'http://wrong': '0x64', 'http://right': '0x1' });
+    const p = httpTransport(['http://wrong', 'http://right'], { chainId: 1, retryDelay: 1 });
+    expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
+    expect(await p.request({ method: 'eth_blockNumber', params: [] })).toBe('0xok');
+    expect(reads).toEqual(['http://right', 'http://right']);
+    expect(probes.filter((u) => u === 'http://wrong').length).toBe(1); // evicted, not re-probed
+    expect(probes.filter((u) => u === 'http://right').length).toBe(1); // attested once, cached
   });
 
-  test('an endpoint on the wrong chain is refused', async () => {
-    const restore = stub((m) => ({
-      jsonrpc: '2.0',
-      id: 1,
-      result: m === 'eth_chainId' ? '0x1' : '0x64',
-    }));
-    try {
-      expect(await testRpc('http://x', 1)).toBe(true);
-      expect(await testRpc('http://x', 5_042_002)).toBe(false);
-    } finally {
-      restore();
-    }
+  test('no chainId given: the first attested endpoint pins the ring', async () => {
+    const { reads } = byUrl({ 'http://a': '0x1', 'http://b': '0x64' });
+    const p = httpTransport(['http://a', 'http://b'], { retryDelay: 1 });
+    expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
+    // Force the ring past `a`: dedupe is keyed on params, so a second distinct read lands on
+    // `b` only through failover, which the fallback below simulates by making `a` fail.
+    useFetch(async (url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (String(url) === 'http://a') throw new TypeError('down');
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x64' }), {
+        status: 200,
+      });
+    });
+    await expect(p.request({ method: 'eth_call', params: ['x'] })).rejects.toBeInstanceOf(
+      RpcNetworkError,
+    );
+    expect(reads).toEqual(['http://a']); // b answered as chain 100 and was never read from
   });
 
-  test('getHealthyRpc fails closed when no endpoint attests the chain', async () => {
-    // Chain 999 has one endpoint; it answers as Ethereum. Returning it anyway is the poisoned
-    // endpoint the selection was supposed to exclude.
-    const restore = stub((m) => ({
-      jsonrpc: '2.0',
-      id: 1,
-      result: m === 'eth_chainId' ? '0x1' : '0x64',
-    }));
-    try {
-      expect(await getHealthyRpc(999)).toBeUndefined();
-    } finally {
-      restore();
-    }
+  test('a probe that fails as transport is retried, not cached as a verdict', async () => {
+    let probes = 0;
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId' && probes++ === 0)
+        return new Response(null, { status: 500, statusText: 'ISE' });
+      return ok(body);
+    });
+    const p = httpTransport('http://rpc', { chainId: 1, retryDelay: 1 });
+    expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
+    expect(probes).toBe(2);
   });
 
-  test('getHealthyRpc returns an endpoint that attests the chain', async () => {
-    const restore = stub((m) => ({
-      jsonrpc: '2.0',
-      id: 1,
-      result: m === 'eth_chainId' ? '0x3e7' : '0x64',
-    }));
-    try {
-      expect(await getHealthyRpc(999)).toBe('https://rpc.hyperliquid.xyz/evm');
-    } finally {
-      restore();
-    }
+  test('every endpoint on the wrong chain fails closed', async () => {
+    byUrl({ 'http://x': '0x64' });
+    const p = httpTransport('http://x', { chainId: 1, retries: 1, retryDelay: 1 });
+    await expect(p.request({ method: 'eth_call', params: [] })).rejects.toBeInstanceOf(
+      RpcNetworkError,
+    );
   });
 });

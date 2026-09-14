@@ -476,56 +476,6 @@ export function getMulticall3(chainId: number): Address {
 }
 
 /**
- * Is this endpoint alive AND the chain the caller means?
- *
- * ! `res.ok` was the whole test, and `res.ok` is an HTTP fact. A gateway that answers 200 with a
- * JSON-RPC error, a captive portal, an endpoint that has been re-pointed at a different network —
- * all read as healthy, and the caller then does its reads against whatever that is. The endpoint
- * is unauthenticated by nature (public URL, no identity), so the one thing that can be checked is
- * that it ANSWERS AS the expected chain; pass `expectedChainId` and an endpoint on another chain
- * is refused instead of selected.
- */
-export async function testRpc(url: string, expectedChainId?: number): Promise<boolean> {
-  const call = async (method: string): Promise<string | undefined> => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', method, params: [], id: 1 }),
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!res.ok) return undefined;
-    const body = (await res.json()) as { result?: unknown; error?: unknown };
-    return typeof body.result === 'string' && !body.error ? body.result : undefined;
-  };
-  try {
-    if ((await call('eth_blockNumber')) === undefined) return false;
-    if (expectedChainId === undefined) return true;
-    const id = await call('eth_chainId');
-    return id !== undefined && BigInt(id) === BigInt(expectedChainId);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Find first healthy RPC for chain.
- *
- * Endpoints are probed for the chain they claim to be, not merely for answering. What this
- * CANNOT give you is per-read consistency: the transport fails over between endpoints per
- * attempt, so two consecutive reads may come from different replicas at different heights. Pin
- * `opt.block` when several reads have to agree (see `multicall`).
- */
-export async function getHealthyRpc(chainId: number): Promise<string | undefined> {
-  const rpcs = getAllRpcs(chainId);
-  for (const rpc of rpcs) {
-    if (await testRpc(rpc, chainId)) return rpc;
-  }
-  // None attested the chain. Returning the first anyway would hand back exactly the unattested
-  // endpoint this function exists to reject, so fail closed and let the caller decide.
-  return undefined;
-}
-
-/**
  * List all supported chain IDs
  */
 export function getSupportedChainIds(): number[] {

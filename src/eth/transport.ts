@@ -63,6 +63,10 @@ export interface TransportOpts {
   timeout?: number; // per-request ms (default 10000)
   retries?: number; // extra attempts after the first (default 3)
   retryDelay?: number; // base backoff ms (default 150)
+  // The chain every endpoint must attest (eth_chainId, once, before its first use). Absent, the
+  // first endpoint that answers sets it: the ring is one chain either way, and a public URL
+  // re-pointed at another network is evicted instead of answering reads as truth.
+  chainId?: number;
   // batch:false disables coalescing; otherwise the prepared batch flushes on whichever fires
   // first: {wait} ms since the first enqueue (default 0 = same tick / microtask), {max}
   // requests per round-trip (default 100), or {maxBytes} approx serialized request bytes
@@ -80,7 +84,7 @@ export function httpTransport(
   urls: string | readonly string[],
   opts: TransportOpts = {},
 ): Eip1193Provider {
-  const endpoints = (Array.isArray(urls) ? urls : [urls]) as string[];
+  const endpoints = Array.isArray(urls) ? [...(urls as string[])] : [urls as string];
   const timeout = opts.timeout ?? 10_000;
   const retries = opts.retries ?? 3;
   const baseDelay = opts.retryDelay ?? 150;
@@ -132,12 +136,40 @@ export function httpTransport(
     }
   }
 
+  // Endpoint attestation. A public RPC URL has no identity; the one checkable fact is that it
+  // ANSWERS AS the expected chain. Attested once per endpoint and cached; a transport failure
+  // during the probe is retried later, a mismatch evicts the endpoint from the ring for good.
+  let chain = opts.chainId;
+  const attested = new Map<string, Promise<boolean>>();
+  const attest = (url: string): Promise<boolean> => {
+    let p = attested.get(url);
+    if (!p) {
+      p = fetchRpc(url, { jsonrpc: '2.0', id: ++id, method: 'eth_chainId', params: [] }).then(
+        (r) => {
+          const got = r.error || typeof r.result !== 'string' ? Number.NaN : Number(r.result);
+          if (!Number.isSafeInteger(got)) throw new RpcNetworkError(`eth_chainId failed on ${url}`);
+          chain ??= got;
+          return got === chain;
+        },
+      );
+      p.catch(() => attested.delete(url));
+      attested.set(url, p);
+    }
+    return p;
+  };
+
   // Failover across endpoints + capped exponential backoff.
   async function post(body: unknown): Promise<RpcResponse> {
     let last: unknown;
     for (let attempt = 0; attempt <= retries; attempt++) {
+      if (!endpoints.length) throw new RpcNetworkError(`no endpoint attests chain ${chain}`);
+      const url = endpoints[attempt % endpoints.length];
       try {
-        return await fetchRpc(endpoints[attempt % endpoints.length], body);
+        if (!(await attest(url))) {
+          endpoints.splice(endpoints.indexOf(url), 1);
+          throw new RpcNetworkError(`${url} is not chain ${chain}`);
+        }
+        return await fetchRpc(url, body);
       } catch (e) {
         last = e;
         if (attempt < retries)
