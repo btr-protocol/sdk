@@ -91,6 +91,12 @@ export interface BuildOpts {
 
 const MAX_UINT256 = (1n << 256n) - 1n;
 
+/** Scale an amount by the server's own `tol_pbps`, floor division. The only tolerance the builder
+ *  applies to a server-floored plan: it never picks one itself. */
+function applyTolPbps(amount: bigint, tolPbps: number): bigint {
+  return (amount * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+}
+
 /**
  * Trust boundary for a server-authored floor. `/v2` returns `tol_pbps` and `min_out` derived from
  * the same `SwapQuote` as `amount_out`; the ONE formula, for both spread and relative modes, is
@@ -101,17 +107,11 @@ export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bi
   if (minOut > amountOut) {
     throw new Error(`server floor ${minOut} exceeds amount_out ${amountOut}`);
   }
-  const expected = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+  const expected = applyTolPbps(amountOut, tolPbps);
   const diff = expected > minOut ? expected - minOut : minOut - expected;
   if (diff > 1n) {
     throw new Error(`server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`);
   }
-}
-
-/** Scale an amount by the server's own `tol_pbps`, floor division. The only tolerance the builder
- *  applies to a server-floored plan: it never picks one itself. */
-function applyTolPbps(amount: bigint, tolPbps: number): bigint {
-  return (amount * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
 }
 
 export interface TokenMeta {
