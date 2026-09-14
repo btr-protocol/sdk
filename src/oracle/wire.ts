@@ -156,22 +156,33 @@ export interface V5Blob {
  * source day, never a wire field.
  */
 export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
+  return decodeBlob(blob, V5_BLOB_VERSION);
+}
+
+/** One walker for both wires: v6 differs only in the lane rule (no reserved bits, sentinels kept)
+ *  and the `nC == nP` conf lockstep. */
+function decodeBlob(blob: Hex | Uint8Array, version: number): V5Blob {
+  const v = `V${version}`;
+  const v6 = version === V6_BLOB_VERSION;
   const b = toBytes(blob);
-  if (b.length < V5_HEADER_BYTES) throw new Error(`V5 blob length ${b.length} shorter than header`);
-  if (b[0] !== V5_BLOB_VERSION) throw new Error(`V5 blob version ${b[0]} != ${V5_BLOB_VERSION}`);
+  if (b.length < V5_HEADER_BYTES)
+    throw new Error(`${v} blob length ${b.length} shorter than header`);
+  if (b[0] !== version) throw new Error(`${v} blob version ${b[0]} != ${version}`);
   const tsDs = Number(readUint(b, 5, 3));
-  if (tsDs >= V5_DAY_DS) throw new Error(`V5 tsDs ${tsDs} outside [0, ${V5_DAY_DS})`);
+  if (tsDs >= V5_DAY_DS) throw new Error(`${v} tsDs ${tsDs} outside [0, ${V5_DAY_DS})`);
   const nP = b[8];
   const nS = b[9];
   const nC = b[10];
-  if (nP === 0 && nS === 0 && nC === 0) throw new Error('V5 blob carries no entries');
+  if (nP === 0 && nS === 0 && nC === 0) throw new Error(`${v} blob carries no entries`);
+  if (v6 && nC !== nP)
+    throw new Error(`${v} blob nC ${nC} != nP ${nP} (conf is mandatory per price entry)`);
   const want =
     V5_HEADER_BYTES +
     nP * V5_PRICE_ENTRY_BYTES +
     nS * V5_SIGMA_ENTRY_BYTES +
     nC * V5_CONF_ENTRY_BYTES;
   if (b.length !== want) {
-    throw new Error(`V5 blob length ${b.length} != sections (${nP}p ${nS}s ${nC}c => ${want})`);
+    throw new Error(`${v} blob length ${b.length} != sections (${nP}p ${nS}s ${nC}c => ${want})`);
   }
   const prices: V5Blob['prices'] = [];
   const sigmas: V5Blob['sigmas'] = [];
@@ -180,28 +191,36 @@ export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
   let last = -1;
   for (let i = 0; i < nP; i++, o += V5_PRICE_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(V5_BLOB_VERSION, gi, last, 'price');
+    checkGi(version, gi, last, 'price');
     last = gi;
     const lane = Number(readUint(b, o + 1, 4));
-    if (lane > V5_LANE_MASK) throw new Error(`V5 lane ${lane} sets a reserved top bit (gi ${gi})`);
-    if (lane !== 0 && (lane & V5_MANT_MSB) === 0) {
-      throw new Error(`V5 lane ${lane} MSB-clear sentinel (gi ${gi}): chain skips, never a price`);
+    if (!v6) {
+      if (lane > V5_LANE_MASK)
+        throw new Error(`V5 lane ${lane} sets a reserved top bit (gi ${gi})`);
+      if (lane !== 0 && (lane & V5_MANT_MSB) === 0) {
+        throw new Error(
+          `V5 lane ${lane} MSB-clear sentinel (gi ${gi}): chain skips, never a price`,
+        );
+      }
     }
     prices.push({ gi, lane });
   }
   last = -1;
   for (let i = 0; i < nS; i++, o += V5_SIGMA_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(V5_BLOB_VERSION, gi, last, 'sigma');
+    checkGi(version, gi, last, 'sigma');
     last = gi;
     sigmas.push({ gi, sigmaPbps: Number(readUint(b, o + 1, 4)) });
   }
   last = -1;
   for (let i = 0; i < nC; i++, o += V5_CONF_ENTRY_BYTES) {
     const gi = b[o];
-    checkGi(V5_BLOB_VERSION, gi, last, 'conf');
+    checkGi(version, gi, last, 'conf');
     last = gi;
     confs.push({ gi, confBps: Number(readUint(b, o + 1, 2)) });
+    if (v6 && gi !== prices[i].gi) {
+      throw new Error(`V6 price/conf gi mismatch: price gi ${prices[i].gi} vs conf gi ${gi}`);
+    }
   }
   return { version: b[0], seq: Number(readUint(b, 1, 4)), tsDs, prices, sigmas, confs };
 }
@@ -313,58 +332,7 @@ export interface V6Blob {
  * source day, never a wire field (unchanged from v5).
  */
 export function decodeBlobV6(blob: Hex | Uint8Array): V6Blob {
-  const b = toBytes(blob);
-  if (b.length < V5_HEADER_BYTES) throw new Error(`V6 blob length ${b.length} shorter than header`);
-  if (b[0] !== V6_BLOB_VERSION) throw new Error(`V6 blob version ${b[0]} != ${V6_BLOB_VERSION}`);
-  const tsDs = Number(readUint(b, 5, 3));
-  if (tsDs >= V5_DAY_DS) throw new Error(`V6 tsDs ${tsDs} outside [0, ${V5_DAY_DS})`);
-  const nP = b[8];
-  const nS = b[9];
-  const nC = b[10];
-  if (nP === 0 && nS === 0 && nC === 0) throw new Error('V6 blob carries no entries');
-  if (nC !== nP)
-    throw new Error(`V6 blob nC ${nC} != nP ${nP} (conf is mandatory per price entry)`);
-  const want =
-    V5_HEADER_BYTES +
-    nP * V5_PRICE_ENTRY_BYTES +
-    nS * V5_SIGMA_ENTRY_BYTES +
-    nC * V5_CONF_ENTRY_BYTES;
-  if (b.length !== want) {
-    throw new Error(`V6 blob length ${b.length} != sections (${nP}p ${nS}s ${nC}c => ${want})`);
-  }
-  const prices: V6Blob['prices'] = [];
-  const sigmas: V6Blob['sigmas'] = [];
-  const confs: V6Blob['confs'] = [];
-  let o = V5_HEADER_BYTES;
-  let last = -1;
-  for (let i = 0; i < nP; i++, o += V5_PRICE_ENTRY_BYTES) {
-    const gi = b[o];
-    checkGi(V6_BLOB_VERSION, gi, last, 'price');
-    last = gi;
-    prices.push({ gi, lane: Number(readUint(b, o + 1, 4)) });
-  }
-  last = -1;
-  for (let i = 0; i < nS; i++, o += V5_SIGMA_ENTRY_BYTES) {
-    const gi = b[o];
-    checkGi(V6_BLOB_VERSION, gi, last, 'sigma');
-    last = gi;
-    sigmas.push({ gi, sigmaPbps: Number(readUint(b, o + 1, 4)) });
-  }
-  last = -1;
-  for (let i = 0; i < nC; i++, o += V5_CONF_ENTRY_BYTES) {
-    const gi = b[o];
-    checkGi(V6_BLOB_VERSION, gi, last, 'conf');
-    last = gi;
-    confs.push({ gi, confBps: Number(readUint(b, o + 1, 2)) });
-  }
-  for (let i = 0; i < nP; i++) {
-    if (prices[i].gi !== confs[i].gi) {
-      throw new Error(
-        `V6 price/conf gi mismatch: price gi ${prices[i].gi} vs conf gi ${confs[i].gi}`,
-      );
-    }
-  }
-  return { version: b[0], seq: Number(readUint(b, 1, 4)), tsDs, prices, sigmas, confs };
+  return decodeBlob(blob, V6_BLOB_VERSION);
 }
 
 /**
