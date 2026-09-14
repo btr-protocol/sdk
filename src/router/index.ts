@@ -285,23 +285,25 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   // largest: Σ leg floors === the server floor exactly, and no part is floored above its own slice.
   // Verified once, against the aggregate, exactly as the router path does.
   const serverFloorByPart = new Map<number, bigint>();
-  const byToken = new Map<string, { idx: number; q: bigint }[]>();
+  const byFloor = new Map<
+    NonNullable<PlanLegOpts['serverFloors']>[string],
+    { idx: number; q: bigint }[]
+  >();
   for (const [i, part] of parts.entries()) {
     const last = part.route.legs.at(-1);
     const out = last && opts.tokenOf(last.tokenOut);
-    if (!out || !opts.serverFloors?.[out.address.toLowerCase()]) continue;
-    const key = out.address.toLowerCase();
-    byToken.set(key, [
-      ...(byToken.get(key) ?? []),
+    const server = out && opts.serverFloors?.[out.address.toLowerCase()];
+    if (!server) continue;
+    byFloor.set(server, [
+      ...(byFloor.get(server) ?? []),
       { idx: i, q: toUnits(part.quote.amountOut, out.decimals) },
     ]);
   }
-  for (const [key, slices] of byToken) {
-    const server = opts.serverFloors?.[key];
-    if (!server) continue;
+  for (const [server, slices] of byFloor) {
     assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
     const total = slices.reduce((s, x) => s + x.q, 0n);
-    if (total <= 0n) continue;
+    // Nothing quoted for a floored token: no slice can carry the floor. Fail closed.
+    if (total <= 0n) return null;
     const shares = slices.map((x) => (server.minOut * x.q) / total);
     // The division residual (≤ slices.length wei) rides on the LARGEST slice: it has the most
     // headroom, where adding it to a chained slice could floor hop 2 a wei above what hop 1 funds.
@@ -324,14 +326,13 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       if (!rl[0].poolAddr || !tin || !tout) return null;
       if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
       const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
-      const server = opts.serverFloors?.[tout.address.toLowerCase()];
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
         amountIn: partInUnits(part.fraction, i, tin.decimals),
         quotedOut,
-        minOut: serverFloorByPart.get(i) ?? (server ? server.minOut : applySlip(quotedOut, slip)),
+        minOut: serverFloorByPart.get(i) ?? applySlip(quotedOut, slip),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
       });
@@ -382,9 +383,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut:
-          serverFloorByPart.get(i) ??
-          (server ? server.minOut : applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip)),
+        minOut: serverFloorByPart.get(i) ?? applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
         unwrapOut: opts.nativeOut,
         chained: true,
       });
