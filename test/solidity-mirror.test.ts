@@ -136,12 +136,15 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
 
   test('pool flag bits and masks match PoolConstantsLib.sol', () => {
     const c = poolConsts();
-    // HALT_MASK is the one that decides whether a leg is tradeable; it is derived on chain
-    // (`HALT_RISK_BIT | HALT_GUARDIAN_BIT`), so it is derived here too rather than copied.
+    // HALT_MASK is the one that decides whether a leg is tradeable and HALT_SETTABLE_MASK what
+    // `setHalt` may clear (the anchor latch is outside it); both are derived on chain from the
+    // bits, so they are derived here too rather than copied.
     for (const k of [
       'HALT_RISK_BIT',
       'HALT_GUARDIAN_BIT',
+      'HALT_ANCHOR_BIT',
       'HALT_MASK',
+      'HALT_SETTABLE_MASK',
       'SWAP_ENABLED_BIT',
       'LIABILITY_SWAP_ENABLED_BIT',
       'FLASH_ENABLED_BIT',
