@@ -940,6 +940,140 @@ describe('planToLegs', () => {
     });
   });
 
+  // N1. The server floor is END-TO-END: `/v2` authors ONE `min_out` per output token and
+  // `planToRouterPlan` floors the SUM of the parts landing it. Encoding that floor on every part
+  // asks each slice to deliver the aggregate, so a split the server accepted reverts
+  // `ThresholdViolation`. These pin the leg path to the router path's aggregate semantics.
+  test('a split meets the server floor in AGGREGATE — no part carries the whole floor', () => {
+    const a = direct(POOL_S, 'USDC', 'USDT');
+    const b = direct(POOL_V, 'USDC', 'USDT');
+    const splitPlan: SwapPlan = {
+      amountIn: 1000,
+      amountOut: 990,
+      isSplit: true,
+      parts: [
+        { route: a, fraction: 0.7, quote: { route: a, amountIn: 700, amountOut: 700, fills: [] } },
+        { route: b, fraction: 0.3, quote: { route: b, amountIn: 300, amountOut: 300, fills: [] } },
+      ],
+    };
+    const floors = {
+      [USDT.toLowerCase()]: {
+        amountOut: 1000n * 10n ** 18n,
+        minOut: 990n * 10n ** 18n,
+        tolPbps: 10_000,
+      },
+    };
+    const legs = mustLegs(
+      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+    );
+    expect(legs.length).toBe(2);
+    // Each slice is floored on its own share, not the aggregate: 700·0.99 and 300·0.99.
+    expect(legs[0].minOut).toBe(693n * 10n ** 18n);
+    expect(legs[1].minOut).toBe(297n * 10n ** 18n);
+    for (const l of legs) expect(l.minOut).toBeLessThan(990n * 10n ** 18n); // would have reverted
+    // Σ === the server floor exactly, so the aggregate still meets the promise.
+    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(990n * 10n ** 18n);
+  });
+
+  test('an aggregate below the server floor is NOT lowered — it reverts instead', () => {
+    const a = direct(POOL_S, 'USDC', 'USDT');
+    const b = direct(POOL_V, 'USDC', 'USDT');
+    // Parts quote 900 in total; the server floor is 990. The floor is authoritative: the builder
+    // must not scale it down to the stale replica, so the encoded batch cannot meet it and reverts.
+    const splitPlan: SwapPlan = {
+      amountIn: 1000,
+      amountOut: 990,
+      isSplit: true,
+      parts: [
+        { route: a, fraction: 0.7, quote: { route: a, amountIn: 700, amountOut: 700, fills: [] } },
+        { route: b, fraction: 0.3, quote: { route: b, amountIn: 300, amountOut: 200, fills: [] } },
+      ],
+    };
+    const floors = {
+      [USDT.toLowerCase()]: {
+        amountOut: 1000n * 10n ** 18n,
+        minOut: 990n * 10n ** 18n,
+        tolPbps: 10_000,
+      },
+    };
+    const legs = mustLegs(
+      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+    );
+    const aggregate = 900n * 10n ** 18n;
+    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(990n * 10n ** 18n);
+    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBeGreaterThan(aggregate);
+    for (const l of legs) expect(l.minOut).toBeGreaterThan(l.quotedOut);
+  });
+
+  test('a chained hop 2 carries its slice of the server floor, funded by hop 1', () => {
+    const a = {
+      legs: [
+        { poolTag: 'v1', poolAddr: POOL_V, tokenIn: 'USDC', tokenOut: 'USDT' },
+        { poolTag: 's1', poolAddr: POOL_S, tokenIn: 'USDT', tokenOut: 'DAI' },
+      ],
+      tokens: ['USDC', 'USDT', 'DAI'],
+      hops: 2,
+    };
+    const b = {
+      legs: [
+        { poolTag: 'v2', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
+        { poolTag: 's2', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'DAI' },
+      ],
+      tokens: ['USDC', 'USDT', 'DAI'],
+      hops: 2,
+    };
+    const splitPlan: SwapPlan = {
+      amountIn: 1000,
+      amountOut: 990,
+      isSplit: true,
+      parts: [
+        {
+          route: a,
+          fraction: 0.7,
+          quote: {
+            route: a,
+            amountIn: 700,
+            amountOut: 700,
+            fills: [{ leg: a.legs[0], amountIn: 700, amountOut: 800 }],
+          },
+        },
+        {
+          route: b,
+          fraction: 0.3,
+          quote: {
+            route: b,
+            amountIn: 300,
+            amountOut: 300,
+            fills: [{ leg: b.legs[0], amountIn: 300, amountOut: 400 }],
+          },
+        },
+      ],
+    };
+    const floors = {
+      [DAI.toLowerCase()]: {
+        amountOut: 1000n * 10n ** 18n,
+        minOut: 990n * 10n ** 18n,
+        tolPbps: 10_000,
+      },
+    };
+    const legs = mustLegs(
+      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+    );
+    expect(legs.length).toBe(4);
+    // Hop 1 is funded from the wallet, floored on its own quote at the server tolerance.
+    expect(legs[0].minOut).toBe(792n * 10n ** 18n); // 800·0.99 USDT
+    expect(legs[2].minOut).toBe(396n * 10n ** 18n); // 400·0.99 USDT
+    // Hop 2 spends hop 1's floor and carries only its part's slice of the end-to-end floor.
+    expect(legs[1].amountIn).toBe(legs[0].minOut);
+    expect(legs[3].amountIn).toBe(legs[2].minOut);
+    expect(legs[1].minOut).toBe(693n * 10n ** 18n); // 700/1000 of 990 DAI
+    expect(legs[3].minOut).toBe(297n * 10n ** 18n); // residual, so Σ === 990
+    for (const l of [legs[1], legs[3]]) expect(l.minOut).toBeLessThan(990n * 10n ** 18n);
+    expect(legs[1].minOut + legs[3].minOut).toBe(990n * 10n ** 18n);
+    expect(legs[1].chained).toBe(true);
+    expect(legs[3].chained).toBe(true);
+  });
+
   test('missing pool address or token meta → null', () => {
     const noAddr = direct(undefined, 'USDC', 'USDT');
     const noMeta = direct(POOL_S, 'USDC', 'WOOF');

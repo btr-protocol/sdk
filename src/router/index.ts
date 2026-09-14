@@ -104,9 +104,7 @@ export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bi
   const expected = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
   const diff = expected > minOut ? expected - minOut : minOut - expected;
   if (diff > 1n) {
-    throw new Error(
-      `server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`,
-    );
+    throw new Error(`server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`);
   }
 }
 
@@ -158,8 +156,9 @@ export interface PlanLegOpts {
    *  check is `min_out = amount_out·(1e6 − tol_pbps)/1e6` on the server's own integer, never on
    *  the f64 plan amount, which truncates 18 decimals and would fail (or pass) the wrong check.
    *  When present the builder encodes THAT floor (verified with {@link assertServerFloor}) and
-   *  never picks a tolerance itself. A two-leg part still scales its intermediate hop; only the
-   *  delivered token's floor is server-authored. */
+   *  never picks a tolerance itself. The floor is END-TO-END: on the leg path it is allocated
+   *  across the parts landing the same token (`planToLegs`), and a two-leg part scales its
+   *  intermediate hop; only the delivered token's floor is server-authored. */
   serverFloors?: Record<string, { amountOut: bigint; minOut: bigint; tolPbps: number }>;
 }
 
@@ -278,6 +277,38 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   // is floored, the residual dust rides on the smallest (last) part, and Σ === amountInUnits to
   // the wei. Without it the old float path stands, for callers that have no exact total.
   const partInUnits = inputCarver(plan, parts.length, opts.amountInUnits);
+  // SERVER FLOORS ARE END-TO-END. `/v2` authors ONE `min_out` per output token for the whole plan,
+  // and `planToRouterPlan` floors the SUM of the parts landing that token. Encoding that floor on
+  // EVERY part — or on a chained hop 2 — asks each slice to deliver the aggregate, so a split the
+  // server already accepted reverts `ThresholdViolation`. Allocate it across the parts that deliver
+  // the token, proportional to their quoted terminal output with the division residual on the
+  // largest: Σ leg floors === the server floor exactly, and no part is floored above its own slice.
+  // Verified once, against the aggregate, exactly as the router path does.
+  const serverFloorByPart = new Map<number, bigint>();
+  const byToken = new Map<string, { idx: number; q: bigint }[]>();
+  for (const [i, part] of parts.entries()) {
+    const last = part.route.legs.at(-1);
+    const out = last && opts.tokenOf(last.tokenOut);
+    if (!out || !opts.serverFloors?.[out.address.toLowerCase()]) continue;
+    const key = out.address.toLowerCase();
+    byToken.set(key, [
+      ...(byToken.get(key) ?? []),
+      { idx: i, q: toUnits(part.quote.amountOut, out.decimals) },
+    ]);
+  }
+  for (const [key, slices] of byToken) {
+    const server = opts.serverFloors?.[key];
+    if (!server) continue;
+    assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
+    const total = slices.reduce((s, x) => s + x.q, 0n);
+    if (total <= 0n) continue;
+    const shares = slices.map((x) => (server.minOut * x.q) / total);
+    // The division residual (≤ slices.length wei) rides on the LARGEST slice: it has the most
+    // headroom, where adding it to a chained slice could floor hop 2 a wei above what hop 1 funds.
+    const best = slices.reduce((b, x, k) => (x.q > slices[b].q ? k : b), 0);
+    shares[best] += server.minOut - shares.reduce((s, x) => s + x, 0n);
+    slices.forEach((x, k) => serverFloorByPart.set(x.idx, shares[k]));
+  }
   for (const [i, part] of parts.entries()) {
     const rl = part.route.legs;
     // This builder encodes ONE or TWO legs; the `else` below reads `rl[0]` and `rl[1]` and nothing
@@ -294,14 +325,13 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
       const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
       const server = opts.serverFloors?.[tout.address.toLowerCase()];
-      if (server) assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
         amountIn: partInUnits(part.fraction, i, tin.decimals),
         quotedOut,
-        minOut: server ? server.minOut : applySlip(quotedOut, slip),
+        minOut: serverFloorByPart.get(i) ?? (server ? server.minOut : applySlip(quotedOut, slip)),
         wrapIn: opts.nativeIn,
         unwrapOut: opts.nativeOut,
       });
@@ -334,7 +364,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       // ZERO margin - a floor it can only meet if hop 1 comes in perfect - so ordinary noise
       // reverts the batch with `ThresholdViolation` after hop 1 has already mined. Scaling the
       // quote by the same ratio hop 1 was floored by is conservative in the safe direction: pool
-      // output is concave in input, so the linear scale sits at or below the true output.
+      // output is concave in input, so the linear scale sits at or below the true output. When a
+      // server floor is present, hop 2's floor is this part's allocated slice of it
+      // (`serverFloorByPart`), never the whole end-to-end floor.
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
@@ -344,16 +376,15 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
       });
-      if (server) assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[1].poolAddr as Address,
         tokenIn: tmid.address,
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut: server
-          ? server.minOut
-          : applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
+        minOut:
+          serverFloorByPart.get(i) ??
+          (server ? server.minOut : applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip)),
         unwrapOut: opts.nativeOut,
         chained: true,
       });
