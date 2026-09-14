@@ -79,6 +79,8 @@ export const Role = {
   TREASURY_OWNER: 3,
   OWNER: 4,
   RISK_STEWARD: 5,
+  GUARDIAN: 6,
+  GUARDIAN_REVOKE: 7,
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
