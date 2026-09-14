@@ -5,6 +5,7 @@ import {
   type ExecLeg,
   type RouterPlan,
   type TokenMeta,
+  assertServerFloor,
   buildRouterApprovalCalls,
   buildRouterCalls,
   buildRouterSwapExecCalls,
@@ -1029,5 +1030,46 @@ describe('planToLegs', () => {
         { slippageFrac: 0, tokenOf, isOfficialPool },
       ),
     ).toBeNull();
+  });
+});
+
+/** The floor check must run on the server's raw `amount_out`, not the f64 plan amount. An 18-dec
+ *  output past f64's 15-digit integer range is truncated when it lands in `quote.amountOut`, so a
+ *  check against the plan asks for a DIFFERENT floor than the server authored. Both builders are
+ *  pinned here; the pre-fix calls (`assertServerFloor(quotedOut, …)` / `(amount, …)`) throw. */
+describe('server floors — checked against the server amount_out, not the plan float', () => {
+  const amountOut = 1_000_000_000_000_000_003n; // 1e18 + 3 wei: not f64-representable
+  const tolPbps = 1;
+  const minOut = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+  // What `Number(formatUnits(amountOut, 18))` becomes: 1, i.e. `toUnits` hands over 1e18.
+  const planFloatUnits = 1_000_000_000_000_000_000n;
+
+  test('the regression is real: the truncated amount fails the server floor assertion', () => {
+    const planExpected = (planFloatUnits * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+    expect(minOut).not.toBe(planExpected);
+    // The delivered floor is consistent with the server integer...
+    expect(() => assertServerFloor(amountOut, tolPbps, minOut)).not.toThrow();
+    // ...and NOT with the f64 plan amount. This is the call the pre-fix builder made.
+    expect(() => assertServerFloor(planFloatUnits, tolPbps, minOut)).toThrow();
+  });
+
+  const opts = {
+    slippageFrac: 0.01,
+    tokenOf,
+    isOfficialPool,
+    serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
+  };
+  const single = plan(1, 1, [part(route([P1], ['USDC', 'USDT']), 1, 1, 1)]);
+
+  test('planToLegs encodes the server floor after checking the raw amount_out', () => {
+    const legs = planToLegs(single, opts);
+    expect(legs).not.toBeNull();
+    expect(legs?.[0].minOut).toBe(minOut);
+  });
+
+  test('planToRouterPlan encodes the server floor after checking the raw amount_out', () => {
+    const rp = planToRouterPlan(single, { ...opts, amountInUnits: 1n });
+    expect(rp).not.toBeNull();
+    expect(rp?.floors[0].minOut).toBe(minOut);
   });
 });
