@@ -157,8 +157,11 @@ export function encode(
 
   // 3a. Dynamic Bytes/String
   if (base === 'bytes' && !sizeStr) {
-    const hex = typeof val === 'string' ? clean(val) : (val as string);
-    const len = Math.ceil(hex.length / 2);
+    const hex = clean(val as string);
+    // Odd length or a non-hex char used to encode anyway: `len` rounded up and the chain read a
+    // different payload than the caller wrote, in well-formed calldata.
+    if (!/^([0-9a-fA-F]{2})*$/.test(hex)) throw new Error(`encode bytes: bad value ${String(val)}`);
+    const len = hex.length / 2;
     return { h: '', t: pad(numToHex(len)) + hex.padEnd(Math.ceil(len / 32) * 64, '0') };
   }
   if (base === 'string') {
