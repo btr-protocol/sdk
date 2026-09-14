@@ -296,24 +296,9 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
 
 // ── wire v6 (ExternalOracleV5): same header/sections, self-describing exp7 lane, nC == nP ─────
 
-/** A v6 price entry: `gi:u8 | lane:u32` where the payload is `exp7:u7 | mant:u25` (all 32 bits). */
-export interface V6PriceEntry {
-  gi: number;
-  /** raw u32 lane; `(mant & bit24) == 0` = STALE/skipped. Decode with {@link decodeLane}. */
-  lane: number;
-}
-
-export interface V6Blob {
-  /** Always 6. */
-  version: number;
-  seq: number;
-  /** DECISECONDS SINCE MIDNIGHT UTC, [0, 864000). Cyclic - no epoch. See {@link reconSecsFromDs}. */
-  tsDs: number;
-  prices: V6PriceEntry[];
-  sigmas: Array<{ gi: number; sigmaPbps: number }>;
-  /** Exactly one per price entry, same `gi` sequence (the chain's `nC == nP` lockstep). */
-  confs: Array<{ gi: number; confBps: number }>;
-}
+/** Same shape as v5 (`version` is 6); the lane is a full-u32 `exp7:u7 | mant:u25` and `confs`
+ *  is one per price entry in the same `gi` order. */
+export type V6Blob = V5Blob;
 
 /**
  * Decode a wire-v6 DIFF blob: header 11B (`ver:u8=6 | seq:u32 | tsDs:u24 | nP:u8 | nS:u8 | nC:u8`),
