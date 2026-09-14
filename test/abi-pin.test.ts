@@ -119,7 +119,8 @@ async function runScript(
 ): Promise<{ code: number; out: string }> {
   const p = Bun.spawn(['bun', join(cwd, 'scripts', 'fetch-abis.ts')], {
     cwd,
-    env: { ...process.env, ...env },
+    // The sandbox exercises the backend chain; a BTR_DEX_EVM override in the caller's shell must not leak in.
+    env: { ...process.env, BTR_DEX_EVM: '', ...env },
     stdout: 'pipe',
     stderr: 'pipe',
   });
