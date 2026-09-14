@@ -116,6 +116,9 @@ export function isHex(value: string): value is Hex {
 
 export const zeroAddress: Address = '0x0000000000000000000000000000000000000000';
 
+/** EIP-7528 native-asset sentinel (on-chain `Constants.NATIVE`). Pool wraps to wnative on pull. */
+export const NATIVE_TOKEN: Address = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+
 export function isZeroAddress(address: string): boolean {
   return normalizeAddress(address) === zeroAddress;
 }
