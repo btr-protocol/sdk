@@ -170,7 +170,8 @@ export function httpTransport(
           // (indexOf -1 would splice the LAST, healthy, endpoint).
           const k = endpoints.indexOf(url);
           if (k >= 0) endpoints.splice(k, 1);
-          throw new RpcNetworkError(`${url} is not chain ${chain}`);
+          attempt--; // a verdict, not a flake: no backoff, no attempt spent
+          continue;
         }
         return await fetchRpc(url, body);
       } catch (e) {
