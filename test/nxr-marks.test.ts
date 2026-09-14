@@ -24,7 +24,7 @@ describe('NXR mark sources', () => {
     const syms = roster(chain);
     if (!syms.length) return; // sdk-only checkout: contract repo is closed source
     const missing = syms.filter((s) => !nxrMark(s));
-    expect(missing, `add these to NXR_MARKS`).toEqual([]);
+    expect(missing, 'add these to NXR_MARKS').toEqual([]);
   });
 
   // The live Arc roster grew from the original four-core ceremony set. Keep a structural pin:

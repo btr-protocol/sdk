@@ -37,7 +37,9 @@ function gauss(rng: () => number): () => number {
       spare = null;
       return v;
     }
-    let u: number, v: number, s: number;
+    let u: number;
+    let v: number;
+    let s: number;
     do {
       u = 2 * rng() - 1;
       v = 2 * rng() - 1;
@@ -65,8 +67,8 @@ function gbmPaths(
   const b = new Array<number>(nTicks);
   const dt = dtSec / (365 * 24 * 3600); // ann time
   const sqdt = Math.sqrt(dt);
-  let sa = s0a,
-    sb = s0b;
+  let sa = s0a;
+  let sb = s0b;
   const c = rhoTrue;
   const c2 = Math.sqrt(Math.max(0, 1 - c * c));
   for (let i = 0; i < nTicks; i++) {
@@ -94,8 +96,8 @@ function toOhlc(
   for (let i = 0; i < prices.length; i += ticksPerBucket) {
     const slice = prices.slice(i, i + ticksPerBucket);
     if (!slice.length) break;
-    let h = slice[0],
-      l = slice[0];
+    let h = slice[0];
+    let l = slice[0];
     for (const p of slice) {
       if (p > h) h = p;
       if (p < l) l = p;
@@ -122,8 +124,8 @@ function meanLogRangeBias(
 ): number {
   // Align by ts; compute (R_est - R_true) / R_true mean.
   const tMap = new Map(truth.map((r) => [r.ts, r]));
-  let sum = 0,
-    n = 0;
+  let sum = 0;
+  let n = 0;
   for (const e of estimated) {
     const t = tMap.get(e.ts);
     if (!t) continue;
@@ -133,7 +135,7 @@ function meanLogRangeBias(
     sum += (re - rt) / rt;
     n++;
   }
-  return n > 0 ? sum / n : NaN;
+  return n > 0 ? sum / n : Number.NaN;
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────

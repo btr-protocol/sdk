@@ -51,10 +51,8 @@ const bytesToHex = (b: Uint8Array): Hex =>
 
 // Byte-exact golden, pinned as literals so a regenerated fixture cannot drift silently:
 // hex and keccak must BOTH match, or the TS codec no longer reads chain-accepted bytes.
-const GOLDEN_HEX =
-  '0x050000000104656402010100170f0cf001159bff2f00000186a0010009' as Hex;
-const GOLDEN_KECCAK =
-  '0x6615180489aad02e35006978fa1ff39fbdd81129e84fa95037374454c5399b35' as Hex;
+const GOLDEN_HEX = '0x050000000104656402010100170f0cf001159bff2f00000186a0010009' as Hex;
+const GOLDEN_KECCAK = '0x6615180489aad02e35006978fa1ff39fbdd81129e84fa95037374454c5399b35' as Hex;
 
 describe('wire v5 fixture shape', () => {
   it('agrees with the constants the codec is built on', () => {
@@ -231,7 +229,13 @@ describe('wire v5 blob', () => {
     expect(() => decodeBlobV5(sent(0x00000001))).toThrow(/sentinel/);
     expect(() => decodeBlobV5(sent(0))).not.toThrow();
     expect(() =>
-      encodeBlobV5({ seq: 1, tsDs: 0, prices: [{ gi: 0, lane: 0x00ffffff }], sigmas: [], confs: [] }),
+      encodeBlobV5({
+        seq: 1,
+        tsDs: 0,
+        prices: [{ gi: 0, lane: 0x00ffffff }],
+        sigmas: [],
+        confs: [],
+      }),
     ).toThrow(/sentinel/);
   });
 

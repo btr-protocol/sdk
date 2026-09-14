@@ -197,7 +197,7 @@ describe('planToLegs validates slippage and derives minOut in bigint space', () 
       planToLegs(directPlan(100, 100), { slippageFrac: -0.01, tokenOf, isOfficialPool }),
     ).toThrow();
     expect(() =>
-      planToLegs(directPlan(100, 100), { slippageFrac: NaN, tokenOf, isOfficialPool }),
+      planToLegs(directPlan(100, 100), { slippageFrac: Number.NaN, tokenOf, isOfficialPool }),
     ).toThrow();
   });
 
