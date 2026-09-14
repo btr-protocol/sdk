@@ -15,31 +15,6 @@ export function getApiRoot() {
   return _api;
 }
 
-/** Generic fetch helper: 10s timeout, typed */
-export async function btrFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 10_000);
-  const caller = init?.signal;
-  if (caller?.aborted) {
-    clearTimeout(t);
-    throw caller.reason instanceof Error ? caller.reason : new Error('aborted');
-  }
-  const onCallerAbort = (): void => ctrl.abort();
-  caller?.addEventListener('abort', onCallerAbort, { once: true });
-  const signal =
-    caller && typeof AbortSignal.any === 'function'
-      ? AbortSignal.any([ctrl.signal, caller])
-      : ctrl.signal;
-  try {
-    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal });
-    if (!res.ok) throw new Error(`BTR API ${res.status} ${path}`);
-    return (await res.json()) as T;
-  } finally {
-    caller?.removeEventListener('abort', onCallerAbort);
-    clearTimeout(t);
-  }
-}
-
 /** A response that keeps the status and `Retry-After` instead of collapsing to an `Error`. */
 export interface RawResponse {
   ok: boolean;
@@ -63,14 +38,10 @@ export async function btrFetchRaw(
     clearTimeout(t);
     throw caller.reason instanceof Error ? caller.reason : new Error('aborted');
   }
-  const onCallerAbort = (): void => ctrl.abort();
+  const onCallerAbort = (): void => ctrl.abort(caller?.reason);
   caller?.addEventListener('abort', onCallerAbort, { once: true });
-  const signal =
-    caller && typeof AbortSignal.any === 'function'
-      ? AbortSignal.any([ctrl.signal, caller])
-      : ctrl.signal;
   try {
-    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal });
+    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal: ctrl.signal });
     const body = await res.text();
     const ra = res.headers.get('retry-after');
     const n = ra === null ? Number.NaN : Number(ra);
@@ -84,4 +55,11 @@ export async function btrFetchRaw(
     caller?.removeEventListener('abort', onCallerAbort);
     clearTimeout(t);
   }
+}
+
+/** Generic fetch helper: 10s timeout, throws on non-2xx, typed JSON. */
+export async function btrFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await btrFetchRaw(path, { timeoutMs: 10_000, ...init });
+  if (!res.ok) throw new Error(`BTR API ${res.status} ${path}`);
+  return JSON.parse(res.body) as T;
 }
