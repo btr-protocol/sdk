@@ -35,6 +35,7 @@ export {
   isHex,
   zeroAddress,
   isZeroAddress,
+  NATIVE_TOKEN,
 } from './types';
 
 /**

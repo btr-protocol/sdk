@@ -12,7 +12,7 @@ import type {
 } from '../abis/structs.generated.js';
 import { decodeFn, encodeFn } from '../eth/abi';
 import { multicallStrict } from '../eth/multicall';
-import type { Address, Eip1193Provider, Hex } from '../eth/types';
+import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { toAsset } from './asset.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -267,8 +267,7 @@ export async function getPoolData(
 // Transaction Functions
 // ─────────────────────────────────────────────────────────────
 
-/** EIP-7528 native-asset sentinel (on-chain `Constants.NATIVE`). Pool wraps to wnative on pull. */
-export const NATIVE_TOKEN: Address = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+export { NATIVE_TOKEN };
 const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
