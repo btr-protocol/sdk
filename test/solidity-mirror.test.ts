@@ -165,7 +165,7 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
     // `_keyOf` returns the subject-free key for these three and only these three; any other op
     // cancelled with `subject = 0` computes a key nothing was queued under.
     const admin = src(join(DEX, 'src', 'Admin.sol'));
-    const body = /_keyOf\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/.exec(admin)?.[1] ?? '';
+    const body = /_keyOf\([^)]*\)[^{]*\{([\s\S]*?)\n {2}\}/.exec(admin)?.[1] ?? '';
     const named = [...body.matchAll(/OpType\.(\w+)/g)].map((m) => m[1]);
     expect(new Set(named)).toEqual(
       new Set(
