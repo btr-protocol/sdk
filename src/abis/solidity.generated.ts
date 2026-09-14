@@ -87,7 +87,9 @@ export type Role = (typeof Role)[keyof typeof Role];
 // On-chain library constants.
 export const HALT_RISK_BIT = 1;
 export const HALT_GUARDIAN_BIT = 64;
-export const HALT_MASK = 65;
+export const HALT_ANCHOR_BIT = 128;
+export const HALT_MASK = 193;
+export const HALT_SETTABLE_MASK = 65;
 export const SWAP_ENABLED_BIT = 2;
 export const LIABILITY_SWAP_ENABLED_BIT = 4;
 export const FLASH_ENABLED_BIT = 16;
