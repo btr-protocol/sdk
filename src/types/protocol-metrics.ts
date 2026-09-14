@@ -111,7 +111,6 @@ export const PROTOCOL_LIQUIDITY_METRICS = [
 export interface AprLegs {
   feeApr: number | null;
   strategyApr: number | null;
-  unrealizedStrategyApr?: number | null;
   stale: boolean;
 }
 
