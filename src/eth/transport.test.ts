@@ -224,6 +224,15 @@ describe('httpTransport attests every endpoint before its first use', () => {
     expect(reads).toEqual(['http://good', 'http://good']);
   });
 
+  test('a wrong-chain verdict costs neither an attempt nor a backoff', async () => {
+    // The eviction used to throw into the retry loop: one of `retries` burnt and the backoff
+    // slept on a deterministic answer. retries: 0 means the read lives only if the verdict is free.
+    const { reads } = byUrl({ 'http://wrong': '0x64', 'http://right': '0x1' });
+    const p = httpTransport(['http://wrong', 'http://right'], { chainId: 1, retries: 0 });
+    expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
+    expect(reads).toEqual(['http://right']);
+  });
+
   test('no chainId given: the first attested endpoint pins the ring', async () => {
     const { reads } = byUrl({ 'http://a': '0x1', 'http://b': '0x64' });
     const p = httpTransport(['http://a', 'http://b'], { retryDelay: 1 });
