@@ -4,9 +4,10 @@
  * V5 (`ExternalOracleV4.pushV4` / `pushSignedV4`): 8 x 29-bit lanes, wire v5 DIFF blobs, 11-byte
  * header, 5-byte price entries, `tsDs` = deciseconds since midnight UTC (cyclic, no epoch).
  *
- * V6 (`ExternalOracleV5.push`): same 11-byte header and 5/5/3-byte sections, but the price lane is
- * a self-describing u32 (`exp7:u7 | mant:u25`, `mark = mant << (exp7 - 16)`, no per-feed bias) and
- * `nC == nP` is mandatory: price and conf are walked in lockstep on the same `gi` sequence.
+ * V6 (`ExternalOracleV5.push`): 12-byte header (`srcSecs` = ABSOLUTE source second u32, A-262),
+ * same 5/5/3-byte sections, but the price lane is a self-describing u32 (`exp7:u7 | mant:u25`,
+ * `mark = mant << (exp7 - 16)`, no per-feed bias) and `nC == nP` is mandatory: price and conf are
+ * walked in lockstep on the same `gi` sequence.
  *
  * Byte-contract is LOCKED against the shared fixtures
  * dex-evm/test/fixtures/oracle-v5-wire-golden.json (keccak = 0x66151804…9b35) and
@@ -44,12 +45,13 @@ export const V5_MANT_MSB = 1 << 24;
 /** Deciseconds in a day: the modulus of the v5 `tsDs` field (u20 value, zero-padded to u24). */
 export const V5_DAY_DS = 864_000;
 
-/** The only live v6 header/section geometry is identical to v5; only the lane and `nC` differ. */
 export const V6_BLOB_VERSION = 6;
+export const V6_HEADER_BYTES = 12; // ver u8 | seq u32 | srcSecs u32 | nP u8 | nS u8 | nC u8
 /** `mark = mant << (exp7 - 16)`: the self-describing exponent is absolute, no per-feed bias. */
 export const V6_EXP_OFFSET = 16;
-/** 7 significant exponent bits in the u32 lane; the top bits are no longer reserved. */
-export const V6_EXP_MASK = 0x7f;
+/** `ExternalOracleV5._checkHeader` bounds on `srcSecs` against `block.timestamp`. */
+export const V6_SOURCE_TS_FUTURE_SKEW_SECS = 5;
+export const V6_MAX_SOURCE_AGE_SECS = 6 * 3600;
 
 /** V5 lane geometry `exp:u4 | mant:u25` (caller-supplied bias) and v6 `exp7:u7 | mant:u25`. */
 const LANE_SPEC: Record<PushWire, { mantBits: number; expBits: number }> = {
@@ -154,38 +156,41 @@ export interface V5Blob {
  * source day, never a wire field.
  */
 export function decodeBlobV5(blob: Hex | Uint8Array): V5Blob {
-  return decodeBlob(blob, V5_BLOB_VERSION);
+  const { ts, ...d } = decodeBlob(blob, V5_BLOB_VERSION);
+  return { ...d, tsDs: ts };
 }
 
-/** One walker for both wires: v6 differs only in the lane rule (no reserved bits, sentinels kept)
- *  and the `nC == nP` conf lockstep. */
-function decodeBlob(blob: Hex | Uint8Array, version: number): V5Blob {
+/** One walker for both wires: v6 differs in the header clock (`srcSecs` u32 absolute vs `tsDs`
+ *  u24 cyclic, so a 12B header), the lane rule (no reserved bits, sentinels kept) and the
+ *  `nC == nP` conf lockstep. `ts` is the raw header clock in the wire's own unit. */
+function decodeBlob(
+  blob: Hex | Uint8Array,
+  version: number,
+): Omit<V5Blob, 'tsDs'> & { ts: number } {
   const v = `V${version}`;
   const v6 = version === V6_BLOB_VERSION;
+  const hdr = v6 ? V6_HEADER_BYTES : V5_HEADER_BYTES;
   const b = toBytes(blob);
-  if (b.length < V5_HEADER_BYTES)
-    throw new Error(`${v} blob length ${b.length} shorter than header`);
+  if (b.length < hdr) throw new Error(`${v} blob length ${b.length} shorter than header`);
   if (b[0] !== version) throw new Error(`${v} blob version ${b[0]} != ${version}`);
-  const tsDs = Number(readUint(b, 5, 3));
-  if (tsDs >= V5_DAY_DS) throw new Error(`${v} tsDs ${tsDs} outside [0, ${V5_DAY_DS})`);
-  const nP = b[8];
-  const nS = b[9];
-  const nC = b[10];
-  if (nP === 0 && nS === 0 && nC === 0) throw new Error(`${v} blob carries no entries`);
+  const ts = Number(readUint(b, 5, hdr - 8));
+  if (!v6 && ts >= V5_DAY_DS) throw new Error(`${v} tsDs ${ts} outside [0, ${V5_DAY_DS})`);
+  const nP = b[hdr - 3];
+  const nS = b[hdr - 2];
+  const nC = b[hdr - 1];
+  if (v6 ? nP === 0 : nP === 0 && nS === 0 && nC === 0)
+    throw new Error(`${v} blob carries no entries`);
   if (v6 && nC !== nP)
     throw new Error(`${v} blob nC ${nC} != nP ${nP} (conf is mandatory per price entry)`);
   const want =
-    V5_HEADER_BYTES +
-    nP * V5_PRICE_ENTRY_BYTES +
-    nS * V5_SIGMA_ENTRY_BYTES +
-    nC * V5_CONF_ENTRY_BYTES;
+    hdr + nP * V5_PRICE_ENTRY_BYTES + nS * V5_SIGMA_ENTRY_BYTES + nC * V5_CONF_ENTRY_BYTES;
   if (b.length !== want) {
     throw new Error(`${v} blob length ${b.length} != sections (${nP}p ${nS}s ${nC}c => ${want})`);
   }
   const prices: V5Blob['prices'] = [];
   const sigmas: V5Blob['sigmas'] = [];
   const confs: V5Blob['confs'] = [];
-  let o = V5_HEADER_BYTES;
+  let o = hdr;
   let last = -1;
   for (let i = 0; i < nP; i++, o += V5_PRICE_ENTRY_BYTES) {
     const gi = b[o];
@@ -220,7 +225,7 @@ function decodeBlob(blob: Hex | Uint8Array, version: number): V5Blob {
       throw new Error(`V6 price/conf gi mismatch: price gi ${prices[i].gi} vs conf gi ${gi}`);
     }
   }
-  return { version: b[0], seq: Number(readUint(b, 1, 4)), tsDs, prices, sigmas, confs };
+  return { version: b[0], seq: Number(readUint(b, 1, 4)), ts, prices, sigmas, confs };
 }
 
 /**
@@ -294,32 +299,40 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   return out;
 }
 
-// ── wire v6 (ExternalOracleV5): same header/sections, self-describing exp7 lane, nC == nP ─────
+// ── wire v6 (ExternalOracleV5): 12B header (absolute srcSecs), self-describing exp7 lane, nC == nP
 
-/** Same shape as v5 (`version` is 6); the lane is a full-u32 `exp7:u7 | mant:u25` and `confs`
- *  is one per price entry in the same `gi` order. */
-export type V6Blob = V5Blob;
+/** v5 sections with an ABSOLUTE clock (`version` is 6); the lane is a full-u32 `exp7:u7 | mant:u25`
+ *  and `confs` is one per price entry in the same `gi` order. */
+export type V6Blob = Omit<V5Blob, 'tsDs'> & {
+  /** Absolute source second (unix), the header's u32. No reconstruction, no day ambiguity. */
+  srcSecs: number;
+};
 
 /**
- * Decode a wire-v6 DIFF blob: header 11B (`ver:u8=6 | seq:u32 | tsDs:u24 | nP:u8 | nS:u8 | nC:u8`),
+ * Decode a wire-v6 DIFF blob: header 12B (`ver:u8=6 | seq:u32 | srcSecs:u32 | nP:u8 | nS:u8 | nC:u8`),
  * then nP x 5B price entries (gi u8 | lane u32), nS x 5B sigma entries, nC x 3B conf entries.
  *
- * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `tsDs >= 864000`,
- * all-empty blob, length disagreeing with section counts, non-ascending `gi`), plus a `nC != nP`
- * or a price/conf `gi` sequence that is not identical. The lane's absolute `exp7` uses all 32 bits,
- * so there is NO reserved-top-bit rule; a nonzero lane with the mantissa MSB clear is the
- * sentinel-write `_applyLane` SKIPS (returns false) rather than reverts, so the decoder keeps it
- * and `decodeLane` reads it as the stale 0n.
- *
- * `dayMod` is NOT read here: it is a storage-only tag the contract derives from the reconstructed
- * source day, never a wire field (unchanged from v5).
+ * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `nP == 0`, `nC != nP`,
+ * length disagreeing with section counts, non-ascending `gi`), plus a price/conf `gi` sequence
+ * that is not identical. With `nowSecs` (the pushing block's timestamp) it also applies the
+ * chain's `FutureTimestamp` / `StaleTimestamp` bounds on `srcSecs`. The lane's absolute `exp7`
+ * uses all 32 bits, so there is NO reserved-top-bit rule; a nonzero lane with the mantissa MSB
+ * clear is the sentinel-write `_applyLane` SKIPS (returns false) rather than reverts, so the
+ * decoder keeps it and `decodeLane` reads it as the stale 0n.
  */
-export function decodeBlobV6(blob: Hex | Uint8Array): V6Blob {
-  return decodeBlob(blob, V6_BLOB_VERSION);
+export function decodeBlobV6(blob: Hex | Uint8Array, nowSecs?: number): V6Blob {
+  const { ts, ...d } = decodeBlob(blob, V6_BLOB_VERSION);
+  if (nowSecs !== undefined) {
+    if (ts > nowSecs + V6_SOURCE_TS_FUTURE_SKEW_SECS)
+      throw new Error(`V6 srcSecs ${ts} in the future of ${nowSecs}`);
+    if (ts + V6_MAX_SOURCE_AGE_SECS < nowSecs)
+      throw new Error(`V6 srcSecs ${ts} stale at ${nowSecs}`);
+  }
+  return { ...d, srcSecs: ts };
 }
 
 /**
- * Absolute seconds for a v5/v6 `tsDs`, the client mirror of `ExternalOracleV4/V5._recon`: pick the
+ * Absolute seconds for a v5 `tsDs`, the client mirror of `ExternalOracleV4._recon`: pick the
  * nearest candidate day around `nowSecs`. Unambiguous for any true age under +/-12h; a caller
  * MUST still bound the result (the contract rejects anything outside
  * [now - MAX_RECON_AGE, now + SOURCE_TS_FUTURE_SKEW]) before trusting it.

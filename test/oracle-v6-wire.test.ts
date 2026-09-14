@@ -16,6 +16,9 @@ import type { Hex } from '../src/eth/types';
 import {
   V6_BLOB_VERSION,
   V6_EXP_OFFSET,
+  V6_HEADER_BYTES,
+  V6_MAX_SOURCE_AGE_SECS,
+  V6_SOURCE_TS_FUTURE_SKEW_SECS,
   decodeBlobV6,
   decodeLane,
   encodeLane,
@@ -34,13 +37,14 @@ const bytesToHex = (b: Uint8Array): Hex =>
   `0x${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
 
 // Byte-exact golden: the hex is pinned as a literal so a regenerated fixture cannot drift silently.
-const GOLDEN_HEX = '0x0600000001046564020102007f0f0cf0017d9bff2f00000186a0000007010009' as Hex;
+const GOLDEN_HEX = '0x06000000016b49d20a020102007f0f0cf0017d9bff2f00000186a0000007010009' as Hex;
 
 describe('wire v6 fixture shape', () => {
   it('agrees with the constants the codec is built on', () => {
     expect(GOLDEN.wire).toBe(V6_BLOB_VERSION);
     expect(GOLDEN.header.version).toBe(V6_BLOB_VERSION);
     expect(GOLDEN.header.nPrice).toBe(GOLDEN.header.nConf); // nC == nP lockstep
+    expect(V6_HEADER_BYTES).toBe(12);
     expect(V6_EXP_OFFSET).toBe(16);
     expect(GOLDEN.batchTypehash).toBe('BatchQuoteV4(bytes32 blobHash)');
   });
@@ -77,7 +81,8 @@ describe('wire v6 blob', () => {
     const d = decodeBlobV6(BLOB_BYTES);
     expect(d.version).toBe(6);
     expect(d.seq).toBe(GOLDEN.header.seq);
-    expect(d.tsDs).toBe(GOLDEN.header.sourceTsDs);
+    expect(d.srcSecs).toBe(GOLDEN.header.srcSecs);
+    expect(BigInt(GOLDEN.expects[0].obsSecs)).toBe(BigInt(d.srcSecs));
     expect(d.prices).toEqual([
       { gi: 0, lane: 0x7f0f0cf0 },
       { gi: 1, lane: 0x7d9bff2f },
@@ -92,54 +97,55 @@ describe('wire v6 blob', () => {
 
   it('accepts an exp7 lane that sets the whole u32 (no reserved top bits)', () => {
     const top = Uint8Array.from(BLOB_BYTES);
-    top.set([0xff, 0x0f, 0x0c, 0xf0], 12); // price gi0 lane: exp7 = 127
+    top.set([0xff, 0x0f, 0x0c, 0xf0], 13); // price gi0 lane: exp7 = 127
     expect(() => decodeBlobV6(top)).not.toThrow();
   });
 
   it('keeps a nonzero MSB-clear lane: the sentinel-write the chain SKIPS, never reverts', () => {
     const skipped = Uint8Array.from(BLOB_BYTES);
-    skipped.set([0x00, 0x00, 0x00, 0x01], 12); // nonzero, mantissa MSB clear
+    skipped.set([0x00, 0x00, 0x00, 0x01], 13); // nonzero, mantissa MSB clear
     const d = decodeBlobV6(skipped);
     expect(d.prices[0].lane).toBe(1);
     expect(decodeLane(d.prices[0].lane, 0, 'v6')).toBe(0n);
   });
 
-  it('fails closed on version, tsDs, empty, length, gi order, nC and price/conf lockstep', () => {
+  it('applies the chain Future/Stale bounds on srcSecs only when given the block time', () => {
+    const src = GOLDEN.header.srcSecs;
+    expect(() => decodeBlobV6(BLOB_BYTES)).not.toThrow();
+    expect(() => decodeBlobV6(BLOB_BYTES, src - V6_SOURCE_TS_FUTURE_SKEW_SECS)).not.toThrow();
+    expect(() => decodeBlobV6(BLOB_BYTES, src - V6_SOURCE_TS_FUTURE_SKEW_SECS - 1)).toThrow(
+      /future/,
+    );
+    expect(() => decodeBlobV6(BLOB_BYTES, src + V6_MAX_SOURCE_AGE_SECS)).not.toThrow();
+    expect(() => decodeBlobV6(BLOB_BYTES, src + V6_MAX_SOURCE_AGE_SECS + 1)).toThrow(/stale/);
+  });
+
+  it('fails closed on version, nP == 0, length, gi order, nC and price/conf lockstep', () => {
     const bad = (mut: (b: Uint8Array) => void): Uint8Array => {
       const c = Uint8Array.from(BLOB_BYTES);
       mut(c);
       return c;
     };
     expect(() => decodeBlobV6(bad((b) => (b[0] = 5)))).toThrow(/version/);
-    // tsDs = 864000 = 0x0D2F00, one past the day
+    // _checkHeader: nP == 0 reverts even with sigma entries present
     expect(() =>
       decodeBlobV6(
         bad((b) => {
-          b[5] = 0x0d;
-          b[6] = 0x2f;
-          b[7] = 0x00;
-        }),
-      ),
-    ).toThrow(/tsDs/);
-    expect(() =>
-      decodeBlobV6(
-        bad((b) => {
-          b[8] = 0;
           b[9] = 0;
-          b[10] = 0;
+          b[11] = 0;
         }),
       ),
     ).toThrow(/no entries/);
     // nC (2) -> 1 while nP stays 2
-    expect(() => decodeBlobV6(bad((b) => (b[10] = 1)))).toThrow(/nC/);
+    expect(() => decodeBlobV6(bad((b) => (b[11] = 1)))).toThrow(/nC/);
     // nS -> 2 with the body unchanged: section length disagrees
-    expect(() => decodeBlobV6(bad((b) => (b[9] = 2)))).toThrow(/sections/);
-    expect(() => decodeBlobV6(BLOB_BYTES.slice(0, 10))).toThrow(/shorter than header/);
+    expect(() => decodeBlobV6(bad((b) => (b[10] = 2)))).toThrow(/sections/);
+    expect(() => decodeBlobV6(BLOB_BYTES.slice(0, 11))).toThrow(/shorter than header/);
     // second price gi 1 -> 0, no longer ascending
-    expect(() => decodeBlobV6(bad((b) => (b[16] = 0)))).toThrow(/ascending/);
+    expect(() => decodeBlobV6(bad((b) => (b[17] = 0)))).toThrow(/ascending/);
     // nC == nP == 2 but the conf gi sequence is (0, 2) against price (0, 1)
     const mismatch = hexToBytes(
-      '0x0600000001046564020102007f0f0cf0017d9bff2f00000186a0000007020009',
+      '0x06000000016b49d20a020102007f0f0cf0017d9bff2f00000186a0000007020009',
     );
     expect(() => decodeBlobV6(mismatch)).toThrow(/price\/conf gi mismatch/);
   });
