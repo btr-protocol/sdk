@@ -46,8 +46,6 @@ export const V5_DAY_DS = 864_000;
 
 /** The only live v6 header/section geometry is identical to v5; only the lane and `nC` differ. */
 export const V6_BLOB_VERSION = 6;
-/** ExternalOracleV5.LANES_PER_SLOT - 4, down from V5's 8 (absolute exp7 widens the clock word). */
-export const V6_LANES_PER_SLOT = 4;
 /** `mark = mant << (exp7 - 16)`: the self-describing exponent is absolute, no per-feed bias. */
 export const V6_EXP_OFFSET = 16;
 /** 7 significant exponent bits in the u32 lane; the top bits are no longer reserved. */
