@@ -46,47 +46,20 @@ export interface ExecLeg {
   tokenOut: Address;
   amountIn: bigint;
   minOut: bigint; // per-leg slippage floor
-  /** The output this leg was QUOTED at, in base units - the number the user was shown. `minOut` is
-   *  always `applySlip(quotedOut, slippageFrac)` and nothing else, so the tolerance that actually
-   *  reaches calldata is auditable from the leg alone (see `refloorLeg`). */
+  /** The output this leg was QUOTED at, in base units - the number the user was shown. Kept for
+   *  display and for the legacy intermediate-hop scaling; the DELIVERED token's floor is the
+   *  server-authored one (`PlanLegOpts.serverFloors`), never a local recompute. */
   quotedOut: bigint;
   /** tokenIn is the chain's wrapped native and the user pays the gas token: prepend a wrap. */
   wrapIn?: boolean;
   /** tokenOut is the chain's wrapped native and the user wants the gas token: append an unwrap. */
   unwrapOut?: boolean;
   /** This leg is funded by the PRECEDING leg's output (a cross part's second hop): its `amountIn`
-   *  is the previous leg's `minOut`, so re-flooring the previous leg must re-chain this one. */
+   *  is the previous leg's `minOut`, so a changed floor for the previous leg must re-chain this
+   *  one. */
   chained?: boolean;
 }
 
-/** Re-floor one leg against the pool's OWN quote, read fresh at send time.
- *
- *  WHY THIS EXISTS. `minOut` used to be `applySlip(quotedOut, slip)` and nothing more, where
- *  `quotedOut` came from the off-chain model (`@sdk/amm` or the Rust pricer) at DISPLAY time. Two
- *  gaps then ate the whole tolerance before the transaction was ever sent:
- *   1. model-vs-chain. The replica is not bit-exact with `Pricing._quotePath`; measured live on Arc
- *      the front quoted 1000.12 USDC.b for 1000 USDT.b while `Pool.getSwapQuote` returned
- *      1000.016425205618633264 - 1.04 bps rich, against a spread-scaled tolerance of 0.9 bps.
- *      Deterministic `ThresholdViolation`, no market move required.
- *   2. time. `Pricing._staleTerm` is `sigma*sqrt(age - grace)` re-evaluated at `block.timestamp`,
- *      so the deliverable output DECAYS with wall-clock even with a frozen mark, and an approval
- *      mined between quote and swap sits squarely inside that window.
- *
- *  So the floor is taken against `min(quotedOut, freshOut)`: never above the floor the user was
- *  promised (`applySlip(quotedOut)`), and never above what the pool can pay right now - which is
- *  what leaves the tolerance real room for the drift that happens AFTER the send. `freshOut` must
- *  come from `Pool.getSwapQuote`, the view twin of the `getAnchorPathQuote` call `Pricing.swap`
- *  makes: same routing path, same maths, evaluated one block early.
- *
- *  The caller is responsible for refusing to send when `freshOut < applySlip(quotedOut, slip)`:
- *  that is the quote going stale beyond what the user agreed to, and it must surface as a warning,
- *  never as a silently lowered floor. */
-export function refloorLeg(leg: ExecLeg, freshOut: bigint, slippageFrac: number): ExecLeg {
-  const base = freshOut > 0n && freshOut < leg.quotedOut ? freshOut : leg.quotedOut;
-  return { ...leg, minOut: applySlip(base, slippageFrac) };
-}
-
-/** An encoded call ready for eth_sendTransaction / wallet_sendCalls. */
 export interface ExecCall {
   to: Address;
   data: Hex;
@@ -135,6 +108,12 @@ export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bi
       `server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`,
     );
   }
+}
+
+/** Scale an amount by the server's own `tol_pbps`, floor division. The only tolerance the builder
+ *  applies to a server-floored plan: it never picks one itself. */
+function applyTolPbps(amount: bigint, tolPbps: number): bigint {
+  return (amount * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
 }
 
 export interface TokenMeta {
@@ -342,7 +321,12 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       // with `amountIn: 0n` and a floor that scales to 0 (`ThresholdViolation`/`ZeroValue`), the
       // whole point of planning being to never emit a leg with no floor. Fail closed.
       if (leg1Quoted <= 0n) return null;
-      const leg1MinOut = applySlip(leg1Quoted, slip);
+      const server = opts.serverFloors?.[t2out.address.toLowerCase()];
+      // The server's own tolerance scales the intermediate hop when it is present; the legacy
+      // caller-supplied fraction only stands in for a plan with no server floor.
+      const leg1MinOut = server
+        ? applyTolPbps(leg1Quoted, server.tolPbps)
+        : applySlip(leg1Quoted, slip);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
       // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE. `part.quote.amountOut` is what the
       // path delivers when hop 1 delivers its full quoted output; hop 2 is actually handed
@@ -360,7 +344,6 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
       });
-      const server = opts.serverFloors?.[t2out.address.toLowerCase()];
       if (server) assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[1].poolAddr as Address,
@@ -732,10 +715,8 @@ export interface RouterPlan {
    *  floor lives beside it, not in it. */
   floors: RouterFloor[];
   /** The pre-slippage output each floor was derived from, keyed by lowercased token address.
-   *
-   *  Kept so a re-floor can hold the floor to `min(quoted, fresh)` — the user must never be
-   *  promised MORE than the quote they were shown, however well the market has moved since — and
-   *  so the fall can be reported against the number that was actually on screen. */
+   *  Kept so a fall can be reported against the number that was actually on screen. The floor is
+   *  never re-derived locally: it is the server-authored one or the caller-supplied fallback. */
   quotedOut: Readonly<Record<string, bigint>>;
   /** msg.value to attach: the gas token wrapped before the swap. 0 unless `nativeIn`. */
   wrapValue: bigint;
@@ -745,9 +726,8 @@ export interface RouterPlan {
   unwrapAmount: bigint;
   /** Whether the user asked to be paid in the GAS TOKEN.
    *
-   *  Carried explicitly because `unwrapAmount > 0n` is not the same question. A re-floor can drive
-   *  a floor to zero, and inferring the intent from the amount meant the plan stopped unwrapping
-   *  from then on — a later re-floor back up produced a real floor with no withdraw beside it, and
+   *  Carried explicitly because `unwrapAmount > 0n` is not the same question. A server floor can be
+   *  zero, and inferring the intent from the amount meant the plan stopped unwrapping from then on:
    *  the user was silently paid in wrapped native. */
   nativeOut: boolean;
 }
@@ -842,41 +822,6 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
     wrapValue: opts.nativeIn ? parts.reduce((a, p) => a + p.amountIn, 0n) : 0n,
     unwrapAmount: opts.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
     nativeOut: opts.nativeOut === true,
-  };
-}
-
-/** Re-floor a built plan against a FRESH quote, without re-deriving the route.
- *
- *  The quote a user was shown ages between render and send. Rebuilding the whole plan to move the
- *  floors would re-run the split against whatever the pools look like now and could hand the wallet
- *  a different route than the one on screen; this moves only the numbers the tolerance controls.
- *
- *  `freshOut` is quoted (pre-slippage) output per token, keyed lowercase. A token the fresh quote
- *  does not mention keeps its existing floor. */
-export function refloorRouterPlan(
-  rp: RouterPlan,
-  freshOut: Map<string, bigint>,
-  slippageFrac: number,
-): RouterPlan {
-  assertSlip('refloorRouterPlan', slippageFrac);
-  const floors = rp.floors.map((f) => {
-    const key = f.token.toLowerCase();
-    const fresh = freshOut.get(key);
-    if (fresh === undefined) return f;
-    // `min`, never the fresh number alone. A market that moved in the user's FAVOUR would
-    // otherwise raise the floor above the quote they agreed to, turning a better fill into a
-    // revert; and the floor must still never exceed what the pool can pay right now.
-    const quoted = rp.quotedOut[key];
-    const base = quoted !== undefined && quoted < fresh ? quoted : fresh;
-    return { token: f.token, minOut: applySlip(base, slippageFrac) };
-  });
-  return {
-    ...rp,
-    floors,
-    // Keyed on the INTENT, not on the current amount. Guarding this on `unwrapAmount > 0n` meant a
-    // re-floor to zero permanently disabled the unwrap, and the next re-floor back up paid the
-    // user in wrapped native with no withdraw at all.
-    unwrapAmount: rp.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
   };
 }
 

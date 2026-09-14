@@ -50,6 +50,7 @@ function pool(
 const healthyPool = () => pool('core');
 
 const BE: LpRouteOpts = {
+  slippageFrac: 0.005,
   backend: {
     meta: { addressOf: () => null, decimalsOf: () => 6 },
     baseDecimals: 6,
