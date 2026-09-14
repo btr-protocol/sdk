@@ -159,7 +159,9 @@ export interface PlanLegOpts {
    *  intermediate hop; only the delivered token's floor is server-authored. A chained hop 2 is
    *  then funded at `leg1Quoted·(1−tol)` and floored at ≈ `leg2Quoted·(1−tol)`: ZERO margin, so
    *  adverse drift after hop 1 mines reverts `ThresholdViolation`. Route cross parts through
-   *  `planToRouterPlan` where the aggregate floor is enforced once. */
+   *  `planToRouterPlan` where the aggregate floor is enforced once. REQUIRED for a chained part:
+   *  `planToLegs` returns null rather than author a hop-2 floor of its own (`slippageFrac` floors
+   *  direct legs only). */
   serverFloors?: Record<string, { amountOut: bigint; minOut: bigint; tolPbps: number }>;
 }
 
@@ -354,21 +356,16 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       // whole point of planning being to never emit a leg with no floor. Fail closed.
       if (leg1Quoted <= 0n) return null;
       const server = opts.serverFloors?.[t2out.address.toLowerCase()];
-      // The server's own tolerance scales the intermediate hop when it is present; the legacy
-      // caller-supplied fraction only stands in for a plan with no server floor.
-      const leg1MinOut = server
-        ? applyTolPbps(leg1Quoted, server.tolPbps)
-        : applySlip(leg1Quoted, slip);
+      const leg2MinOut = serverFloorByPart.get(i);
+      // A chained part is floored by the SERVER or not at all. The old no-server fallback floored
+      // hop 2 at `q2·(1−s)²` (hop 1's floor funds hop 2, then `s` again on top) while the UI
+      // promised `q2·(1−s)`: ~2× the tolerance extractable, authored here. The SDK never authors a
+      // floor (L-43); fail closed and let the caller fetch `/v2/route`.
+      if (!server || leg2MinOut === undefined) return null;
+      const leg1MinOut = applyTolPbps(leg1Quoted, server.tolPbps);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
-      // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE. `part.quote.amountOut` is what the
-      // path delivers when hop 1 delivers its full quoted output; hop 2 is actually handed
-      // `leg1MinOut`, which is `slip` below that. Flooring hop 2 on the un-scaled quote leaves it
-      // ZERO margin - a floor it can only meet if hop 1 comes in perfect - so ordinary noise
-      // reverts the batch with `ThresholdViolation` after hop 1 has already mined. Scaling the
-      // quote by the same ratio hop 1 was floored by is conservative in the safe direction: pool
-      // output is concave in input, so the linear scale sits at or below the true output. When a
-      // server floor is present, hop 2's floor is this part's allocated slice of it
-      // (`serverFloorByPart`), never the whole end-to-end floor.
+      // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE, and floored at this part's allocated
+      // slice of the end-to-end server floor (`serverFloorByPart`), never the whole floor.
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
@@ -384,7 +381,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         tokenOut: t2out.address,
         amountIn: leg1MinOut,
         quotedOut: leg2Quoted,
-        minOut: serverFloorByPart.get(i) ?? applySlip((leg2Quoted * leg1MinOut) / leg1Quoted, slip),
+        minOut: leg2MinOut,
         unwrapOut: opts.nativeOut,
         chained: true,
       });

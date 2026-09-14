@@ -362,30 +362,29 @@ describe('planToLegs routes only through pools the caller vouches for', () => {
   });
 });
 
-describe('a chained second hop is floored on what hop 1 actually delivers', () => {
-  test("leg 2's floor is scaled by the ratio hop 1 was floored by", () => {
-    const slip = 0.01;
-    const legs = planToLegs(crossPlan(), { slippageFrac: slip, tokenOf, isOfficialPool });
-    expect(legs?.length).toBe(2);
-    const [l1, l2] = legs as NonNullable<typeof legs>;
-    expect(l2.amountIn).toBe(l1.minOut);
-    // Hop 2 is handed l1.minOut, not l1.quotedOut, so its floor must sit at or below
-    // applySlip(quote * l1.minOut / l1.quotedOut) — never at applySlip(quote).
-    const naive = (l2.quotedOut * 99n) / 100n;
-    expect(l2.minOut).toBeLessThan(naive);
-    const scaled = (l2.quotedOut * l1.minOut) / l1.quotedOut;
-    expect(l2.minOut).toBe((scaled * 99n) / 100n);
-    // And the displayed number is untouched: quotedOut is still the quote the user read.
-    expect(l2.quotedOut).toBe(98n * 10n ** 18n);
+describe('a chained second hop is floored by the server or not at all', () => {
+  // A-926. The no-server fallback floored hop 2 at q2·(1−s)² (hop 1's floor funds hop 2, then s
+  // again) while the UI promised q2·(1−s): ~2× the tolerance extractable, authored by the SDK.
+  test('no server floor: the chained plan is refused, never floored locally', () => {
+    expect(planToLegs(crossPlan(), { slippageFrac: 0.01, tokenOf, isOfficialPool })).toBeNull();
   });
 
-  test('the old floor was unmeetable: hop 2 got less input than its floor assumed', () => {
-    const legs = planToLegs(crossPlan(), { slippageFrac: 0, tokenOf, isOfficialPool });
+  test('with a server floor hop 2 is funded by hop 1 floor and floored on the server number', () => {
+    const c = meta.C;
+    const amountOut = 98n * 10n ** BigInt(c.decimals);
+    const floor = { amountOut, minOut: (amountOut * 99n) / 100n, tolPbps: 10_000 };
+    const legs = planToLegs(crossPlan(), {
+      slippageFrac: 0.5, // ignored on a chained part: the server tolerance scales hop 1
+      tokenOf,
+      isOfficialPool,
+      serverFloors: { [c.address.toLowerCase()]: floor },
+    });
+    expect(legs?.length).toBe(2);
     const [l1, l2] = legs as NonNullable<typeof legs>;
-    // At zero slippage the ratio is 1, so nothing changes — the fix only bites where a
-    // tolerance exists to be eaten.
-    expect(l1.minOut).toBe(l1.quotedOut);
-    expect(l2.minOut).toBe(l2.quotedOut);
+    expect(l1.minOut).toBe((l1.quotedOut * 99n) / 100n);
+    expect(l2.amountIn).toBe(l1.minOut);
+    expect(l2.minOut).toBe(floor.minOut);
+    expect(l2.quotedOut).toBe(amountOut);
   });
 });
 
