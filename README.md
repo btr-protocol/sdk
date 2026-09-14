@@ -71,18 +71,14 @@ await swap(provider, poolAddress, {
 });
 ```
 
-Multi-pool — find the best route, then build calldata:
+Multi-pool — `POST {api}/route` returns the `SwapPlan` (`routeAsync`); build calldata from it:
 
 ```ts
-import { poolStateFrom, rankSwap } from '@btr-protocol/sdk/amm';
-import { buildSwapCalls, planToLegs, totalValue } from '@btr-protocol/sdk/router';
+import { buildSwapCalls, planToLegs } from '@btr-protocol/sdk/router';
 
-const pools = [{ tag: 'stable', addr: poolAddress, state: poolStateFrom(poolData.assets, 'USDC', feedOf) }];
-const ranked = rankSwap(pools, 'WETH', 'USDT', amountInFloat); // direct + 2-hop, may split
-
-const legs = ranked && planToLegs(ranked.best, { slippageFrac: 0.005, tokenOf });
+const legs = planToLegs(plan, { slippageFrac, tokenOf, isOfficialPool, serverFloors });
 const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
-// calls = deduplicated [...approvals, ...swaps] — EIP-5792 wallet_sendCalls (value: totalValue(calls)) or sequential
+// calls = deduplicated [...approvals, ...swaps] — EIP-5792 wallet_sendCalls or sequential
 ```
 
 ## Toolchain
