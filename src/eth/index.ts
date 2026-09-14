@@ -72,8 +72,6 @@ export {
   getExplorerAddressUrl,
   getWrappedNative,
   getMulticall3,
-  testRpc,
-  getHealthyRpc,
   getSupportedChainIds,
   getMainnetChainIds,
   isTestOrLocalChain,
