@@ -681,43 +681,62 @@ describe('planToLegs', () => {
     expect(legs[0].wrapIn).toBeUndefined();
   });
 
-  test('cross-pool part → 2 legs; leg2.amountIn = leg1.minOut; wrap flags leg1 only', () => {
-    const route = {
-      legs: [
-        { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
-        { poolTag: 's', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
-      ],
-      tokens: ['BNB', 'USDC', 'USDT'],
-      hops: 2,
-    };
-    const plan: SwapPlan = {
-      amountIn: 1,
-      amountOut: 599,
-      isSplit: false,
-      parts: [
-        {
-          route,
-          fraction: 1,
-          quote: {
-            route,
-            amountIn: 1,
-            amountOut: 599,
-            fills: [
-              { leg: route.legs[0], amountIn: 1, amountOut: 600 },
-              { leg: route.legs[1], amountIn: 600, amountOut: 599 },
-            ],
-          },
+  const crossRoute = {
+    legs: [
+      { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
+      { poolTag: 's', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
+    ],
+    tokens: ['BNB', 'USDC', 'USDT'],
+    hops: 2,
+  };
+  const crossPlan: SwapPlan = {
+    amountIn: 1,
+    amountOut: 599,
+    isSplit: false,
+    parts: [
+      {
+        route: crossRoute,
+        fraction: 1,
+        quote: {
+          route: crossRoute,
+          amountIn: 1,
+          amountOut: 599,
+          fills: [
+            { leg: crossRoute.legs[0], amountIn: 1, amountOut: 600 },
+            { leg: crossRoute.legs[1], amountIn: 600, amountOut: 599 },
+          ],
         },
-      ],
-    };
+      },
+    ],
+  };
+  const crossFloors = {
+    [USDT.toLowerCase()]: { amountOut: 599n * 10n ** 18n, minOut: 599n * 10n ** 18n, tolPbps: 0 },
+  };
+
+  test('cross-pool part → 2 legs; leg2.amountIn = leg1.minOut; wrap flags leg1 only', () => {
     const legs = mustLegs(
-      planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, nativeIn: true }),
+      planToLegs(crossPlan, {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+        nativeIn: true,
+        serverFloors: crossFloors,
+      }),
     );
     expect(legs.length).toBe(2);
     expect(legs[0].wrapIn).toBe(true);
     expect(legs[0].minOut).toBe(600_000_000n); // bridged USDC @ 6 decimals
     expect(legs[1].amountIn).toBe(legs[0].minOut);
     expect(legs[1].wrapIn).toBeUndefined();
+  });
+
+  // A-926. Without a server floor the builder used to floor hop 2 at `q2·(1−s)²` — hop 1's floor
+  // funds hop 2, then `s` again on top — while the UI promised `q2·(1−s)`: ~2× the tolerance
+  // extractable, authored by the SDK. The SDK never authors a floor (L-43): null instead.
+  test('a chained part with no server floor is refused, not floored by the SDK', () => {
+    expect(
+      planToLegs(crossPlan, { slippageFrac: 0.01, tokenOf, isOfficialPool, nativeIn: true }),
+    ).toBeNull();
   });
 
   // A part longer than this builder encodes used to be silently truncated to its first two legs,
@@ -921,7 +940,15 @@ describe('planToLegs', () => {
         ],
       };
       const legs = mustLegs(
-        planToLegs(crossPlan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
+        planToLegs(crossPlan, {
+          slippageFrac: 0,
+          tokenOf,
+          isOfficialPool,
+          amountInUnits: BALANCE,
+          serverFloors: {
+            [USDC.toLowerCase()]: { amountOut: 31_000_000n, minOut: 31_000_000n, tolPbps: 0 },
+          },
+        }),
       );
       expect(legs[0].amountIn).toBe(BALANCE);
       expect(legs[1].amountIn).toBe(legs[0].minOut); // hop 2 spends the bridged floor, not the wallet
