@@ -21,21 +21,20 @@ export const OpType = {
   UPDATE_ANCHOR: 2,
   UPDATE_TREASURY: 3,
   UPDATE_HOOK: 4,
-  UPDATE_ORACLE: 5,
-  ADD_ASSET: 6,
-  UPDATE_RISK: 7,
-  UPDATE_FEES: 8,
-  UPDATE_PROFILE: 9,
-  UPDATE_CURVE: 10,
-  UPDATE_ASSET_PARAMS: 11,
+  ADD_ASSET: 5,
+  UPDATE_RISK: 6,
+  UPDATE_FEES: 7,
+  UPDATE_PROFILE: 8,
+  UPDATE_CURVE: 9,
+  UPDATE_ASSET_PARAMS: 10,
   /** Payload = the token address only; the amount is recomputed at execute. Pays out to
    *  `treasury()`, so `Admin._tier` puts it on the HIGH (treasury-custody) lane. */
-  SWEEP: 12,
+  SWEEP: 11,
   /** One-shot per pool: arms pool-level solvency by writing the leg roster. CRITICAL lane. */
-  BACKFILL_LEGS: 13,
+  BACKFILL_LEGS: 12,
   /** Seat handover (GEN-1). Pool-level key, GOVERNANCE tier; payload = the next seat.
    *  Staging the live owner is normalised to the sentinel donation at request time. */
-  UPDATE_POOL_ADMIN: 14,
+  UPDATE_POOL_ADMIN: 13,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 
