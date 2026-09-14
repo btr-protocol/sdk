@@ -102,20 +102,6 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'cancelGuardianGrant',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'cancelGuardianRevoke',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [],
     name: 'cancelOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
@@ -145,13 +131,6 @@ export const ACCESS_CONTROL_ABI = [
     name: 'completeOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'executeGuardianGrant',
-    outputs: [],
-    stateMutability: 'nonpayable',
     type: 'function',
   },
   {
@@ -339,58 +318,6 @@ export const ACCESS_CONTROL_ABI = [
     type: 'function',
   },
   {
-    inputs: [],
-    name: 'pendingGuardian',
-    outputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'pendingGuardianOp',
-    outputs: [
-      {
-        internalType: 'uint96',
-        name: '',
-        type: 'uint96',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'pendingGuardianRevoke',
-    outputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'pendingGuardianRevokeOp',
-    outputs: [
-      {
-        internalType: 'uint96',
-        name: '',
-        type: 'uint96',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
     inputs: [
       {
         internalType: 'enum AccessControl.Role',
@@ -494,36 +421,23 @@ export const ACCESS_CONTROL_ABI = [
     type: 'function',
   },
   {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'g',
-        type: 'address',
-      },
-    ],
-    name: 'requestGuardianGrant',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'g',
-        type: 'address',
-      },
-    ],
-    name: 'requestGuardianRevoke',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
     inputs: [],
     name: 'requestOwnershipHandover',
     outputs: [],
     stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 's',
+        type: 'address',
+      },
+    ],
+    name: 'revokeRiskSteward',
+    outputs: [],
+    stateMutability: 'nonpayable',
     type: 'function',
   },
   {
@@ -589,19 +503,6 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'setKeeper',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 's',
-        type: 'address',
-      },
-    ],
-    name: 'revokeRiskSteward',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -687,38 +588,6 @@ export const ACCESS_CONTROL_ABI = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-    ],
-    name: 'GuardianGrantCancelled',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'uint48',
-        name: 'eta',
-        type: 'uint48',
-      },
-    ],
-    name: 'GuardianGrantRequested',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
         indexed: false,
         internalType: 'uint8',
         name: 'max',
@@ -726,38 +595,6 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'GuardianQuorumMaxUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-    ],
-    name: 'GuardianRevokeCancelled',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'uint48',
-        name: 'eta',
-        type: 'uint48',
-      },
-    ],
-    name: 'GuardianRevokeRequested',
     type: 'event',
   },
   {
