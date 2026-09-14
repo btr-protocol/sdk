@@ -38,7 +38,7 @@ export interface Asset {
    *  `PoolConfig.validatePresetAssign` refuses the assignment, so there is no curve-less quote. */
   presetId: number;
   minFeePbps: number;
-  /** Spread term σ_path·vega/PBPS (1 % of σ at 10_000); dispersion σ·vega/BPS. See `AimmProfile.vega`. */
+  /** Scale: see `AimmProfile.vega`. */
   vegaBps: number;
   /** GEN-4 deposit cap: `m<<4|e` whole base tokens. 0 = legacy uncapped. */
   depositCapCode: number;
