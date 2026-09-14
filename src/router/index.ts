@@ -46,9 +46,7 @@ export interface ExecLeg {
   tokenOut: Address;
   amountIn: bigint;
   minOut: bigint; // per-leg slippage floor
-  /** The output this leg was QUOTED at, in base units - the number the user was shown. Kept for
-   *  display and for the legacy intermediate-hop scaling; the DELIVERED token's floor is the
-   *  server-authored one (`PlanLegOpts.serverFloors`), never a local recompute. */
+  /** Quoted output in base units — display only; the floor is `minOut`. */
   quotedOut: bigint;
   /** tokenIn is the chain's wrapped native and the user pays the gas token: prepend a wrap. */
   wrapIn?: boolean;
@@ -158,7 +156,10 @@ export interface PlanLegOpts {
    *  When present the builder encodes THAT floor (verified with {@link assertServerFloor}) and
    *  never picks a tolerance itself. The floor is END-TO-END: on the leg path it is allocated
    *  across the parts landing the same token (`planToLegs`), and a two-leg part scales its
-   *  intermediate hop; only the delivered token's floor is server-authored. */
+   *  intermediate hop; only the delivered token's floor is server-authored. A chained hop 2 is
+   *  then funded at `leg1Quoted·(1−tol)` and floored at ≈ `leg2Quoted·(1−tol)`: ZERO margin, so
+   *  adverse drift after hop 1 mines reverts `ThresholdViolation`. Route cross parts through
+   *  `planToRouterPlan` where the aggregate floor is enforced once. */
   serverFloors?: Record<string, { amountOut: bigint; minOut: bigint; tolPbps: number }>;
 }
 
