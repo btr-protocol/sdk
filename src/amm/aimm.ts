@@ -209,6 +209,9 @@ export function sanitizeDispersion(minDispersion: number, cap: number): number {
 // ── Quote-free state types ────────────────────────────────────────────────────
 
 export interface AimmProfile {
+  /** BPS. Spread term = σ_path·vega/PBPS (`Pricing._pathSpread`): 10_000 prices 1 % of σ, the
+   *  uint16 max 6.5 %. Kept on this scale for phase-1 stables (A-005, owner call); dispersion is
+   *  σ·vega/BPS, so the SAME vega tracks σ 1:1 there. */
   vega: number;
   minFeePbps: number;
   minDisp: number;
