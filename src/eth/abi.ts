@@ -428,7 +428,11 @@ export function decodeFn<T = never>({
   // content). A single dynamic output is referenced via a head pointer.
   if (outputs.length > 1) return decode('tuple', data, 0, outputs).val as T;
   const o = outputs[0];
-  const d = clean(data);
+  let d = clean(data);
+  // ponytail: live Arc pools pre-date `maxLiabWeightBps` and return a 14-word Asset; pad the
+  // missing trailing word (reads as 0 = cap disabled) until the pre-BNB Arc upgrade, then delete.
+  if (functionName === 'getAsset' && o.components?.length === 15 && d.length === 14 * 64)
+    d += '0'.repeat(64);
   const start = isDynamicType(o.type, o.components) ? Number(BN(`0x${d.slice(0, 64)}`)) * 2 : 0;
   return decode(o.type, d, start, o.components).val as T;
 }
