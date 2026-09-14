@@ -744,10 +744,6 @@ export interface RouterPlan {
    *  an extra field here rides into the calldata layout. Anything else the caller needs about a
    *  floor lives beside it, not in it. */
   floors: RouterFloor[];
-  /** The pre-slippage output each floor was derived from, keyed by lowercased token address.
-   *  Kept so a fall can be reported against the number that was actually on screen. The floor is
-   *  never re-derived locally: it is the server-authored one or the caller-supplied fallback. */
-  quotedOut: Readonly<Record<string, bigint>>;
   /** msg.value to attach: the gas token wrapped before the swap. 0 unless `nativeIn`. */
   wrapValue: bigint;
   /** `WNATIVE.withdraw` amount after the swap. 0 unless `nativeOut`. Tracks the floor, not the
@@ -848,7 +844,6 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   return {
     parts,
     floors,
-    quotedOut: Object.fromEntries([...quoted.entries()].map(([k, v]) => [k, v.amount])),
     wrapValue: opts.nativeIn ? parts.reduce((a, p) => a + p.amountIn, 0n) : 0n,
     unwrapAmount: opts.nativeOut ? floors.reduce((a, f) => a + f.minOut, 0n) : 0n,
     nativeOut: opts.nativeOut === true,

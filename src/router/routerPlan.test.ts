@@ -636,7 +636,6 @@ describe('the calldata that actually executed on Arc', () => {
         },
       ],
       floors: [{ token: AWETH, minOut: 4_677281567053665n }],
-      quotedOut: { [AWETH.toLowerCase()]: 4_724526835407742n },
       wrapValue: 0n,
       unwrapAmount: 0n,
       nativeOut: false,
