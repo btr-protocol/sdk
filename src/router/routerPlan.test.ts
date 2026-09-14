@@ -12,7 +12,6 @@ import {
   buildSwapCalls,
   planToLegs,
   planToRouterPlan,
-  refloorRouterPlan,
 } from './index.js';
 import type { SwapPlan } from './route.js';
 
@@ -503,54 +502,6 @@ describe('buildRouterCalls', () => {
   });
 });
 
-describe('refloorRouterPlan', () => {
-  const rt = route([P1], ['USDC', 'USDT']);
-  const base = must(
-    planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-      slippageFrac: 0,
-      tokenOf,
-      isOfficialPool,
-    }),
-  );
-
-  test('moves the floor to a fresh quote and leaves the ROUTE alone', () => {
-    const next = refloorRouterPlan(base, new Map([[USDT.toLowerCase(), 90n * 10n ** 18n]]), 0.1);
-    expect(next.floors[0].minOut).toBe(81n * 10n ** 18n);
-    expect(next.parts).toEqual(base.parts); // re-quoting must not re-route under the user
-  });
-
-  test("a market that moved in the user's favour does not raise the floor above the quote", () => {
-    // Flooring at the fresh number would promise more than the screen ever showed, and turn a
-    // better-than-quoted fill into a revert.
-    const next = refloorRouterPlan(base, new Map([[USDT.toLowerCase(), 500n * 10n ** 18n]]), 0);
-    expect(next.floors[0].minOut).toBe(99n * 10n ** 18n);
-  });
-
-  test('a token the fresh quote does not mention keeps its floor', () => {
-    const next = refloorRouterPlan(base, new Map(), 0.1);
-    expect(next.floors).toEqual(base.floors);
-  });
-
-  test('a native-out unwrap follows its floor down', () => {
-    const nrt = route([P1], ['USDC', 'BNB']);
-    const rp = must(
-      planToRouterPlan(plan(100, 2, [part(nrt, 1, 100, 2)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        nativeOut: true,
-      }),
-    );
-    const next = refloorRouterPlan(rp, new Map([[WNATIVE.toLowerCase(), 10n ** 18n]]), 0);
-    expect(next.unwrapAmount).toBe(10n ** 18n);
-    expect(next.unwrapAmount).toBe(next.floors[0].minOut);
-  });
-
-  test('a slippage outside [0,1) throws', () => {
-    expect(() => refloorRouterPlan(base, new Map(), 1)).toThrow(/slippageFrac/);
-  });
-});
-
 // ── what the pre-deployment audit found ────────────────────────────────────
 //
 // Each of these reproduces a defect a reviewer demonstrated against this module before the Router
@@ -612,27 +563,6 @@ describe('audit regressions', () => {
         isOfficialPool,
       }),
     ).toBeNull();
-  });
-
-  test('a re-floor to zero does not permanently kill a native-out unwrap', () => {
-    const rt = route([P1], ['USDC', 'BNB']);
-    const rp = must(
-      planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        nativeOut: true,
-      }),
-    );
-    const zeroed = refloorRouterPlan(rp, new Map([[WNATIVE.toLowerCase(), 0n]]), 0);
-    expect(zeroed.unwrapAmount).toBe(0n);
-    // Guarded on the amount rather than the intent, the plan stopped unwrapping from here on and
-    // the next re-floor paid the user in WRAPPED native with no withdraw beside it.
-    const back = refloorRouterPlan(zeroed, new Map([[WNATIVE.toLowerCase(), 3n * 10n ** 18n]]), 0);
-    // Clamped to the 2e18 that was quoted — the fresh 3e18 is better than the screen promised.
-    expect(back.floors[0].minOut).toBe(2n * 10n ** 18n);
-    // The point of the test: the unwrap came back with it, rather than staying dead at zero.
-    expect(back.unwrapAmount).toBe(back.floors[0].minOut);
   });
 
   test('the ABI carries every error the contract can revert with', () => {

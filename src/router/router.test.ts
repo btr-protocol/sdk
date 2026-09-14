@@ -14,9 +14,9 @@ const DEPOSIT_SEL = '0xd0e30db0'; // deposit()
 const WITHDRAW_SEL = '0x2e1a7d4d'; // withdraw(uint256)
 const MAX_UINT256 = (1n << 256n) - 1n;
 
-// The call builders never read `quotedOut` — only `refloorLeg` does — so these fixtures pin it AT
-// the `minOut` each test is actually asserting on, i.e. a leg quoted with zero slippage. It is
-// required on the type because every real producer knows it and `freshFloor` divides by it.
+// The call builders never read `quotedOut` (display and the fallback floor only), so these
+// fixtures pin it AT the `minOut` each test is actually asserting on, i.e. a leg quoted with zero
+// slippage. It is required on the type because every real producer knows it.
 
 /** Last word of approve(spender, amount) calldata → amount. */
 const approveAmount = (data: string): bigint => BigInt(`0x${data.slice(2 + 8 + 64)}`);
