@@ -281,6 +281,13 @@ describe('the encoder refuses what it cannot represent', () => {
       inputs: [{ name: 'a', type: 'uint256[2]' }],
       outputs: [],
     },
+    {
+      type: 'function',
+      name: 'k',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'b', type: 'bytes' }],
+      outputs: [],
+    },
   ] as never;
 
   test('a 21-byte address is rejected, not truncated to its last 20', () => {
@@ -313,6 +320,12 @@ describe('the encoder refuses what it cannot represent', () => {
   test('bytes4 SHORTER than 4 bytes is rejected, not right-padded into a different word (A-641)', () => {
     // 0x112233 padded to 0x11223300 is a different selector/feed id, and the calldata is well formed.
     expect(() => encodeFn({ abi, functionName: 'h', args: ['0x112233'] })).toThrow(/encode bytes4/);
+  });
+
+  test('dynamic bytes refuses an odd length or a non-hex char (A-641)', () => {
+    expect(() => encodeFn({ abi, functionName: 'k', args: ['0x112'] })).toThrow(/encode bytes/);
+    expect(() => encodeFn({ abi, functionName: 'k', args: ['0x11zz'] })).toThrow(/encode bytes/);
+    expect(encodeFn({ abi, functionName: 'k', args: ['0x1122'] })).toContain('1122');
   });
 
   test('a fixed array T[N] refuses any element count but N (A-641)', () => {
