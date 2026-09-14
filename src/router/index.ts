@@ -175,10 +175,13 @@ export interface PlanLegOpts {
    *  Split parts are carved from this bigint and sum back to it EXACTLY. */
   amountInUnits?: bigint;
   /** Server-authored end-to-end floors from `/v2/quote|route`, keyed by lowercase output token.
+   *  Each carries the SAME `amount_out` the floor was derived from, in output base units: the
+   *  check is `min_out = amount_out·(1e6 − tol_pbps)/1e6` on the server's own integer, never on
+   *  the f64 plan amount, which truncates 18 decimals and would fail (or pass) the wrong check.
    *  When present the builder encodes THAT floor (verified with {@link assertServerFloor}) and
    *  never picks a tolerance itself. A two-leg part still scales its intermediate hop; only the
    *  delivered token's floor is server-authored. */
-  serverFloors?: Record<string, { minOut: bigint; tolPbps: number }>;
+  serverFloors?: Record<string, { amountOut: bigint; minOut: bigint; tolPbps: number }>;
 }
 
 /** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
@@ -312,7 +315,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
       const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
       const server = opts.serverFloors?.[tout.address.toLowerCase()];
-      if (server) assertServerFloor(quotedOut, server.tolPbps, server.minOut);
+      if (server) assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
@@ -358,7 +361,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         wrapIn: opts.nativeIn,
       });
       const server = opts.serverFloors?.[t2out.address.toLowerCase()];
-      if (server) assertServerFloor(leg2Quoted, server.tolPbps, server.minOut);
+      if (server) assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       legs.push({
         pool: rl[1].poolAddr as Address,
         tokenIn: tmid.address,
@@ -820,7 +823,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => {
     const server = opts.serverFloors?.[token.toLowerCase()];
     if (server) {
-      assertServerFloor(amount, server.tolPbps, server.minOut);
+      assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
       return { token, minOut: server.minOut };
     }
     return { token, minOut: applySlip(amount, slip) };
