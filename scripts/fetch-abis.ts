@@ -7,11 +7,12 @@
  * bakes) → keep-existing → vendored `abis.fallback.ts` (STALE hot-path minimum; keeps a fresh
  * clone building, e.g. front Docker via SDK_REF).
  *
- * ! `../dex-evm/out/<name>.sol/<name>.json` was in that chain, documented as "same bytes the
- * backend bakes". It is not: the forge artifact carries the contract's own entries only, so Pool
- * is 74 entries against the backend's 97 — the library events and errors the backend merges in are
- * missing, and revert data logged by a library decodes to nothing. Only the shape check stood
- * between that and a release; the content pin below rejects it, so the path is gone.
+ * A forge artifact carries the contract's own entries only: the events and errors raised inside
+ * a linked library (`Pricing.ThresholdViolation`, `PoolLiquidity.Swapped`) are missing, and revert
+ * data from one decodes to nothing. So a re-pin against a contract release reads the checkout
+ * EXPLICITLY and merges the linked libraries' entries — the surface the backend bakes:
+ *
+ *   BTR_DEX_EVM=../dex-evm BTR_ABI_UPDATE=1 bun run fetch-abis   # after `forge build` there
  *
  * INTEGRITY IS A CONTENT PIN, NOT A SHAPE CHECK. `abis.lock.json` holds a normalised keccak of
  * each ABI (see `src/abis/hash.ts`) and NOTHING is written that misses its pin — not the backend's
@@ -40,6 +41,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const api = (process.env.BTR_API_URL ?? 'https://api.btr.markets').replace(/\/$/, '');
 const lockPath = join(root, 'abis.lock.json');
 const REPIN = process.env.BTR_ABI_UPDATE === '1';
+/** A built dex-evm checkout; when set it is the ONLY source (the release being pinned). */
+const DEX_EVM = process.env.BTR_DEX_EVM;
 const ALLOW_STALE = process.env.BTR_ABI_ALLOW_STALE === '1';
 
 const TARGETS = [
@@ -143,6 +146,32 @@ function fromSiblings(name: string): unknown[] | null {
   return existsSync(p) ? unwrap(JSON.parse(readFileSync(p, 'utf8'))) : null;
 }
 
+/** Contract artifact ∪ the events and errors of every library it links, transitively. */
+function fromDexEvm(name: string): unknown[] {
+  const artifact = (file: string) =>
+    JSON.parse(readFileSync(join(DEX_EVM as string, 'out', file), 'utf8')) as {
+      abi: Entry[];
+      bytecode: { linkReferences?: Record<string, Record<string, unknown>> };
+    };
+  const abi: Entry[] = [];
+  const seen = new Set<string>();
+  const add = (e: Entry) => {
+    const k = `${e.type}:${sigOf(e)}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      abi.push(e);
+    }
+  };
+  const walk = (file: string, own: boolean) => {
+    const a = artifact(file);
+    for (const e of a.abi) if (own || e.type === 'event' || e.type === 'error') add(e);
+    for (const [src, libs] of Object.entries(a.bytecode.linkReferences ?? {}))
+      for (const lib of Object.keys(libs)) walk(`${src.split('/').pop()}/${lib}.json`, false);
+  };
+  walk(`${name}.sol/${name}.json`, true);
+  return abi;
+}
+
 /** The artifact already on disk, read back through its own export so what is checked is exactly
  *  what the SDK will import. A previous run's output is not trusted for being a previous run's
  *  output; it carries the pin or it is not kept. */
@@ -167,11 +196,13 @@ function write(t: Target, abi: unknown[], note: string): void {
  *  A source that fails the PIN is not a transport failure — it is the case this script exists for,
  *  so it stops the build instead of falling through to the next source. */
 for (const t of TARGETS) {
-  const sources: { note: string; load: () => Promise<unknown[] | null> }[] = [
-    { note: 'backend', load: () => fromBackend(t.name) },
-    { note: 'sibling checkout', load: async () => fromSiblings(t.name) },
-    { note: 'existing artifact', load: () => fromExisting(t) },
-  ];
+  const sources: { note: string; load: () => Promise<unknown[] | null> }[] = DEX_EVM
+    ? [{ note: 'dex-evm checkout', load: async () => fromDexEvm(t.name) }]
+    : [
+        { note: 'backend', load: () => fromBackend(t.name) },
+        { note: 'sibling checkout', load: async () => fromSiblings(t.name) },
+        { note: 'existing artifact', load: () => fromExisting(t) },
+      ];
 
   let done = false;
   const tried: string[] = [];
@@ -189,7 +220,7 @@ for (const t of TARGETS) {
     }
     // Reached here with bytes in hand: a pin failure is a real integrity failure, not a blink.
     write(t, abi, s.note);
-    if (s.note !== 'backend') console.log(`fetch-abis: ${t.name} from ${s.note} (${tried[0]})`);
+    if (tried.length) console.log(`fetch-abis: ${t.name} from ${s.note} (${tried[0]})`);
     done = true;
     break;
   }
