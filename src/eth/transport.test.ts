@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { createPrivateKeyClient } from './client';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
 const realFetch = globalThis.fetch;
@@ -263,6 +264,16 @@ describe('httpTransport attests every endpoint before its first use', () => {
     const p = httpTransport('http://rpc', { chainId: 1, retryDelay: 1 });
     expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
     expect(probes).toBe(2);
+  });
+
+  test('a private-key client pins its transport to expectedChainId', async () => {
+    // Signing checked the chain at the preimage; reads went through unchecked.
+    byUrl({ 'http://x': '0x64' });
+    const key = `0x${'11'.repeat(32)}` as `0x${string}`;
+    const c = createPrivateKeyClient('http://x', key, 1);
+    await expect(c.call('0x0000000000000000000000000000000000000001', '0x')).rejects.toBeInstanceOf(
+      RpcNetworkError,
+    );
   });
 
   test('every endpoint on the wrong chain fails closed', async () => {

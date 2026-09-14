@@ -299,7 +299,8 @@ export function createPrivateKeyClient(
    *  `signTransaction` at the preimage; omit only for a caller that genuinely does not know. */
   expectedChainId?: number,
 ): Client {
-  const provider = createHttpProvider(rpcUrl);
+  // The same chain pins the transport: reads refuse a wrong-chain endpoint too, not only signing.
+  const provider = createHttpProvider(rpcUrl, { chainId: expectedChainId });
   const account = privateKeyToAddress(privateKey);
 
   return {
