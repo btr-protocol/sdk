@@ -1,11 +1,18 @@
-/** Build-time ABIs: the backend getAbi service is the SSoT, this repo commits no copies.
+/** Build-time ABIs: the backend getAbi service is the SSoT, and `abis/<Name>.json` is the snapshot
+ * of it this repo was reviewed against.
  *
- *   bun run fetch-abis                       # GET {api}/v1/abis/{Pool,Admin}
+ *   bun run fetch-abis                       # committed snapshot, else GET {api}/v1/abis/{Pool,Admin}
  *   BTR_API_URL=http://localhost:3000 bun run fetch-abis
  *
- * Source chain per target: backend → the sibling `../back/abis` checkout (the bytes the backend
- * bakes) → keep-existing → vendored `abis.fallback.ts` (STALE hot-path minimum; keeps a fresh
- * clone building, e.g. front Docker via SDK_REF).
+ * Source chain per target: the committed snapshot → backend → the sibling `../back/abis` checkout
+ * (the bytes the backend bakes) → keep-existing → vendored `abis.fallback.ts` (STALE hot-path
+ * minimum; keeps a fresh clone building, e.g. front Docker via SDK_REF).
+ *
+ * THE SNAPSHOT IS READ FIRST SO A BUILD NEVER DEPENDS ON THE LIVE API SERVING THE RELEASE IT IS
+ * BUILDING. A contract release that re-pins the lock before the backend redeploys — or a front
+ * rollback that moves `SDK_REF` back after the backend moved on — failed the pin on every
+ * `bun install`, so no front hotfix could be built during the incident that needed one. The pin
+ * itself is unchanged: the snapshot carries it like any other source, and misses it the same way.
  *
  * A forge artifact carries the contract's own entries only: the events and errors raised inside
  * a linked library (`Pricing.ThresholdViolation`, `PoolLiquidity.Swapped`) are missing, and revert
@@ -141,6 +148,12 @@ async function fromBackend(name: string): Promise<unknown[]> {
   return unwrap(await res.json());
 }
 
+/** The reviewed snapshot, committed beside the lock it hashes to. */
+function fromCommitted(name: string): unknown[] | null {
+  const p = join(root, 'abis', `${name}.json`);
+  return existsSync(p) ? unwrap(JSON.parse(readFileSync(p, 'utf8'))) : null;
+}
+
 function fromSiblings(name: string): unknown[] | null {
   const p = join(root, '..', 'back', 'abis', `${name}.json`);
   return existsSync(p) ? unwrap(JSON.parse(readFileSync(p, 'utf8'))) : null;
@@ -199,6 +212,8 @@ for (const t of TARGETS) {
   const sources: { note: string; load: () => Promise<unknown[] | null> }[] = DEX_EVM
     ? [{ note: 'dex-evm checkout', load: async () => fromDexEvm(t.name) }]
     : [
+        // Skipped on a re-pin: `BTR_ABI_UPDATE=1` exists to read the live surface, not the snapshot.
+        ...(REPIN ? [] : [{ note: 'committed snapshot', load: async () => fromCommitted(t.name) }]),
         { note: 'backend', load: () => fromBackend(t.name) },
         { note: 'sibling checkout', load: async () => fromSiblings(t.name) },
         { note: 'existing artifact', load: () => fromExisting(t) },

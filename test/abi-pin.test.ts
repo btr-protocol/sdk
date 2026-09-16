@@ -66,6 +66,19 @@ describe('abiHash pins content, not shape', () => {
   });
 });
 
+// The committed snapshot is what every build reads FIRST, so it carries the same pin the backend
+// answer must: drift from the lock stops the build rather than shipping an unreviewed ABI.
+describe('the committed ABI snapshot is pinned', () => {
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+
+  for (const name of ['Pool', 'Admin']) {
+    test(`abis/${name}.json hashes to the lock`, () => {
+      const raw = JSON.parse(readFileSync(join(repo, 'abis', `${name}.json`), 'utf8'));
+      expect(abiHash(Array.isArray(raw) ? raw : raw.abi)).toBe(lock[name]);
+    });
+  }
+});
+
 // A-1131: PoolFactory is a consumer surface too, and it drifted once already (pinned without
 // `executeOfficial`/`cancelOfficial`, still carrying the removed `setProtocolDeployer`). The
 // committed SDK snapshot, the backend's `back/abis/PoolFactory.json` and the lock must agree, and
@@ -166,6 +179,19 @@ describe('fetch-abis refuses what it cannot pin', () => {
     expect(r.code).not.toBe(0);
     expect(r.out).toContain('STALE');
     expect(existsSync(join(sandbox, 'repo', 'src', 'abis', 'Pool.ts'))).toBe(false);
+  }, 30_000);
+
+  test('a dead backend is survivable: the committed snapshot builds on its own', async () => {
+    // The release/rollback window this exists for: the API serves a different release than the
+    // lock pins, or is down. The snapshot is pinned, so the build proceeds on it and never
+    // reaches the STALE fallback.
+    const r = makeSandbox();
+    cpSync(join(repo, 'abis'), join(r, 'abis'), { recursive: true });
+    const out = await runScript(r, { BTR_API_URL: 'http://127.0.0.1:1' });
+    expect(out.code).toBe(0);
+    expect(out.out).toContain('committed snapshot');
+    expect(out.out).not.toContain('STALE');
+    expect(existsSync(join(r, 'src', 'abis', 'Pool.ts'))).toBe(true);
   }, 30_000);
 
   test('...unless the stale build is asked for explicitly', async () => {
