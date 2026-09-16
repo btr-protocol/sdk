@@ -98,6 +98,23 @@ describe('v2 quote client', () => {
     await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
+  // The formula is SELF-consistency: the server writes both of its sides. A 99.9% tolerance — the
+  // widest `slippage::floor` will author — satisfies it exactly while leaving no floor to speak of,
+  // and the swap is sandwiched for almost the whole amount.
+  test('refuses a tolerance the request could not have produced', async () => {
+    stub(quoteBody(100, 1_000_000n, 999_000));
+    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('a relative request is bounded by its own pbps, not the service ceiling', async () => {
+    const req = { ...REQ, slippage: { mode: 'relative', pbps: 50 } as const };
+    stub(quoteBody(100, 1_000_000n, 5_000));
+    await expect(quoteV2(req)).rejects.toMatchObject({ kind: 'floor_violation' });
+    // 100 pbps is where `slippage::floor` clamps a 50 pbps request, so it is the legal ceiling.
+    stub(quoteBody(101, 1_000_000n, 100));
+    await expect(quoteV2(req)).resolves.toBeDefined();
+  });
+
   test('drops a response from an older block than the last accepted', async () => {
     stub(quoteBody(100));
     await quoteV2(REQ);

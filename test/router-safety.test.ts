@@ -378,6 +378,7 @@ describe('a chained second hop is floored by the server or not at all', () => {
       tokenOf,
       isOfficialPool,
       serverFloors: { [c.address.toLowerCase()]: floor },
+      maxTolPbps: floor.tolPbps,
     });
     expect(legs?.length).toBe(2);
     const [l1, l2] = legs as NonNullable<typeof legs>;

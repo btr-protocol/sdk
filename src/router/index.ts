@@ -100,8 +100,22 @@ function applyTolPbps(amount: bigint, tolPbps: number): bigint {
  * the same `SwapQuote` as `amount_out`; the ONE formula, for both spread and relative modes, is
  * `min_out = amount_out·(1e6 − tol_pbps)/1e6` (`back/crates/quote/src/slippage.rs`). This checks
  * it rather than trusting it, and throws instead of quietly lowering the floor.
+ *
+ * The formula alone is only SELF-consistency: the server authors both sides of it, so a triple
+ * like `{X, 999000, X/1000}` — legal all the way to the service's own 99.9% ceiling — passes while
+ * leaving no floor at all, and the swap is sandwiched for almost the whole amount. `maxTolPbps` is
+ * the caller's own tolerance, the one number in the exchange the server did not write, and it
+ * bounds the tolerance the caller will encode.
  */
-export function assertServerFloor(amountOut: bigint, tolPbps: number, minOut: bigint): void {
+export function assertServerFloor(
+  amountOut: bigint,
+  tolPbps: number,
+  minOut: bigint,
+  maxTolPbps: number,
+): void {
+  if (!(tolPbps <= maxTolPbps)) {
+    throw new Error(`server tol_pbps ${tolPbps} exceeds the requested ${maxTolPbps}`);
+  }
   if (minOut > amountOut) {
     throw new Error(`server floor ${minOut} exceeds amount_out ${amountOut}`);
   }
@@ -163,6 +177,21 @@ export interface PlanLegOpts {
    *  `planToLegs` returns null rather than author a hop-2 floor of its own (`slippageFrac` floors
    *  direct legs only). */
   serverFloors?: Record<string, { amountOut: bigint; minOut: bigint; tolPbps: number }>;
+  /** Ceiling on the server's `tol_pbps`, in pbps, from the CALLER's own slippage policy. REQUIRED
+   *  whenever `serverFloors` is set: {@link assertServerFloor} can only prove the floor agrees
+   *  with the server's own `amount_out`, and the widest tolerance the service will author (99.9%)
+   *  satisfies that check while floring nothing. Supply the user's own maximum. */
+  maxTolPbps?: number;
+}
+
+/** The caller's tolerance ceiling for a server-authored floor. A plan carrying `serverFloors` and
+ *  no ceiling is refused rather than encoded: there would be nothing bounding the floor but the
+ *  service that wrote it. */
+function serverTolCeiling(caller: string, opts: PlanLegOpts): number {
+  if (opts.maxTolPbps === undefined) {
+    throw new Error(`${caller}: maxTolPbps is required whenever serverFloors is set`);
+  }
+  return opts.maxTolPbps;
 }
 
 /** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
@@ -303,7 +332,12 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     ]);
   }
   for (const [server, slices] of byFloor) {
-    assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
+    assertServerFloor(
+      server.amountOut,
+      server.tolPbps,
+      server.minOut,
+      serverTolCeiling('planToLegs', opts),
+    );
     const total = slices.reduce((s, x) => s + x.q, 0n);
     // Nothing quoted for a floored token: no slice can carry the floor. Fail closed.
     if (total <= 0n) return null;
@@ -834,7 +868,12 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => {
     const server = opts.serverFloors?.[token.toLowerCase()];
     if (server) {
-      assertServerFloor(server.amountOut, server.tolPbps, server.minOut);
+      assertServerFloor(
+        server.amountOut,
+        server.tolPbps,
+        server.minOut,
+        serverTolCeiling('planToRouterPlan', opts),
+      );
       return { token, minOut: server.minOut };
     }
     return { token, minOut: applySlip(amount, slip) };

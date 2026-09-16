@@ -5,7 +5,9 @@
  * The server authors the floor (`tol_pbps` + `min_out`) from the same `getSwapQuote` that produced
  * `amount_out`. The client does not re-derive it; it checks the wire's ONE invariant,
  * `min_out = amount_out·(1e6 − tol_pbps)/1e6` for BOTH spread and relative modes
- * (`assertServerFloor`), and refuses to use a floor that violates it.
+ * (`assertServerFloor`), and bounds `tol_pbps` by the widest the REQUEST's own policy can produce.
+ * The formula alone is self-consistency — the server writes both of its sides — so without the
+ * bound a floor 99.9% under the quote passes it.
  */
 
 import { btrFetchRaw } from '../api.js';
@@ -181,11 +183,29 @@ async function post(path: string, body: unknown, opts: V2ClientOpts): Promise<un
   }
 }
 
+/** `back/crates/quote/src/slippage.rs` MAX_TOL_PBPS: 99.9%. */
+const MAX_TOL_PBPS = 999_000;
+/** `SwapQuote.spreadPbps` is a uint16 BY CONSTRUCTION — `Pricing.sol` solves its interior swing cap
+ *  so a composed fence always fits the field — so this is the widest spread any quote can carry. */
+const MAX_SPREAD_PBPS = 0xffff;
+
+/** The widest `tol_pbps` the request's own policy can yield server-side (`slippage::floor`):
+ *  relative is its clamped pbps, spread is `pct`% of a chain spread that cannot exceed its field.
+ *
+ *  Derived from the CALLER's numbers only. The served `spread_pbps` is deliberately not used: the
+ *  server authors that too, so a bound built on it would bound nothing. A server tolerance TIGHTER
+ *  than the policy is allowed through — it floors higher than asked, which costs a fill, not value. */
+function policyTolPbps(slip: Slippage): number {
+  if (slip.mode === 'relative') return Math.min(MAX_TOL_PBPS, Math.max(100, slip.pbps));
+  const pct = Math.min(300, Math.max(10, slip.pct));
+  return Math.min(MAX_TOL_PBPS, Math.floor((pct * MAX_SPREAD_PBPS) / 100));
+}
+
 /** One floor, typed. The generic `assertServerFloor` throws a plain `Error` for the builder; a
  *  wire-sourced violation is the client's to classify. */
-function checkFloor(amountOut: string, tolPbps: number, minOut: string): void {
+function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Slippage): void {
   try {
-    assertServerFloor(BigInt(amountOut), tolPbps, BigInt(minOut));
+    assertServerFloor(BigInt(amountOut), tolPbps, BigInt(minOut), policyTolPbps(slip));
   } catch (e) {
     throw new V2Error(
       'floor_violation',
@@ -208,7 +228,7 @@ export async function quoteV2(
   acceptBlock(key, raw.block.number);
   for (const a of raw.amounts) {
     if (!isRefused(a)) {
-      checkFloor(a.amount_out, a.tol_pbps, a.min_out);
+      checkFloor(a.amount_out, a.tol_pbps, a.min_out, req.slippage);
     }
   }
   return raw;
@@ -226,6 +246,8 @@ export async function routeV2(
   }
   const key = `r:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}:${req.amount_in.toLowerCase()}`;
   acceptBlock(key, raw.block.number);
-  for (const f of raw.best?.floors ?? []) checkFloor(f.amount_out, f.tol_pbps, f.min_out);
+  for (const f of raw.best?.floors ?? []) {
+    checkFloor(f.amount_out, f.tol_pbps, f.min_out, req.slippage);
+  }
   return raw;
 }

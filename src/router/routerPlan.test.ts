@@ -721,6 +721,7 @@ describe('planToLegs', () => {
         isOfficialPool,
         nativeIn: true,
         serverFloors: crossFloors,
+        maxTolPbps: 0,
       }),
     );
     expect(legs.length).toBe(2);
@@ -948,6 +949,7 @@ describe('planToLegs', () => {
           serverFloors: {
             [USDC.toLowerCase()]: { amountOut: 31_000_000n, minOut: 31_000_000n, tolPbps: 0 },
           },
+          maxTolPbps: 0,
         }),
       );
       expect(legs[0].amountIn).toBe(BALANCE);
@@ -990,7 +992,13 @@ describe('planToLegs', () => {
       },
     };
     const legs = mustLegs(
-      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+      planToLegs(splitPlan, {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+        serverFloors: floors,
+        maxTolPbps: 10_000,
+      }),
     );
     expect(legs.length).toBe(2);
     // Each slice is floored on its own share, not the aggregate: 700·0.99 and 300·0.99.
@@ -1023,7 +1031,13 @@ describe('planToLegs', () => {
       },
     };
     const legs = mustLegs(
-      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+      planToLegs(splitPlan, {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+        serverFloors: floors,
+        maxTolPbps: 10_000,
+      }),
     );
     const aggregate = 900n * 10n ** 18n;
     expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(990n * 10n ** 18n);
@@ -1083,7 +1097,13 @@ describe('planToLegs', () => {
       },
     };
     const legs = mustLegs(
-      planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, serverFloors: floors }),
+      planToLegs(splitPlan, {
+        slippageFrac: 0,
+        tokenOf,
+        isOfficialPool,
+        serverFloors: floors,
+        maxTolPbps: 10_000,
+      }),
     );
     expect(legs.length).toBe(4);
     // Hop 1 is funded from the wallet, floored on its own quote at the server tolerance.
@@ -1138,9 +1158,9 @@ describe('server floors — checked against the server amount_out, not the plan 
     const planExpected = (planFloatUnits * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
     expect(minOut).not.toBe(planExpected);
     // The delivered floor is consistent with the server integer...
-    expect(() => assertServerFloor(amountOut, tolPbps, minOut)).not.toThrow();
+    expect(() => assertServerFloor(amountOut, tolPbps, minOut, tolPbps)).not.toThrow();
     // ...and NOT with the f64 plan amount. This is the call the pre-fix builder made.
-    expect(() => assertServerFloor(planFloatUnits, tolPbps, minOut)).toThrow();
+    expect(() => assertServerFloor(planFloatUnits, tolPbps, minOut, tolPbps)).toThrow();
   });
 
   const opts = {
@@ -1148,6 +1168,7 @@ describe('server floors — checked against the server amount_out, not the plan 
     tokenOf,
     isOfficialPool,
     serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
+    maxTolPbps: tolPbps,
   };
   const single = plan(1, 1, [part(route([P1], ['USDC', 'USDT']), 1, 1, 1)]);
 
@@ -1161,5 +1182,29 @@ describe('server floors — checked against the server amount_out, not the plan 
     const rp = planToRouterPlan(single, { ...opts, amountInUnits: 1n });
     expect(rp).not.toBeNull();
     expect(rp?.floors[0].minOut).toBe(minOut);
+  });
+
+  // The formula only proves the server agrees with ITSELF. `{X, 999000, X/1000}` — legal all the
+  // way to the service's own ceiling — satisfies it and leaves no floor at all, so the caller's own
+  // tolerance, the one number the server did not author, has to bound it.
+  test('a tolerance wider than the caller asked for is refused, however consistent', () => {
+    const wideTol = 999_000;
+    const wide = (amountOut * (1_000_000n - BigInt(wideTol))) / 1_000_000n;
+    const wideOpts = {
+      ...opts,
+      serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut: wide, tolPbps: wideTol } },
+    };
+    expect(() => planToLegs(single, wideOpts)).toThrow(/exceeds the requested/);
+    expect(() => planToRouterPlan(single, { ...wideOpts, amountInUnits: 1n })).toThrow(
+      /exceeds the requested/,
+    );
+  });
+
+  test('a server floor with no caller ceiling is refused, never encoded unbounded', () => {
+    const { maxTolPbps: _drop, ...noCeiling } = opts;
+    expect(() => planToLegs(single, noCeiling)).toThrow(/maxTolPbps is required/);
+    expect(() => planToRouterPlan(single, { ...noCeiling, amountInUnits: 1n })).toThrow(
+      /maxTolPbps is required/,
+    );
   });
 });
