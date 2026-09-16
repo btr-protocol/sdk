@@ -6,13 +6,13 @@
  *   bun run scripts/fetch-seed-marks.ts bnb        # bnb → 56.seed-marks.json
  *   CHAIN=arc bun run scripts/fetch-seed-marks.ts  # same, via env
  *
- * Both halves of the ceremony read this file: <Chain>OracleDeploy seeds every feed from it, and
- * <Chain>PoolDeploy converts seedUsdPerLeg to token units with it (then asserts its mark equals the
- * on-chain feed seed). One fetch, one artifact, no second source that can disagree.
+ * Both halves of the ceremony read this file: the oracle deploy seeds every feed from it, and
+ * `Pools.s.sol` converts each asset's manifest `seedUsd` to token units with it (then asserts its
+ * mark equals the on-chain feed seed). One fetch, one artifact, no second source that can disagree.
  *
- * The ROSTER is never restated here: it is the `symbols` array of that chain's risk-params JSON,
- * which is also what the chain's OracleDeploy `_syms()` pins (Arc: 18, the idx-17 USDC/USD depeg
- * reference is seeded from ORACLE_SEED_USDCUSD_1E18, not from this file). A symbol with no NXR
+ * The ROSTER is never restated here: it is the non-`ref` keys of that chain's `<slug>.manifest.json`
+ * `assets` object (schema: `dex-evm/deployments/manifest.schema.json`), which is also what the
+ * chain's oracle deploy pins. A symbol with no NXR
  * mapping is a hard error, never a silent skip, and the mapping is `src/venues/nxr.ts NXR_MARKS`,
  * chain-free, because an asset's mark source does not change when it is listed on a second chain.
  * This script therefore needs no per-chain feed table and cannot exit 1 on a chain simply for not
@@ -45,19 +45,13 @@ import {
 } from '../src/venues/nxr.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
- *  file and is checked against the risk JSON, so one chain can never write another's snapshot. The seed
- *  SIZE is deliberately NOT pinned here; it is read from the risk JSON below. A second hand-written
- *  copy of it guarded nothing this ceremony does not already guard (`ArcPoolDeploy._loadCfg` asserts
- *  the snapshot against the risk JSON, and `checkSeedBudget()` refuses a roster it cannot fund),
- *  while a resize left the copy stale and exited 1 on the very file it is meant to read. */
+ *  file and is checked against the deploy manifest, so one chain can never write another's
+ *  snapshot. Nothing else about the chain is restated here - the roster and the chainId assertion
+ *  both come out of `<slug>.manifest.json` (schema: `dex-evm/deployments/manifest.schema.json`). */
 const CHAINS = {
-  arc: { chainId: 5_042_002, risk: 'arc-risk-params.json', basis: 'USDC' },
-  // A chain earns a row the moment its risk manifest exists, BEFORE its oracle ceremony: the
-  // broadcast seeds every feed from this script's output, so a missing row is a chain that cannot
-  // be seeded at all. Nothing else about the chain is restated here - the roster, the seed size and
-  // the chainId assertion all come out of the manifest, which is why the row is three fields.
-  bnb: { chainId: 56, risk: 'bnb-risk-params.json', basis: 'USDC' },
-} as const satisfies Record<string, { chainId: number; risk: string; basis: MarkBasis }>;
+  arc: { chainId: 5_042_002, manifest: 'arc.manifest.json', basis: 'USDC' },
+  bnb: { chainId: 56, manifest: 'bnb.manifest.json', basis: 'USDC' },
+} as const satisfies Record<string, { chainId: number; manifest: string; basis: MarkBasis }>;
 
 const chainArg = (process.argv[2] || process.env.CHAIN || 'arc').toLowerCase();
 const CHAIN = CHAINS[chainArg as keyof typeof CHAINS];
@@ -67,13 +61,13 @@ if (!CHAIN) {
 }
 
 const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
-// The Solidity halves (ArcPoolDeploy._riskPath/_marksPath) resolve RISK_PARAMS/SEED_MARKS against
-// the forge working directory dex/evm. Mirror them so one env override names the same file for the
+// The Solidity halves (AssetLib._manifest/_seedMarksPath) resolve MANIFEST/SEED_MARKS against the
+// forge working directory dex/evm. Mirror them so one env override names the same file for the
 // fetcher and the deploy scripts, instead of two different defaults.
 const EVM = join(DEX, 'evm');
-const RISK = process.env.RISK_PARAMS
-  ? join(EVM, process.env.RISK_PARAMS)
-  : join(EVM, `deployments/${CHAIN.risk}`);
+const MANIFEST = process.env.MANIFEST
+  ? join(EVM, process.env.MANIFEST)
+  : join(EVM, `deployments/${CHAIN.manifest}`);
 const OUT = process.env.SEED_MARKS
   ? join(EVM, process.env.SEED_MARKS)
   : join(EVM, `deployments/${CHAIN.chainId}.seed-marks.json`);
@@ -88,35 +82,28 @@ const PEG = [0.98, 1.02] as const;
  *  a peg-plausible mid from a dead ticker is exactly what the band cannot see. */
 const MAX_AGE_MS = 5 * 60_000;
 
-const risk: {
-  chainId: number;
-  seedUsdPerLeg: number;
-  unmintableSeedUsdPerLeg?: number;
-  symbols: string[];
-} = await Bun.file(RISK).json();
-const seedUsdPerLeg = risk.seedUsdPerLeg;
-if (!Number.isFinite(seedUsdPerLeg) || seedUsdPerLeg <= 0) {
-  console.error(`${RISK}: seedUsdPerLeg absent or non-positive — nothing to size a seed from`);
+/** One row of `manifest.assets`. `_doc` sibling keys are plain strings, filtered out below before
+ *  this type applies. `hub` marks the base (USDC): no market feed, seeded as the identity 1e18 by
+ *  `Pool.s.sol` itself, never read from this snapshot's `marks` map. `ref` marks the signed depeg
+ *  reference row (e.g. `USDC-USD`): a feed the keeper pushes, never a pool leg, and not resolvable
+ *  through the per-asset symbol→NXR mapping this script uses, so it is excluded from the roster. */
+interface AssetRow {
+  hub?: boolean;
+  ref?: boolean;
+}
+const manifest: { chain: { id: number }; assets: Record<string, AssetRow | string> } =
+  await Bun.file(MANIFEST).json();
+// The manifest is the SoT for the roster; the chain arg only selects WHICH file. A mismatch means
+// the operator is seeding a different ceremony than they think.
+if (manifest.chain.id !== CHAIN.chainId) {
+  console.error(`${MANIFEST}: chain.id ${manifest.chain.id} != ${CHAIN.chainId} (${chainArg})`);
   process.exit(1);
 }
-// The native (unmintable) legs read a SECOND depth target from the same SoT. OPTIONAL: on a chain
-// whose USDC is a TestnetERC20 mock the bridged concept does not exist, so its risk-params JSON
-// carries no key and the snapshot must not either. Where the params file HAS the key (Arc) the
-// snapshot must carry it too, or ArcPoolDeploy._assertSeedMarksCfg sees a mismatch on a key this file
-// never wrote. A present-but-non-positive key is a hard error, never a silently zero-sized class.
-const unmintableSeedUsdPerLeg = risk.unmintableSeedUsdPerLeg;
-if (unmintableSeedUsdPerLeg !== undefined) {
-  if (!Number.isFinite(unmintableSeedUsdPerLeg) || unmintableSeedUsdPerLeg <= 0) {
-    console.error(
-      `${RISK}: unmintableSeedUsdPerLeg present but non-positive — nothing to size the native legs from`,
-    );
-    process.exit(1);
-  }
-}
-// The risk JSON is the SoT for the roster and the seed size; the chain arg only selects WHICH file.
-// A mismatch means the operator is seeding a different ceremony than they think.
-if (risk.chainId !== CHAIN.chainId) {
-  console.error(`${RISK}: chainId ${risk.chainId} != ${CHAIN.chainId} (${chainArg})`);
+const assets = Object.entries(manifest.assets).filter(
+  (e): e is [string, AssetRow] => typeof e[1] === 'object' && e[1] !== null && !e[1].ref,
+);
+if (!assets.length) {
+  console.error(`${MANIFEST}: no listable assets — nothing to seed`);
   process.exit(1);
 }
 
@@ -124,17 +111,17 @@ if (risk.chainId !== CHAIN.chainId) {
 // the BASIS this chain's pools consume a mark in. `nxrPair` returns null rather than falling back
 // to the USD row: on a quoteUnit-0 chain that fallback is a mark off by the whole USD/USDC basis
 // with nothing left on-chain to correct it, which no band or peg clamp can see.
-const roster = (risk.symbols ?? []).map((symbol) => {
+const roster = assets.map(([symbol, a]) => {
   // The BASE is exempt from the basis, and not as an exception to it: it carries no market feed
   // (there is no USDC/USDC identity: Pricing._readBasePriceOrHalt discards the base read for
   // quoting), only the signed depeg reference, which is deliberately USD-quoted because a
   // depeg is only observable against USD. Its mark below is the identity 1 and never fetched.
-  const basis = symbol === risk.symbols[0] ? 'USD' : CHAIN.basis;
+  const basis = a.hub ? 'USD' : CHAIN.basis;
   const m = nxrPair(symbol, basis);
   const full = nxrMark(symbol);
   if (!m || !full) {
     console.error(
-      `${RISK}: symbol ${symbol} has no ${basis}-basis NXR mark source — add it to` +
+      `${MANIFEST}: symbol ${symbol} has no ${basis}-basis NXR mark source — add it to` +
         ` src/venues/nxr.ts NXR_MARKS${basis === 'USDC' ? ' (the `usdc` row)' : ''}.` +
         ` Probe the EXPLICIT pair first: a delimiter-less near-miss answers 200 with another` +
         ` asset's mid, so "it returns a price" is not evidence the pair exists. Confirm it also` +
@@ -145,12 +132,8 @@ const roster = (risk.symbols ?? []).map((symbol) => {
   // nxrQuote/quoteVia are cleared before the basis pair is applied: a spread does not REMOVE a
   // key the basis row omits, so `CAD-USDC` would silently inherit the USD row's
   // `nxrQuote: 'USD-CAD'` and be seeded upside down.
-  return { symbol, ...full, nxrQuote: undefined, quoteVia: undefined, ...m };
+  return { symbol, hub: a.hub === true, ...full, nxrQuote: undefined, quoteVia: undefined, ...m };
 });
-if (!roster.length) {
-  console.error(`${RISK}: empty symbols[] — nothing to seed`);
-  process.exit(1);
-}
 
 const errs: string[] = [];
 const marks: Record<string, { ticker: string; mid: number; mark1e18: string }> = {};
@@ -194,8 +177,8 @@ async function fetchMid(pair: string, shut: boolean): Promise<{ mid: number } | 
 }
 
 for (const f of roster) {
-  // USDC/USDC is an identity feed by construction: never fetched, never off 1.
-  if (f.symbol === 'USDC') {
+  // The hub is an identity feed by construction: never fetched, never off 1.
+  if (f.hub) {
     marks[f.symbol] = { ticker: f.nxrSymbol, mid: 1, mark1e18: (10n ** 18n).toString() };
     continue;
   }
@@ -255,9 +238,10 @@ const snapshot = {
   chainId: CHAIN.chainId,
   source: `${NXR}/v1/price`,
   fetchedAt: fetchedAt.toISOString(),
+  // AssetLib._seedMarks checks freshness against this, in ms since epoch — `fetchedAt` is for
+  // humans and the SCAFFOLD sentinel; this is what the ceremony actually gates on.
+  fetchedAtMs: fetchedAt.getTime(),
   maxAgeMs: MAX_AGE_MS,
-  seedUsdPerLeg,
-  ...(unmintableSeedUsdPerLeg === undefined ? {} : { unmintableSeedUsdPerLeg }),
   marks,
 };
 await Bun.write(OUT, `${JSON.stringify(snapshot, null, 1)}\n`);
