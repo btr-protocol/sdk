@@ -20,7 +20,7 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
           git -C ../back sparse-checkout set abis
-          git -C ../back checkout -q 0f5552853d3afc9c321c4fd3ce58b619e7b630f6
+          git -C ../back checkout -q 54abe0b47021b2cd15d656e6d0973be5fe4c63b9
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
