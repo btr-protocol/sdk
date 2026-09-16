@@ -17,15 +17,36 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dexEvm = process.env.BTR_DEX_EVM ?? join(root, '..', 'dex-evm');
 const source = join(dexEvm, 'abi', 'constants.json');
 const out = join(root, 'src', 'abis', 'solidity.generated.ts');
+const v5Source = join(dexEvm, 'abi', 'ExternalOracleV5.json');
+const v5Out = join(root, 'src', 'abis', 'ExternalOracleV5.ts');
 
 if (!existsSync(source)) {
   console.log(`gen-constants: ${source} absent — keeping the committed mirror`);
   process.exit(0);
+}
+
+// The V5 feed ADMIN surface, beside the vendored V4 read surface. Generations are not
+// interchangeable here: V4 spells the freeze `pauseFeed`/`FeedPaused` and V5 spells it
+// `haltFeed`/`FeedHalted`, and `updateFeed` gained `sigmaFloorPbps`. A caller drives the
+// generation its deployment record names — Arc is V4, BNB is V5 — so both ship.
+if (existsSync(v5Source)) {
+  const abi = readFileSync(v5Source, 'utf8').trimEnd();
+  writeFileSync(
+    v5Out,
+    `// GENERATED from dex-evm/abi/ExternalOracleV5.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
+      `/**\n * ExternalOracleV5 - the deployed feed read + admin surface (beacon generation).\n *\n` +
+      ` * V4 is the Arc fleet and lives in \`ExternalOracleV4.ts\`; pick by the deployment record's\n` +
+      ` * oracle version, never by assuming one. Push paths are decoded from raw calldata\n` +
+      ` * (\`oracle/wire.ts\`), never through this ABI.\n */\n` +
+      `import type { Abi } from '../eth/abi.js';\n\nexport const EXTERNAL_ORACLE_V5_ABI: Abi = ${abi};\n`,
+  );
+  console.log('gen-constants: wrote src/abis/ExternalOracleV5.ts');
 }
 
 type Consts = {
@@ -107,3 +128,11 @@ lines.push('];');
 
 writeFileSync(out, `${lines.join('\n')}\n`);
 console.log(`gen-constants: wrote src/abis/solidity.generated.ts from ${source}`);
+
+// Same posture `fetch-abis.ts` takes: the output is committed, so it has to satisfy `biome check`,
+// but biome may be absent in a Docker build layer — warn, never throw.
+try {
+  await $`bunx biome format --write ${[out, v5Out].filter((f) => existsSync(f))}`.cwd(root).quiet();
+} catch {
+  console.log('gen-constants: biome format skipped (biome unavailable)');
+}
