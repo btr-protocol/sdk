@@ -146,7 +146,7 @@ export interface V5Blob {
  * then nP x 5B price entries (gi u8 | lane u32), nS x 5B sigma entries (gi u8 | sigmaPbps u32),
  * nC x 3B conf entries (gi u8 | confBps u16).
  *
- * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `tsDs >= 864000`,
+ * Fails closed where `_checkHeader` reverts `InvalidBlobHeader` (wrong version, `tsDs >= 864000`,
  * all-empty blob, length disagreeing with section counts, reserved top-3 lane bits, non-ascending
  * `gi`), plus anywhere the price walk SKIPS instead of pricing: a nonzero lane with the mantissa
  * MSB clear is the sentinel-write the chain flags and ignores, so the decoder rejects it rather
@@ -312,7 +312,7 @@ export type V6Blob = Omit<V5Blob, 'tsDs'> & {
  * Decode a wire-v6 DIFF blob: header 12B (`ver:u8=6 | seq:u32 | srcSecs:u32 | nP:u8 | nS:u8 | nC:u8`),
  * then nP x 5B price entries (gi u8 | lane u32), nS x 5B sigma entries, nC x 3B conf entries.
  *
- * Fails closed where `_checkHeader` reverts `BadBlobHeader` (wrong version, `nP == 0`, `nC != nP`,
+ * Fails closed where `_checkHeader` reverts `InvalidBlobHeader` (wrong version, `nP == 0`, `nC != nP`,
  * length disagreeing with section counts, non-ascending `gi`), plus a price/conf `gi` sequence
  * that is not identical. With `nowSecs` (the pushing block's timestamp) it also applies the
  * chain's `FutureTimestamp` / `StaleTimestamp` bounds on `srcSecs`. The lane's absolute `exp7`

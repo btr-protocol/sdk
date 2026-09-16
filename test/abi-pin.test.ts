@@ -89,7 +89,7 @@ describe('PoolFactory parity is pinned across repos', () => {
         .filter((e) => e.type === 'function')
         .map((e) => e.name),
     );
-    for (const fn of ['setOfficial', 'executeOfficial', 'cancelOfficial', 'syncOfficial']) {
+    for (const fn of ['requestOfficial', 'executeOfficial', 'cancelOfficial', 'syncOfficial']) {
       expect(names.has(fn)).toBe(true);
     }
     expect(names.has('setProtocolDeployer')).toBe(false);

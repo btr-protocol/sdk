@@ -203,7 +203,7 @@ export function dispersionCap(c: QuarticCurve): number {
 
 export function sanitizeDispersion(minDispersion: number, cap: number): number {
   const mn = minDispersion === 0 ? 1000 : minDispersion;
-  if (mn > cap || mn > MAX_DISPERSION_PBPS) throw new Error('BadConfig: dispersion floor');
+  if (mn > cap || mn > MAX_DISPERSION_PBPS) throw new Error('InvalidConfig: dispersion floor');
   return mn;
 }
 

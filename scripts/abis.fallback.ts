@@ -146,7 +146,7 @@ export const ABI_FALLBACKS: Record<string, unknown[]> = {
       'nonpayable',
     ),
     fn(
-      'cancelTimelock',
+      'cancelOp',
       [T('pool', 'address'), T('opType', 'uint8'), T('subject', 'bytes32')],
       [],
       'nonpayable',

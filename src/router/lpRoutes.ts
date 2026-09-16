@@ -32,7 +32,7 @@ export interface LpRouteOpts {
    *  front). REQUIRED: the back end authors slippage, so none is picked here. */
   slippageFrac: number;
   liabilityEnabled?: (symbol: string) => boolean;
-  maxRedeem?: (symbol: string) => number;
+  maxWithdraw?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
   /** `PoolStorage.lastGoodCWad` per pool tag: the degraded same-asset exit cap when a mark is
    *  unusable. Absent reads as never-observed (1), the chain's own fallback for a zero slot. */
@@ -126,7 +126,7 @@ const seasonGate = (
   burnedFace: number,
   opts: LpRouteOpts,
 ): RankedLpRoute => {
-  const capacity = opts.maxRedeem?.(burnedSymbol);
+  const capacity = opts.maxWithdraw?.(burnedSymbol);
   if (capacity !== undefined && capacity < burnedFace) {
     return unfeasible(route, 'cooldown', route.out);
   }

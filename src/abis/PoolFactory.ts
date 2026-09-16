@@ -457,7 +457,7 @@ export const POOL_FACTORY_ABI = [
         type: 'bool',
       },
     ],
-    name: 'setOfficial',
+    name: 'requestOfficial',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -716,7 +716,7 @@ export const POOL_FACTORY_ABI = [
   },
   {
     inputs: [],
-    name: 'BadConfig',
+    name: 'InvalidConfig',
     type: 'error',
   },
   {
@@ -757,12 +757,12 @@ export const POOL_FACTORY_ABI = [
   },
   {
     inputs: [],
-    name: 'NotAuth',
+    name: 'NotAuthorized',
     type: 'error',
   },
   {
     inputs: [],
-    name: 'NotCode',
+    name: 'NotContract',
     type: 'error',
   },
   {
@@ -782,7 +782,7 @@ export const POOL_FACTORY_ABI = [
   },
   {
     inputs: [],
-    name: 'ZeroAddr',
+    name: 'ZeroAddress',
     type: 'error',
   },
 ];

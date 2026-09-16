@@ -15,7 +15,7 @@
  * itself is unchanged: the snapshot carries it like any other source, and misses it the same way.
  *
  * A forge artifact carries the contract's own entries only: the events and errors raised inside
- * a linked library (`Pricing.ThresholdViolation`, `PoolLiquidity.Swapped`) are missing, and revert
+ * a linked library (`PricingLib.ThresholdViolation`, `PoolLiquidityLib.Swapped`) are missing, and revert
  * data from one decodes to nothing. So a re-pin against a contract release reads the checkout
  * EXPLICITLY and merges the linked libraries' entries — the surface the backend bakes:
  *
@@ -77,7 +77,7 @@ const TARGETS = [
     symbol: 'ADMIN_ABI',
     file: 'src/abis/Admin.ts',
     doc: 'Singleton admin entrypoints (ERC-1967 proxy); governance ops via requestOp/execute.',
-    fns: ['requestOp', 'cancelTimelock', 'haltAsset', 'unhaltAsset'],
+    fns: ['requestOp', 'cancelOp', 'haltAsset', 'unhaltAsset'],
     pins: { 'requestOp(address,uint8,bytes32,bytes)': '0xf548551a' },
   },
 ] as const;

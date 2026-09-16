@@ -736,7 +736,7 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'BadConfig',
+    name: 'InvalidConfig',
     type: 'error',
   },
   {
@@ -782,12 +782,12 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'NotAuth',
+    name: 'NotAuthorized',
     type: 'error',
   },
   {
     inputs: [],
-    name: 'NotCode',
+    name: 'NotContract',
     type: 'error',
   },
   {
@@ -818,7 +818,7 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'ZeroAddr',
+    name: 'ZeroAddress',
     type: 'error',
   },
 ];

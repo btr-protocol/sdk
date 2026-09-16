@@ -363,7 +363,7 @@ export const FLASH_ABI = [
   },
   {
     type: 'error',
-    name: 'BadConfig',
+    name: 'InvalidConfig',
     inputs: [],
   },
   {
@@ -389,12 +389,12 @@ export const FLASH_ABI = [
   },
   {
     type: 'error',
-    name: 'NotAuth',
+    name: 'NotAuthorized',
     inputs: [],
   },
   {
     type: 'error',
-    name: 'NotCode',
+    name: 'NotContract',
     inputs: [],
   },
   {
@@ -434,7 +434,7 @@ export const FLASH_ABI = [
   },
   {
     type: 'error',
-    name: 'ZeroAddr',
+    name: 'ZeroAddress',
     inputs: [],
   },
   {

@@ -424,7 +424,7 @@ export const LP_TOKEN_ABI = [
   },
   {
     type: 'error',
-    name: 'NotAuth',
+    name: 'NotAuthorized',
     inputs: [],
   },
   {
@@ -449,7 +449,7 @@ export const LP_TOKEN_ABI = [
   },
   {
     type: 'error',
-    name: 'ZeroAddr',
+    name: 'ZeroAddress',
     inputs: [],
   },
 ];
