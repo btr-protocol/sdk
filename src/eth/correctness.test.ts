@@ -126,6 +126,8 @@ describe('multicall batching', () => {
 
   // Encode an aggregate3 return for `n` legs (leg `failIndex` marked reverted): top-level
   // dynamic return: [offset 0x20][array len][elem offsets][elems], each elem {bool,bytes}.
+  // Each leg's returnData is a FULL 32-byte word, as a `uint256` getter returns on the wire:
+  // the decoder refuses return data that ends inside a word rather than reading a smaller number.
   const encResults = (n: number, failIndex = -1): string => {
     const w = (v: bigint) => v.toString(16).padStart(64, '0');
     const ES = 0x80n;
@@ -133,11 +135,7 @@ describe('multicall batching', () => {
     let out = w(0x20n) + w(BigInt(n));
     for (let i = 0; i < n; i++) out += w(base + BigInt(i) * ES);
     for (let i = 0; i < n; i++)
-      out +=
-        w(i === failIndex ? 0n : 1n) +
-        w(0x40n) +
-        w(1n) +
-        (i === failIndex ? '08' : '01').padEnd(64, '0');
+      out += w(i === failIndex ? 0n : 1n) + w(0x40n) + w(32n) + w(i === failIndex ? 8n : 1n);
     return `0x${out}`;
   };
   /** Provider answering one Result per aggregate3 leg, counting wire requests. */
