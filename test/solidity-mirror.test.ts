@@ -1,16 +1,16 @@
 /** `src/abis/solidity.generated.ts` against the Solidity it claims to mirror.
  *
- *  The file's own header says solc keeps neither enum ordinals nor internal constants in the ABI,
- *  "so both are parsed out of the declaring `.sol` file" — but nothing in this repo parses
- *  anything: the mirror is hand-maintained under a GENERATED banner. An ordinal is exactly the
- *  kind of value that moves silently (`OpType` is grouped by timelock tier, so a member added to
- *  a group shifts every ordinal after it) and a wrong one sends a governance op to the wrong
- *  lever, or reads a halt bit that is not the halt bit.
+ *  The mirror is now GENERATED — `scripts/gen-constants.ts` writes it from `dex-evm/abi/constants.json`,
+ *  which `dex-evm/abi/consts.py` emits from the declaring sources. That closes the drift at the
+ *  source, but not the loop: a clone with no `dex-evm` sibling keeps the COMMITTED file, so the
+ *  committed file is still what a build compiles against and still has to be checked.
  *
- *  So this is the parser the header promised, run as an assertion instead of a codegen step: the
- *  declaring files stay the single source of truth and the mirror has to agree with them. It reads
- *  the sibling `../dex-evm` and `../shared` checkouts and skips — loudly — when they are absent,
- *  the same posture `fetch-abis.ts` takes for `../back/abis` in a Docker/SDK_REF build.
+ *  So this re-parses the declaring `.sol` independently of the generator and asserts the committed
+ *  mirror agrees. An ordinal is exactly the kind of value that moves silently (`OpType` is grouped
+ *  by timelock tier, so a member added to a group shifts every ordinal after it) and a wrong one
+ *  sends a governance op to the wrong lever, or reads a halt bit that is not the halt bit.
+ *  Skips — loudly — when the siblings are absent, the posture `fetch-abis.ts` takes for
+ *  `../back/abis` in a Docker/SDK_REF build.
  */
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -105,7 +105,7 @@ function evaluate(expr: string, env: Map<string, number>): number | undefined {
 
 describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
   const poolConsts = () => constants(src(join(DEX, 'src', 'libraries', 'PoolConstantsLib.sol')));
-  const pricingConsts = () => constants(src(join(DEX, 'src', 'libraries', 'Pricing.sol')));
+  const pricingConsts = () => constants(src(join(DEX, 'src', 'libraries', 'PricingLib.sol')));
 
   test('OpType ordinals match IPool.sol', () => {
     const members = enumMembers(src(join(DEX, 'src', 'interfaces', 'IPool.sol')), 'OpType');
@@ -117,13 +117,13 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
     expect(Object.fromEntries(members.map((n, i) => [n, i]))).toEqual({ ...M.BatchOp });
   });
 
-  test('Resource ordinals match shared Errors.sol', () => {
-    const members = enumMembers(src(join(SHARED, 'evm', 'src', 'Errors.sol')), 'Resource');
+  test('Resource ordinals match shared ErrLib.sol', () => {
+    const members = enumMembers(src(join(SHARED, 'evm', 'src', 'ErrLib.sol')), 'Resource');
     expect(Object.fromEntries(members.map((n, i) => [n, i]))).toEqual({ ...M.Resource });
   });
 
-  test('Tier ordinals match shared Constants.sol', () => {
-    const members = enumMembers(src(join(SHARED, 'evm', 'src', 'Constants.sol')), 'Tier');
+  test('Tier ordinals match shared ConstantsLib.sol', () => {
+    const members = enumMembers(src(join(SHARED, 'evm', 'src', 'ConstantsLib.sol')), 'Tier');
     expect(Object.fromEntries(members.map((n, i) => [n, i]))).toEqual({ ...M.Tier });
   });
 
@@ -149,24 +149,38 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
       'SWAP_ENABLED_BIT',
       'LIABILITY_SWAP_ENABLED_BIT',
       'FLASH_ENABLED_BIT',
+      'TOKEN_EXOTIC_BIT',
+      'DEPOSIT_GATED_BIT',
+      'ENABLE_MASK',
+      'GATING_MASK',
+      'KNOWN_FLAGS_MASK',
       'FEED_HALT_BIT',
       'MAX_CONFIDENCE_HALT_BPS',
       'MAX_DISPERSION_PBPS',
+      'INDEX_REASON_DONATE',
+      'INDEX_REASON_YIELD',
+      'INDEX_REASON_WRITEDOWN',
+      'INDEX_REASON_FEE',
+      'ORACLE_MODE_EXTERNAL',
+      'ORACLE_MODE_INTERNAL',
+      'QUOTE_UNIT_ANCHOR',
+      'QUOTE_UNIT_UOA',
       'HOOK_PRE_OUTFLOW',
       'HOOK_POST_INFLOW',
+      'HOOK_FLAGS_MASK',
     ] as const) {
       expect([k, c.get(k)]).toEqual([k, M[k]]);
     }
   });
 
-  test('staleness constants match Pricing.sol', () => {
+  test('staleness constants match PricingLib.sol', () => {
     const c = pricingConsts();
     expect(c.get('STALE_Z')).toBe(M.STALE_Z);
     expect(c.get('STALE_GRACE_CAP_SECS')).toBe(M.STALE_GRACE_CAP_SECS);
   });
 
-  test('INTERIOR_SWING_CAP_PBPS is the Pricing.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {
-    const pricing = src(join(DEX, 'src', 'libraries', 'Pricing.sol'));
+  test('INTERIOR_SWING_CAP_PBPS is the PricingLib.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {
+    const pricing = src(join(DEX, 'src', 'libraries', 'PricingLib.sol'));
     expect(pricing).toContain(
       'INTERIOR_SWING_CAP_PBPS =\n    (2 * FENCE_BUDGET_PBPS * SC.PBPS) / (2 * SC.PBPS + FENCE_BUDGET_PBPS);',
     );

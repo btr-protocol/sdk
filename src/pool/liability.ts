@@ -18,6 +18,7 @@
 // Protocol-fee EXEMPT and no accrueLpFee booking on-chain: the swapper pays the full embedded
 // spread only; no reserves move.
 
+import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import {
   INTERIOR_ENDPOINT,
   type PathLegWire,
@@ -36,8 +37,6 @@ import { applySlip } from '../utils/maths.js';
 
 /** SC.WAD */
 export const WAD = 1e18;
-/** PoolConstantsLib.sol:15: bit 2 of asset flags. Both legs must carry it. */
-export const LIABILITY_SWAP_ENABLED_BIT = 1 << 2;
 
 /** The slice of IPool.Asset the liability math reads. Build from getAsset output. Face units. */
 export interface LiabLeg {

@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import { type PoolState, buildLeg } from '../amm/aimm.js';
 // bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
 // PoolSolvency.solvency/previewCap, PoolLiquidity.exitMu and swapLiability.
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
-  LIABILITY_SWAP_ENABLED_BIT,
   WAD,
   exitCap,
   exitValue,
@@ -90,11 +90,11 @@ describe('LEDA-7: the ONE off-chain replica of pool-level settlement', () => {
 });
 
 describe('liabilitySwapEnabled (flag bit gate)', () => {
-  test('bit 2 of asset flags (PoolConstantsLib.sol:15)', () => {
-    expect(LIABILITY_SWAP_ENABLED_BIT).toBe(0b100);
-    expect(liabilitySwapEnabled(0b100)).toBe(true);
-    expect(liabilitySwapEnabled(0b111)).toBe(true);
-    expect(liabilitySwapEnabled(0b011)).toBe(false);
+  test('bit 5 of asset flags (PoolConstantsLib)', () => {
+    expect(LIABILITY_SWAP_ENABLED_BIT).toBe(1 << 5);
+    expect(liabilitySwapEnabled(1 << 5)).toBe(true);
+    expect(liabilitySwapEnabled(0b111111)).toBe(true);
+    expect(liabilitySwapEnabled(0b011111)).toBe(false);
   });
 });
 

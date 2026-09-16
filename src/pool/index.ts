@@ -145,7 +145,6 @@ export type {
   SwapLiabilityQuote,
 } from './liability.js';
 export {
-  LIABILITY_SWAP_ENABLED_BIT,
   WAD as WAD_F,
   exitCap,
   exitValue,
