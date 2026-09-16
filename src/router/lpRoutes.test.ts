@@ -167,7 +167,7 @@ describe('rankDeposit (routes A / B)', () => {
     const pools = [healthyPool()];
     const gated = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, {
       ...BE,
-      maxWithdraw: () => 0,
+      maxRedeem: () => 0,
     });
     const b = gated.routes.find((r) => r.id === 'deposit-first');
     expect(b?.feasible).toBe(false);
@@ -175,7 +175,7 @@ describe('rankDeposit (routes A / B)', () => {
     expect(gated.best?.id).toBe('market-first');
     const ok = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, {
       ...BE,
-      maxWithdraw: () => 10_000,
+      maxRedeem: () => 10_000,
     });
     expect(ok.routes.find((r) => r.id === 'deposit-first')?.feasible).toBe(true);
   });
@@ -209,7 +209,7 @@ describe("rankRedeem (routes A' / B')", () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankRedeem(pools, 'NZDF', 'AUDF', 5_000, {
       ...BE,
-      maxWithdraw: () => 4_999,
+      maxRedeem: () => 4_999,
     });
     for (const r of routes) {
       expect(r.feasible).toBe(false);
@@ -404,7 +404,7 @@ describe('same-asset direct paths', () => {
   test('rankRedeem(T, T) still honors the season gate (it burns LP like every exit)', async () => {
     const gated = await rankRedeem([healthyPool()], 'AUDF', 'AUDF', 5_000, {
       ...BE,
-      maxWithdraw: () => 4_999,
+      maxRedeem: () => 4_999,
     });
     expect(gated.best).toBeNull();
     expect(gated.routes[0]?.reason).toBe('cooldown');
@@ -433,8 +433,8 @@ describe('missing liability liquidity / single-pool scope edges', () => {
 });
 
 describe('capacity clamp boundary', () => {
-  test('maxWithdraw exactly equal to the burned face passes the gate on both sides', async () => {
-    const cap: LpRouteOpts = { ...BE, maxWithdraw: () => 5_000 };
+  test('maxRedeem exactly equal to the burned face passes the gate on both sides', async () => {
+    const cap: LpRouteOpts = { ...BE, maxRedeem: () => 5_000 };
     const dep = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, cap);
     expect(dep.routes.find((r) => r.id === 'deposit-first')?.feasible).toBe(true);
     const red = await rankRedeem([healthyPool()], 'NZDF', 'AUDF', 5_000, cap);

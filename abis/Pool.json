@@ -1359,7 +1359,7 @@
   },
   {
     "type": "function",
-    "name": "maxWithdraw",
+    "name": "maxRedeem",
     "inputs": [
       {
         "name": "owner",
