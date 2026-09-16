@@ -2,17 +2,17 @@
 pragma solidity =0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {NUQuartic as NUQ} from "../../src/libraries/NUQuartic.sol";
+import {NUQuarticLib as NUQ} from "../../src/libraries/NUQuarticLib.sol";
 
 /// @title CurveStorageDump — generator for `sdk/test/fixtures/curve-storage.json`.
 /// @notice NOT part of the dex suite. `gen-curve-storage.sh` copies this file into a pristine
 ///         snapshot of the dex repo at HEAD, runs it, and copies the JSON back. See that script for
 ///         the reproduction steps; nothing here is ever written into the dex repo.
 /// @dev What the fixture certifies: `sdk/src/pool/storage.ts` `readCurve` hand-decodes the packed
-///      `NUQuartic.Curve` header (m | 14×uint16 boundaries | dispRef at bit 232, flags at bit 248) and the two
+///      `NUQuarticLib.Curve` header (m | 14×uint16 boundaries | dispRef at bit 232, flags at bit 248) and the two
 ///      words per segment (4×int64 | int64+int128). solc reports that struct as
 ///      `header:uint256 + segs:uint256[28]`, so NONE of that packing appears in `storageLayout` and
-///      `test/storage-layout.test.ts` cannot see it. This dumps the RAW STORAGE WORDS `NUQuartic.set`
+///      `test/storage-layout.test.ts` cannot see it. This dumps the RAW STORAGE WORDS `NUQuarticLib.set`
 ///      actually wrote, plus the library's OWN `rangeQ`/`evalQ`/`areaQ` readings of them, so the SDK
 ///      decoder is checked against Solidity rather than against a second copy of the same guess.
 contract CurveStorageDumpTest is Test {

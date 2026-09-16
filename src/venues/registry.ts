@@ -96,7 +96,7 @@ export function activeRefMarksUsd(chainId: number): Record<string, number> {
  * `ExternalOracle.getFeed` key for a token symbol; null when the chain has no feed for it.
  *
  * The base resolves to its signed `USDC-USD` reference: there is no `USDC/USDC` identity feed, and
- * `Pricing._denominate` divides every usd-quoted asset by that reference.
+ * `PricingLib._denominate` divides every usd-quoted asset by that reference.
  */
 export function activeFeedId(chainId: number, symbol: string): Hex | null {
   const v = chainVenue(chainId);

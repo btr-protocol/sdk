@@ -160,7 +160,7 @@ export function addressAt(word: Hex, offset: number): Address {
   return `0x${bytesToHex(b.slice(i, i + 20))}` as Address;
 }
 
-/** `NUQuartic.Curve.segs` is a fixed uint256[28] block (m ≤ 14 → 2m live words). */
+/** `NUQuarticLib.Curve.segs` is a fixed uint256[28] block (m ≤ 14 → 2m live words). */
 export const CURVE_SEG_SLOTS = 28;
 
 /** Mapping entry base slot for a uint16 key (curves preset table). */
@@ -198,7 +198,7 @@ export async function readAssetPresetId(
 }
 
 /**
- * Read + decode a shared preset curve (`NUQuartic.Curve` @ curves[presetId], slot 6):
+ * Read + decode a shared preset curve (`NUQuarticLib.Curve` @ curves[presetId], slot 6):
  * header slot + the 2m live segment slots (of the fixed uint256[28] block). Returns null when
  * the preset is unset (header 0: Pricing falls back to the linear-impact quote).
  * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
@@ -223,7 +223,7 @@ export async function readCurve(
   if (header === 0n) return null;
   const m = Number(header & 0xffn);
   // The directory holds the m-1 INTERIOR boundaries only; the last right edge is the BPS constant,
-  // never stored (NUQuartic.set: "interior boundaries only; b_m = SC.BPS"). Those freed bits carry
+  // never stored (NUQuarticLib.set: "interior boundaries only; b_m = SC.BPS"). Those freed bits carry
   // the median at 216, so reading m entries here both loses b_m and mis-reads the median as one.
   const boundaries: number[] = [];
   for (let j = 1; j < m; j++) {

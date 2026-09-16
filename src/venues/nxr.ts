@@ -85,7 +85,7 @@ const PEG_STABLE = (nxrSymbol: string, usdc?: NxrPair): NxrMark => ({ nxrSymbol,
  */
 export const NXR_MARKS: Record<string, NxrMark> = {
   // ── peg stables. The USD row is Pyth `X-USD`, correct only where the pool re-denominates
-  // on-chain (Pricing._denominate divides by the USDC-USD reference); it is NOT the retired
+  // on-chain (PricingLib._denominate divides by the USDC-USD reference); it is NOT the retired
   // "USDC≈1 proxy", which was extractable (DEN-01, 2026-07-29). The `usdc` row is the pair for a
   // pool that consumes the mark as attested, and only the five Arc lists carry one. USDS, PYUSD and USD1
   // bridge through USDT: USDS and PYUSD because their `-USDC` and `-USD` are both compose-on-read

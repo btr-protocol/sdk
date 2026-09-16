@@ -2,15 +2,15 @@
  * Differential guard for `readCurve`'s hand-decoded bit packing.
  *
  * Why this file exists: `test/storage-layout.test.ts` pins every SDK slot/offset table against
- * solc's `storageLayout`, but solc reports `NUQuartic.Curve` as `header:uint256 + segs:uint256[28]`.
+ * solc's `storageLayout`, but solc reports `NUQuarticLib.Curve` as `header:uint256 + segs:uint256[28]`.
  * The real layout — `m | 14×uint16 boundaries | dispRef@232 | flags@248` in the header, and
  * `c0|c1|c2|c3` / `c4|S` as signed lanes in the segment words — is packed BY HAND inside
- * `NUQuartic.set`, so it is invisible to `storageLayout` and the layout test cannot cover it. That
+ * `NUQuarticLib.set`, so it is invisible to `storageLayout` and the layout test cannot cover it. That
  * is the same blind spot that let the `presetId` off-by-4 ship, with every shaped quote reading a
  * bogus curve behind a green suite.
  *
  * The guard is differential, not a re-implementation: `test/fixtures/curve-storage.json` holds the
- * RAW STORAGE WORDS `NUQuartic.set` wrote for a deliberately awkward curve, together with the
+ * RAW STORAGE WORDS `NUQuarticLib.set` wrote for a deliberately awkward curve, together with the
  * library's OWN `rangeQ`/`evalQ`/`areaQ` readings of them. This serves those words to the real
  * `readCurve` over a fake provider and asserts the SDK recovers exactly what Solidity put in — so a
  * decoder that drifts fails even if it drifts consistently. Regenerate with
@@ -62,7 +62,7 @@ function wordProvider(words: string[] = fx.words): Eip1193Provider & { reads: bi
 
 const read = () => readCurve(wordProvider(), POOL, PRESET_ID);
 
-describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
+describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
   test('header fields: m, the uint16 boundary directory, dispRef@232, flags@248', async () => {
     const c = (await read()) as NonNullable<Awaited<ReturnType<typeof readCurve>>>;
     expect(c).not.toBeNull();
@@ -90,7 +90,7 @@ describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
     // Solidity's own rangeQ.
     expect(`${evalQ(c, 0)}`).toBe(fx.y0);
     expect(`${evalQ(c, 10_000) - evalQ(c, 0)}`).toBe(fx.span);
-    // `NUQuartic.set` is external, so its `memory` params are ABI-decoded copies: `_centre` shifts
+    // `NUQuarticLib.set` is external, so its `memory` params are ABI-decoded copies: `_centre` shifts
     // them in the callee only and the fixture records the polygon as SUBMITTED. Re-apply the same
     // shift here — `(wQ[0] + wQ[n-1]) >> 1`, arithmetic shift as in Solidity — so this still
     // asserts the stored ends against the centred weights rather than against the raw input.
@@ -152,7 +152,7 @@ describe('readCurve decodes the words NUQuartic.set actually wrote', () => {
 });
 
 describe('curveToWire rebuilds the header Solidity wrote', () => {
-  // The strongest available check on the packer: take the words `NUQuartic.set` produced for this
+  // The strongest available check on the packer: take the words `NUQuarticLib.set` produced for this
   // deliberately ASYMMETRIC curve, decode them, re-pack, and demand the same 32 bytes back.
   test('the round-trip is byte-exact', async () => {
     const c = (await read()) as NonNullable<Awaited<ReturnType<typeof readCurve>>>;

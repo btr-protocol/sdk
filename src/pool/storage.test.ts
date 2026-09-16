@@ -147,15 +147,15 @@ describe('mappingBase', () => {
   });
 });
 
-describe('readCurve (NUQuartic.Curve storage decode)', () => {
+describe('readCurve (NUQuarticLib.Curve storage decode)', () => {
   const POOL = '0x00000000000000000000000000000000000000AA' as const;
   const u64 = (v: bigint) => (v < 0n ? v + (1n << 64n) : v) & ((1n << 64n) - 1n);
   const u128 = (v: bigint) => (v < 0n ? v + (1n << 128n) : v) & ((1n << 128n) - 1n);
 
-  // Pack a decoded curve exactly like NUQuartic.set writes storage.
+  // Pack a decoded curve exactly like NUQuarticLib.set writes storage.
   function packWords(c: ReturnType<typeof buildCurve>): Map<bigint, bigint> {
     let header = BigInt(c.m);
-    // Interior boundaries ONLY: b_m is the BPS constant and is never stored (NUQuartic.set).
+    // Interior boundaries ONLY: b_m is the BPS constant and is never stored (NUQuarticLib.set).
     // Writing it here too would leave the directory one entry wider than the contract's.
     c.boundaries.slice(0, -1).forEach((b, j) => {
       header |= BigInt(b) << BigInt(8 + 16 * j);

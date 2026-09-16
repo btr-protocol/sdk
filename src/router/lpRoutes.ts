@@ -307,7 +307,7 @@ async function marketMint(
     );
   }
   const first = steps[0];
-  // The deposit MINTS AT C (`PoolLiquidity.deposit`: face = amt·WAD/C) and refuses without a rate.
+  // The deposit MINTS AT C (`PoolLiquidityLib.deposit`: face = amt·WAD/C) and refuses without a rate.
   const depositPool = pools.find((p) => p.tag === first?.poolTag);
   const c = depositPool ? poolSolvency(depositPool.state) : null;
   if (c === null) return unfeasible(MARKET_DEAD, 'feed-unavailable');
@@ -415,7 +415,7 @@ export async function rankDeposit(
   if (xToken === targetSym) {
     const holder = poolHolding(pools, xToken, xToken);
     if (!holder) return { best: null, routes: [] };
-    // Face minted at C (`PoolLiquidity.deposit`); no rate ⇒ the chain refuses the mint.
+    // Face minted at C (`PoolLiquidityLib.deposit`); no rate ⇒ the chain refuses the mint.
     const c = poolSolvency(holder.state);
     const direct: RankedLpRoute = {
       id: 'market-first',

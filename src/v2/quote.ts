@@ -185,7 +185,7 @@ async function post(path: string, body: unknown, opts: V2ClientOpts): Promise<un
 
 /** `back/crates/quote/src/slippage.rs` MAX_TOL_PBPS: 99.9%. */
 const MAX_TOL_PBPS = 999_000;
-/** `SwapQuote.spreadPbps` is a uint16 BY CONSTRUCTION — `Pricing.sol` solves its interior swing cap
+/** `SwapQuote.spreadPbps` is a uint16 BY CONSTRUCTION — `PricingLib.sol` solves its interior swing cap
  *  so a composed fence always fits the field — so this is the widest spread any quote can carry. */
 const MAX_SPREAD_PBPS = 0xffff;
 

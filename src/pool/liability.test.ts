@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import { type PoolState, buildLeg } from '../amm/aimm.js';
 // bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
-// PoolSolvency.solvency/previewCap, PoolLiquidity.exitMu and swapLiability.
+// PoolSolvencyLib.solvency/previewCap, PoolLiquidityLib.exitMu and swapLiability.
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,

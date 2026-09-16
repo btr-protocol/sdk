@@ -3,10 +3,10 @@
 // getAsset (sdk/pool/index.ts); conversion is backend SSOT (quoteLegAsync / POST /v1/route), never
 // the deleted TS curve replica.
 //
-// LP settlement is POOL-LEVEL (LED-A, PoolSolvency.sol): `C = Σ R_k·m_k / Σ L_k·m_k`. There is no
+// LP settlement is POOL-LEVEL (LED-A, PoolSolvencyLib.sol): `C = Σ R_k·m_k / Σ L_k·m_k`. There is no
 // per-leg haircut anywhere on the chain any more; this module is the ONE off-chain replica of it.
 //
-// swapLiability pipeline (PoolLiquidity.swapLiability):
+// swapLiability pipeline (PoolLiquidityLib.swapLiability):
 //   1. liabIn      = lpAmountIn * idxIn / WAD
 //   2. fairIn      = liabIn * C                     (mintRate: refuses when a mark is unusable)
 //   3. conv        = backendConvert(in -> out, fairIn); spread/toll/skew embedded
@@ -53,7 +53,7 @@ const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
 export const liabilitySwapEnabled = (flags: number): boolean =>
   (flags & LIABILITY_SWAP_ENABLED_BIT) !== 0;
 
-/** `PoolSolvency.solvency` over a `PoolState`: `C = Σ R·m / Σ L·m`, marks in base per token (the hub
+/** `PoolSolvencyLib.solvency` over a `PoolState`: `C = Σ R·m / Σ L·m`, marks in base per token (the hub
  *  is the base, mark 1). Null is the chain's `ok == false`: a leg whose mark is unusable leaves no
  *  rate, so a mint or a cross conversion refuses (`mintRate` reverts `FeedUnavailable`). A 0/0 leg
  *  is skipped BEFORE its mark is read (A-1121: a dead feed on an emptied leg must not freeze the
@@ -74,7 +74,7 @@ export function poolSolvency(state: PoolState): number | null {
   return Number.isFinite(c) ? c : null;
 }
 
-/** `PoolSolvency.previewCap`: the live rate when there is one, else the degraded fallback
+/** `PoolSolvencyLib.previewCap`: the live rate when there is one, else the degraded fallback
  *  `min(1, lastGoodC)` with a never-observed (0) slot reading 1. Never a bare 1 over a known
  *  `lastGoodCWad < 1`: that would pay MORE for an oracle outage than for a healthy pool. */
 export function exitCap(c: number | null, lastGoodCWad?: bigint): number {
@@ -83,7 +83,7 @@ export function exitCap(c: number | null, lastGoodCWad?: bigint): number {
   return g === 0 || g > 1 ? 1 : g;
 }
 
-/** `PoolLiquidity.exitMu` in face units: the SAME-ASSET payout `face · min(c_leg, cap)`.
+/** `PoolLiquidityLib.exitMu` in face units: the SAME-ASSET payout `face · min(c_leg, cap)`.
  *  `cap` is the pool rate (`exitCap`); `c_leg = R/L` is the in-kind DELIVERY bound, not a fence -
  *  the full `face · C` claim stays reachable through a cross exit. A leg with no book pays `cap`. */
 export function exitValue(face: number, cLeg: number, cap: number): number {

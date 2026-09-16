@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate `curve-storage.json` — the packed NUQuartic.Curve storage words that
+# Regenerate `curve-storage.json` — the packed NUQuarticLib.Curve storage words that
 # `test/curve-storage.test.ts` checks `readCurve` against.
 #
 #   sdk/test/fixtures/gen-curve-storage.sh          # dex + shared at HEAD

@@ -188,7 +188,7 @@ export function buildCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
-/** `Pricing.INTERIOR_SWING_CAP_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
+/** `PricingLib.INTERIOR_SWING_CAP_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
 export const INTERIOR_SWING_CAP_PBPS = 10_862;
 export const MAX_DISPERSION_PBPS = 900_000;
 
@@ -210,7 +210,7 @@ export function sanitizeDispersion(minDispersion: number, cap: number): number {
 // ── Quote-free state types ────────────────────────────────────────────────────
 
 export interface AimmProfile {
-  /** BPS. Spread term = σ_path·vega/PBPS (`Pricing._pathSpread`): 10_000 prices 1 % of σ, the
+  /** BPS. Spread term = σ_path·vega/PBPS (`PricingLib._pathSpread`): 10_000 prices 1 % of σ, the
    *  uint16 max 6.5 %. Kept on this scale for phase-1 stables (A-005, owner call); dispersion is
    *  σ·vega/BPS, so the SAME vega tracks σ 1:1 there. */
   vega: number;
@@ -393,14 +393,14 @@ export interface SpokeWire {
   decimals?: number;
 }
 /**
- * One ENDPOINT of a swap path: the wire form of the chain's `Pricing.EndpointCache`.
+ * One ENDPOINT of a swap path: the wire form of the chain's `PricingLib.EndpointCache`.
  *
- * A leg is not a path. `Pricing._quotePath` caches an endpoint per side and the settle tail reads
+ * A leg is not a path. `PricingLib._quotePath` caches an endpoint per side and the settle tail reads
  * two things off them that no leg carries:
  * - `acc.vegaBps = max(cIn.vegaBps, cOut.vegaBps)` — the spread's vega is the ENDPOINT max.
  * - `_covToll(cOut, …)` — the coverage toll is charged on whichever endpoint the swap DELIVERS,
  *   which on a spoke→base sell is the hub. The base carries a wall like every other listed asset
- *   (`PoolConfig.requireNeverDepletable` rejects κ=0 at every writer).
+ *   (`PoolConfigLib.requireNeverDepletable` rejects κ=0 at every writer).
  */
 export interface EndpointWire {
   reserves: string;
@@ -599,9 +599,9 @@ const toU128Hex = (v: number): string => {
 
 /** The DENSITY MEDIAN: the first x where y(x) ≥ 0, then whichever neighbour has the smaller |y|.
  *
- *  A mirror of `NUQuartic._median` (and `core::quartic::median`) — the same search over the same
+ *  A mirror of `NUQuarticLib._median` (and `core::quartic::median`) — the same search over the same
  *  `evalQ`, so the centre this SDK puts on the wire is the centre the chain would have found.
- *  It is the only x at which the curve quotes the mark itself, and `Pricing._skewToDepth` anchors
+ *  It is the only x at which the curve quotes the mark itself, and `PricingLib._skewToDepth` anchors
  *  zero inventory skew on it. On an antisymmetric curve it IS exactly BPS/2, which is why pinning
  *  5000 went unnoticed: every live preset is symmetric. An asymmetric one moved the centre and the
  *  wire kept saying 5000. */

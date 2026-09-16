@@ -113,7 +113,7 @@ if (!assets.length) {
 // with nothing left on-chain to correct it, which no band or peg clamp can see.
 const roster = assets.map(([symbol, a]) => {
   // The BASE is exempt from the basis, and not as an exception to it: it carries no market feed
-  // (there is no USDC/USDC identity: Pricing._readBasePriceOrHalt discards the base read for
+  // (there is no USDC/USDC identity: PricingLib._readBasePriceOrHalt discards the base read for
   // quoting), only the signed depeg reference, which is deliberately USD-quoted because a
   // depeg is only observable against USD. Its mark below is the identity 1 and never fetched.
   const basis = a.hub ? 'USD' : CHAIN.basis;
