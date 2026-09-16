@@ -1,5 +1,6 @@
-# CI: the SDK is a standalone package. Tests that need closed-source contract
-# artifacts skip on an sdk-only checkout by design; nothing here materialises siblings.
+# CI: the SDK mirrors contract surfaces it does not own, so the siblings that own them are
+# materialised here, pinned. They used to be absent and `solidity-mirror.test.ts` skipped itself —
+# a green run that proved nothing about the one thing the file exists to prove.
 name: CI
 
 on:
@@ -21,6 +22,16 @@ jobs:
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
           git -C ../back sparse-checkout set abis
           git -C ../back checkout -q 54abe0b47021b2cd15d656e6d0973be5fe4c63b9
+      # The solidity mirror test re-parses the DECLARING sources; it hard-fails without them.
+      - run: |
+          git clone -q --filter=blob:none --no-checkout \
+            "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
+          git -C ../dex-evm sparse-checkout set src abi
+          git -C ../dex-evm checkout -q e1afc0c4d38a0e800f5a24954a0001932f853f7d
+          git clone -q --filter=blob:none --no-checkout \
+            "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
+          git -C ../shared sparse-checkout set evm/src
+          git -C ../shared checkout -q 2a4d163492be35ee084e7a5befc31c4ef0348ad2
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test

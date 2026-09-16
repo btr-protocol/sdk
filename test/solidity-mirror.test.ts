@@ -9,8 +9,8 @@
  *  mirror agrees. An ordinal is exactly the kind of value that moves silently (`OpType` is grouped
  *  by timelock tier, so a member added to a group shifts every ordinal after it) and a wrong one
  *  sends a governance op to the wrong lever, or reads a halt bit that is not the halt bit.
- *  Skips — loudly — when the siblings are absent, the posture `fetch-abis.ts` takes for
- *  `../back/abis` in a Docker/SDK_REF build.
+ *  FAILS when the siblings are absent rather than skipping: a skip made the absence of the check
+ *  indistinguishable from the check passing, which is how the mirror drifted in the first place.
  */
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -20,7 +20,15 @@ import { INTERIOR_SWING_CAP_PBPS } from '../src/amm/aimm';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
-const have = existsSync(DEX) && existsSync(SHARED);
+// HARD, not `describe.if`: this file exists to prove the committed mirror still matches the
+// Solidity, and a skip proved the opposite of what a green run looked like. CI clones both
+// siblings (pinned, see .github/workflows/test.yml); a local run without them is not a run.
+if (!existsSync(DEX) || !existsSync(SHARED)) {
+  throw new Error(
+    'solidity-mirror.test.ts needs the sibling ../dex-evm and ../shared checkouts — ' +
+      'clone them beside this repo (CI pins and clones both)',
+  );
+}
 
 const src = (p: string) => readFileSync(p, 'utf8');
 
@@ -103,7 +111,7 @@ function evaluate(expr: string, env: Map<string, number>): number | undefined {
   return i === toks.length ? v : undefined;
 }
 
-describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
+describe('solidity.generated.ts mirrors the declaring sources', () => {
   const poolConsts = () => constants(src(join(DEX, 'src', 'libraries', 'PoolConstantsLib.sol')));
   const pricingConsts = () => constants(src(join(DEX, 'src', 'libraries', 'PricingLib.sol')));
 
@@ -205,8 +213,4 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
       ),
     );
   });
-});
-
-test.if(!have)('sibling contract checkouts absent — mirror parity NOT verified', () => {
-  expect(have).toBe(false);
 });
