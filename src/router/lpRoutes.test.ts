@@ -62,37 +62,13 @@ const WAD_HEX = `0x${(10n ** 18n).toString(16)}`;
 const raw6 = (tok: number): string => `0x${BigInt(Math.round(tok * 1e6)).toString(16)}`;
 const tok6 = (raw: string): number => Number(BigInt(raw)) / 1e6;
 
-// Backend stub: /route serves the single-pool direct plan (identity pricing, capacity-capped);
-// /quote answers legs 1:1. Local logic under test: gates, ranking, floors, haircut plumbing.
+// Backend stub: /route serves the market router's direct plan (identity pricing, capacity-capped);
+// /quote and /quote-path answer 1:1. Local logic under test: gates, ranking, floors, haircut plumbing.
 function installStub() {
   // @ts-expect-error stub fetch
   globalThis.fetch = async (url: string, init: { body?: string }) => {
     const body = JSON.parse(init.body ?? '{}');
     if (String(url).endsWith('/route')) {
-      // Single-pool 'liab' wires are the liability converter's intra-pool cross, not the
-      // market router: they carry no router capacity cap, so answer identity.
-      const tags = ((body.pools ?? []) as { tag: string }[]).map((p) => p.tag);
-      if (tags.length === 1 && tags[0] === 'liab') {
-        const out = raw6(tok6(body.amount_in));
-        const legs = [
-          {
-            pool_tag: 'liab',
-            token_in: body.token_in,
-            token_out: body.token_out,
-            amount_in: body.amount_in,
-            amount_out: out,
-          },
-        ];
-        return {
-          ok: true,
-          json: async () => ({
-            best_amount_out: out,
-            best_is_split: false,
-            best_parts: [{ legs, fraction: WAD_HEX, amount_out: out }],
-            singles: [{ legs, amount_in: body.amount_in, amount_out: out }],
-          }),
-        };
-      }
       const amt = tok6(body.amount_in);
       const holding = (
         body.pools as { tag: string; spokes: { token: string; liabilities: string }[] }[]
@@ -134,12 +110,14 @@ function installStub() {
         }),
       };
     }
+    // A path body carries its input on the first hop; a leg body carries it at the top.
+    const amountIn = body.legs ? body.legs[0].amount_in : body.amount_in;
     const mid = `0x${(10n ** 18n).toString(16)}`;
     return {
       ok: true,
       json: async () => ({
-        amount_out: body.amount_in,
-        gross_out: body.amount_in,
+        amount_out: amountIn,
+        gross_out: amountIn,
         avg_price: mid,
         mid_price: mid,
         mark_price: mid,

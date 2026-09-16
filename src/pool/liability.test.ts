@@ -232,23 +232,12 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
     lp_fee: '0x0',
   });
 
-  test('balanced pool: spoke cross routes over POST /v1/route, never clamps', async () => {
-    const outs = [4_990_000_000n, 4_985_000_000n];
+  test('balanced pool: spoke cross settles ONCE over POST /v1/quote-path, never clamps', async () => {
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
     // @ts-expect-error stub fetch
     globalThis.fetch = async (url: string, init: { body?: string }) => {
-      if (String(url).endsWith('/route')) {
-        const body = JSON.parse(init.body ?? '{}');
-        return {
-          ok: true,
-          json: async () => ({
-            best_amount_out: body.amount_in,
-            best_is_split: false,
-            best_parts: [],
-            singles: [],
-          }),
-        };
-      }
-      return { ok: true, json: async () => quoteWire(outs.shift() ?? 0n) };
+      calls.push({ url: String(url), body: JSON.parse(init.body ?? '{}') });
+      return { ok: true, json: async () => quoteWire(5_000_000_000n) };
     };
     try {
       const state = balancedState();
@@ -264,6 +253,21 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       expect(q?.markCapBinding).toBe(false);
       expect(q?.convQuoted).toBeCloseTo(5_000, 6);
       expect(q?.haircutIn).toBe(0);
+
+      // A cross is ONE settlement, not two leg quotes summed: exactly one POST, to /quote-path,
+      // carrying both hops. The spread comes back whole rather than re-charged per hop.
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url.endsWith('/quote-path')).toBe(true);
+      const legs = calls[0].body.legs as Record<string, unknown>[];
+      expect(legs).toHaveLength(2);
+      expect(legs[0].selling).toBe(true);
+      expect(legs[1].selling).toBe(false);
+      expect(legs[0].decimals_out).toBe(backendOpts.baseDecimals);
+      expect(legs[1].decimals_in).toBe(backendOpts.baseDecimals);
+      // The hub is interior to the path on both hops.
+      for (const l of legs) expect((l.counterparty as { reserves: string }).reserves).toBe('0x0');
+      // Half of ONE 40 pbps path spread. Two summed leg quotes would have landed at 0.4.
+      expect(q?.convSpreadBps).toBeCloseTo(40 / 100 / 2, 9);
     } finally {
       // @ts-expect-error restore the real fetch
       globalThis.fetch = undefined;
@@ -271,23 +275,8 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
   });
 
   test('an under-covered in-leg in a whole pool settles at C = 1, not at its own 60%', async () => {
-    const outs = [10_000_000_000n, 9_990_000_000n];
     // @ts-expect-error stub fetch
-    globalThis.fetch = async (url: string, init: { body?: string }) => {
-      if (String(url).endsWith('/route')) {
-        const body = JSON.parse(init.body ?? '{}');
-        return {
-          ok: true,
-          json: async () => ({
-            best_amount_out: body.amount_in,
-            best_is_split: false,
-            best_parts: [],
-            singles: [],
-          }),
-        };
-      }
-      return { ok: true, json: async () => quoteWire(outs.shift() ?? 0n) };
-    };
+    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(9_990_000_000n) });
     try {
       const state = balancedState(); // C = 1 across the pool
       const inLeg = legOf('AUDF', 600_000, 1_000_000); // the leg alone is 40% short

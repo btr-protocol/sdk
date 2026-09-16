@@ -514,7 +514,7 @@ function noteQuote429Error(e: unknown): void {
 
 async function post<T>(
   base: string,
-  path: '/quote' | '/route' | '/depth',
+  path: '/quote' | '/quote-path' | '/route' | '/depth',
   body: unknown,
 ): Promise<T> {
   guardQuote429(path);
@@ -545,6 +545,21 @@ export function quoteAsync(
   base?: string,
 ): Promise<Record<string, unknown>> {
   return post<Record<string, unknown>>(backendBase(base), '/quote', body);
+}
+
+/**
+ * A whole path, settled ONCE over POST /v1/quote-path.
+ *
+ * A cross is NOT the sum of its legs: the chain walks every hop gross and charges one spread,
+ * one coverage toll and one fee at the tail. Summing per-leg {@link quoteLegAsync} calls
+ * re-charges the spread on each hop and lands under the chain. At most two legs.
+ *
+ * A hop whose far token is interior to the path passes {@link INTERIOR_ENDPOINT}. Only a
+ * buy-FIRST path needs a real counterparty on its head: that is its input endpoint, whose
+ * vega the path spread is taken at, and the backend refuses an interior one there.
+ */
+export function quotePathAsync(legs: PathLegWire[], base?: string): Promise<QuoteResponseWire> {
+  return post<QuoteResponseWire>(backendBase(base), '/quote-path', { legs });
 }
 
 /** Optimal routing across pools over POST /v1/route. */
@@ -654,6 +669,12 @@ export interface QuoteRequestWire {
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
+}
+
+/** One hop of a {@link quotePathAsync} request: a `/quote` body plus the hop's own scales. */
+export interface PathLegWire extends QuoteRequestWire {
+  decimals_in: number;
+  decimals_out: number;
 }
 
 export interface QuoteResponseWire {

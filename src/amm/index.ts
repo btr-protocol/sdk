@@ -31,6 +31,7 @@ export type {
   DepthBookWire,
   DepthRequestWire,
   WireMeta,
+  PathLegWire,
   QuoteRequestWire,
   QuoteResponseWire,
 } from './aimm.js';
@@ -55,6 +56,7 @@ export {
   backendBase,
   noteQuote429,
   quoteAsync,
+  quotePathAsync,
   routeAsync,
   depthAsync,
   curveToWire,

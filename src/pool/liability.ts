@@ -20,18 +20,17 @@
 
 import {
   INTERIOR_ENDPOINT,
+  type PathLegWire,
   type PoolLeg,
   type PoolState,
   type Quote,
   type QuoteResponseWire,
-  type RouteRequestWire,
   type WireMeta,
   hubEndpointWire,
-  poolStateToWire,
-  premiumBps,
+  legToQuoteBody,
   quoteFromWire,
   quoteLegAsync,
-  routeAsync,
+  quotePathAsync,
 } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 
@@ -135,7 +134,7 @@ export interface SwapLiabilityQuote {
  *  quoteSwapLiabilityCoreAsync. Kept by name so old imports fail loud, never silently local. */
 export function quoteSwapLiabilityCore(): SwapLiabilityQuote | null {
   throw new Error(
-    'aimm TS pricer deleted: liability conversion over POST /v1/quote|route via quoteSwapLiabilityCoreAsync (backend SSOT)',
+    'aimm TS pricer deleted: liability conversion over POST /v1/quote|quote-path via quoteSwapLiabilityCoreAsync (backend SSOT)',
   );
 }
 
@@ -195,8 +194,9 @@ export interface BackendConvertOpts {
 }
 
 /**
- * Backend conversion for the liability pipeline: one POST /v1/quote per walked leg,
- * except the spoke→spoke cross which routes over POST /v1/route (routing SSOT).
+ * Backend conversion for the liability pipeline: one POST /v1/quote per direct leg, and for a
+ * spoke→spoke cross ONE POST /v1/quote-path over both hops (the chain settles a path once, so
+ * summing two leg quotes re-charges the spread and under-quotes it).
  * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint
  * nothing from). Composed in fill order over the backend's own outputs.
  */
@@ -215,12 +215,6 @@ export function backendConvert(
   // A leg that touches the hub is settled against the HUB's endpoint (its coverage wall tolls a
   // sell into it, its vega enters the spread both ways). No hub book ⇒ no honest quote.
   const hub = state.hub ? hubEndpointWire(state.hub, opts.baseDecimals) : null;
-  const toU128 = (tok: number, dec: number): string => {
-    if (!Number.isFinite(tok) || tok < 0) throw new Error('backendConvert: non-finite amount');
-    const scaled = Math.round(tok * 10 ** dec);
-    if (!Number.isSafeInteger(scaled)) throw new Error('backendConvert: amount exceeds 2^53');
-    return `0x${BigInt(scaled).toString(16)}`;
-  };
   return async (fairIn: number): Promise<Quote> => {
     if (!inBase && outBase && legIn) {
       if (!hub) throw new Error('backendConvert: no hub book for a sell into the base');
@@ -233,54 +227,23 @@ export function backendConvert(
       return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (!inBase && !outBase && legIn && legOut) {
-      const wire = poolStateToWire('liab', undefined, state, opts.meta, opts.baseDecimals);
-      const req: RouteRequestWire = {
-        pools: [wire],
-        token_in: tokenIn,
-        token_out: tokenOut,
-        amount_in: toU128(fairIn, decIn),
-      };
-      const routed = await routeAsync(req, opts.backendBase);
-      const amountOut = Number(BigInt(routed.best_amount_out)) / 10 ** legOut.decimals;
-      // Cross: the hub is INTERIOR on both hops, never the path's delivering endpoint.
-      const w1 = await quoteLegAsync(
-        legIn,
-        fairIn,
-        true,
-        decIn,
-        INTERIOR_ENDPOINT,
-        opts.backendBase,
-      );
-      const q1 = quoteFromWire(w1, decIn, opts.baseDecimals, [tokenIn, base], fairIn);
-      const baseMid = q1.amountOut;
-      const w2 = await quoteLegAsync(
-        legOut,
-        baseMid,
-        false,
-        opts.baseDecimals,
-        INTERIOR_ENDPOINT,
-        opts.backendBase,
-      );
-      const q2 = quoteFromWire(w2, opts.baseDecimals, legOut.decimals, [base, tokenOut], baseMid);
-      const avg = fairIn > 0 && amountOut > 0 ? amountOut / fairIn : 0;
-      const mid = q1.midPrice * q2.midPrice;
-      const mark = q1.markPrice * q2.markPrice;
-      return {
-        amountOut,
-        grossOut: q2.grossOut,
-        avgPrice: avg,
-        midPrice: mid,
-        markPrice: mark,
-        midPremiumBps: premiumBps(mid, mark),
-        netPremiumBps: premiumBps(avg, mark),
-        priceImpactBps: q1.priceImpactBps + q2.priceImpactBps,
-        spreadBps: q1.spreadBps + q2.spreadBps,
-        lpFeeBps: q1.lpFeeBps + q2.lpFeeBps,
-        protoFeeBps: 0,
-        covTollBps: q2.covTollBps,
-        saturated: q1.saturated || q2.saturated,
-        route: [tokenIn, base, tokenOut],
-      };
+      // The hub is INTERIOR to a cross on both hops: the path delivers on the out-spoke's own
+      // book and takes its vega from the in-spoke's, so neither hop's counterparty is read.
+      const legs: PathLegWire[] = [
+        {
+          ...legToQuoteBody(legIn, fairIn, true, decIn, INTERIOR_ENDPOINT),
+          decimals_in: decIn,
+          decimals_out: opts.baseDecimals,
+        },
+        {
+          // The walk overwrites this hop's input with the first hop's gross output.
+          ...legToQuoteBody(legOut, 0, false, opts.baseDecimals, INTERIOR_ENDPOINT),
+          decimals_in: opts.baseDecimals,
+          decimals_out: legOut.decimals,
+        },
+      ];
+      const w = await quotePathAsync(legs, opts.backendBase);
+      return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
     }
     throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
   };
