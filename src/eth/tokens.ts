@@ -36,9 +36,9 @@ export const TOKENS: Record<string, TokenMetadata> = {
     symbol: 'BNB',
     name: 'BNB',
     decimals: 18,
+    // Native on 56 has no address (NATIVE_TOKEN sentinel); 0xbb4C..095c there is WBNB.
     addresses: {
       '1': '0xB8c77482e45F1F44dE1745F52C74426C631bDD52',
-      '56': '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     },
   },
   SOL: {
@@ -75,7 +75,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-      '56': '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
       '999': '0xBe6727B535545C67d5cAa73dEa54865B92CF7907',
       '8453': '0x4200000000000000000000000000000000000006',
       '42161': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',

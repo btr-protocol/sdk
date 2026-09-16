@@ -64,6 +64,14 @@ describe('resolveTokenAlias', () => {
     expect(getTokenAddress('weth', 1)).toBe(weth as string);
     expect(getTokenAddress('WETH.b', 1)).toBe(weth as string);
   });
+
+  // On BNB Chain the gas token has no ERC-20 address: 0xbb4C..095c is WBNB, and 0x2170..33F8 is
+  // Binance-peg ETH, not the chain's wrapped native. Neither may resolve as BNB or WETH there.
+  test('chain 56 resolves no address for native BNB or WETH', () => {
+    expect(getTokenAddress('BNB', 56)).toBeUndefined();
+    expect(getTokenAddress('WETH', 56)).toBeUndefined();
+    expect(getTokenAddress('WBNB', 56)).toBe('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c');
+  });
 });
 
 describe('tokenMatchesSearch', () => {
