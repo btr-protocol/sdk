@@ -253,7 +253,8 @@ export function decode(
   const d = clean(data);
   const readWord = (off: number) => {
     const w = d.slice(off, off + 64);
-    if (w.length !== 64) throw new Error(`abi decode: data ends inside the word at byte ${off / 2}`);
+    if (w.length !== 64)
+      throw new Error(`abi decode: data ends inside the word at byte ${off / 2}`);
     return w;
   };
   const readInt = (off: number) => BN(`0x${readWord(off)}`);
