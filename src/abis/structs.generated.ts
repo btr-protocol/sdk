@@ -46,15 +46,6 @@ export type OracleConfigFields =
 
 export type RiskConfigFields = 'flags' | 'kappaCovBps' | 'depositCapCode' | 'maxLiabWeightBps';
 
-export type RiskFencesFields =
-  | 'minFeeHardMinPbps'
-  | 'minFeeHardMaxPbps'
-  | 'vegaHardMinBps'
-  | 'vegaHardMaxBps'
-  | 'haircutSuppressorHardMaxBps'
-  | 'haircutSuppressorHardMinBps'
-  | 'maxDeltaBps';
-
 export type SwapQuoteFields =
   | 'amountOut'
   | 'amountIn'
@@ -70,7 +61,7 @@ export type SwapQuoteFields =
   | 'hopAmounts'
   | 'hopPrices';
 
-export type WithdrawResultFields = 'amountOut' | 'lpBurned';
+export type WithdrawResultFields = 'amountOut';
 
 /**
  * Compile-time equality of an interface's keys with a generated field union. Resolves to `true`

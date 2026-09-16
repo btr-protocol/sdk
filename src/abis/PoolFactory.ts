@@ -160,30 +160,6 @@ export const POOL_FACTORY_ABI = [
     type: 'function',
   },
   {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'tokenA',
-        type: 'address',
-      },
-      {
-        internalType: 'address',
-        name: 'tokenB',
-        type: 'address',
-      },
-    ],
-    name: 'getCommonPools',
-    outputs: [
-      {
-        internalType: 'address[]',
-        name: 'pools',
-        type: 'address[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
     inputs: [],
     name: 'getOfficialPoolsCount',
     outputs: [

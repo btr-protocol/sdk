@@ -4,7 +4,7 @@
  * AccessControl
  * @module @btr-protocol/sdk/abis
  *
- * Singleton AccessControl: governance SSoT (owner / treasury / factory / keepers / guardians / risk stewards) plus the immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians; quorumStatus is the drift monitor.
+ * Singleton AccessControl: governance SSoT (owner / treasury / factory / keepers / guardians / risk stewards) plus the immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians.
  * Source: backend ABI service
  */
 
@@ -387,29 +387,6 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'quorumStatus',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: 'armed',
-        type: 'bool',
-      },
-      {
-        internalType: 'bool',
-        name: 'ownerOk',
-        type: 'bool',
-      },
-      {
-        internalType: 'uint8',
-        name: 'guardians',
-        type: 'uint8',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
     name: 'renounceOwnership',
     outputs: [],
     stateMutability: 'payable',
@@ -729,31 +706,6 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'RoleUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'deployer',
-        type: 'address',
-      },
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'owner',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'uint256',
-        name: 'schedule',
-        type: 'uint256',
-      },
-    ],
-    name: 'ZeroDelayGovernance',
     type: 'event',
   },
   {

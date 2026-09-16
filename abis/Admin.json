@@ -657,60 +657,6 @@
         "internalType": "address",
         "name": "pool",
         "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      }
-    ],
-    "name": "riskFences",
-    "outputs": [
-      {
-        "internalType": "uint16",
-        "name": "minFeeHardMinPbps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "minFeeHardMaxPbps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "vegaHardMinBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "vegaHardMaxBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "haircutSuppressorHardMaxBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "haircutSuppressorHardMinBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "maxDeltaBps",
-        "type": "uint16"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
       }
     ],
     "name": "sealBootstrap",
@@ -747,39 +693,6 @@
       }
     ],
     "name": "setAssetParams",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint128",
-        "name": "minLiquidity",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint16",
-        "name": "minFeePbps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "vegaBps",
-        "type": "uint16"
-      }
-    ],
-    "name": "setAssetParamsBounded",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -881,66 +794,6 @@
       }
     ],
     "name": "setRiskConfigTighten",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "components": [
-          {
-            "internalType": "uint16",
-            "name": "minFeeHardMinPbps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "minFeeHardMaxPbps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "vegaHardMinBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "vegaHardMaxBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "haircutSuppressorHardMaxBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "haircutSuppressorHardMinBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "maxDeltaBps",
-            "type": "uint16"
-          }
-        ],
-        "internalType": "struct IAdmin.RiskFences",
-        "name": "f",
-        "type": "tuple"
-      }
-    ],
-    "name": "setRiskFences",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1254,43 +1107,6 @@
       },
       {
         "indexed": true,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "minFeePbps",
-        "type": "uint16"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "vegaBps",
-        "type": "uint16"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "tighten",
-        "type": "bool"
-      }
-    ],
-    "name": "BoundedAssetParamsUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "indexed": true,
         "internalType": "uint16",
         "name": "presetId",
         "type": "uint16"
@@ -1454,31 +1270,6 @@
       }
     ],
     "name": "RiskConfigUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "maxDeltaBps",
-        "type": "uint16"
-      }
-    ],
-    "name": "RiskFencesUpdated",
     "type": "event"
   },
   {
@@ -1713,38 +1504,6 @@
   {
     "inputs": [],
     "name": "ZeroAddr",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ErrLib.Resource",
-        "name": "resource",
-        "type": "uint8"
-      },
-      {
-        "internalType": "address",
-        "name": "target",
-        "type": "address"
-      }
-    ],
-    "name": "NotConfigured",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "threshold",
-        "type": "uint256"
-      }
-    ],
-    "name": "ThresholdViolation",
     "type": "error"
   }
 ]
