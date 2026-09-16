@@ -4,7 +4,7 @@
  * AccessControl
  * @module @btr-protocol/sdk/abis
  *
- * Singleton AccessControl: governance SSoT (owner / treasuryOwner / factory / keepers / guardians / risk stewards) plus the immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians; quorumStatus is the drift monitor.
+ * Singleton AccessControl: governance SSoT (owner / treasury / factory / keepers / guardians / risk stewards) plus the immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians; quorumStatus is the drift monitor.
  * Source: backend ABI service
  */
 
@@ -45,7 +45,7 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'MAX_TREASURY_OWNER_VETOES',
+    name: 'MIN_ARM_GUARDIANS',
     outputs: [
       {
         internalType: 'uint8',
@@ -400,11 +400,6 @@ export const ACCESS_CONTROL_ABI = [
         type: 'bool',
       },
       {
-        internalType: 'bool',
-        name: 'treasuryOwnerOk',
-        type: 'bool',
-      },
-      {
         internalType: 'uint8',
         name: 'guardians',
         type: 'uint8',
@@ -528,38 +523,6 @@ export const ACCESS_CONTROL_ABI = [
         internalType: 'address',
         name: '',
         type: 'address',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'treasuryOwner',
-    outputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'enum AccessControl.Role',
-        name: '',
-        type: 'uint8',
-      },
-    ],
-    name: 'treasuryOwnerVetoes',
-    outputs: [
-      {
-        internalType: 'uint8',
-        name: '',
-        type: 'uint8',
       },
     ],
     stateMutability: 'view',
