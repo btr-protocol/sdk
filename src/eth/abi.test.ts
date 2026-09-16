@@ -397,7 +397,7 @@ describe('decode refuses return data shorter than its type', () => {
   ] as never;
 
   test('a uint256 cut short of one word throws instead of reading a smaller number', () => {
-    expect(decodeFn({ abi, functionName: 'f', data: `0x${'00'.repeat(31)}2a` })).toBe(42n);
+    expect(decodeFn<bigint>({ abi, functionName: 'f', data: `0x${'00'.repeat(31)}2a` })).toBe(42n);
     expect(() => decodeFn({ abi, functionName: 'f', data: `0x${'00'.repeat(29)}2a` })).toThrow(
       /ends inside the word/,
     );
