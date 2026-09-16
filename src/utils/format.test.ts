@@ -4,6 +4,7 @@ import {
   formatNumber,
   formatPercentSig,
   formatPrice,
+  formatUnits,
   formatYield,
   subscriptZeros,
   toInputValue,
@@ -169,5 +170,20 @@ describe('formatYield rounds to significant figures', () => {
     expect(formatYield(null)).toBe('—');
     expect(formatYield(undefined)).toBe('—');
     expect(formatYield(Number.NaN)).toBe('—');
+  });
+});
+
+describe('formatUnits', () => {
+  test.each([
+    [123n, 0, '123'],
+    [0n, 0, '0'],
+    [-5n, 0, '-5'],
+    [-5n, 18, '-0.000000000000000005'],
+    [-1_500_000n, 6, '-1.5'],
+    [1_500_000n, 6, '1.5'],
+    [5n, 18, '0.000000000000000005'],
+    [10n ** 18n, 18, '1'],
+  ])('formatUnits(%p, %p) === %p', (value, decimals, expected) => {
+    expect(formatUnits(value, decimals)).toBe(expected);
   });
 });

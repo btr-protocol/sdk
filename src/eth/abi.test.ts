@@ -384,3 +384,29 @@ describe('getPlan dispatch', () => {
     expect(getPlan(mixed, 'Swap').fn.inputs?.[0].type).toBe('address');
   });
 });
+
+describe('decode refuses return data shorter than its type', () => {
+  const abi = [
+    {
+      name: 'f',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ name: '', type: 'uint256' }],
+    },
+  ] as never;
+
+  test('a uint256 cut short of one word throws instead of reading a smaller number', () => {
+    expect(decodeFn({ abi, functionName: 'f', data: `0x${'00'.repeat(31)}2a` })).toBe(42n);
+    expect(() => decodeFn({ abi, functionName: 'f', data: `0x${'00'.repeat(29)}2a` })).toThrow(
+      /ends inside the word/,
+    );
+    expect(() => decodeFn({ abi, functionName: 'f', data: '0x' })).toThrow(/ends inside the word/);
+  });
+
+  test('a bytes value whose length word overruns the data throws', () => {
+    const data = encodeAbiParameters([{ type: 'bytes' }], [`0x${'ab'.repeat(40)}`]);
+    expect(decodeAbiParameters([{ type: 'bytes' }], data)[0]).toBe(`0x${'ab'.repeat(40)}`);
+    expect(() => decodeAbiParameters([{ type: 'bytes' }], data.slice(0, -60))).toThrow(/overruns/);
+  });
+});

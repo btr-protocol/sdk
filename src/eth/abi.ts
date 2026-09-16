@@ -251,7 +251,11 @@ export function decode(
   components?: AbiParameter[],
 ): { val: unknown; read: number } {
   const d = clean(data);
-  const readWord = (off: number) => d.slice(off, off + 64);
+  const readWord = (off: number) => {
+    const w = d.slice(off, off + 64);
+    if (w.length !== 64) throw new Error(`abi decode: data ends inside the word at byte ${off / 2}`);
+    return w;
+  };
   const readInt = (off: number) => BN(`0x${readWord(off)}`);
 
   // 1. Arrays ([] or [N])
@@ -316,7 +320,9 @@ export function decode(
   if (base === 'bytes' && !sizeStr) {
     // Dynamic bytes: offset points at length word
     const len = Number(readInt(offset));
-    return { val: `0x${d.slice(offset + 64, offset + 64 + len * 2)}`, read: 64 };
+    const end = offset + 64 + len * 2;
+    if (d.length < end) throw new Error(`abi decode: ${len}-byte value overruns the data`);
+    return { val: `0x${d.slice(offset + 64, end)}`, read: 64 };
   }
 
   if (base === 'string') {

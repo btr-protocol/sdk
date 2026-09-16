@@ -86,6 +86,9 @@ export function formatCurrencyCompact(
 
 /** Format token amount from wei to decimal string */
 export function formatUnits(value: bigint, decimals: number): string {
+  if (value < 0n) return `-${formatUnits(-value, decimals)}`;
+  // slice(0, -0) is '' and slice(-0) is the whole string: 0 decimals needs its own branch.
+  if (decimals === 0) return value.toString();
   const str = value.toString().padStart(decimals + 1, '0');
   const intPart = str.slice(0, -decimals) || '0';
   const decPart = str.slice(-decimals);

@@ -222,7 +222,14 @@ export async function getSwapQuote(
     params: [{ to: poolAddress, data: calldata }, 'latest'],
   })) as Hex;
 
-  return decodeFn({ abi: POOL_ABI, functionName: 'getSwapQuote', data: result });
+  const q = decodeFn<SwapQuote>({ abi: POOL_ABI, functionName: 'getSwapQuote', data: result });
+  // The decoder returns bigint for every int/uint; the uint16/int8 fields are typed number.
+  return {
+    ...q,
+    spreadPbps: Number(q.spreadPbps),
+    skewIn: Number(q.skewIn),
+    skewOut: Number(q.skewOut),
+  };
 }
 
 /**
