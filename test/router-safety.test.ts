@@ -432,6 +432,43 @@ describe('a nativeOut batch refuses to unwrap on someone else s behalf', () => {
   });
 });
 
+describe('a chained batch refuses to swap on someone else s behalf', () => {
+  const BOB = '0x5555555555555555555555555555555555555555' as Address;
+  const MID = '0x7777777777777777777777777777777777777777' as Address;
+  // Hop 1 pays `recipient`; hop 2 pulls the intermediate from `msg.sender`. Unless the two are the
+  // same account, hop 1's output lands at the recipient and hop 2 either reverts or spends the
+  // SENDER's own unrelated balance of the intermediate. Only the unwrap path used to be checked.
+  const leg = (tokenIn: Address, tokenOut: Address, amountIn: bigint) => ({
+    pool: POOL as Address,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    minOut: amountIn - 1n,
+    quotedOut: amountIn,
+  });
+  const chained = [leg(TOKEN_A, MID, 10n), leg(MID, TOKEN_B, 9n)];
+
+  test('recipient != sender throws, with no unwrap anywhere in the batch', () => {
+    expect(() => buildSwapCalls(chained, { recipient: BOB, sender: ALICE })).toThrow(
+      /recipient must be the sender/,
+    );
+  });
+
+  test('a chained batch with no sender at all is refused, never assumed self-directed', () => {
+    expect(() => buildSwapCalls(chained, { recipient: BOB })).toThrow(/sender is required/);
+  });
+
+  test('an unchained split to a third party still builds', () => {
+    const split = [leg(TOKEN_A, MID, 10n), leg(TOKEN_A, TOKEN_B, 10n)];
+    expect(() => buildSwapCalls(split, { recipient: BOB, sender: ALICE })).not.toThrow();
+  });
+
+  test('recipient == sender builds both hops', () => {
+    const calls = buildSwapCalls(chained, { recipient: ALICE, sender: ALICE });
+    expect(calls.length).toBeGreaterThan(1);
+  });
+});
+
 describe('the venue swap deadline is a send-time window, not a quote-time one', () => {
   // `quoteAllExactIn` bakes `defaultDeadline()` into the calldata it returns. That window is then
   // spent on everything between the quote and the broadcast — an approval mining first, a wallet

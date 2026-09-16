@@ -411,7 +411,13 @@ function validateLegs(
 ): { wrapValue: bigint; unwrapAmount: bigint } {
   let wrapValue = 0n;
   let unwrapAmount = 0n;
+  let chained = false;
+  const outs = new Set<string>();
   for (const leg of legs) {
+    // Every swap pays `recipient` but pulls `tokenIn` from `msg.sender`: a leg spending an earlier
+    // leg's output is only funded when the two are the same account.
+    if (outs.has(leg.tokenIn.toLowerCase())) chained = true;
+    outs.add(leg.tokenOut.toLowerCase());
     // Trust boundary: the EIP-7528 sentinel is not a contract. Approving or swapping it would
     // encode an approve to an address with no code, so a leg must carry the wrapped address.
     if (isSentinel(leg.tokenIn) || isSentinel(leg.tokenOut)) {
@@ -432,21 +438,22 @@ function validateLegs(
       unwrapAmount += leg.minOut;
     }
   }
-  if (unwrapAmount > 0n) assertUnwrapSelfDirected(opts);
+  if (unwrapAmount > 0n) {
+    assertSelfDirected(opts, 'nativeOut plan (WNATIVE.withdraw burns from msg.sender)');
+  }
+  if (chained) assertSelfDirected(opts, 'chained plan (the next swap pulls from msg.sender)');
   return { wrapValue, unwrapAmount };
 }
 
-/** The unwrap burns from `msg.sender`; the swap pays `recipient`. They must be the same account,
- *  so an unknown sender is refused — defaulting `recipient` to it is how the wrong account gets
- *  paid. */
-function assertUnwrapSelfDirected(opts: Pick<BuildOpts, 'recipient' | 'sender'>): void {
+/** The swap pays `recipient`; an unwrap burns, and a chained swap pulls, from `msg.sender`. They
+ *  must be the same account, so an unknown sender is refused — defaulting `recipient` to it is how
+ *  the wrong account gets paid. */
+function assertSelfDirected(opts: Pick<BuildOpts, 'recipient' | 'sender'>, plan: string): void {
   if (!opts.sender) {
-    throw new Error('nativeOut plan: sender is required (WNATIVE.withdraw burns from msg.sender)');
+    throw new Error(`${plan}: sender is required`);
   }
   if (opts.sender.toLowerCase() !== opts.recipient.toLowerCase()) {
-    throw new Error(
-      'nativeOut plan: recipient must be the sender (WNATIVE.withdraw burns from msg.sender)',
-    );
+    throw new Error(`${plan}: recipient must be the sender`);
   }
 }
 
@@ -910,7 +917,7 @@ export function buildRouterSwapExecCalls(
       throw new Error('buildRouterSwapExecCalls: nativeOut plan needs opts.wrappedNative');
     }
     // `Router.swap` pays the wrapped native to `recipient`; this withdraw burns from `msg.sender`.
-    assertUnwrapSelfDirected(opts);
+    assertSelfDirected(opts, 'nativeOut plan (WNATIVE.withdraw burns from msg.sender)');
     calls.push(unwrapCall(wnative, rp.unwrapAmount));
   }
   return calls;
