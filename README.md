@@ -43,7 +43,7 @@ BTR_ABI_ALLOW_STALE=1 bun run fetch-abis # offline build against the vendored ST
 |---|---|
 | `.` | Curated root re-export (utils, pool, router, amm, eth) |
 | `/abis` | Static interface snapshots (`POOL_ABI`, `POOL_FACTORY_ABI`, …) |
-| `/amm` | Off-chain AIMM pricer + route-finding (fallback compute; the backend is authoritative) |
+| `/amm` | AIMM types + v1 backend fetchers; pricing = btr-quote `/v2` chain quotes |
 | `/eth` | Dependency-free EVM JSON-RPC client, multicall, ERC-20/721/1155/4626, signatures, RLP |
 | `/pool` | Single-pool reads + tx builders (`getSwapQuote`, `swap`, `deposit`, `withdraw`) |
 | `/router` | Route plan → ordered approve+swap calldata (`planToLegs`, `buildSwapCalls`) |
