@@ -12,6 +12,9 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Hex } from '../src/eth/types';
 import {
   V6_BLOB_VERSION,
@@ -36,8 +39,11 @@ const hexToBytes = (h: string): Uint8Array =>
 const bytesToHex = (b: Uint8Array): Hex =>
   `0x${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
 
-// Byte-exact golden: the hex is pinned as a literal so a regenerated fixture cannot drift silently.
-const GOLDEN_HEX = '0x06000000016b49d20a020102007f0f0cf0017d9bff2f00000186a0000007010009' as Hex;
+// Byte-exact golden. The fixture is vendored from dex-evm, so the whole of it is pinned by digest
+// rather than one literal: a re-copy that moves ANY byte — a lane, an expected mark, the blob —
+// moves this hash, which a hand-copied hex constant beside an unread file cannot notice.
+const FIXTURE_PATH = join(import.meta.dir, 'fixtures', 'oracle-v6-wire-golden.json');
+const FIXTURE_SHA256 = '52cd23b3d0f66406d4d8b4a49fc03e231c1a2838b5276bcf05cd66f98e9722ee';
 
 describe('wire v6 fixture shape', () => {
   it('agrees with the constants the codec is built on', () => {
@@ -76,8 +82,10 @@ describe('wire v6 self-describing lanes (exp7:u7 | mant:u25)', () => {
 
 describe('wire v6 blob', () => {
   it('pins the golden bytes and decodes every section', () => {
-    expect(BLOB_HEX).toBe(GOLDEN_HEX);
-    expect(bytesToHex(BLOB_BYTES)).toBe(GOLDEN_HEX);
+    expect(createHash('sha256').update(readFileSync(FIXTURE_PATH)).digest('hex')).toBe(
+      FIXTURE_SHA256,
+    );
+    expect(bytesToHex(BLOB_BYTES)).toBe(BLOB_HEX);
     const d = decodeBlobV6(BLOB_BYTES);
     expect(d.version).toBe(6);
     expect(d.seq).toBe(GOLDEN.header.seq);
