@@ -13,16 +13,14 @@ import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
 import { abiHash } from '../src/abis/hash';
 
 const repo = join(import.meta.dir, '..');
-const POOL_ABI_JSON = JSON.parse(
-  readFileSync(join(repo, '..', 'back', 'abis', 'Pool.json'), 'utf8'),
-);
-const POOL_ABI = (Array.isArray(POOL_ABI_JSON) ? POOL_ABI_JSON : POOL_ABI_JSON.abi) as unknown[];
-const POOL_FACTORY_ABI_JSON = JSON.parse(
-  readFileSync(join(repo, '..', 'back', 'abis', 'PoolFactory.json'), 'utf8'),
-);
-const POOL_FACTORY_BACK = (
-  Array.isArray(POOL_FACTORY_ABI_JSON) ? POOL_FACTORY_ABI_JSON : POOL_FACTORY_ABI_JSON.abi
-) as unknown[];
+const readAbi = (p: string): unknown[] => {
+  const j = JSON.parse(readFileSync(p, 'utf8'));
+  return (Array.isArray(j) ? j : j.abi) as unknown[];
+};
+const POOL_ABI = readAbi(join(repo, 'abis', 'Pool.json'));
+// The backend's served copy lives in the sibling checkout; CI has none, so those checks skip.
+const backAbis = join(repo, '..', 'back', 'abis');
+const hasBack = existsSync(join(backAbis, 'Pool.json'));
 
 // ── the hash itself ──────────────────────────────────────────────────────────
 
@@ -59,11 +57,6 @@ describe('abiHash pins content, not shape', () => {
     });
     expect(abiHash(tampered)).not.toBe(abiHash(POOL_ABI));
   });
-
-  test('the committed lock matches what the backend bakes', () => {
-    const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
-    expect(lock.Pool).toBe(abiHash(POOL_ABI));
-  });
 });
 
 // The committed snapshot is what every build reads FIRST, so it carries the same pin the backend
@@ -90,10 +83,6 @@ describe('PoolFactory parity is pinned across repos', () => {
     expect(lock.PoolFactory).toBe(abiHash(POOL_FACTORY_ABI));
   });
 
-  test('the backend ABI is the same surface as the SDK snapshot', () => {
-    expect(abiHash(POOL_FACTORY_BACK)).toBe(lock.PoolFactory);
-  });
-
   test('the official-grant surface is present and setProtocolDeployer is gone', () => {
     const names = new Set(
       (POOL_FACTORY_ABI as { type?: string; name?: string }[])
@@ -105,6 +94,16 @@ describe('PoolFactory parity is pinned across repos', () => {
     }
     expect(names.has('setProtocolDeployer')).toBe(false);
   });
+});
+
+// The backend serves its own copy of each ABI; it must be the surface the lock pins.
+describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+  for (const name of ['Pool', 'PoolFactory']) {
+    test(`back/abis/${name}.json hashes to the lock`, () => {
+      expect(abiHash(readAbi(join(backAbis, `${name}.json`)))).toBe(lock[name]);
+    });
+  }
 });
 
 // ── the script ───────────────────────────────────────────────────────────────
