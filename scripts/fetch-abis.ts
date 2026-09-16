@@ -235,7 +235,10 @@ for (const t of TARGETS) {
     }
     // Reached here with bytes in hand: a pin failure is a real integrity failure, not a blink.
     write(t, abi, s.note);
-    if (tried.length) console.log(`fetch-abis: ${t.name} from ${s.note} (${tried[0]})`);
+    // Named on every path: which source answered is the fact an operator needs during a release
+    // or rollback window, and with the snapshot read first the happy path is no longer the
+    // backend, so a silent success hid which ABI the build actually compiled against.
+    console.log(`fetch-abis: ${t.name} from ${s.note}${tried.length ? ` (${tried[0]})` : ''}`);
     done = true;
     break;
   }
