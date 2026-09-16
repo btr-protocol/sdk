@@ -46,6 +46,15 @@ export type OracleConfigFields =
 
 export type RiskConfigFields = 'flags' | 'kappaCovBps' | 'depositCapCode' | 'maxLiabWeightBps';
 
+export type RiskFencesFields =
+  | 'minFeeHardMinPbps'
+  | 'minFeeHardMaxPbps'
+  | 'vegaHardMinBps'
+  | 'vegaHardMaxBps'
+  | 'haircutSuppressorHardMaxBps'
+  | 'haircutSuppressorHardMinBps'
+  | 'maxDeltaBps';
+
 export type SwapQuoteFields =
   | 'amountOut'
   | 'amountIn'

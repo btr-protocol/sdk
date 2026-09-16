@@ -46,7 +46,7 @@ const SWAP_QUOTE = [
   T('hopPrices', 'uint256[]'),
 ];
 
-const WITHDRAW_RESULT = [T('amountOut', 'uint256'), T('lpBurned', 'uint256')];
+const WITHDRAW_RESULT = [T('amountOut', 'uint256')];
 
 const err = (name: string, inputs: { name: string; type: string }[]): unknown => ({
   type: 'error',
