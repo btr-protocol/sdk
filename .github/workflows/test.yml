@@ -21,7 +21,7 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
           git -C ../back sparse-checkout set abis
-          git -C ../back checkout -q 54abe0b47021b2cd15d656e6d0973be5fe4c63b9
+          git -C ../back checkout -q 59c085a3a5a7e3b9a3404bf38c77c934c6fe1a09
       # The solidity mirror test re-parses the DECLARING sources; it hard-fails without them.
       - run: |
           git clone -q --filter=blob:none --no-checkout \
