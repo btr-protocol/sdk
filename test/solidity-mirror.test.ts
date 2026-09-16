@@ -16,6 +16,7 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
+import { INTERIOR_SWING_CAP_PBPS } from '../src/amm/aimm';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
@@ -162,6 +163,18 @@ describe.if(have)('solidity.generated.ts mirrors the declaring sources', () => {
     const c = pricingConsts();
     expect(c.get('STALE_Z')).toBe(M.STALE_Z);
     expect(c.get('STALE_GRACE_CAP_SECS')).toBe(M.STALE_GRACE_CAP_SECS);
+  });
+
+  test('INTERIOR_SWING_CAP_PBPS is the Pricing.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {
+    const pricing = src(join(DEX, 'src', 'libraries', 'Pricing.sol'));
+    expect(pricing).toContain(
+      'INTERIOR_SWING_CAP_PBPS =\n    (2 * FENCE_BUDGET_PBPS * SC.PBPS) / (2 * SC.PBPS + FENCE_BUDGET_PBPS);',
+    );
+    const tree = src(join(DEX, 'src', 'libraries', 'AnchorTreeLib.sol'));
+    const depth = Number(/MAX_DEPTH = (\d+);/.exec(tree)?.[1]);
+    const budget = Math.floor(65_535 / (2 * depth + 1 - 3)); // uint16.max / MAX_INTERIOR_LEGS
+    const P = 1_000_000;
+    expect(INTERIOR_SWING_CAP_PBPS).toBe(Math.floor((2 * budget * P) / (2 * P + budget)));
   });
 
   test('POOL_SCOPED_OPS is exactly what Admin._keyOf keys without a subject', () => {

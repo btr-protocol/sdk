@@ -28,13 +28,13 @@ export const STABLE_PROFILE: AimmProfile = {
 };
 
 // Volatile floor DERIVED from the preset, never picked: `sanitizeDispersion` CHECKS
-// `minDispersion` against `dispersionCap` (10_000 here); a floor above the cap is a
+// `minDispersion` against `dispersionCap` (10_862 here); a floor above the cap is a
 // pool configuration that cannot exist on chain.
 const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
   minFeePbps: 1_000,
-  minDisp: VOL_CAP / 5,
+  minDisp: Math.floor(VOL_CAP / 5),
   curve: BOOTSTRAP_VOLATILE_CURVE,
 };
 

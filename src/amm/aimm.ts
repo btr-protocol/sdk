@@ -188,7 +188,8 @@ export function buildCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
-export const INTERIOR_SWING_CAP_PBPS = 10_000;
+/** `Pricing.INTERIOR_SWING_CAP_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
+export const INTERIOR_SWING_CAP_PBPS = 10_862;
 export const MAX_DISPERSION_PBPS = 900_000;
 
 export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
