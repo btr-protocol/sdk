@@ -1,7 +1,7 @@
 /** `src/abis/solidity.generated.ts` against the Solidity it claims to mirror.
  *
  *  The mirror is now GENERATED — `scripts/gen-constants.ts` writes it from `dex-evm/abi/constants.json`,
- *  which `dex-evm/abi/consts.py` emits from the declaring sources. That closes the drift at the
+ *  which `dex-evm/tools/consts.py` emits from the declaring sources. That closes the drift at the
  *  source, but not the loop: a clone with no `dex-evm` sibling keeps the COMMITTED file, so the
  *  committed file is still what a build compiles against and still has to be checked.
  *

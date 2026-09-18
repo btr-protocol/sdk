@@ -7,7 +7,7 @@
  * cannot ride the getAbi path `fetch-abis.ts` uses. It was hand-maintained instead, and the file
  * said `.generated` while carrying a "MAINTAINED BY HAND" header — eight copies of one flag bit
  * across five repos, found drifting once per audit. dex-evm now publishes them from its own
- * sources (`abi/consts.py`, covered by `abi/gen.py --check`); this reads that file.
+ * sources (`tools/consts.py`, covered by `tools/abi-gen.py --check`); this reads that file.
  *
  * The OUTPUT IS COMMITTED, unlike `Pool.ts`: a fresh clone (front's Docker build via `SDK_REF`)
  * has no `dex-evm` sibling, and a build that silently emitted no constants would typecheck and
