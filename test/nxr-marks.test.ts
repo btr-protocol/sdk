@@ -15,7 +15,7 @@ import { chainVenue } from '../src/venues/registry';
  */
 const DEX = resolve(import.meta.dir, '../../dex-evm/deployments');
 const roster = (chain: string): string[] => {
-  const p = resolve(DEX, `${chain}-risk-params.json`);
+  const p = resolve(DEX, `${chain}.risk-params.json`);
   return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')).symbols as string[]) : [];
 };
 

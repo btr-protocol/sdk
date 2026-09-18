@@ -79,7 +79,7 @@ const PEG_STABLE = (nxrSymbol: string, usdc?: NxrPair): NxrMark => ({ nxrSymbol,
 
 /**
  * Roster symbol ⇒ its NXR mark source. Keys are canonical roster symbols: punctuation stripped,
- * UPPER-CASE (`arc-risk-params.json` `.noteSymbolConvention`). `CBBTC`, not `cbBTC`: the mixed-case
+ * UPPER-CASE (`arc.risk-params.json` `.noteSymbolConvention`). `CBBTC`, not `cbBTC`: the mixed-case
  * spelling mismatches the `TOKENS` registry key and is already rejected by the collector's
  * `/^[A-Z0-9]{1,16}-…/` pair regex, so it resolves here only through `nxrMark`'s case folding.
  */
@@ -110,7 +110,7 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   /** The base's own depeg reference. There is no USDC/USDC identity feed. */
   USDC: PEG_STABLE('USDC-USD'),
   // ── Arc faucet twins. Pool legs that own NO FEED: each borrows an existing one on chain
-  // (dex arc-risk-params `noteFaucetTwins`). A row here is what gives the front a price symbol at
+  // (dex arc.risk-params `noteFaucetTwins`). A row here is what gives the front a price symbol at
   // all: `priceSymbolOf` reads `nxrSymbol`, so without one the stream key is the roster symbol
   // itself (`EURCBUSDC`), which resolves to nothing and silently values the leg at `refUsd ?? 1`.
   //

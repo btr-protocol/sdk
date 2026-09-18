@@ -19,7 +19,7 @@
  *
  * To add or update a chain, transcribe from `dex-evm/deployments/`, checking each address against
  * the chain: `contracts` + `tokens` + `feedIds` from `<chainId>.deploy.json` (`feed_<SYM>` keys),
- * `tickerIds` from `<slug>-mitch-tickers.json`, `rosters` from `<slug>-risk-params.json`, `pools`
+ * `tickerIds` from `<slug>.mitch-tickers.json`, `rosters` from `<slug>.risk-params.json`, `pools`
  * and `refFeeds` from `<chainId>.pools.json` (`<class>Pool` / `<class>PoolRefFeeds`). A wrong address
  * is still an address: nothing downstream fails to parse, it just executes against the wrong
  * contract (keepers/bots/bots.arc.toml records what that cost on 2026-08-14).
