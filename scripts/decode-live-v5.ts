@@ -8,8 +8,10 @@
  * working, and it is what gives every feed 256x upward / 128x downward headroom
  * before `encode_lane` runs out of exponent. Run this to check it still holds.
  *
- *   ssh <node> (operator port-forward)'sudo k0s kubectl -n nxr port-forward deploy/nxr-signer-arc-0 18099:40004' &
- *   curl -s 'http://127.0.0.1:18099/v1/quote/signed?domain=arc-v4&version=5' \
+ * Point `RPC_URL`/`ORACLE` at the deployment you decode; operators use their own
+ * port-forward to reach it. Then:
+ *
+ *   curl -s "${RPC_URL:?}/v1/quote/signed?domain=arc-v4&version=5" \
  *     | bun scripts/decode-live-v5.ts
  *
  * The ENTRY COUNT varies run to run — a feed whose mark is unavailable is
