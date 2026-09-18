@@ -9,3 +9,13 @@ coverage/
 src/abis/Pool.ts
 src/abis/Admin.ts
 
+
+# Secrets hygiene
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+create3-salts*.json
+*.kubeconfig
+kubeconfig*
