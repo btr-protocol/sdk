@@ -473,7 +473,10 @@ export interface DepthBookWire {
   step: number;
   bids: DepthRowWire[];
   asks: DepthRowWire[];
+  /** Distinct pools the merged book draws on. */
   poolCount?: number;
+  /** Itineraries merged into it: > `poolCount` whenever routes share a pool. */
+  routeCount?: number;
 }
 export interface DepthRequestWire {
   pools: NamedPoolWire[];

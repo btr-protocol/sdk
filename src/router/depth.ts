@@ -242,6 +242,8 @@ export interface AggregatedDepthBook {
   askDisp: AggRow[];
   ladder: { steps: number[]; defaultIdx: number } | null;
   poolCount: number;
+  /** Itineraries merged into the book; absent on a locally aggregated one. */
+  routeCount?: number;
 }
 
 export interface BookPart {
@@ -485,6 +487,7 @@ export async function aggregatePairDepthAsync(
       askDisp: [],
       ladder: null,
       poolCount: wire.poolCount ?? 1,
+      routeCount: wire.routeCount,
     };
   }
   return {
@@ -502,6 +505,7 @@ export async function aggregatePairDepthAsync(
     askDisp: [],
     ladder: null,
     poolCount: wire.poolCount ?? 1,
+    routeCount: wire.routeCount,
   };
 }
 
