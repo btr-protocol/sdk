@@ -606,7 +606,7 @@ const toU128Hex = (v: number): string => {
  *  `evalQ`, so the centre this SDK puts on the wire is the centre the chain would have found.
  *  It is the only x at which the curve quotes the mark itself, and `PricingLib._skewToDepth` anchors
  *  zero inventory skew on it. On an antisymmetric curve it IS exactly BPS/2, which is why pinning
- *  5000 went unnoticed: every live preset is symmetric. An asymmetric one moved the centre and the
+ *  5000 went unnoticed: every live curve is symmetric. An asymmetric one moved the centre and the
  *  wire kept saying 5000. */
 export function medianQ(c: QuarticCurve): number {
   let lo = 0;

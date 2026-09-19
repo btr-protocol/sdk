@@ -59,7 +59,7 @@ export const POOL_STRUCTS = {
     minLiquidity: [1, 20],
     liquidityIndexWad: [2, 0],
     minDispersionPbps: [2, 12],
-    presetId: [2, 16],
+    curveId: [2, 16],
     minFeePbps: [2, 18],
     vegaBps: [2, 20],
     depositCapCode: [2, 22],

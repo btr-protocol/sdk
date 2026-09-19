@@ -163,7 +163,7 @@ export function addressAt(word: Hex, offset: number): Address {
 /** `NUQuarticLib.Curve.segs` is a fixed uint256[28] block (m ≤ 14 → 2m live words). */
 export const CURVE_SEG_SLOTS = 28;
 
-/** Mapping entry base slot for a uint16 key (curves preset table). */
+/** Mapping entry base slot for a uint16 key (the shared curve table). */
 export function mappingBaseU16(key: number, mappingSlot: bigint): bigint {
   const encoded = encodeAbiParameters(
     [{ type: 'uint256' }, { type: 'uint256' }],
@@ -179,15 +179,15 @@ function i64AtBits(word: bigint, shift: number): bigint {
 }
 
 /**
- * Read the asset's pricing-shape pointer (`Asset.presetId`): index into `PoolStorage.curves`.
- * 0 = no preset (fallback quote).
+ * Read the asset's pricing-shape pointer (`Asset.curveId`): index into `PoolStorage.curves`.
+ * 0 = no curve (fallback quote).
  */
-export async function readAssetPresetId(
+export async function readAssetCurveId(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
 ): Promise<number> {
-  const [slot, offset] = POOL_STRUCTS.Asset.presetId;
+  const [slot, offset] = POOL_STRUCTS.Asset.curveId;
   const key = await resolveTokenStorageKey(provider, pool, token);
   const word = await getStorageAt(
     provider,
@@ -198,17 +198,17 @@ export async function readAssetPresetId(
 }
 
 /**
- * Read + decode a shared preset curve (`NUQuarticLib.Curve` @ curves[presetId], slot 6):
+ * Read + decode a shared curve (`NUQuarticLib.Curve` @ curves[curveId], slot 6):
  * header slot + the 2m live segment slots (of the fixed uint256[28] block). Returns null when
- * the preset is unset (header 0: Pricing falls back to the linear-impact quote).
+ * the curve is unset (header 0: Pricing falls back to the linear-impact quote).
  * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
  */
 export async function readCurve(
   provider: Eip1193Provider,
   pool: Address,
-  presetId: number,
+  curveId: number,
 ): Promise<QuarticCurve | null> {
-  const base = mappingBaseU16(presetId, POOL_STORAGE.curves);
+  const base = mappingBaseU16(curveId, POOL_STORAGE.curves);
   // ONE transport round-trip: the segment block is a FIXED uint256[28] slot run (m ≤ 14), so the
   // header and every possible segment word are fetched speculatively together. The transport's
   // tick-batch coalesces these into a single JSON-RPC POST; per-slot eth_getStorageAt cannot ride

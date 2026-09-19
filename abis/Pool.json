@@ -228,7 +228,7 @@
         ]
       },
       {
-        "name": "presetId",
+        "name": "curveId",
         "type": "uint16",
         "internalType": "uint16"
       },
@@ -391,7 +391,7 @@
     "name": "adminSetCurve",
     "inputs": [
       {
-        "name": "presetId",
+        "name": "curveId",
         "type": "uint16",
         "internalType": "uint16"
       },
@@ -503,7 +503,7 @@
         "internalType": "address"
       },
       {
-        "name": "presetId",
+        "name": "curveId",
         "type": "uint16",
         "internalType": "uint16"
       },
@@ -849,7 +849,7 @@
             "internalType": "uint32"
           },
           {
-            "name": "presetId",
+            "name": "curveId",
             "type": "uint16",
             "internalType": "uint16"
           },

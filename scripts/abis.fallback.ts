@@ -20,7 +20,7 @@ const ASSET = [
   T('minLiquidity', 'uint96'),
   T('liquidityIndexWad', 'uint96'),
   T('minDispersionPbps', 'uint32'),
-  T('presetId', 'uint16'),
+  T('curveId', 'uint16'),
   T('minFeePbps', 'uint16'),
   T('vegaBps', 'uint16'),
   T('depositCapCode', 'uint16'),

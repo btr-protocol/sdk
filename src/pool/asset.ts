@@ -2,7 +2,7 @@ import type { Asset } from './index.js';
 
 const ASSET_NUMBER_FIELDS = [
   'minDispersionPbps',
-  'presetId',
+  'curveId',
   'minFeePbps',
   'vegaBps',
   'depositCapCode',

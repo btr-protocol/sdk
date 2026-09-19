@@ -19,7 +19,7 @@ const RISK = {
   protoFeeBps: 2_000,
 };
 
-/** Stable: tight preset-2 curve + tight dispersion (peg book). */
+/** Stable: tight curve 2 + tight dispersion (peg book). */
 export const STABLE_PROFILE: AimmProfile = {
   ...RISK,
   minFeePbps: 10,
@@ -27,7 +27,7 @@ export const STABLE_PROFILE: AimmProfile = {
   curve: BOOTSTRAP_STABLE_CURVE,
 };
 
-// Volatile floor DERIVED from the preset, never picked: `sanitizeDispersion` CHECKS
+// Volatile floor DERIVED from the curve, never picked: `sanitizeDispersion` CHECKS
 // `minDispersion` against `dispersionCap` (10_862 here); a floor above the cap is a
 // pool configuration that cannot exist on chain.
 const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);

@@ -9,7 +9,7 @@ export type AssetFields =
   | 'minLiquidity'
   | 'liquidityIndexWad'
   | 'minDispersionPbps'
-  | 'presetId'
+  | 'curveId'
   | 'minFeePbps'
   | 'vegaBps'
   | 'depositCapCode'

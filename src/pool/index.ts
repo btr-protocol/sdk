@@ -34,9 +34,9 @@ export interface Asset {
   minLiquidity: bigint;
   liquidityIndexWad: bigint;
   minDispersionPbps: number;
-  /** Pricing-shape pointer into PoolStorage.curves (shared preset table). Never 0 on a listed leg:
-   *  `PoolConfigLib.validatePresetAssign` refuses the assignment, so there is no curve-less quote. */
-  presetId: number;
+  /** Pricing-shape pointer into PoolStorage.curves (shared curve table). Never 0 on a listed leg:
+   *  `PoolConfigLib.validateCurveAssign` refuses the assignment, so there is no curve-less quote. */
+  curveId: number;
   minFeePbps: number;
   /** Scale: see `AimmProfile.vega`. */
   vegaBps: number;
@@ -168,7 +168,7 @@ export {
   mappingBase,
   mappingBaseU16,
   resolveTokenStorageKey,
-  readAssetPresetId,
+  readAssetCurveId,
   readCurve,
   readOracleConfig,
   readRiskConfig,

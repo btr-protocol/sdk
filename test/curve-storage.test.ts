@@ -6,7 +6,7 @@
  * The real layout — `m | 14×uint16 boundaries | dispRef@232 | flags@248` in the header, and
  * `c0|c1|c2|c3` / `c4|S` as signed lanes in the segment words — is packed BY HAND inside
  * `NUQuarticLib.set`, so it is invisible to `storageLayout` and the layout test cannot cover it. That
- * is the same blind spot that let the `presetId` off-by-4 ship, with every shaped quote reading a
+ * is the same blind spot that let the `curveId` off-by-4 ship, with every shaped quote reading a
  * bogus curve behind a green suite.
  *
  * The guard is differential, not a re-implementation: `test/fixtures/curve-storage.json` holds the
@@ -24,7 +24,7 @@ import { CURVE_SEG_SLOTS, readCurve } from '../src/pool/storage';
 import FIXTURE from './fixtures/curve-storage.json';
 
 const POOL = '0x00000000000000000000000000000000000000aa' as Address;
-const PRESET_ID = 7;
+const CURVE_ID = 7;
 
 interface Fixture {
   dispRef: number;
@@ -40,7 +40,7 @@ interface Fixture {
 const fx = FIXTURE as unknown as Fixture;
 
 /**
- * Serves the dumped words as if they were `curves[PRESET_ID]`. The base slot is taken from the
+ * Serves the dumped words as if they were `curves[CURVE_ID]`. The base slot is taken from the
  * FIRST slot `readCurve` asks for, so this fixes the packing under test without also re-asserting
  * the mapping slot arithmetic (which `storage-layout.test.ts` owns).
  */
@@ -60,7 +60,7 @@ function wordProvider(words: string[] = fx.words): Eip1193Provider & { reads: bi
   } as Eip1193Provider & { reads: bigint[] };
 }
 
-const read = () => readCurve(wordProvider(), POOL, PRESET_ID);
+const read = () => readCurve(wordProvider(), POOL, CURVE_ID);
 
 describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
   test('header fields: m, the uint16 boundary directory, dispRef@232, flags@248', async () => {
@@ -103,7 +103,7 @@ describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
 
   test('one speculative sweep of header + the fixed 28-slot block - one round trip, no more', async () => {
     const p = wordProvider();
-    const c = (await readCurve(p, POOL, PRESET_ID)) as NonNullable<
+    const c = (await readCurve(p, POOL, CURVE_ID)) as NonNullable<
       Awaited<ReturnType<typeof readCurve>>
     >;
     // eth_getStorageAt cannot ride Multicall3 aggregate3 (raw storage, no view getter by
@@ -114,8 +114,8 @@ describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
     expect(c.m).toBeGreaterThan(0);
   });
 
-  test('an unset preset (header 0) reads as null, not as an m=0 curve', async () => {
-    const zero = await readCurve(wordProvider([`0x${'0'.repeat(64)}`]), POOL, PRESET_ID);
+  test('an unset curve (header 0) reads as null, not as an m=0 curve', async () => {
+    const zero = await readCurve(wordProvider([`0x${'0'.repeat(64)}`]), POOL, CURVE_ID);
     expect(zero).toBeNull();
   });
 
@@ -142,7 +142,7 @@ describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
       const words = [...fx.words];
       const flipped = BigInt(words[w]) ^ (1n << bit);
       words[w] = `0x${flipped.toString(16).padStart(64, '0')}`;
-      const c = await readCurve(wordProvider(words), POOL, PRESET_ID);
+      const c = await readCurve(wordProvider(words), POOL, CURVE_ID);
       expect(
         JSON.stringify(c, (_k, v) => (typeof v === 'bigint' ? `${v}` : v)),
         `word ${w} bit ${bit}`,
@@ -161,7 +161,7 @@ describe('curveToWire rebuilds the header Solidity wrote', () => {
 
   test("the median is the curve's own root, not a pinned BPS/2", () => {
     // Solidity put 4235 in this header. The packer used to write 5000 unconditionally, which is
-    // right only for an antisymmetric curve — i.e. for every preset anyone had tried.
+    // right only for an antisymmetric curve — i.e. for every curve anyone had tried.
     const solidityMedian = (BigInt(fx.words[0]) >> 216n) & 0xffffn;
     expect(solidityMedian).toBe(4235n);
     expect(solidityMedian).not.toBe(5000n);

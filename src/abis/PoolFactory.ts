@@ -288,7 +288,7 @@ export const POOL_FACTORY_ABI = [
         type: 'address',
       },
     ],
-    name: 'isSpawn',
+    name: 'isClone',
     outputs: [
       {
         internalType: 'bool',
@@ -362,7 +362,7 @@ export const POOL_FACTORY_ABI = [
     outputs: [
       {
         internalType: 'bool',
-        name: 'spawn',
+        name: 'clone',
         type: 'bool',
       },
       {

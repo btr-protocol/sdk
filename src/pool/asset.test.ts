@@ -15,7 +15,7 @@ const row = {
   minLiquidity: 0n,
   liquidityIndexWad: 10n ** 18n,
   minDispersionPbps: 2034n,
-  presetId: 5n,
+  curveId: 5n,
   minFeePbps: 90n,
   vegaBps: 4000n,
   depositCapCode: 0n,
@@ -43,7 +43,7 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says (A-104)
     expect(a.maxLiabWeightBps).toBe(0);
     expect(a.flags).toBe(7);
     expect(a.decimals).toBe(6);
-    expect(a.presetId).toBe(5);
+    expect(a.curveId).toBe(5);
     expect(a.reserves).toBe(1_000_000n);
     expect(a.liquidityIndexWad).toBe(10n ** 18n);
   });
