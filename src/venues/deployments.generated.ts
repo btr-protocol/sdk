@@ -12,10 +12,10 @@
  * MAINTAINED BY HAND. There is NO generator for this file and the `.generated` in its name is
  * historical - `gen-oracle-lanes.py` writes `oracle-lanes.generated.ts`, nothing writes this one.
  * Do not write one either: the records are not sufficient to reproduce it. `contracts.poolImpl`
- * here is the LIVE beacon implementation (0x136bC3A7…, read off Arc's PoolFactory), which matches
- * neither `poolImpl` nor `pendingPoolImpl` in `dex-evm/deployments/5042002.pools.json` - a later
- * upgrade landed and the record is stale. A generator sourced from that record would quietly
- * regress a live address, which is the exact failure this file exists to prevent.
+ * is the LIVE beacon implementation, read off Arc's `PoolFactory.implementation()`, and the beacon
+ * has moved four times. A generator sourced from a record alone would quietly regress a live
+ * address on the next upgrade, which is the exact failure this file exists to prevent. Every
+ * address below is therefore transcribed AND read back from the chain, never copied on faith.
  *
  * To add or update a chain, transcribe from `dex-evm/deployments/`, checking each address against
  * the chain: `contracts` + `tokens` + `feedIds` from `<chainId>.deploy.json` (`feed_<SYM>` keys),
@@ -76,7 +76,9 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       // here, so this is what `registry.ts` and the pools read.
       oracle: '0x842c2736F072A8A7b523D23bd3Ef21F21AC24d5C',
       poolFactory: '0xaF5Dfa6F3f549bAb1598Ff24d15c0cF9aCaA6Df7',
-      poolImpl: '0x136bC3A713DB3C8da6836244923F7bdA401F1b27',
+      // Beacon implementation read off the factory, not copied from a record: this address moves
+      // on every pool upgrade and is the one thing a stale record regresses silently.
+      poolImpl: '0xE3ABf08Ec5A2246D843041Af3127368b14cDCD94',
       // The reference oracle every non-base spoke prices against. Its own timelock round has
       // EXECUTED, so both tiers are ExternalOracleV4 (wire v5) and only one generation is live.
       // Join a lane map on the ADDRESS, never on the tag: the two tiers are separate instances
