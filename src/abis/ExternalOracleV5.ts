@@ -48,7 +48,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   },
   {
     inputs: [],
-    name: 'MAX_DEV_THRESHOLD',
+    name: 'MAX_DEV_THRESHOLD_BPS',
     outputs: [
       {
         internalType: 'uint16',
@@ -74,7 +74,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   },
   {
     inputs: [],
-    name: 'MAX_SOURCE_AGE',
+    name: 'MAX_SOURCE_AGE_SECS',
     outputs: [
       {
         internalType: 'uint32',
@@ -87,7 +87,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   },
   {
     inputs: [],
-    name: 'SIGNER_GOV_GRACE',
+    name: 'SIGNER_GOV_GRACE_SECS',
     outputs: [
       {
         internalType: 'uint48',
@@ -284,7 +284,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
           },
           {
             internalType: 'uint16',
-            name: 'maxDeviationBps',
+            name: 'maxDevBps',
             type: 'uint16',
           },
           {
@@ -634,7 +634,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
       {
         internalType: 'uint16',
-        name: 'maxDeviationBps',
+        name: 'maxDevBps',
         type: 'uint16',
       },
       {
@@ -710,7 +710,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint16',
-        name: 'maxDeviationBps',
+        name: 'maxDevBps',
         type: 'uint16',
       },
       {
@@ -741,7 +741,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint16',
-        name: 'maxDeviationBps',
+        name: 'maxDevBps',
         type: 'uint16',
       },
     ],
@@ -809,7 +809,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint16',
-        name: 'maxDeviationBps',
+        name: 'maxDevBps',
         type: 'uint16',
       },
       {
@@ -1117,11 +1117,6 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   {
     inputs: [],
     name: 'NotReady',
-    type: 'error',
-  },
-  {
-    inputs: [],
-    name: 'SessionExpired',
     type: 'error',
   },
   {

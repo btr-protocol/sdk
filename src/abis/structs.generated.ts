@@ -28,7 +28,7 @@ export type FeedDataFields =
   | 'ttlSecs'
   | 'confidenceBps'
   | 'flags'
-  | 'maxDeviationBps'
+  | 'maxDevBps'
   | 'sourceTsMs';
 
 export type FeeParamsFields = 'protoSharePct' | 'flashFeePbps';

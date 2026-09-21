@@ -1304,7 +1304,7 @@
         "internalType": "address"
       },
       {
-        "name": "newCooldown",
+        "name": "newCooldownSecs",
         "type": "uint16",
         "indexed": false,
         "internalType": "uint16"

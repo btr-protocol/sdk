@@ -624,7 +624,7 @@ export const POOL_FACTORY_ABI = [
         type: 'address',
       },
     ],
-    name: 'PoolOfficialSet',
+    name: 'PoolOfficialUpdated',
     type: 'event',
   },
   {

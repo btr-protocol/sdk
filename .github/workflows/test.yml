@@ -27,11 +27,11 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
           git -C ../dex-evm sparse-checkout set src abi
-          git -C ../dex-evm checkout -q aa398d318eca1b061fedc20e77cd52123e9fe80a
+          git -C ../dex-evm checkout -q e012fa73a0884b8f6d751a023f77c8492e28f8f1
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
           git -C ../shared sparse-checkout set evm/src
-          git -C ../shared checkout -q 0f7e63d8d5a041ae15183510891fb72a88ee2374
+          git -C ../shared checkout -q 807585a1c722877cadbbd61db3042311181fdba9
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test

@@ -26,7 +26,7 @@ export interface FeedData {
   /** Feed bits; bit0 = paused. */
   flags: number;
   /** Single-push deviation bound, bps. Widening it is timelocked; narrowing is instant. */
-  maxDeviationBps: number;
+  maxDevBps: number;
   /** Signer-attested source time, ms since epoch. Strictly monotonic per feed; 0 when unsigned. */
   sourceTsMs: number;
 }
