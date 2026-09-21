@@ -18,9 +18,9 @@ import { buildSwapCalls, planToLegs } from '../src/router/index';
 import {
   activeFeedId,
   activeOracle,
-  activeUsdc,
   chainVenue,
   deployedChainIds,
+  nativeUsdc,
   staticVenuePools,
 } from '../src/venues/registry';
 import {
@@ -233,7 +233,7 @@ describe('chain resolution refuses to guess', () => {
     const UNDEPLOYED = 1_337_999;
     expect(deployedChainIds()).not.toContain(UNDEPLOYED);
     expect(() => staticVenuePools(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
-    expect(() => activeUsdc(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
+    expect(() => nativeUsdc(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
     expect(() => activeOracle(UNDEPLOYED)).toThrow(/no BTR deployment for chain 1337999/);
     expect(() => activeFeedId(UNDEPLOYED, 'USDC')).toThrow(/no BTR deployment for chain 1337999/);
   });
@@ -278,9 +278,9 @@ describe('chain resolution refuses to guess', () => {
     expect(() => chainVenue(0)).toThrow(/deployed: \[5042002\]/);
   });
 
-  test('every deployed chain resolves a base, an oracle and at least one pool', () => {
+  test('every deployed chain resolves native USDC, an oracle and at least one pool', () => {
     for (const id of deployedChainIds()) {
-      expect(activeUsdc(id)).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(nativeUsdc(id)).toMatch(/^0x[0-9a-fA-F]{40}$/);
       expect(activeOracle(id)).toMatch(/^0x[0-9a-fA-F]{40}$/);
       expect(staticVenuePools(id).length).toBeGreaterThan(0);
       // Every pool must list at least both its base and one counter-asset, else it quotes nothing.

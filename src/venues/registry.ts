@@ -55,11 +55,11 @@ export function chainVenue(chainId: number): ChainVenue {
   return v;
 }
 
-/** USDC base (USDC-hub numeraire): the first symbol of every roster. */
-export function activeUsdc(chainId: number): Address {
+/** The chain's native USDC (Arc's gas token), NOT the pool base: Arc's live base is USDC.b. */
+export function nativeUsdc(chainId: number): Address {
   const v = chainVenue(chainId);
   const usdc = v.tokens.USDC;
-  if (!usdc) throw new Error(`chain ${chainId} deployment carries no USDC base`);
+  if (!usdc) throw new Error(`chain ${chainId} deployment carries no native USDC`);
   return usdc;
 }
 
