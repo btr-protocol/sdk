@@ -10,9 +10,12 @@
  * zeroAddress. The real source of truth for deployed addresses is the backend venues API
  * (`GET {api}/v1/venues`), which the front end consumes directly.
  *
- * There is no CREATE3 anywhere in the stack. Pool proxies are ERC-1967 beacon proxies pointing at
- * `PoolFactory` itself (the factory IS the beacon), deployed at a salt that includes block.chainid
- * (`PoolFactory.createPool`), so addresses are NOT identical across chains. Mock tokens are plain
+ * Pool proxies are ERC-1967 beacon proxies pointing at `PoolFactory` itself (the factory IS the
+ * beacon). `PoolFactory.createPool(salt, ...)` mints them through the CREATE3 factory with the
+ * PoolFactory as the sender, so a pool address is `f(create3Factory, poolFactory, salt)`: the base
+ * token and the roster are mutable state and are not in it, and one salt lands on one address on
+ * every chain of a fleet. `predictPool(salt)` derives it off chain. Singletons are CREATE3 from the
+ * deployer EOA instead, so they do NOT share that property across fleets. Mock tokens are plain
  * nonce-ordered CREATE.
  */
 

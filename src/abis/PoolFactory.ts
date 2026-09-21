@@ -4,8 +4,10 @@
  * PoolFactory
  * @module @btr-protocol/sdk/abis
  *
- * EIP-1167 minimal-clone factory for pool instances, and the upgrade beacon itself: clones read `implementation()` from it.
- * Source: backend ABI service
+ * Owner-gated factory minting ERC-1967 beacon proxies at reserved CREATE3 addresses, and the
+ * upgrade beacon itself: every pool reads `implementation()` from it. `predictPool(salt)` derives
+ * the address `createPool` mints, identically on every chain.
+ * Source: dex-evm/abi/PoolFactory.json
  */
 
 export const POOL_FACTORY_ABI = [
@@ -21,6 +23,11 @@ export const POOL_FACTORY_ABI = [
         name: 'ac_',
         type: 'address',
       },
+      {
+        internalType: 'address',
+        name: 'create3Factory_',
+        type: 'address',
+      },
     ],
     stateMutability: 'nonpayable',
     type: 'constructor',
@@ -28,6 +35,19 @@ export const POOL_FACTORY_ABI = [
   {
     inputs: [],
     name: 'AC',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'CREATE3_FACTORY',
     outputs: [
       {
         internalType: 'address',
@@ -86,6 +106,11 @@ export const POOL_FACTORY_ABI = [
   },
   {
     inputs: [
+      {
+        internalType: 'bytes32',
+        name: 'salt',
+        type: 'bytes32',
+      },
       {
         internalType: 'address',
         name: 'baseToken',
@@ -246,6 +271,25 @@ export const POOL_FACTORY_ABI = [
     inputs: [
       {
         internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    name: 'isClone',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
         name: 'pool',
         type: 'address',
       },
@@ -270,25 +314,6 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     name: 'isPool',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    name: 'isClone',
     outputs: [
       {
         internalType: 'bool',
@@ -421,25 +446,31 @@ export const POOL_FACTORY_ABI = [
   {
     inputs: [
       {
+        internalType: 'bytes32',
+        name: 'salt',
+        type: 'bytes32',
+      },
+    ],
+    name: 'predictPool',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'address[]',
         name: 'tokens',
         type: 'address[]',
       },
     ],
     name: 'registerTokens',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'newImplementation',
-        type: 'address',
-      },
-    ],
-    name: 'requestReferenceUpgrade',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -458,6 +489,19 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     name: 'requestOfficial',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newImplementation',
+        type: 'address',
+      },
+    ],
+    name: 'requestReferenceUpgrade',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -715,11 +759,6 @@ export const POOL_FACTORY_ABI = [
     type: 'error',
   },
   {
-    inputs: [],
-    name: 'InvalidConfig',
-    type: 'error',
-  },
-  {
     inputs: [
       {
         internalType: 'uint256',
@@ -738,6 +777,11 @@ export const POOL_FACTORY_ABI = [
   {
     inputs: [],
     name: 'Expired',
+    type: 'error',
+  },
+  {
+    inputs: [],
+    name: 'InvalidConfig',
     type: 'error',
   },
   {

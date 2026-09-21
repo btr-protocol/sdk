@@ -137,13 +137,13 @@ export interface PlanLegOpts {
   /** Is this pool address one the caller is willing to hand tokens to? REQUIRED, and required to
    *  fail closed: a plan naming any pool this rejects produces NO plan at all.
    *
-   *  `PoolFactory.createPool` is PERMISSIONLESS, so a pool address is no longer self-authenticating
-   *  — anyone can deploy a contract that looks like a BTR pool, and a quote source that names it
-   *  gets an `approve` and a `swap` from the user's own account. On the legacy path that approval
-   *  is granted PER POOL, so one rogue address in one part is a standing allowance against the
-   *  user's balance (`approveMax` makes it unbounded).
+   *  A pool address is not self-authenticating. `PoolFactory.createPool` is owner-gated, but
+   *  nothing stops anyone deploying a contract that looks like a BTR pool outside the factory, and
+   *  a quote source that names it gets an `approve` and a `swap` from the user's own account. On
+   *  the legacy path that approval is granted PER POOL, so one rogue address in one part is a
+   *  standing allowance against the user's balance (`approveMax` makes it unbounded).
    *
-   *  Feed it `PoolFactory.isOfficialPool` — the factory's asserted-official index — or a set
+   *  Feed it `PoolFactory.isOfficialPool`, the factory's asserted-official index, or a set
    *  derived from it. `tokenOf` is the same shape and the same contract: the caller owns the
    *  universe, this module only encodes what the caller already trusts. */
   isOfficialPool: (pool: Address) => boolean;

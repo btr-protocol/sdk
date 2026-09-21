@@ -20,7 +20,10 @@
  * To add or update a chain, transcribe from `dex-evm/deployments/`, checking each address against
  * the chain: `contracts` + `tokens` + `feedIds` from `<chainId>.deploy.json` (`feed_<SYM>` keys),
  * `tickerIds` from `<slug>.mitch-tickers.json`, `rosters` from `<slug>.risk-params.json`, `pools`
- * and `refFeeds` from `<chainId>.pools.json` (`<class>Pool` / `<class>PoolRefFeeds`). A wrong address
+ * and `refFeeds` from `<chainId>.pools.json` (`<class>Pool` / `<class>PoolRefFeeds`). A pool minted
+ * by `createPool(salt, ...)` sits at the address `create3-addresses.json .pools.<key>` reserves for
+ * that fleet, identical on every chain of it, but the record remains what is transcribed here.
+ * Arc's pools predate the reservations and are ordinary deterministic clones. A wrong address
  * is still an address: nothing downstream fails to parse, it just executes against the wrong
  * contract (keepers/bots/bots.arc.toml records what that cost on 2026-08-14).
  *
