@@ -1,1750 +1,1741 @@
 [
   {
-    "type": "constructor",
     "inputs": [
       {
+        "internalType": "address",
         "name": "ac_",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "AC",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "address",
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "acceptPoolAdmin",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "addAsset",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
-        "name": "oracleCfg",
-        "type": "tuple",
-        "internalType": "struct IPool.OracleConfig",
         "components": [
           {
+            "internalType": "bytes32",
             "name": "feedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
+            "type": "bytes32"
           },
           {
+            "internalType": "address",
             "name": "primary",
-            "type": "address",
-            "internalType": "address"
+            "type": "address"
           },
           {
+            "internalType": "uint8",
             "name": "mode",
-            "type": "uint8",
-            "internalType": "uint8"
+            "type": "uint8"
           },
           {
+            "internalType": "uint8",
             "name": "quoteUnit",
-            "type": "uint8",
-            "internalType": "uint8"
+            "type": "uint8"
           },
           {
+            "internalType": "uint16",
             "name": "refBandBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "bytes32",
             "name": "refFeedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
+            "type": "bytes32"
           },
           {
+            "internalType": "address",
             "name": "refPrimary",
-            "type": "address",
-            "internalType": "address"
+            "type": "address"
           }
-        ]
+        ],
+        "internalType": "struct IPool.OracleConfig",
+        "name": "oracleCfg",
+        "type": "tuple"
       },
       {
+        "components": [
+          {
+            "internalType": "uint16",
+            "name": "flags",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "kappaCovBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "depositCapCode",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "maxLiabWeightBps",
+            "type": "uint16"
+          }
+        ],
+        "internalType": "struct IPool.RiskConfig",
         "name": "riskCfg",
-        "type": "tuple",
-        "internalType": "struct IPool.RiskConfig",
-        "components": [
-          {
-            "name": "flags",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "kappaCovBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "depositCapCode",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "maxLiabWeightBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          }
-        ]
+        "type": "tuple"
       },
       {
+        "internalType": "uint16",
         "name": "curveId",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "minFeePbps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint32",
         "name": "minDispersionPbps",
-        "type": "uint32",
-        "internalType": "uint32"
+        "type": "uint32"
       },
       {
+        "internalType": "uint16",
         "name": "vegaBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
+    "name": "addAsset",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "batchRiskOp",
     "inputs": [
       {
+        "internalType": "address[]",
         "name": "pools",
-        "type": "address[]",
-        "internalType": "address[]"
+        "type": "address[]"
       },
       {
+        "internalType": "address[]",
         "name": "tokens",
-        "type": "address[]",
-        "internalType": "address[]"
+        "type": "address[]"
       },
       {
+        "internalType": "enum IAdmin.BatchOp",
         "name": "op",
-        "type": "uint8",
-        "internalType": "enum IAdmin.BatchOp"
+        "type": "uint8"
       },
       {
+        "internalType": "uint16",
         "name": "src",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
+    "name": "batchRiskOp",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "bootstrapSealed",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [
       {
+        "internalType": "bool",
         "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "type": "bool"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "uint8",
+        "name": "opType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "subject",
+        "type": "bytes32"
+      }
+    ],
     "name": "cancelOp",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "opType",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "subject",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "cancelUpgrade",
-    "inputs": [],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "clearAssetHook",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "collapseAnchor",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "newAnchor",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
+    "name": "collapseAnchor",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "collectProtocolFees",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeAddAsset",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "executeBackfillLegs",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address[]",
         "name": "legs",
-        "type": "address[]",
-        "internalType": "address[]"
+        "type": "address[]"
       }
     ],
+    "name": "executeBackfillLegs",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "executeMigrateBaseToken",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address[]",
         "name": "spokes",
-        "type": "address[]",
-        "internalType": "address[]"
+        "type": "address[]"
       }
     ],
+    "name": "executeMigrateBaseToken",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeSweep",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateAnchor",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateAssetParams",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "uint16",
+        "name": "curveId",
+        "type": "uint16"
+      }
+    ],
     "name": "executeUpdateCurve",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "curveId",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateFees",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateHook",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateProfile",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateRisk",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "executeUpdateTreasury",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "executeUpgrade",
-    "inputs": [],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint16",
+        "name": "src",
+        "type": "uint16"
+      }
+    ],
     "name": "haltAsset",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "src",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "pause",
-    "inputs": [],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "paused",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "bool",
         "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "type": "bool"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "pendingImplementation",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "address",
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "pendingUpgrade",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "pendingUpgradeOp",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "uint96",
         "name": "",
-        "type": "uint96",
-        "internalType": "uint96"
+        "type": "uint96"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "proxiableUUID",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "raiseKappa",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "uint16",
         "name": "kappaCovBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
+    "name": "raiseKappa",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "requestAssetParams",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "uint32",
+        "name": "minDispersionPbps",
+        "type": "uint32"
+      }
+    ],
+    "name": "raiseMinDispersion",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
         "name": "minLiquidity",
-        "type": "uint128",
-        "internalType": "uint128"
+        "type": "uint128"
       },
       {
+        "internalType": "uint16",
         "name": "minFeePbps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "vegaBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
+    "name": "requestAssetParams",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "requestOp",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "uint8",
         "name": "opType",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
+        "internalType": "bytes32",
         "name": "subject",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       },
       {
+        "internalType": "bytes",
         "name": "payload",
-        "type": "bytes",
-        "internalType": "bytes"
+        "type": "bytes"
       }
     ],
+    "name": "requestOp",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "requestUpgrade",
     "inputs": [
       {
+        "internalType": "address",
         "name": "newImplementation",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
+    "name": "requestUpgrade",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "riskFences",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
+    "name": "riskFences",
     "outputs": [
       {
+        "internalType": "uint16",
         "name": "minFeeHardMinPbps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "minFeeHardMaxPbps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "vegaHardMinBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "vegaHardMaxBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "haircutSuppressorHardMaxBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "haircutSuppressorHardMinBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint16",
         "name": "maxDeltaBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "sealBootstrap",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
+        "name": "minLiquidity",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint16",
+        "name": "minFeePbps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "vegaBps",
+        "type": "uint16"
+      }
+    ],
     "name": "setAssetParamsBounded",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "minLiquidity",
-        "type": "uint128",
-        "internalType": "uint128"
-      },
-      {
-        "name": "minFeePbps",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
-        "name": "vegaBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "setCurve",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "uint16",
         "name": "curveId",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint256[]",
         "name": "interior",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "type": "uint256[]"
       },
       {
+        "internalType": "int256[]",
         "name": "wQ",
-        "type": "int256[]",
-        "internalType": "int256[]"
+        "type": "int256[]"
       },
       {
+        "internalType": "uint16",
         "name": "dispRefPbps",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "internalType": "uint8",
         "name": "flags",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "uint8"
       }
     ],
+    "name": "setCurve",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "setFlowCooldown",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "uint16",
         "name": "cooldownSecs",
-        "type": "uint16",
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
+    "name": "setFlowCooldown",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "setRiskConfigTighten",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
-        "name": "cfg",
-        "type": "tuple",
-        "internalType": "struct IPool.RiskConfig",
         "components": [
           {
+            "internalType": "uint16",
             "name": "flags",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "kappaCovBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "depositCapCode",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "maxLiabWeightBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           }
-        ]
+        ],
+        "internalType": "struct IPool.RiskConfig",
+        "name": "cfg",
+        "type": "tuple"
       }
     ],
+    "name": "setRiskConfigTighten",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "setRiskFences",
     "inputs": [
       {
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
-        "name": "f",
-        "type": "tuple",
-        "internalType": "struct IAdmin.RiskFences",
         "components": [
           {
+            "internalType": "uint16",
             "name": "minFeeHardMinPbps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "minFeeHardMaxPbps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "vegaHardMinBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "vegaHardMaxBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "haircutSuppressorHardMaxBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "haircutSuppressorHardMinBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           },
           {
+            "internalType": "uint16",
             "name": "maxDeltaBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint16"
           }
-        ]
+        ],
+        "internalType": "struct IAdmin.RiskFences",
+        "name": "f",
+        "type": "tuple"
       }
     ],
+    "name": "setRiskFences",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint16",
+        "name": "src",
+        "type": "uint16"
+      }
+    ],
     "name": "unhaltAsset",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "src",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "unpause",
     "inputs": [],
+    "name": "unpause",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "upgradeToAndCall",
     "inputs": [
       {
+        "internalType": "address",
         "name": "newImplementation",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "bytes",
         "name": "data",
-        "type": "bytes",
-        "internalType": "bytes"
+        "type": "bytes"
       }
     ],
+    "name": "upgradeToAndCall",
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    "type": "event",
-    "name": "AnchorUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "asset",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "anchor",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "AnchorUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "AssetAdded",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "decimals",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
-        "name": "minLiquidity",
-        "type": "uint128",
         "indexed": false,
-        "internalType": "uint128"
+        "internalType": "uint128",
+        "name": "minLiquidity",
+        "type": "uint128"
       }
     ],
-    "anonymous": false
+    "name": "AssetAdded",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint16",
+        "name": "src",
+        "type": "uint16"
+      }
+    ],
     "name": "AssetHalted",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "src",
-        "type": "uint16",
-        "indexed": true,
-        "internalType": "uint16"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "AssetHookUpdated",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "address",
         "name": "hook",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        "type": "address"
       },
       {
-        "name": "flags",
-        "type": "uint32",
         "indexed": false,
-        "internalType": "uint32"
+        "internalType": "uint32",
+        "name": "flags",
+        "type": "uint32"
       }
     ],
-    "anonymous": false
+    "name": "AssetHookUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "AssetParamsUpdated",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint128",
         "name": "minLiquidity",
-        "type": "uint128",
-        "indexed": false,
-        "internalType": "uint128"
+        "type": "uint128"
       }
     ],
-    "anonymous": false
+    "name": "AssetParamsUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint16",
+        "name": "src",
+        "type": "uint16"
+      }
+    ],
     "name": "AssetUnhalted",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "src",
-        "type": "uint16",
-        "indexed": true,
-        "internalType": "uint16"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "BaseTokenMigrated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "oldBase",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "newBase",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "BaseTokenMigrated",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "BatchLegSkipped",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      }
+    ],
     "name": "BootstrapSealed",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "BoundedAssetParamsUpdated",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "minFeePbps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "vegaBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       },
       {
+        "indexed": false,
+        "internalType": "bool",
         "name": "tighten",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
+        "type": "bool"
       }
     ],
-    "anonymous": false
+    "name": "BoundedAssetParamsUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "CurveUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "uint16",
         "name": "curveId",
-        "type": "uint16",
-        "indexed": true,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "CurveUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "FeeParamsUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "protoSharePct",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "flashFeePbps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "FeeParamsUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "FlowCooldownUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "newCooldownSecs",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "FlowCooldownUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "Paused",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "bool",
         "name": "paused",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
+        "type": "bool"
       }
     ],
-    "anonymous": false
+    "name": "Paused",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "PoolAdminUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "oldAdmin",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "newAdmin",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "PoolAdminUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
     "name": "ProfileUpdated",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "ProtocolFeesCollected",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "recipient",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        "type": "uint256"
       }
     ],
-    "anonymous": false
+    "name": "ProtocolFeesCollected",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "RiskConfigUpdated",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "flags",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "RiskConfigUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "RiskFencesUpdated",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "maxDeltaBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "RiskFencesUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "RiskOpsBatched",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "op",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
+        "indexed": false,
+        "internalType": "uint16",
         "name": "src",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "RiskOpsBatched",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "opType",
+        "type": "uint8"
+      }
+    ],
     "name": "TimelockCancelled",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "id",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "opType",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "opType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint48",
+        "name": "executableAt",
+        "type": "uint48"
+      }
+    ],
     "name": "TimelockRequested",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "id",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "opType",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
-      },
-      {
-        "name": "executableAt",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "TreasuryUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "pool",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "oldTreasury",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "newTreasury",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "TreasuryUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "upgradeId",
+        "type": "bytes32"
+      }
+    ],
     "name": "UpgradeCancelled",
-    "inputs": [
-      {
-        "name": "upgradeId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "UpgradeRequested",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "upgradeId",
-        "type": "bytes32",
         "indexed": true,
-        "internalType": "bytes32"
+        "internalType": "bytes32",
+        "name": "upgradeId",
+        "type": "bytes32"
       },
       {
+        "indexed": false,
+        "internalType": "address",
         "name": "newImplementation",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint48",
         "name": "executableAt",
-        "type": "uint48",
-        "indexed": false,
-        "internalType": "uint48"
+        "type": "uint48"
       }
     ],
-    "anonymous": false
+    "name": "UpgradeRequested",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "Upgraded",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "implementation",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "Upgraded",
+    "type": "event"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "AlreadyPending",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
-    "name": "AssetParamMoved",
     "inputs": [
       {
+        "internalType": "uint8",
         "name": "field",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
+        "internalType": "uint256",
         "name": "queued",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       },
       {
+        "internalType": "uint256",
         "name": "live",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       }
-    ]
+    ],
+    "name": "AssetParamMoved",
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "Expired",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "enum ErrLib.Resource",
+        "name": "resource",
+        "type": "uint8"
+      }
+    ],
     "name": "FeatureDisabled",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum ErrLib.Resource"
-      }
-    ]
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "InvalidConfig",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "InvalidInput",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "InvalidState",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "NoPending",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "NotAuthorized",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "NotContract",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "NotOwner",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "NotReady",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "Unauthorized",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "UnauthorizedCallContext",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "UpgradeFailed",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "ZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotConfigured",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum ErrLib.Resource"
-      },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ThresholdViolation",
-    "inputs": [
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "threshold",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "type": "error"
   }
 ]
