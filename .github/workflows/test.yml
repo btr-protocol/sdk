@@ -21,17 +21,17 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
           git -C ../back sparse-checkout set abis
-          git -C ../back checkout -q 64a5df3bae7184f9dcb3fe79b6ee984227db86e2
+          git -C ../back checkout -q 3a007b080599b9b82c43364b5c959d51c6c13d22
       # The solidity mirror test re-parses the DECLARING sources; it hard-fails without them.
       - run: |
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
           git -C ../dex-evm sparse-checkout set src abi
-          git -C ../dex-evm checkout -q 3925319291324261893725414422f402f378e4e6
+          git -C ../dex-evm checkout -q 9b8e3bcc6b137d1edc7a06eb9bc6ed51d749952b
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
           git -C ../shared sparse-checkout set evm/src
-          git -C ../shared checkout -q 2e70fbbe143a5b707239aedc9a4bc9e2299a7c8b
+          git -C ../shared checkout -q 4354807e54a21949ee3088146ea94c33e5c284e4
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
