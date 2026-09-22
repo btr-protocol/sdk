@@ -71,7 +71,8 @@ export const CONTRACTS = {
   // BNB Chain - placeholder addresses, not deployed (to be deployed)
   56: {
     BTR: zeroAddress,
-    TREASURY: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3' as Address,
+    // deployments/bnb.manifest.json `.roles.treasury`; never the deployer EOA.
+    TREASURY: '0x0E7A1152074492649a126DC1b931B635bf54c8Fb' as Address,
     BRIDGE: zeroAddress,
     POOL_ZERO: zeroAddress,
     POOL_STABLE: zeroAddress,
