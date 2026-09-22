@@ -60,6 +60,16 @@ describe('v2 quote client', () => {
     resetV2ClientState();
   });
 
+  test('sends the request chain as ?chainId=', async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (u: string) => {
+      urls.push(u);
+      return new Response(JSON.stringify(quoteBody(100)), { status: 200 });
+    }) as unknown as typeof fetch;
+    await quoteV2({ ...REQ, chain_id: 56 });
+    expect(urls[0]).toEndWith('/v2/quote?chainId=56');
+  });
+
   test('accepts a floor the server derived from the same quote', async () => {
     stub(quoteBody(100));
     const res = await quoteV2(REQ);

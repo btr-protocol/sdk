@@ -10,7 +10,7 @@
  * bound a floor 99.9% under the quote passes it.
  */
 
-import { btrFetchRaw } from '../api.js';
+import { btrFetchRaw, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
 import { V2Error, parseV2Error } from './errors.js';
 
@@ -220,7 +220,7 @@ export async function quoteV2(
   opts: V2ClientOpts = {},
 ): Promise<QuoteResponseV2> {
   cooldown((opts.now ?? Date.now)());
-  const raw = (await post('/v2/quote', req, opts)) as QuoteResponseV2;
+  const raw = (await post(withChainId('/v2/quote', req.chain_id), req, opts)) as QuoteResponseV2;
   if (!raw || typeof raw.block?.number !== 'number') {
     throw new V2Error('transport', 'v2/quote response is missing its block');
   }
@@ -240,7 +240,7 @@ export async function routeV2(
   opts: V2ClientOpts = {},
 ): Promise<RouteResponseV2> {
   cooldown((opts.now ?? Date.now)());
-  const raw = (await post('/v2/route', req, opts)) as RouteResponseV2;
+  const raw = (await post(withChainId('/v2/route', req.chain_id), req, opts)) as RouteResponseV2;
   if (!raw || typeof raw.block?.number !== 'number') {
     throw new V2Error('transport', 'v2/route response is missing its block');
   }

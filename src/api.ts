@@ -15,6 +15,14 @@ export function getApiRoot() {
   return _api;
 }
 
+/**
+ * `path` with `chainId=<id>` appended: the one back deployment serves every chain and routes on it.
+ * The chain is required: the SDK never picks one, and an absent param would get the back's default.
+ */
+export function withChainId(path: string, chainId: number): string {
+  return `${path}${path.includes('?') ? '&' : '?'}chainId=${chainId}`;
+}
+
 /** A response that keeps the status and `Retry-After` instead of collapsing to an `Error`. */
 export interface RawResponse {
   ok: boolean;

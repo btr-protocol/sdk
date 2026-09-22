@@ -64,7 +64,7 @@ export * from './v2/quote.js';
 export * from './v2/errors.js';
 
 // Base URL for the thin HTTP client (`setApiRoot`); the `/v2` client reads it.
-export { getApiRoot, setApiRoot } from './api.js';
+export { getApiRoot, setApiRoot, withChainId } from './api.js';
 
 // Deployed-venue registry + on-chain exact-in router
 export * from './venues/index.js';
