@@ -149,6 +149,27 @@ describe('rankDeposit (routes A / B)', () => {
     expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
   });
 
+  test('unplannable input never reaches POST /route (the backend 400s it)', async () => {
+    const stub = globalThis.fetch;
+    const routed: string[] = [];
+    // @ts-expect-error spy fetch
+    globalThis.fetch = (url: string, init: { body?: string }) => {
+      if (String(url).endsWith('/route')) routed.push(String(url));
+      return stub(url, init);
+    };
+    const pools = [healthyPool()];
+    // Sub-wei size: rounds to 0 base units at 6 decimals.
+    const dust = await rankDeposit(pools, 'AUDF', 'NZDF', 1e-9, BE);
+    // Target not listed by any pool yet (registry still loading, or a placeholder symbol).
+    const unlisted = await rankDeposit(pools, 'AUDF', 'JPYC', 5_000, BE);
+    expect(routed).toEqual([]);
+    for (const r of [dust, unlisted]) {
+      expect(r.routes.find((x) => x.id === 'market-first')?.reason).toBe('no-route');
+    }
+    await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, BE);
+    expect(routed.length).toBe(1);
+  });
+
   test('market route past capacity drops out; transfer wins by being the max feasible', async () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 200_000, BE);

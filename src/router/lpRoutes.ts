@@ -25,7 +25,7 @@ import {
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
 import type { NamedPool, SwapPlan } from './route.js';
-import { poolHolding } from './route.js';
+import { poolHas, poolHolding } from './route.js';
 
 export interface LpRouteOpts {
   /** The caller's effective tolerance, resolved at quote time (spread-based by default in the
@@ -244,11 +244,18 @@ async function marketMint(
   const b = needBackend(opts);
   const slip = opts.slippageFrac;
   const decOf = (s: string) => b.meta.decimalsOf(s);
+  const amountRaw = toRawHex(amountIn, decOf(xToken));
+  // The backend answers an unplannable request with a 400, so only ask it a question that can
+  // have an answer: a size that survives the base-unit round, both tokens in a listed pool.
+  const listed = (sym: string) => pools.some((p) => poolHas(p.state, sym));
+  if (BigInt(amountRaw) === 0n || !listed(xToken) || !listed(targetSym)) {
+    return unfeasible(MARKET_DEAD, 'no-route');
+  }
   const req: RouteRequestWire = {
     pools: wires,
     token_in: xToken,
     token_out: targetSym,
-    amount_in: toRawHex(amountIn, decOf(xToken)),
+    amount_in: amountRaw,
   };
   let res: Awaited<ReturnType<typeof routeAsync>>;
   try {
