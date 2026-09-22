@@ -71,6 +71,11 @@
         "name": "token",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "keep",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],

@@ -21,13 +21,13 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
           git -C ../back sparse-checkout set abis
-          git -C ../back checkout -q 69fddf5fc32169de8b249788284f601a2a2544ed
+          git -C ../back checkout -q d5a79f6c1dcccaac9d4a6a62337e634582de0fc5
       # The solidity mirror test re-parses the DECLARING sources; it hard-fails without them.
       - run: |
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
           git -C ../dex-evm sparse-checkout set src abi
-          git -C ../dex-evm checkout -q fb1cfe42b54276b87e74050348c809a37930baad
+          git -C ../dex-evm checkout -q bf2ef86c77efbbf1afbf2e3fa32f1a490e99e6c9
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
           git -C ../shared sparse-checkout set evm/src

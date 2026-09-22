@@ -125,6 +125,19 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
     type: 'function',
   },
   {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'cancelRelayerGrant',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'cancelSignerGrantBatch',
     outputs: [],
@@ -190,6 +203,19 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
     ],
     name: 'executeFeedWiden',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'executeRelayerGrant',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -326,6 +352,11 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
         name: 'signerThreshold_',
         type: 'uint8',
       },
+      {
+        internalType: 'address[]',
+        name: 'initialRelayers_',
+        type: 'address[]',
+      },
     ],
     name: 'initialize',
     outputs: [],
@@ -365,6 +396,25 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
         internalType: 'uint256',
         name: '',
         type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'pendingRelayerGrant',
+    outputs: [
+      {
+        internalType: 'uint96',
+        name: '',
+        type: 'uint96',
       },
     ],
     stateMutability: 'view',
@@ -477,6 +527,25 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   {
     inputs: [
       {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'relayers',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'bytes32',
         name: 'feedId',
         type: 'bytes32',
@@ -505,6 +574,19 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   {
     inputs: [
       {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'requestRelayerGrant',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'address[]',
         name: 'batch',
         type: 'address[]',
@@ -524,6 +606,19 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
     ],
     name: 'requestSignerThresholdDecrease',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'revokeRelayer',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -793,6 +888,12 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
         name: 'newMinSigmaPbps',
         type: 'uint32',
       },
+      {
+        indexed: false,
+        internalType: 'uint32',
+        name: 'bandMinSigmaPbps',
+        type: 'uint32',
+      },
     ],
     name: 'FeedWidenExecuted',
     type: 'event',
@@ -875,6 +976,64 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
     ],
     name: 'LaneQuarantined',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'RelayerGrantCancelled',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint48',
+        name: 'eta',
+        type: 'uint48',
+      },
+    ],
+    name: 'RelayerGrantRequested',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'RelayerGranted',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'RelayerRevoked',
     type: 'event',
   },
   {
