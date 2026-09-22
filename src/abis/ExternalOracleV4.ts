@@ -19,7 +19,7 @@ const FEED_DATA_COMPONENTS = [
   { name: 'ttlSecs', type: 'uint16', internalType: 'uint16' },
   { name: 'confidenceBps', type: 'uint16', internalType: 'uint16' },
   { name: 'flags', type: 'uint16', internalType: 'uint16' },
-  { name: 'maxDeviationBps', type: 'uint16', internalType: 'uint16' },
+  { name: 'maxDevBps', type: 'uint16', internalType: 'uint16' },
   { name: 'sourceTsMs', type: 'uint48', internalType: 'uint48' },
 ] as const;
 
