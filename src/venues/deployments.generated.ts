@@ -26,6 +26,7 @@
  * Arc's pools predate the reservations and are ordinary deterministic clones. A wrong address
  * is still an address: nothing downstream fails to parse, it just executes against the wrong
  * contract (keepers/bots/bots.arc.toml records what that cost on 2026-08-14).
+ * BNB (56): its records are zero-address scaffold until the ceremony; transcribe + read back after it, never before.
  *
  * `feedIds` is keyed by feed NAME and ORDERED by on-chain ordinal: entry `n` is `feedIds[n]`, the
  * index every NXR-signed record carries. Arc's record states that order (`.feedOrder`). The chain

@@ -3,8 +3,9 @@
 // Every lookup here takes a `chainId` and throws when BTR is not deployed on it. That is the
 // whole point of the module: the previous shape hardcoded one chain and took no chain at all, so a
 // bot configured for another chain quoted the hardcoded pool addresses and *succeeded*: the worst failure mode
-// available, because nothing reverts and nothing logs. There is deliberately no default chain and
-// no fallback: a caller that cannot name its chain has no business building swap calldata.
+// available, because nothing reverts and nothing logs. There is deliberately no fallback: a caller
+// that cannot name its chain has no business building swap calldata. `defaultChainId()` only picks
+// which chain an app SHOWS first; every lookup still takes the chain explicitly.
 //
 // Facts come from `./deployments.generated.ts`, the recorded deployment facts per chain.
 // A chain with no record is simply absent, so an undeployed chain fails
@@ -38,6 +39,33 @@ export function deployedChainIds(): number[] {
     .sort((a, b) => a - b);
 }
 
+export interface BtrChain {
+  chainId: number;
+  /** `dex-evm/deployments/chains.json` slug; names `<slug>.manifest.json`. */
+  slug: string;
+  /** `live` iff `DEPLOYED_VENUES` carries a transcribed record for the chain. */
+  status: 'live' | 'pending';
+}
+
+/** Every chain the one BTR deployment serves, in default order: BNB first once live, then Arc. */
+export const BTR_CHAINS: readonly BtrChain[] = (
+  [
+    [56, 'bnb'],
+    [5042002, 'arc'],
+  ] as const
+).map(([chainId, slug]) => ({
+  chainId,
+  slug,
+  status: DEPLOYED_VENUES[chainId] ? 'live' : 'pending',
+}));
+
+/** The first live served chain: Arc until BNB's record is transcribed, then BNB. */
+export function defaultChainId(): number {
+  const c = BTR_CHAINS.find((c) => c.status === 'live');
+  if (!c) throw new Error('no served BTR chain has a deployment record');
+  return c.chainId;
+}
+
 /**
  * The deployment record for `chainId`, or a throw naming what is deployed.
  *
@@ -48,8 +76,12 @@ export function deployedChainIds(): number[] {
 export function chainVenue(chainId: number): ChainVenue {
   const v = DEPLOYED_VENUES[chainId];
   if (!v) {
+    const served = BTR_CHAINS.find((c) => c.chainId === chainId);
+    const why = served
+      ? `chain ${chainId} (${served.slug}) is served but pending its ceremony record`
+      : 'No SDK record exists for it yet';
     throw new Error(
-      `no BTR deployment for chain ${chainId} — deployed: [${deployedChainIds().join(', ')}]. No SDK record exists for it yet.`,
+      `no BTR deployment for chain ${chainId} — deployed: [${deployedChainIds().join(', ')}]. ${why}.`,
     );
   }
   return v;
