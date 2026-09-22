@@ -129,6 +129,12 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   CBBTC: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   BNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   XAUT: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
+  // BSC wrapped/bridged legs mark their underlying. Each pair is the one bnb.manifest.json's MITCH
+  // ticker id names (NXR /v1/price echoes the id): WBNB 434436167548534784 = BNB-USDC, BTCB
+  // 435315776850755584 = BTC-USDC, ETH 438724262896861184 = ETH-USDC (probed 2026-09-22).
+  WBNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
+  BTCB: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
+  ETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
   // PAXG's only first-class tape is USDT-quoted: `PAXG-USD` and `PAXG-USDC` are both
   // compose-on-read (flags 128), which the signer cannot resolve at all.
   PAXG: {
@@ -153,6 +159,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   INTC: { nxrSymbol: 'INTC-USDC', band: [20, 400], refUsd: 93 },
   ASML: { nxrSymbol: 'ASML-USDC', band: [400, 7000], refUsd: 1757 },
   SPCX: { nxrSymbol: 'SPCX-USDC', band: [35, 600], refUsd: 140 },
+  // BSC `QQQb` (case-folded): manifest ticker 17769639133052928 = QQQ-USDC, flags 192 like the rest.
+  QQQB: { nxrSymbol: 'QQQ-USDC', band: [150, 3000], refUsd: 742 },
   // ── fiat-backed wrappers: mark the UNDERLYING CURRENCY, never the wrapper.
   // Owner rule, and on the USDC basis it is no longer merely a preference. A wrapper's own ticker
   // is an issuer claim on the currency: a thinner, more easily dark tape than the rate it tracks.

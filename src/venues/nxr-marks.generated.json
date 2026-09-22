@@ -143,6 +143,30 @@
       "symbol": "XAUT-USDC"
     }
   },
+  "WBNB": {
+    "usd": {
+      "symbol": "BNB-USDC"
+    },
+    "usdc": {
+      "symbol": "BNB-USDC"
+    }
+  },
+  "BTCB": {
+    "usd": {
+      "symbol": "BTC-USDC"
+    },
+    "usdc": {
+      "symbol": "BTC-USDC"
+    }
+  },
+  "ETH": {
+    "usd": {
+      "symbol": "ETH-USDC"
+    },
+    "usdc": {
+      "symbol": "ETH-USDC"
+    }
+  },
   "PAXG": {
     "usd": {
       "symbol": "PAXG-USD"
@@ -230,6 +254,14 @@
     },
     "usdc": {
       "symbol": "SPCX-USDC"
+    }
+  },
+  "QQQB": {
+    "usd": {
+      "symbol": "QQQ-USDC"
+    },
+    "usdc": {
+      "symbol": "QQQ-USDC"
     }
   },
   "EURC": {

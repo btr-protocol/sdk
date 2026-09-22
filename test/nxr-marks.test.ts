@@ -65,6 +65,22 @@ describe('NXR mark sources', () => {
     expect(syms).not.toContain('cbBTC');
   });
 
+  // BNB's roster lives in its manifest, one row per asset with its own quoteUnit: 1 wants the USD
+  // row, 0 the USDC one. `ref` rows are depeg lanes, not pool legs, and the hub marks USDC-USD.
+  test('every bnb manifest asset has a mark on its quoteUnit basis', () => {
+    const p = resolve(DEX, 'bnb.manifest.json');
+    if (!existsSync(p)) return;
+    const assets = JSON.parse(readFileSync(p, 'utf8')).assets as Record<
+      string,
+      { ref?: boolean; quoteUnit?: number }
+    >;
+    const missing = Object.entries(assets)
+      .filter(([s, a]) => !s.startsWith('_') && !a.ref)
+      .filter(([s, a]) => !nxrPair(s, s === 'USDC' || a.quoteUnit === 1 ? 'USD' : 'USDC'))
+      .map(([s]) => s);
+    expect(missing, 'add these to NXR_MARKS').toEqual([]);
+  });
+
   // THE constraint on a quoteUnit-0 chain, stated once over whatever the roster happens to be: a
   // USD mark under a USDC-quoted feed is off by the USD/USDC basis with no on-chain correction
   // left, i.e. silently mispriced from the first swap. Neither the scale band nor the peg clamp
