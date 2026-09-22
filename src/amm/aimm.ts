@@ -486,8 +486,9 @@ export interface DepthRequestWire {
 
 const DEFAULT_BASE = 'https://api.btr.markets/v1';
 
+/** A base may carry `?chainId=` (`withChainId`): the one back serves every chain. */
 export function backendBase(explicit?: string): string {
-  if (explicit) return explicit.replace(/\/$/, '');
+  if (explicit) return explicit.replace(/\/(?=\?|$)/, '');
   try {
     const envBase = typeof process !== 'undefined' ? process.env?.BTR_API : undefined;
     if (envBase) return envBase.replace(/\/$/, '');
@@ -525,7 +526,9 @@ async function post<T>(
   const t = setTimeout(() => ctrl.abort(), 10_000);
   let res: Response;
   try {
-    res = await fetch(`${base}${path}`, {
+    // The path goes before a base's query, so `/api/v1?chainId=56` posts to `/api/v1/quote?chainId=56`.
+    const [root, query] = base.split('?');
+    res = await fetch(`${root}${path}${query ? `?${query}` : ''}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

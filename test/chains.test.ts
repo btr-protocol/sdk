@@ -25,3 +25,21 @@ describe('served chains', () => {
     expect(withChainId('/v1/pools?x=1', 5042002)).toBe('/v1/pools?x=1&chainId=5042002');
   });
 });
+
+describe('quote posts keep the chain', () => {
+  test('a base carrying ?chainId= posts the path before it', async () => {
+    const { routeAsync } = await import('../src/amm/aimm.js');
+    const real = globalThis.fetch;
+    let seen = '';
+    globalThis.fetch = (async (url: string) => {
+      seen = url;
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await routeAsync({} as never, withChainId('/api/v1/', 56));
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(seen).toBe('/api/v1/route?chainId=56');
+  });
+});
