@@ -744,16 +744,6 @@
       },
       {
         "internalType": "uint16",
-        "name": "haircutSuppressorHardMaxBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "haircutSuppressorHardMinBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
         "name": "maxDeltaBps",
         "type": "uint16"
       }
@@ -940,16 +930,6 @@
           {
             "internalType": "uint16",
             "name": "vegaHardMaxBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "haircutSuppressorHardMaxBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "haircutSuppressorHardMinBps",
             "type": "uint16"
           },
           {

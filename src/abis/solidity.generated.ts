@@ -101,7 +101,7 @@ export const QUOTE_UNIT_ANCHOR = 0;
 export const QUOTE_UNIT_UOA = 1;
 
 // Staleness (PricingLib).
-export const STALE_GRACE_CAP_SECS = 30;
+export const MAX_STALE_GRACE_SECS = 30;
 export const STALE_Z = 472;
 
 /** Packed `ConstantsLib` timelock schedules, seconds per `Tier`. */

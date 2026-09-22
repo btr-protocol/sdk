@@ -33,7 +33,7 @@ if (!existsSync(source)) {
 
 // The V5 feed ADMIN surface, beside the vendored V4 read surface. Generations are not
 // interchangeable here: V4 spells the freeze `pauseFeed`/`FeedPaused` and V5 spells it
-// `haltFeed`/`FeedHalted`, and `updateFeed` gained `sigmaFloorPbps`. A caller drives the
+// `haltFeed`/`FeedHalted`, and `updateFeed` gained `minSigmaPbps`. A caller drives the
 // generation its deployment record names — Arc is V4, BNB is V5 — so both ship.
 if (existsSync(v5Source)) {
   const abi = readFileSync(v5Source, 'utf8').trimEnd();

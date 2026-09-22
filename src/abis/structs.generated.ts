@@ -51,8 +51,6 @@ export type RiskFencesFields =
   | 'minFeeHardMaxPbps'
   | 'vegaHardMinBps'
   | 'vegaHardMaxBps'
-  | 'haircutSuppressorHardMaxBps'
-  | 'haircutSuppressorHardMinBps'
   | 'maxDeltaBps';
 
 export type SwapQuoteFields =

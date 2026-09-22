@@ -420,7 +420,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
           },
           {
             internalType: 'uint32',
-            name: 'sigmaFloorPbps',
+            name: 'minSigmaPbps',
             type: 'uint32',
           },
         ],
@@ -460,7 +460,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
           },
           {
             internalType: 'uint32',
-            name: 'sigmaFloorPbps',
+            name: 'minSigmaPbps',
             type: 'uint32',
           },
         ],
@@ -493,7 +493,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
       {
         internalType: 'uint32',
-        name: 'newSigmaFloorPbps',
+        name: 'newMinSigmaPbps',
         type: 'uint32',
       },
     ],
@@ -644,7 +644,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
       {
         internalType: 'uint32',
-        name: 'sigmaFloorPbps',
+        name: 'minSigmaPbps',
         type: 'uint32',
       },
     ],
@@ -722,7 +722,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint32',
-        name: 'sigmaFloorPbps',
+        name: 'minSigmaPbps',
         type: 'uint32',
       },
     ],
@@ -760,13 +760,13 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint16',
-        name: 'oldMaxDeviationBps',
+        name: 'oldMaxDevBps',
         type: 'uint16',
       },
       {
         indexed: false,
         internalType: 'uint16',
-        name: 'newMaxDeviationBps',
+        name: 'newMaxDevBps',
         type: 'uint16',
       },
       {
@@ -784,13 +784,13 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint32',
-        name: 'oldSigmaFloorPbps',
+        name: 'oldMinSigmaPbps',
         type: 'uint32',
       },
       {
         indexed: false,
         internalType: 'uint32',
-        name: 'newSigmaFloorPbps',
+        name: 'newMinSigmaPbps',
         type: 'uint32',
       },
     ],
@@ -821,7 +821,7 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       {
         indexed: false,
         internalType: 'uint32',
-        name: 'sigmaFloorPbps',
+        name: 'minSigmaPbps',
         type: 'uint32',
       },
       {

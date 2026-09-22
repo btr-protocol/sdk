@@ -44,7 +44,7 @@ export {
   areaQ,
   scaleY,
   buildCurve,
-  INTERIOR_SWING_CAP_PBPS,
+  MAX_INTERIOR_SWING_PBPS,
   MAX_DISPERSION_PBPS,
   curveSpanQ,
   dispersionCap,

@@ -188,8 +188,8 @@ export function buildCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
-/** `PricingLib.INTERIOR_SWING_CAP_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
-export const INTERIOR_SWING_CAP_PBPS = 10_862;
+/** `PricingLib.MAX_INTERIOR_SWING_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
+export const MAX_INTERIOR_SWING_PBPS = 10_862;
 export const MAX_DISPERSION_PBPS = 900_000;
 
 export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
@@ -197,7 +197,7 @@ export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 
 export function dispersionCap(c: QuarticCurve): number {
   const span = curveSpanQ(c);
   if (span <= 0n) throw new Error('flat curve has no dispersion cap');
-  const cap = (BigInt(INTERIOR_SWING_CAP_PBPS) * BigInt(c.dispRef) * QI) / span;
+  const cap = (BigInt(MAX_INTERIOR_SWING_PBPS) * BigInt(c.dispRef) * QI) / span;
   return Number(cap > 4294967295n ? 4294967295n : cap);
 }
 
