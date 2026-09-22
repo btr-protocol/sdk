@@ -170,6 +170,21 @@ describe('rankDeposit (routes A / B)', () => {
     expect(routed.length).toBe(1);
   });
 
+  test('a 422 capacity answer is reason "capacity", not a backend error', async () => {
+    const stub = globalThis.fetch;
+    // @ts-expect-error spy fetch
+    globalThis.fetch = (url: string, init: { body?: string }) =>
+      String(url).endsWith('/route')
+        ? Promise.resolve({
+            ok: false,
+            status: 422,
+            json: async () => ({ error: 'no_route', reason: 'capacity' }),
+          })
+        : stub(url, init);
+    const { routes } = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, BE);
+    expect(routes.find((r) => r.id === 'market-first')?.reason).toBe('capacity');
+  });
+
   test('market route past capacity drops out; transfer wins by being the max feasible', async () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 200_000, BE);

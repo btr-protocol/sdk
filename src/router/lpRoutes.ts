@@ -10,6 +10,7 @@ import {
   type QuoteRouteWire,
   type RouteRequestWire,
   type WireMeta,
+  isNoCapacityError,
   poolStateToWire,
   routeAsync,
 } from '../amm/aimm.js';
@@ -260,8 +261,8 @@ async function marketMint(
   let res: Awaited<ReturnType<typeof routeAsync>>;
   try {
     res = await routeAsync(req, b.backendBase);
-  } catch {
-    return unfeasible(MARKET_DEAD, 'backend-error');
+  } catch (e) {
+    return unfeasible(MARKET_DEAD, isNoCapacityError(e) ? 'capacity' : 'backend-error');
   }
   let plan: SwapPlan;
   try {

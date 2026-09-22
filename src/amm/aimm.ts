@@ -541,9 +541,21 @@ async function post<T>(
     clearTimeout(t);
   }
   noteQuote429Status(res.status);
-  if (!res.ok) throw new Error(`btr-quote HTTP ${res.status} ${path}`);
+  if (!res.ok) {
+    // A 422 names WHY there is no answer (`{"error":"no_route","reason":"capacity"}`); keep the
+    // reason on the error so a caller can tell "too big" from "broken".
+    const reason = await res
+      .json()
+      .then((b: { reason?: unknown }) => (typeof b?.reason === 'string' ? ` ${b.reason}` : ''))
+      .catch(() => '');
+    throw new Error(`btr-quote HTTP ${res.status} ${path}${reason}`);
+  }
   return (await res.json()) as T;
 }
+
+/** The backend said the pools cannot fill this size (HTTP 422, reason `capacity`). */
+export const isNoCapacityError = (e: unknown): boolean =>
+  e instanceof Error && /^btr-quote HTTP 422 \S+ capacity$/.test(e.message);
 
 /** Single-pool exact-in quote over POST /v1/quote. */
 export function quoteAsync(
