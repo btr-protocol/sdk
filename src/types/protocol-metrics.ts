@@ -99,7 +99,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
 ] as const satisfies readonly ProtocolTimeseriesMetric[];
 
 /** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the paged bucket
- *  listing stays on GET /protocol/liquidity/history. */
+ *  listing stays on GET /v1/liquidity. */
 export type ProtocolLiquidityMetric = 'liq.dep.usd' | 'liq.wd.usd' | 'liq.net.usd' | 'liq.events';
 
 export const PROTOCOL_LIQUIDITY_METRICS = [
@@ -218,7 +218,7 @@ export interface LiquidityFlowBucket {
   amountUsd: number | null;
 }
 
-/** GET /protocol/liquidity/history: LP deposit/withdraw flow, newest first.
+/** GET /v1/liquidity: LP deposit/withdraw flow, newest first.
  *  Aggregate (per-minute) not per-wallet: `dex_liquidity` keeps `sender` for tx-level
  *  drill-down, but a per-address feed is an unbuilt product decision, not a shape gap. */
 export interface ProtocolLiquidityHistory {
