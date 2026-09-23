@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { POOL_ABI } from '../abis/Pool.js';
 import { ROUTER_ABI } from '../abis/Router.js';
+import { type AbiParameter, decodeAbiParameters } from '../eth/abi.js';
 import type { Address } from '../eth/index.js';
 import {
   type ExecLeg,
@@ -10,6 +12,7 @@ import {
   buildRouterCalls,
   buildRouterSwapExecCalls,
   buildSwapCalls,
+  buildSwapExecCalls,
   planToLegs,
   planToRouterPlan,
 } from './index.js';
@@ -646,6 +649,65 @@ describe('the calldata that actually executed on Arc', () => {
     });
     expect(call.to).toBe(ROUTER);
     expect(call.data.toLowerCase()).toBe(ONCHAIN);
+  });
+});
+
+describe('one hop on one pool: direct Pool.swap encodes what Router.swap would', () => {
+  // The front sends a single-pool route direct (37.4k gas cheaper). That is only safe while both
+  // paths debit the same input and hold the user to the same floor, recipient and deadline.
+  const args = (abi: typeof POOL_ABI, name: string, data: string): unknown[] => {
+    const fn = abi.find((e) => e.type === 'function' && e.name === name) as {
+      inputs: AbiParameter[];
+    };
+    return decodeAbiParameters(fn.inputs, `0x${data.slice(10)}`);
+  };
+  const single = plan(1000, 999, [part(route([P1], ['USDC', 'USDT']), 1, 1000, 999)]);
+  const amountOut = 999_000_000_000_000_000_000n;
+  const tolPbps = 5_000;
+  const minOut = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
+  const opts = {
+    slippageFrac: 0.005,
+    tokenOf,
+    isOfficialPool,
+    amountInUnits: 1_000_000_000n,
+    serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
+    maxTolPbps: tolPbps,
+  };
+
+  test('same debit, floor, recipient and deadline', () => {
+    const legs = planToLegs(single, opts) as ExecLeg[];
+    const rp = must(planToRouterPlan(single, opts));
+    const call = { recipient: USER, sender: USER, deadline: 1_788_180_882n };
+    const direct = buildSwapExecCalls(legs, call);
+    expect(direct.map((c) => c.to)).toEqual([P1]);
+    const [tin, tout, amountIn, floor, to, deadline] = args(POOL_ABI, 'swap', direct[0].data);
+    const [parts, floors, rTo, rDeadline] = args(
+      ROUTER_ABI,
+      'swap',
+      buildRouterSwapExecCalls(ROUTER, rp, call)[0].data,
+    ) as [RouterPlan['parts'], RouterPlan['floors'], string, bigint];
+    expect([String(tin), String(tout)].map((a) => a.toLowerCase())).toEqual([
+      USDC.toLowerCase(),
+      USDT.toLowerCase(),
+    ]);
+    expect(amountIn).toBe(1_000_000_000n);
+    expect(amountIn).toBe(parts[0].amountIn);
+    expect(floor).toBe(minOut);
+    expect(floor).toBe(floors[0].minOut);
+    expect(String(to).toLowerCase()).toBe(String(rTo).toLowerCase());
+    expect(deadline).toBe(rDeadline);
+  });
+
+  test('same exact approval, to the pool instead of the router', () => {
+    const legs = planToLegs(single, opts) as ExecLeg[];
+    const [direct] = buildSwapCalls(legs, { recipient: USER, sender: USER });
+    const [via] = buildRouterCalls(ROUTER, must(planToRouterPlan(single, opts)), {
+      recipient: USER,
+    });
+    expect(direct.to).toBe(USDC);
+    expect(via.to).toBe(USDC);
+    expect(approveAmount(direct.data)).toBe(approveAmount(via.data));
+    expect(direct.data.slice(0, 10 + 64)).toContain(P1.slice(2).toLowerCase());
   });
 });
 
