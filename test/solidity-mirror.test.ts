@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
 import { MAX_INTERIOR_SWING_PBPS } from '../src/amm/aimm';
 import { V6_MAX_SOURCE_AGE_SECS, V6_SOURCE_TS_FUTURE_SKEW_SECS } from '../src/oracle/wire';
-import { MARK_WORD } from '../src/pool/layout.v3.generated';
+import { MARK_WORD_V4 } from '../src/pool/layout.v4.generated';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
@@ -215,9 +215,10 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     expect(MAX_INTERIOR_SWING_PBPS).toBe(Math.floor((2 * budget * P) / (2 * P + budget)));
   });
 
-  test('MARK_WORD offsets match MarkWordLib.sol', () => {
+  // The source holds the v4 codec; v3's `MARK_WORD` is frozen.
+  test('MARK_WORD_V4 offsets match MarkWordLib.sol', () => {
     const c = constants(src(join(DEX, 'src', 'libraries', 'MarkWordLib.sol')));
-    for (const [k, v] of Object.entries(MARK_WORD)) expect([k, c.get(k)]).toEqual([k, v]);
+    for (const [k, v] of Object.entries(MARK_WORD_V4)) expect([k, c.get(k)]).toEqual([k, v]);
   });
 
   test('POOL_SCOPED_OPS is exactly what Admin._keyOf keys without a subject', () => {

@@ -2347,49 +2347,31 @@
         "internalType": "address"
       },
       {
-        "name": "amountIn",
+        "name": "amounts",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "amountOut",
+        "name": "fees",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "spreadPbps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
-      },
-      {
-        "name": "protoFee",
+        "name": "prices",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "lpFee",
+        "name": "outBook",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "markPrice",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "midPrice",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "covToll",
+        "name": "outState",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
