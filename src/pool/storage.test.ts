@@ -7,14 +7,19 @@ import { buildCurve } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
 import {
   MARK_WORD,
+  MARK_WORD_V4,
   POOL_STORAGE,
   POOL_STORAGE_V3,
+  POOL_STORAGE_V4,
   POOL_STRUCTS,
   POOL_STRUCTS_V3,
+  POOL_STRUCTS_V4,
   addressAt,
   decodeCustody,
   decodeMark,
+  decodeMarkWord,
   i8At,
+  laneFloat,
   mappingBase,
   mappingBaseU16,
   readCurve,
@@ -133,7 +138,122 @@ test('layout v3 slots match dex ArtifactGuards.t.sol', () => {
   expect(POOL_STRUCTS_V3.HookSlot).toEqual(POOL_STRUCTS.HookSlot);
 });
 
-// Parity vectors shared with dex-evm test/unit/MarkWordLib.t.sol and core tests/storage.rs.
+test('layout v4 slots match dex ArtifactGuards.t.sol', () => {
+  expect(POOL_STORAGE_V4).toEqual({
+    baseToken: 0n,
+    initialized: 0n,
+    protoSharePct: 0n,
+    flashFeePbps: 0n,
+    flowCooldownSecs: 0n,
+    solvencyArmed: 0n,
+    lastGoodCWad9: 0n,
+    wnative: 1n,
+    treasury: 2n,
+    factory: 3n,
+    assets: 4n,
+    oracleConfigs: 5n,
+    curves: 6n,
+    custody: 7n,
+    assetHooks: 8n,
+    lpTokens: 9n,
+    poolAdmin: 10n,
+    // 11 is RESERVED.
+    legs: 12n,
+    marks: 13n,
+  });
+  expect(POOL_STRUCTS_V4.PoolStorage.lastGoodCWad9).toEqual([0, 27]);
+  expect(POOL_STRUCTS_V4.Asset).toEqual(POOL_STRUCTS_V3.Asset);
+  expect(POOL_STRUCTS_V4.Custody).toEqual(POOL_STRUCTS_V3.Custody);
+});
+
+// Layout v4 vectors shared with dex-evm test/unit/MarkWordLib.t.sol and core tests/storage.rs.
+describe('the v4 marks word (MarkWordLib)', () => {
+  test('offsets match dex abi/constants.json', () => {
+    expect(MARK_WORD_V4).toEqual({
+      OBS_SHIFT: 32,
+      SIGMA_SHIFT: 64,
+      CONF_SHIFT: 91,
+      TTL_SHIFT: 107,
+      MAX_DEV_SHIFT: 123,
+      HALT_SHIFT: 134,
+      REF_SHIFT: 135,
+      REF_OBS_SHIFT: 167,
+      REF_CONF_SHIFT: 199,
+      REF_TTL_SHIFT: 215,
+      REF_HALT_SHIFT: 231,
+      INTERNAL_SHIFT: 232,
+      UOA_SHIFT: 233,
+      REF_BAND_SHIFT: 234,
+      MAX_DEV_MAX: 2047,
+    });
+  });
+
+  test('lane floats decode both shift directions', () => {
+    expect(laneFloat(0)).toBe(0n);
+    expect(laneFloat((1 << 24) | (16 << 25))).toBe(1n << 24n);
+    expect(laneFloat(1 << 24)).toBe(1n << 8n);
+    expect(laneFloat(((1 << 24) | (127 << 25)) >>> 0)).toBe(1n << 135n);
+  });
+
+  test('decode the three MarkWordLib vectors', () => {
+    const v1 = decodeMarkWord('0x000192012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234');
+    expect(v1.primary).toEqual({
+      mark1e18: 1_000_099_971_145_400_320n,
+      obs: 1_800_000_030,
+      sigmaPbps: 320,
+      confidenceBps: 2,
+      ttlSecs: 3600,
+      maxDevBps: 50,
+      halted: false,
+      internal: false,
+      uoa: true,
+      refBandBps: 100,
+    });
+    expect(v1.ref).toEqual({
+      mark1e18: 1_000_199_992_343_789_568n,
+      obs: 1_800_000_020,
+      sigmaPbps: 0,
+      confidenceBps: 1,
+      ttlSecs: 600,
+      maxDevBps: 0,
+      halted: false,
+      internal: false,
+      uoa: false,
+      refBandBps: 0,
+    });
+    const v2 = decodeMarkWord('0x03fffdfffffffffffffffffffffffffffffffffffdf5e100ffffffffefffffff');
+    expect(v2.primary).toEqual({
+      mark1e18: 340_282_356_779_733_661_637_539_395_458_142_568_448n,
+      obs: 0xffffffff,
+      sigmaPbps: 100_000_000,
+      confidenceBps: 0xffff,
+      ttlSecs: 0xffff,
+      maxDevBps: 2047,
+      halted: true,
+      internal: true,
+      uoa: false,
+      refBandBps: 0xffff,
+    });
+    expect(v2.ref.mark1e18).toBe(87_112_283_335_611_817_379_210_085_237_284_497_522_688n);
+    expect(v2.ref.halted).toBe(true);
+    const r1 = decodeMarkWord('0x000000812c01f435a4e9003fb2e4b30000000000000000000000000000000000');
+    expect(r1.primary.mark1e18).toBe(0n);
+    expect(r1.ref).toEqual({
+      mark1e18: 3_299_999_960_581_778_964_480n,
+      obs: 1_800_000_000,
+      sigmaPbps: 0,
+      confidenceBps: 1000,
+      ttlSecs: 600,
+      maxDevBps: 0,
+      halted: true,
+      internal: false,
+      uoa: false,
+      refBandBps: 0,
+    });
+  });
+});
+
+// Layout v3 parity vectors (frozen).
 describe('marks words (MarkWordLib)', () => {
   test('offsets match dex abi/constants.json', () => {
     expect(MARK_WORD).toEqual({
@@ -311,7 +431,7 @@ describe('versioned readers', () => {
     }) as unknown as Eip1193Provider;
   const rate = word((970n * 10n ** 15n).toString(16));
 
-  test('lastGoodCWad: slot 14 on v2, 13 on v3 and every later version', async () => {
+  test('lastGoodCWad: slot 14 on v2, 13 on v3, slot 0 tail at 1e-9 WAD on v4+', async () => {
     expect(await readSolvencyState(providerWith(2, new Map([[14n, rate]])), POOL)).toEqual({
       lastGoodCWad: 970n * 10n ** 15n,
     });
@@ -321,8 +441,13 @@ describe('versioned readers', () => {
     expect(await readSolvencyState(providerWith(3, new Map([[14n, rate]])), POOL)).toEqual({
       lastGoodCWad: 0n,
     });
-    expect(await readSolvencyState(providerWith(4, new Map([[13n, rate]])), POOL)).toEqual({
+    // slot 0 = lastGoodCWad9 (970_000_000) << 216 | an armed, initialized base
+    const slot0 = word(((970_000_000n << 216n) | (1n << 208n) | (1n << 160n) | 0xbbn).toString(16));
+    expect(await readSolvencyState(providerWith(4, new Map([[0n, slot0]])), POOL)).toEqual({
       lastGoodCWad: 970n * 10n ** 15n,
+    });
+    expect(await readSolvencyState(providerWith(4, new Map([[13n, rate]])), POOL)).toEqual({
+      lastGoodCWad: 0n,
     });
   });
 
@@ -342,5 +467,19 @@ describe('versioned readers', () => {
     expect(m?.primary.mark1e18).toBe(1_000_100_000_000_000_000n);
     expect(m?.ref.mark1e18).toBe(3300n * 10n ** 18n);
     expect(await readMarks(providerWith(2, slots), POOL, TOKEN)).toBeNull();
+  });
+
+  test('readMarks: one word at slot 13 on v4', async () => {
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    const slots = new Map([
+      [
+        mappingBase(TOKEN, 13n),
+        '0x000192012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234',
+      ],
+    ]);
+    const m = await readMarks(providerWith(4, slots), POOL, TOKEN);
+    expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
+    expect(m?.primary.refBandBps).toBe(100);
+    expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
   });
 });

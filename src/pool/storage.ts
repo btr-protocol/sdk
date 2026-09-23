@@ -4,8 +4,9 @@
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). `POOL_STORAGE` (slots) and `POOL_STRUCTS`
  * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout`; they are the only
  * place either number appears, and every decoder reads them. Two layouts are live, picked by
- * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`, frozen) and v3
- * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved). An ABI diff cannot see packing, so
+ * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`, frozen), v3
+ * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved) and v4
+ * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0). An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
@@ -35,6 +36,7 @@ function isNativeKey(token: Address): boolean {
 import { HOOK_POST_INFLOW, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
+import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 export {
@@ -43,14 +45,20 @@ export {
   POOL_STORAGE_V3,
   POOL_STRUCTS_V3,
 } from './layout.v3.generated.js';
+export {
+  MARK_WORD_V4,
+  POOL_MAPPINGS_V4,
+  POOL_STORAGE_V4,
+  POOL_STRUCTS_V4,
+} from './layout.v4.generated.js';
 
 /** `Pool.storageVersion()`. */
 const STORAGE_VERSION_SELECTOR = '0x403ebd03';
 const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
 
 /**
- * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), >= 3 = layout v3
- * (`POOL_STORAGE_V3`). Memoised per provider and pool: a pool's layout moves only with an impl
+ * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), 3 = layout v3 (`POOL_STORAGE_V3`),
+ * >= 4 = layout v4 (`POOL_STORAGE_V4`). Memoised per provider and pool: a pool's layout moves only with an impl
  * upgrade.
  */
 export function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
@@ -73,8 +81,9 @@ export function readStorageVersion(provider: Eip1193Provider, pool: Address): Pr
 /** The absolute slot table a layout version selects. */
 export function poolStorageOf(
   storageVersion: number,
-): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 {
-  return storageVersion >= 3 ? POOL_STORAGE_V3 : POOL_STORAGE;
+): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 | typeof POOL_STORAGE_V4 {
+  if (storageVersion >= 4) return POOL_STORAGE_V4;
+  return storageVersion === 3 ? POOL_STORAGE_V3 : POOL_STORAGE;
 }
 
 /**
@@ -343,14 +352,19 @@ export async function readOracleConfig(
   };
 }
 
-/** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3): the degraded same-asset exit cap
- *  (`exitCap`); 0 until an LP entrypoint has observed a rate. */
+/** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3; on v4 the uint40 `lastGoodCWad9` in slot
+ *  0's tail, 1e-9 WAD): the degraded same-asset exit cap (`exitCap`), WAD; 0 until an LP
+ *  entrypoint has observed a rate. */
 export async function readSolvencyState(
   provider: Eip1193Provider,
   pool: Address,
 ): Promise<{ lastGoodCWad: bigint }> {
-  const slot = poolStorageOf(await readStorageVersion(provider, pool)).lastGoodCWad;
-  return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, slot)) };
+  const layout = poolStorageOf(await readStorageVersion(provider, pool));
+  if ('lastGoodCWad' in layout) {
+    return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, layout.lastGoodCWad)) };
+  }
+  const slot0 = BigInt(await getStorageAt(provider, pool, layout.lastGoodCWad9));
+  return { lastGoodCWad: (slot0 >> 216n) * 10n ** 9n };
 }
 
 const U128 = (1n << 128n) - 1n;
@@ -405,17 +419,61 @@ export function decodeMark(word: Hex): MarkWord {
   };
 }
 
+/** A V5 lane float (`mant u25 | exp7 u7 << 25`) as a 1e18 mark. */
+export function laneFloat(f: number): bigint {
+  const mant = BigInt(f & 0x1ffffff);
+  const e = BigInt((f >>> 25) & 0x7f);
+  return e >= 16n ? mant << (e - 16n) : mant >> (16n - e);
+}
+
+/** A layout-v4 `marks` word as its two feeds. The mirror rides on `primary`; `ref` carries no σ
+ *  nor maxDev (the pool never reads them) and is all 0 while the band is disarmed. */
+export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } {
+  const w = BigInt(word);
+  const m = MARK_WORD_V4;
+  return {
+    primary: {
+      mark1e18: laneFloat(field(w, 0, 32)),
+      obs: field(w, m.OBS_SHIFT, 32),
+      sigmaPbps: field(w, m.SIGMA_SHIFT, 27),
+      confidenceBps: field(w, m.CONF_SHIFT, 16),
+      ttlSecs: field(w, m.TTL_SHIFT, 16),
+      maxDevBps: field(w, m.MAX_DEV_SHIFT, 11),
+      halted: field(w, m.HALT_SHIFT, 1) === 1,
+      internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
+      uoa: field(w, m.UOA_SHIFT, 1) === 1,
+      refBandBps: field(w, m.REF_BAND_SHIFT, 16),
+    },
+    ref: {
+      mark1e18: laneFloat(field(w, m.REF_SHIFT, 32)),
+      obs: field(w, m.REF_OBS_SHIFT, 32),
+      sigmaPbps: 0,
+      confidenceBps: field(w, m.REF_CONF_SHIFT, 16),
+      ttlSecs: field(w, m.REF_TTL_SHIFT, 16),
+      maxDevBps: 0,
+      halted: field(w, m.REF_HALT_SHIFT, 1) === 1,
+      internal: false,
+      uoa: false,
+      refBandBps: 0,
+    },
+  };
+}
+
 /** The pool's copy of a leg's two feeds; `null` on a v2 pool, which reads its oracle live. */
 export async function readMarks(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
 ): Promise<{ primary: MarkWord; ref: MarkWord } | null> {
-  if ((await readStorageVersion(provider, pool)) < 3) return null;
-  const base = mappingBase(
-    await resolveTokenStorageKey(provider, pool, token),
-    POOL_STORAGE_V3.marks,
-  );
+  const version = await readStorageVersion(provider, pool);
+  if (version < 3) return null;
+  const key = await resolveTokenStorageKey(provider, pool, token);
+  if (version >= 4) {
+    return decodeMarkWord(
+      await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V4.marks)),
+    );
+  }
+  const base = mappingBase(key, POOL_STORAGE_V3.marks);
   const [w0, w1] = await Promise.all([
     getStorageAt(provider, pool, base),
     getStorageAt(provider, pool, base + 1n),

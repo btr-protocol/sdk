@@ -167,12 +167,17 @@ export type {
 } from './storage.js';
 export {
   MARK_WORD,
+  MARK_WORD_V4,
   POOL_STORAGE,
   POOL_STORAGE_V3,
+  POOL_STORAGE_V4,
   POOL_STRUCTS,
   POOL_STRUCTS_V3,
+  POOL_STRUCTS_V4,
   decodeCustody,
   decodeMark,
+  decodeMarkWord,
+  laneFloat,
   poolStorageOf,
   readMarks,
   readStorageVersion,
