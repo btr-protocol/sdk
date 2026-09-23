@@ -55,6 +55,7 @@ type Consts = {
   flags: Record<string, number>;
   pool: Record<string, number>;
   pricing: Record<string, number>;
+  perms: Record<string, number>;
 };
 const c: Consts = JSON.parse(readFileSync(source, 'utf8'));
 
@@ -104,6 +105,10 @@ const group = (title: string, values: Record<string, number>): void => {
 group('`Asset.flags` / `RiskConfig.flags` bits and masks (PoolConstantsLib).', c.flags);
 group('Pool wire constants (PoolConstantsLib).', c.pool);
 group('Staleness (PricingLib).', c.pricing);
+group(
+  '`AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc\'s AccessControl predates the word, see `acGeneration`.',
+  c.perms,
+);
 
 lines.push('/** Packed `ConstantsLib` timelock schedules, seconds per `Tier`. */');
 lines.push('export const GOV_DELAYS = {');

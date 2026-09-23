@@ -4,8 +4,12 @@
  * AccessControl
  * @module @btr-protocol/sdk/abis
  *
- * Singleton AccessControl: governance SSoT (owner / treasury / factory / keepers / guardians / risk stewards) plus the immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches ceil(2n/3) on admin principals and guardianQuorumMax on guardians.
- * Source: backend ABI service
+ * Singleton AccessControl: governance SSoT (owner / treasury / factory, the per-address `perms`
+ * word holding the keeper / guardian / risk-steward roles and the leg gate lanes) plus the
+ * immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches
+ * ceil(2n/3) on admin principals and guardianQuorumMax on guardians.
+ * Source: dex-evm abi/AccessControl.json. Arc runs the pre-`perms` generation, whose role reads
+ * are `ACCESS_CONTROL_LEGACY_ABI` (`@sdk/governance`); pick by `acGeneration(chainId)`.
  */
 
 export const ACCESS_CONTROL_ABI = [
@@ -189,44 +193,6 @@ export const ACCESS_CONTROL_ABI = [
     inputs: [
       {
         internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    name: 'isDepositor',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    name: 'isGuardian',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
         name: 'sender',
         type: 'address',
       },
@@ -237,44 +203,6 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'isGuardianOrAuth',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    name: 'isKeeper',
-    outputs: [
-      {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    name: 'isRiskSteward',
     outputs: [
       {
         internalType: 'bool',
@@ -342,6 +270,25 @@ export const ACCESS_CONTROL_ABI = [
     type: 'function',
   },
   {
+    inputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    name: 'perms',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'previousTreasury',
     outputs: [
@@ -402,55 +349,6 @@ export const ACCESS_CONTROL_ABI = [
   {
     inputs: [
       {
-        internalType: 'address',
-        name: 's',
-        type: 'address',
-      },
-    ],
-    name: 'revokeRiskSteward',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'd',
-        type: 'address',
-      },
-      {
-        internalType: 'bool',
-        name: 'ok',
-        type: 'bool',
-      },
-    ],
-    name: 'setDepositor',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'g',
-        type: 'address',
-      },
-      {
-        internalType: 'bool',
-        name: 's',
-        type: 'bool',
-      },
-    ],
-    name: 'setGuardian',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
         internalType: 'uint8',
         name: 'max',
         type: 'uint8',
@@ -465,16 +363,21 @@ export const ACCESS_CONTROL_ABI = [
     inputs: [
       {
         internalType: 'address',
-        name: 'k',
+        name: 'who',
         type: 'address',
       },
       {
+        internalType: 'uint256',
+        name: 'mask',
+        type: 'uint256',
+      },
+      {
         internalType: 'bool',
-        name: 's',
+        name: 'on',
         type: 'bool',
       },
     ],
-    name: 'setKeeper',
+    name: 'setPerms',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -509,25 +412,6 @@ export const ACCESS_CONTROL_ABI = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'depositor',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'bool',
-        name: 'allowed',
-        type: 'bool',
-      },
-    ],
-    name: 'DepositorUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
         indexed: false,
         internalType: 'uint8',
         name: 'max',
@@ -535,44 +419,6 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'GuardianQuorumMaxUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'bool',
-        name: 'ok',
-        type: 'bool',
-      },
-    ],
-    name: 'GuardianUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'who',
-        type: 'address',
-      },
-      {
-        indexed: false,
-        internalType: 'bool',
-        name: 'ok',
-        type: 'bool',
-      },
-    ],
-    name: 'KeeperUpdated',
     type: 'event',
   },
   {
@@ -622,12 +468,6 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     anonymous: false,
-    inputs: [],
-    name: 'QuorumPolicyArmed',
-    type: 'event',
-  },
-  {
-    anonymous: false,
     inputs: [
       {
         indexed: true,
@@ -637,12 +477,18 @@ export const ACCESS_CONTROL_ABI = [
       },
       {
         indexed: false,
-        internalType: 'bool',
-        name: 'ok',
-        type: 'bool',
+        internalType: 'uint256',
+        name: 'perms',
+        type: 'uint256',
       },
     ],
-    name: 'RiskStewardUpdated',
+    name: 'PermsUpdated',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [],
+    name: 'QuorumPolicyArmed',
     type: 'event',
   },
   {
@@ -736,11 +582,6 @@ export const ACCESS_CONTROL_ABI = [
   },
   {
     inputs: [],
-    name: 'InvalidConfig',
-    type: 'error',
-  },
-  {
-    inputs: [],
     name: 'Expired',
     type: 'error',
   },
@@ -753,6 +594,11 @@ export const ACCESS_CONTROL_ABI = [
       },
     ],
     name: 'FeatureDisabled',
+    type: 'error',
+  },
+  {
+    inputs: [],
+    name: 'InvalidConfig',
     type: 'error',
   },
   {

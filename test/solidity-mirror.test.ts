@@ -64,7 +64,7 @@ function evaluate(expr: string, env: Map<string, number>): number | undefined {
   const toks = expr
     .replace(/\/\/[^\n]*/g, '')
     .trim()
-    .match(/<<|\||&|\(|\)|\d[\d_]*|\w+/g);
+    .match(/<<|\||&|\(|\)|0x[\da-fA-F]+|\d[\d_]*|\w+/g);
   if (!toks) return undefined;
   let i = 0;
   const peek = () => toks[i];
@@ -161,8 +161,9 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
       'FLASH_ENABLED_BIT',
       'TOKEN_EXOTIC_BIT',
       'DEPOSIT_GATED_BIT',
+      'SWAP_GATED_BIT',
       'ENABLE_MASK',
-      'GATING_MASK',
+      'GATE_MASK',
       'KNOWN_FLAGS_MASK',
       'FEED_HALT_BIT',
       'MAX_CONFIDENCE_HALT_BPS',
@@ -179,6 +180,13 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
       'HOOK_POST_INFLOW',
       'HOOK_FLAGS_MASK',
     ] as const) {
+      expect([k, c.get(k)]).toEqual([k, M[k]]);
+    }
+  });
+
+  test('perms lanes match shared ConstantsLib.sol', () => {
+    const c = constants(src(join(SHARED, 'evm', 'src', 'ConstantsLib.sol')));
+    for (const k of ['PERM_KEEPER', 'PERM_GUARDIAN', 'PERM_RISK_STEWARD', 'PERM_INSTANT'] as const) {
       expect([k, c.get(k)]).toEqual([k, M[k]]);
     }
   });

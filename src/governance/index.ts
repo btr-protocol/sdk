@@ -8,6 +8,7 @@
  */
 
 import { Tier } from '../abis/solidity.generated.js';
+import type { Abi } from '../eth/abi.js';
 
 const TIERS = Object.keys(Tier).length;
 const MASK_32 = 0xffff_ffffn;
@@ -35,3 +36,40 @@ export function hasZeroDelay(schedule: bigint): boolean {
   }
   return false;
 }
+
+/**
+ * AccessControl generation on `chainId`. Arc (5042002) predates the `perms` word and answers
+ * `isGuardian` / `isRiskSteward` / `isDepositor` / `isKeeper` (`ACCESS_CONTROL_LEGACY_ABI`); every
+ * other chain answers `perms(address)`. By chain, never by probing: a missing selector reverts, and
+ * a revert is not "no role".
+ */
+export const acGeneration = (chainId?: number): 'legacy' | 'perms' =>
+  chainId === 5042002 ? 'legacy' : 'perms';
+
+const who = { name: 'who', type: 'address', internalType: 'address' };
+const legacyRead = (name: string) => ({
+  type: 'function',
+  name,
+  stateMutability: 'view',
+  inputs: [who],
+  outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+});
+const legacyEvent = (name: string) => ({
+  type: 'event',
+  name,
+  anonymous: false,
+  inputs: [
+    { ...who, indexed: true },
+    { name: 'ok', type: 'bool', indexed: false, internalType: 'bool' },
+  ],
+});
+
+/** Arc's role reads and events, retired by the `perms` word. Here, not in `abis/`, so a header
+ *  hook can carry it without the ABI chunk. */
+export const ACCESS_CONTROL_LEGACY_ABI = [
+  ...['isGuardian', 'isRiskSteward', 'isDepositor'].map(legacyRead),
+  ...['GuardianUpdated', 'RiskStewardUpdated', 'KeeperUpdated'].map(legacyEvent),
+] as unknown as Abi;
+
+/** Does a `perms` word hold `lane` (a `PERM_*` role or a leg gate bit such as `SWAP_GATED_BIT`)? */
+export const holds = (perms: bigint, lane: number): boolean => (perms & BigInt(lane)) !== 0n;
