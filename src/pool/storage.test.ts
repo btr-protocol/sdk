@@ -311,7 +311,7 @@ describe('versioned readers', () => {
     }) as unknown as Eip1193Provider;
   const rate = word((970n * 10n ** 15n).toString(16));
 
-  test('lastGoodCWad: slot 14 on v2, 13 on v3', async () => {
+  test('lastGoodCWad: slot 14 on v2, 13 on v3 and every later version', async () => {
     expect(await readSolvencyState(providerWith(2, new Map([[14n, rate]])), POOL)).toEqual({
       lastGoodCWad: 970n * 10n ** 15n,
     });
@@ -320,6 +320,9 @@ describe('versioned readers', () => {
     });
     expect(await readSolvencyState(providerWith(3, new Map([[14n, rate]])), POOL)).toEqual({
       lastGoodCWad: 0n,
+    });
+    expect(await readSolvencyState(providerWith(4, new Map([[13n, rate]])), POOL)).toEqual({
+      lastGoodCWad: 970n * 10n ** 15n,
     });
   });
 
