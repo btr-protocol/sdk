@@ -8,6 +8,7 @@
 
 export type ChainErrorKind =
   | 'bad_request'
+  | 'not_found'
   | 'no_route'
   | 'rate_limited'
   | 'rpc_unavailable'
@@ -65,7 +66,9 @@ export function parseChainError(status: number, body: string, retryAfterSecs?: n
               ? 'no_route'
               : status === 400
                 ? 'bad_request'
-                : 'transport';
+                : status === 404
+                  ? 'not_found'
+                  : 'transport';
   const message = code || detail || `BTR chain API ${status}`;
   return new ChainError(kind, message, { status, retryAfterSecs, detail });
 }

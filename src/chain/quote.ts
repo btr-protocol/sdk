@@ -54,7 +54,6 @@ export interface ChainQuoteRequest {
   amounts_in: string[];
   pool?: string;
   slippage: Slippage;
-  fresh?: boolean;
 }
 
 export interface QuoteFlags {

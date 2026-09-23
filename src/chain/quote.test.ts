@@ -174,6 +174,19 @@ describe('chain quote client', () => {
     expect(err?.status).toBe(501);
   });
 
+  // An unserved chainId (or a removed path) 404s on every retry: a verdict, not a transport fault.
+  test('404 maps to not_found, not a retryable transport', async () => {
+    stub({ error: 'chain 1 not served' }, 404);
+    let err: ChainError | undefined;
+    try {
+      await chainQuote(REQ);
+    } catch (e) {
+      err = e as ChainError;
+    }
+    expect(err?.kind).toBe('not_found');
+    expect(err?.status).toBe(404);
+  });
+
   test('checks route floors the same way', async () => {
     const body = {
       chain_id: 1,
