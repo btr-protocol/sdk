@@ -1605,6 +1605,19 @@
   },
   {
     "type": "function",
+    "name": "syncMarks",
+    "inputs": [
+      {
+        "name": "assets",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "syncUntracked",
     "inputs": [
       {
