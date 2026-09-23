@@ -269,6 +269,31 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
   {
     inputs: [
       {
+        components: [
+          {
+            internalType: 'address',
+            name: 'pool',
+            type: 'address',
+          },
+          {
+            internalType: 'address[]',
+            name: 'assets',
+            type: 'address[]',
+          },
+        ],
+        internalType: 'struct IExternalOracleV5.Target[]',
+        name: 'targets',
+        type: 'tuple[]',
+      },
+    ],
+    name: 'forward',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'bytes32',
         name: 'feedId',
         type: 'bytes32',
@@ -434,6 +459,47 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
     ],
     name: 'push',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: 'acceptedMask',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'bytes',
+        name: 'blob',
+        type: 'bytes',
+      },
+      {
+        internalType: 'bytes',
+        name: 'sigs',
+        type: 'bytes',
+      },
+      {
+        components: [
+          {
+            internalType: 'address',
+            name: 'pool',
+            type: 'address',
+          },
+          {
+            internalType: 'address[]',
+            name: 'assets',
+            type: 'address[]',
+          },
+        ],
+        internalType: 'struct IExternalOracleV5.Target[]',
+        name: 'targets',
+        type: 'tuple[]',
+      },
+    ],
+    name: 'pushTo',
     outputs: [
       {
         internalType: 'uint256',
@@ -940,6 +1006,19 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
     inputs: [
       {
         indexed: true,
+        internalType: 'address',
+        name: 'pool',
+        type: 'address',
+      },
+    ],
+    name: 'ForwardFailed',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
         internalType: 'bytes32',
         name: 'feedId',
         type: 'bytes32',
@@ -1231,6 +1310,11 @@ export const EXTERNAL_ORACLE_V5_ABI: Abi = [
       },
     ],
     name: 'FeedNotFound',
+    type: 'error',
+  },
+  {
+    inputs: [],
+    name: 'ForwardGas',
     type: 'error',
   },
   {
