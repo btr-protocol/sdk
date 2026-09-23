@@ -27,7 +27,7 @@ jobs:
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
           git -C ../dex-evm sparse-checkout set src abi
-          git -C ../dex-evm checkout -q bf2ef86c77efbbf1afbf2e3fa32f1a490e99e6c9
+          git -C ../dex-evm checkout -q 5b52b93d2044bf89e3a5b29ab20ec1e69a3a0ce0
           git clone -q --filter=blob:none --no-checkout \
             "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
           git -C ../shared sparse-checkout set evm/src

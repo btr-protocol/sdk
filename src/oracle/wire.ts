@@ -51,7 +51,7 @@ export const V6_HEADER_BYTES = 12; // ver u8 | seq u32 | srcSecs u32 | nP u8 | n
 export const V6_EXP_OFFSET = 16;
 /** `ExternalOracleV5._checkHeader` bounds on `srcSecs` against `block.timestamp`. */
 export const V6_SOURCE_TS_FUTURE_SKEW_SECS = 5;
-export const V6_MAX_SOURCE_AGE_SECS = 6 * 3600;
+export const V6_MAX_SOURCE_AGE_SECS = 120;
 
 /** V5 lane geometry `exp:u4 | mant:u25` (caller-supplied bias) and v6 `exp7:u7 | mant:u25`. */
 const LANE_SPEC: Record<PushWire, { mantBits: number; expBits: number }> = {
