@@ -140,6 +140,8 @@ export interface AssetProtocolMetrics extends AprLegs {
   feeAvgBps: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
+  /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
+  tollUsd?: number | null;
   oracleAgeSec: number | null;
   apy: ApyBreakdown;
 }
@@ -157,6 +159,8 @@ export interface PoolProtocolMetrics extends AprLegs {
   investedRatio: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
+  /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
+  tollUsd?: number | null;
   assets: AssetProtocolMetrics[];
 }
 
@@ -166,6 +170,8 @@ export interface ProtocolKpis {
   swapCount: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
+  /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
+  tollUsd?: number | null;
   coverageAvg: number | null;
   feeApr: number | null;
   strategyApr: number | null;
