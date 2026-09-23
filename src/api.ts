@@ -32,8 +32,8 @@ export interface RawResponse {
 }
 
 /**
- * Like `btrFetch`, but the caller decides what a non-2xx means. The v2 client needs the status and
- * the countdown to build its typed union (`V2Error`), which the throwing helper threw away.
+ * Like `btrFetch`, but the caller decides what a non-2xx means. The chain client needs the status and
+ * the countdown to build its typed union (`ChainError`), which the throwing helper threw away.
  */
 export async function btrFetchRaw(
   path: string,

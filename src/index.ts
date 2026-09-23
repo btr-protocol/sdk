@@ -59,11 +59,11 @@ export * from './router/index.js';
 // Off-chain AIMM adapter: state assembly + backend fetchers (POST /v1/quote|route|depth)
 export * from './amm/index.js';
 
-// Chain-mode `/v2` client: typed errors, monotonic block, server-authored floors
-export * from './v2/quote.js';
-export * from './v2/errors.js';
+// Chain-mode `/v1/chain/*` client: typed errors, monotonic block, server-authored floors
+export * from './chain/quote.js';
+export * from './chain/errors.js';
 
-// Base URL for the thin HTTP client (`setApiRoot`); the `/v2` client reads it.
+// Base URL for the thin HTTP client (`setApiRoot`); the chain client reads it.
 export { getApiRoot, setApiRoot, withChainId } from './api.js';
 
 // Deployed-venue registry + on-chain exact-in router

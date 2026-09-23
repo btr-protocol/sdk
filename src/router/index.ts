@@ -97,7 +97,7 @@ function applyTolPbps(amount: bigint, tolPbps: number): bigint {
 }
 
 /**
- * Trust boundary for a server-authored floor. `/v2` returns `tol_pbps` and `min_out` derived from
+ * Trust boundary for a server-authored floor. `/v1/chain/*` returns `tol_pbps` and `min_out` derived from
  * the same `SwapQuote` as `amount_out`; the ONE formula, for both spread and relative modes, is
  * `min_out = amount_out·(1e6 − tol_pbps)/1e6` (`back/crates/quote/src/slippage.rs`). This checks
  * it rather than trusting it, and throws instead of quietly lowering the floor.
@@ -164,7 +164,7 @@ export interface PlanLegOpts {
    *  swap. The approval is built from the same inflated sum, so it matches and hides the cause.
    *  Split parts are carved from this bigint and sum back to it EXACTLY. */
   amountInUnits?: bigint;
-  /** Server-authored end-to-end floors from `/v2/quote|route`, keyed by lowercase output token.
+  /** Server-authored end-to-end floors from `/v1/chain/quote|route`, keyed by lowercase output token.
    *  Each carries the SAME `amount_out` the floor was derived from, in output base units: the
    *  check is `min_out = amount_out·(1e6 − tol_pbps)/1e6` on the server's own integer, never on
    *  the f64 plan amount, which truncates 18 decimals and would fail (or pass) the wrong check.
@@ -324,7 +324,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     partIn.push(amountIn);
   }
   if (ordered.length > 0 && parts.length === 0) return null;
-  // SERVER FLOORS ARE END-TO-END. `/v2` authors ONE `min_out` per output token for the whole plan,
+  // SERVER FLOORS ARE END-TO-END. `/v1/chain/*` authors ONE `min_out` per output token for the whole plan,
   // and `planToRouterPlan` floors the SUM of the parts landing that token. Encoding that floor on
   // EVERY part — or on a chained hop 2 — asks each slice to deliver the aggregate, so a split the
   // server already accepted reverts `ThresholdViolation`. Allocate it across the parts that deliver
@@ -409,7 +409,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       // A chained part is floored by the SERVER or not at all. The old no-server fallback floored
       // hop 2 at `q2·(1−s)²` (hop 1's floor funds hop 2, then `s` again on top) while the UI
       // promised `q2·(1−s)`: ~2× the tolerance extractable, authored here. The SDK never authors a
-      // floor (L-43); fail closed and let the caller fetch `/v2/route`.
+      // floor (L-43); fail closed and let the caller fetch `/v1/chain/route`.
       if (!server || leg2MinOut === undefined) return null;
       const leg1MinOut = applyTolPbps(leg1Quoted, server.tolPbps);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);

@@ -1,5 +1,5 @@
 /**
- * Chain-mode (`/v2`) client: one base URL, typed errors, one cooldown, a monotonic block guard and
+ * Chain-mode (`/v1/chain/*`) client: one base URL, typed errors, one cooldown, a monotonic block guard and
  * a floor check at the trust boundary.
  *
  * The server authors the floor (`tol_pbps` + `min_out`) from the same `getSwapQuote` that produced
@@ -12,7 +12,7 @@
 
 import { btrFetchRaw, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
-import { V2Error, parseV2Error } from './errors.js';
+import { ChainError, parseChainError } from './errors.js';
 
 export type Slippage = { mode: 'spread'; pct: number } | { mode: 'relative'; pbps: number };
 
@@ -47,7 +47,7 @@ export function isRefused(a: QuoteAmountResult): a is { refused: Refused } {
   return 'refused' in a;
 }
 
-export interface QuoteRequestV2 {
+export interface ChainQuoteRequest {
   chain_id: number;
   token_in: string;
   token_out: string;
@@ -64,7 +64,7 @@ export interface QuoteFlags {
   halted: boolean;
 }
 
-export interface QuoteResponseV2 {
+export interface ChainQuoteResponse {
   chain_id: number;
   block: BlockRef;
   source: 'chain';
@@ -72,7 +72,7 @@ export interface QuoteResponseV2 {
   flags: QuoteFlags;
 }
 
-export interface HopV2 {
+export interface ChainHop {
   pool: string;
   token_in: string;
   token_out: string;
@@ -80,23 +80,23 @@ export interface HopV2 {
   amount_out: string;
 }
 
-export interface PartV2 {
-  hops: HopV2[];
+export interface ChainPart {
+  hops: ChainHop[];
 }
 
-export interface FloorV2 {
+export interface ChainFloor {
   token: string;
   amount_out: string;
   tol_pbps: number;
   min_out: string;
 }
 
-export interface RouteSelectionV2 {
-  parts: PartV2[];
-  floors: FloorV2[];
+export interface ChainRouteSelection {
+  parts: ChainPart[];
+  floors: ChainFloor[];
 }
 
-export interface RouteRequestV2 {
+export interface ChainRouteRequest {
   chain_id: number;
   token_in: string;
   token_out: string;
@@ -106,16 +106,16 @@ export interface RouteRequestV2 {
   slippage: Slippage;
 }
 
-export interface RouteResponseV2 {
+export interface ChainRouteResponse {
   chain_id: number;
   block: BlockRef;
   source: 'chain';
-  best: RouteSelectionV2 | null;
-  singles: PartV2[];
+  best: ChainRouteSelection | null;
+  singles: ChainPart[];
   refused: Refused[];
 }
 
-export interface V2ClientOpts {
+export interface ChainClientOpts {
   signal?: AbortSignal;
   timeoutMs?: number;
   /** Injectable clock (tests); defaults to `Date.now`. */
@@ -132,14 +132,14 @@ let cooldownUntilMs = 0;
 const lastBlock = new Map<string, number>();
 
 /** Reset the cooldown and block guards (tests, and a deliberate retry after a cooldown). */
-export function resetV2ClientState(): void {
+export function resetChainClientState(): void {
   cooldownUntilMs = 0;
   lastBlock.clear();
 }
 
 function cooldown(now: number): void {
   if (cooldownUntilMs > now) {
-    throw new V2Error('rate_limited', 'v2 rate limited', {
+    throw new ChainError('rate_limited', 'chain rate limited', {
       status: 429,
       retryAfterSecs: Math.max(1, Math.ceil((cooldownUntilMs - now) / 1000)),
     });
@@ -149,12 +149,12 @@ function cooldown(now: number): void {
 function acceptBlock(key: string, number: number): void {
   const seen = lastBlock.get(key);
   if (seen !== undefined && number < seen) {
-    throw new V2Error('stale_block', `v2 block ${number} is older than ${seen}`);
+    throw new ChainError('stale_block', `chain block ${number} is older than ${seen}`);
   }
   lastBlock.set(key, number);
 }
 
-async function post(path: string, body: unknown, opts: V2ClientOpts): Promise<unknown> {
+async function post(path: string, body: unknown, opts: ChainClientOpts): Promise<unknown> {
   let res: Awaited<ReturnType<typeof btrFetchRaw>>;
   try {
     res = await btrFetchRaw(path, {
@@ -166,10 +166,10 @@ async function post(path: string, body: unknown, opts: V2ClientOpts): Promise<un
     });
   } catch (e) {
     // A network failure is not a price and not a verdict: `transport`, retryable.
-    throw new V2Error('transport', e instanceof Error ? e.message : 'v2 request failed');
+    throw new ChainError('transport', e instanceof Error ? e.message : 'chain request failed');
   }
   if (!res.ok) {
-    const err = parseV2Error(res.status, res.body, res.retryAfterSecs);
+    const err = parseChainError(res.status, res.body, res.retryAfterSecs);
     if (err.kind === 'rate_limited' || err.kind === 'rpc_unavailable') {
       const secs = err.retryAfterSecs ?? 1;
       cooldownUntilMs = (opts.now ?? Date.now)() + secs * 1000;
@@ -179,7 +179,10 @@ async function post(path: string, body: unknown, opts: V2ClientOpts): Promise<un
   try {
     return JSON.parse(res.body) as unknown;
   } catch (e) {
-    throw new V2Error('transport', e instanceof Error ? e.message : 'v2 response was not JSON');
+    throw new ChainError(
+      'transport',
+      e instanceof Error ? e.message : 'chain response was not JSON',
+    );
   }
 }
 
@@ -207,22 +210,26 @@ function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Sl
   try {
     assertServerFloor(BigInt(amountOut), tolPbps, BigInt(minOut), policyTolPbps(slip));
   } catch (e) {
-    throw new V2Error(
+    throw new ChainError(
       'floor_violation',
       e instanceof Error ? e.message : 'server floor is inconsistent',
     );
   }
 }
 
-/** `POST /v2/quote`. */
-export async function quoteV2(
-  req: QuoteRequestV2,
-  opts: V2ClientOpts = {},
-): Promise<QuoteResponseV2> {
+/** `POST /v1/chain/quote`. */
+export async function chainQuote(
+  req: ChainQuoteRequest,
+  opts: ChainClientOpts = {},
+): Promise<ChainQuoteResponse> {
   cooldown((opts.now ?? Date.now)());
-  const raw = (await post(withChainId('/v2/quote', req.chain_id), req, opts)) as QuoteResponseV2;
+  const raw = (await post(
+    withChainId('/v1/chain/quote', req.chain_id),
+    req,
+    opts,
+  )) as ChainQuoteResponse;
   if (!raw || typeof raw.block?.number !== 'number') {
-    throw new V2Error('transport', 'v2/quote response is missing its block');
+    throw new ChainError('transport', 'chain/quote response is missing its block');
   }
   const key = `q:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}`;
   acceptBlock(key, raw.block.number);
@@ -234,15 +241,19 @@ export async function quoteV2(
   return raw;
 }
 
-/** `POST /v2/route`. */
-export async function routeV2(
-  req: RouteRequestV2,
-  opts: V2ClientOpts = {},
-): Promise<RouteResponseV2> {
+/** `POST /v1/chain/route`. */
+export async function chainRoute(
+  req: ChainRouteRequest,
+  opts: ChainClientOpts = {},
+): Promise<ChainRouteResponse> {
   cooldown((opts.now ?? Date.now)());
-  const raw = (await post(withChainId('/v2/route', req.chain_id), req, opts)) as RouteResponseV2;
+  const raw = (await post(
+    withChainId('/v1/chain/route', req.chain_id),
+    req,
+    opts,
+  )) as ChainRouteResponse;
   if (!raw || typeof raw.block?.number !== 'number') {
-    throw new V2Error('transport', 'v2/route response is missing its block');
+    throw new ChainError('transport', 'chain/route response is missing its block');
   }
   const key = `r:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}:${req.amount_in.toLowerCase()}`;
   acceptBlock(key, raw.block.number);

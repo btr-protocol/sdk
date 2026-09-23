@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { V2Error } from './errors.js';
-import { type QuoteResponseV2, quoteV2, resetV2ClientState, routeV2 } from './quote.js';
+import { ChainError } from './errors.js';
+import { type ChainQuoteResponse, chainQuote, chainRoute, resetChainClientState } from './quote.js';
 
 const realFetch = globalThis.fetch;
 
@@ -25,7 +25,7 @@ function quoted(amountOut: bigint, tolPbps: number) {
   };
 }
 
-function quoteBody(block: number, amountOut = 1_000_000n, tol = 5_000): QuoteResponseV2 {
+function quoteBody(block: number, amountOut = 1_000_000n, tol = 5_000): ChainQuoteResponse {
   return {
     chain_id: 1,
     block: { number: block, timestamp: 1_700_000_000 },
@@ -51,13 +51,13 @@ const REQ = {
   slippage: { mode: 'spread', pct: 50 } as const,
 };
 
-describe('v2 quote client', () => {
+describe('chain quote client', () => {
   beforeEach(() => {
-    resetV2ClientState();
+    resetChainClientState();
   });
   afterEach(() => {
     globalThis.fetch = realFetch;
-    resetV2ClientState();
+    resetChainClientState();
   });
 
   test('sends the request chain as ?chainId=', async () => {
@@ -66,13 +66,13 @@ describe('v2 quote client', () => {
       urls.push(u);
       return new Response(JSON.stringify(quoteBody(100)), { status: 200 });
     }) as unknown as typeof fetch;
-    await quoteV2({ ...REQ, chain_id: 56 });
-    expect(urls[0]).toEndWith('/v2/quote?chainId=56');
+    await chainQuote({ ...REQ, chain_id: 56 });
+    expect(urls[0]).toEndWith('/v1/chain/quote?chainId=56');
   });
 
   test('accepts a floor the server derived from the same quote', async () => {
     stub(quoteBody(100));
-    const res = await quoteV2(REQ);
+    const res = await chainQuote(REQ);
     expect(res.block.number).toBe(100);
     const a = res.amounts[0];
     expect('amount_out' in a).toBe(true);
@@ -90,22 +90,22 @@ describe('v2 quote client', () => {
     const body = quoteBody(100, out, tol);
     (body.amounts[0] as { min_out: string }).min_out = hex(minOut);
     stub(body);
-    await expect(quoteV2(REQ)).resolves.toBeDefined();
+    await expect(chainQuote(REQ)).resolves.toBeDefined();
 
     // The pre-fix spread floor (`out·(1e8 − 50·459)/1e8`) differs and must now fail.
     const oldOut = (out * (100_000_000n - 50n * 459n)) / 100_000_000n;
     const bad = quoteBody(101, out, tol);
     (bad.amounts[0] as { min_out: string }).min_out = hex(oldOut);
     stub(bad);
-    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
   test('rejects a floor that does not match amount_out*(1e6-tol)/1e6', async () => {
     const bad = quoteBody(100);
     (bad.amounts[0] as { min_out: string }).min_out = hex(1n); // far below the promised floor
     stub(bad);
-    await expect(quoteV2(REQ)).rejects.toBeInstanceOf(V2Error);
-    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(REQ)).rejects.toBeInstanceOf(ChainError);
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
   // The formula is SELF-consistency: the server writes both of its sides. A 99.9% tolerance — the
@@ -113,28 +113,28 @@ describe('v2 quote client', () => {
   // and the swap is sandwiched for almost the whole amount.
   test('refuses a tolerance the request could not have produced', async () => {
     stub(quoteBody(100, 1_000_000n, 999_000));
-    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
   test('a relative request is bounded by its own pbps, not the service ceiling', async () => {
     const req = { ...REQ, slippage: { mode: 'relative', pbps: 50 } as const };
     stub(quoteBody(100, 1_000_000n, 5_000));
-    await expect(quoteV2(req)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'floor_violation' });
     // 100 pbps is where `slippage::floor` clamps a 50 pbps request, so it is the legal ceiling.
     stub(quoteBody(101, 1_000_000n, 100));
-    await expect(quoteV2(req)).resolves.toBeDefined();
+    await expect(chainQuote(req)).resolves.toBeDefined();
   });
 
   test('drops a response from an older block than the last accepted', async () => {
     stub(quoteBody(100));
-    await quoteV2(REQ);
+    await chainQuote(REQ);
     stub(quoteBody(99));
-    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'stale_block' });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'stale_block' });
   });
 
   test('429 opens one cooldown and refuses the next call without an RPC', async () => {
     stub({ error: 'rate_limited' }, 429, { 'retry-after': '7' });
-    await expect(quoteV2(REQ)).rejects.toMatchObject({
+    await expect(chainQuote(REQ)).rejects.toMatchObject({
       kind: 'rate_limited',
       retryAfterSecs: 7,
     });
@@ -144,17 +144,17 @@ describe('v2 quote client', () => {
       calls += 1;
       return new Response('{}', { status: 429 });
     }) as unknown as typeof fetch;
-    await expect(quoteV2(REQ)).rejects.toMatchObject({ kind: 'rate_limited' });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'rate_limited' });
     expect(calls).toBe(0);
   });
 
   test('503 maps to rpc_unavailable and is not a verdict on liquidity', async () => {
     stub({ error: 'rpc_unavailable', detail: 'rpc: transport down' }, 503, { 'retry-after': '2' });
-    let err: V2Error | undefined;
+    let err: ChainError | undefined;
     try {
-      await quoteV2(REQ);
+      await chainQuote(REQ);
     } catch (e) {
-      err = e as V2Error;
+      err = e as ChainError;
     }
     expect(err?.kind).toBe('rpc_unavailable');
     expect(err?.status).toBe(503);
@@ -164,11 +164,11 @@ describe('v2 quote client', () => {
   // made callers retry a request the server will never serve.
   test('501 maps to not_implemented, not a retryable transport', async () => {
     stub({ error: 'max_hops > 2 is not supported' }, 501);
-    let err: V2Error | undefined;
+    let err: ChainError | undefined;
     try {
-      await quoteV2(REQ);
+      await chainQuote(REQ);
     } catch (e) {
-      err = e as V2Error;
+      err = e as ChainError;
     }
     expect(err?.kind).toBe('not_implemented');
     expect(err?.status).toBe(501);
@@ -206,7 +206,7 @@ describe('v2 quote client', () => {
       refused: [],
     };
     stub(body);
-    const res = await routeV2({
+    const res = await chainRoute({
       chain_id: 1,
       token_in: '0x0000000000000000000000000000000000000001',
       token_out: '0x0000000000000000000000000000000000000002',

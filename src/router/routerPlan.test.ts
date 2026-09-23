@@ -1045,7 +1045,7 @@ describe('planToLegs', () => {
     });
   });
 
-  // N1. The server floor is END-TO-END: `/v2` authors ONE `min_out` per output token and
+  // N1. The server floor is END-TO-END: `/v1/chain/*` authors ONE `min_out` per output token and
   // `planToRouterPlan` floors the SUM of the parts landing it. Encoding that floor on every part
   // asks each slice to deliver the aggregate, so a split the server accepted reverts
   // `ThresholdViolation`. These pin the leg path to the router path's aggregate semantics.

@@ -1,12 +1,12 @@
 /**
- * Typed errors for the chain-mode (`/v2`) surface.
+ * Typed errors for the chain-mode (`/v1/chain/*`) surface.
  *
- * The v1 client read a bare `Error` message (and a regex over a 429 body); the front had to parse
+ * A bare `Error` message (and a regex over a 429 body) left the front parsing
  * prose to tell "quotes unavailable" from "no liquidity" from "slow down". Here the HTTP status
  * and the server's `{error}` code become one closed union, so a caller branches on a value.
  */
 
-export type V2ErrorKind =
+export type ChainErrorKind =
   | 'bad_request'
   | 'no_route'
   | 'rate_limited'
@@ -18,8 +18,8 @@ export type V2ErrorKind =
   | 'stale_block'
   | 'not_implemented';
 
-export class V2Error extends Error {
-  readonly kind: V2ErrorKind;
+export class ChainError extends Error {
+  readonly kind: ChainErrorKind;
   /** HTTP status when the failure came from a response; 0 for a client-side rejection. */
   readonly status: number;
   /** Seconds to wait on `rate_limited`/`rpc_unavailable`, from `Retry-After`. */
@@ -28,12 +28,12 @@ export class V2Error extends Error {
   readonly detail: string | undefined;
 
   constructor(
-    kind: V2ErrorKind,
+    kind: ChainErrorKind,
     message: string,
     opts: { status?: number; retryAfterSecs?: number; detail?: string } = {},
   ) {
     super(message);
-    this.name = 'V2Error';
+    this.name = 'ChainError';
     this.kind = kind;
     this.status = opts.status ?? 0;
     this.retryAfterSecs = opts.retryAfterSecs;
@@ -42,7 +42,7 @@ export class V2Error extends Error {
 }
 
 /** HTTP status → the closed union. 200 is the caller's to handle, never passed here. */
-export function parseV2Error(status: number, body: string, retryAfterSecs?: number): V2Error {
+export function parseChainError(status: number, body: string, retryAfterSecs?: number): ChainError {
   let detail: string | undefined;
   let code = '';
   try {
@@ -52,7 +52,7 @@ export function parseV2Error(status: number, body: string, retryAfterSecs?: numb
   } catch {
     detail = body || undefined;
   }
-  const kind: V2ErrorKind =
+  const kind: ChainErrorKind =
     status === 429
       ? 'rate_limited'
       : status === 503
@@ -66,6 +66,6 @@ export function parseV2Error(status: number, body: string, retryAfterSecs?: numb
               : status === 400
                 ? 'bad_request'
                 : 'transport';
-  const message = code || detail || `BTR v2 API ${status}`;
-  return new V2Error(kind, message, { status, retryAfterSecs, detail });
+  const message = code || detail || `BTR chain API ${status}`;
+  return new ChainError(kind, message, { status, retryAfterSecs, detail });
 }
