@@ -1,15 +1,16 @@
 // Swap execution builder: a quoted plan → the ordered calls that execute it.
 //
-// TWO PATHS, ONE PLAN. Preferred is the on-chain `Router` (bottom of this file): one transaction,
-// all-or-nothing, one approval per input token. The legacy path sends the same plan as N plain
-// `approve` + `Pool.swap` calls from the user's own account, batched atomically via EIP-5792
-// `wallet_sendCalls` where the wallet supports it and sequentially where it does not — which is
-// why it still exists, and why a multi-hop route on it can strand the user holding an intermediate
-// asset when a later call reverts.
+// TWO PATHS, ONE PLAN. The direct path sends the plan as plain `approve` + `Pool.swap` calls from
+// the user's own account, batched atomically via EIP-5792 `wallet_sendCalls` where the wallet
+// supports it and sequentially where it does not. It is the default for a single-pool route: one
+// `Pool.swap`, 37.4k gas under the same swap through `Router` (BSC fork: 224.4k vs 261.8k), and it
+// needs no Router on the chain. The on-chain `Router` (bottom of this file) is for a route across
+// pools: one transaction, all-or-nothing, one approval per input token, where N direct calls can
+// strand the user holding an intermediate asset when a later call reverts.
 //
 // Neither path SELECTS a route. The backend quoter does that; this module only encodes its answer.
 //
-// Multicall3 cannot execute the legacy path: `Pool.swap` pulls tokenIn from `msg.sender`, which
+// Multicall3 cannot execute the direct path: `Pool.swap` pulls tokenIn from `msg.sender`, which
 // under `Multicall3.aggregate3` is the Multicall3 contract (no funds, no allowance) → revert. The
 // calls must originate from the user account. `Router` is not subject to this: it holds the pull
 // itself, which is the point of deploying it.
@@ -140,7 +141,7 @@ export interface PlanLegOpts {
    *  A pool address is not self-authenticating. `PoolFactory.createPool` is owner-gated, but
    *  nothing stops anyone deploying a contract that looks like a BTR pool outside the factory, and
    *  a quote source that names it gets an `approve` and a `swap` from the user's own account. On
-   *  the legacy path that approval is granted PER POOL, so one rogue address in one part is a
+   *  the direct path that approval is granted PER POOL, so one rogue address in one part is a
    *  standing allowance against the user's balance (`approveMax` makes it unbounded).
    *
    *  Feed it `PoolFactory.isOfficialPool`, the factory's asserted-official index, or a set
@@ -234,7 +235,7 @@ function assertSlip(caller: string, slip: number): void {
   }
 }
 
-/** Single call pipeline: one encoder per EIP-5792 call shape, shared by the legacy N-call path,
+/** Single call pipeline: one encoder per EIP-5792 call shape, shared by the direct N-call path,
  *  the on-chain router path, and the LP batches — identical bytes, one owner. */
 function approveCall(token: Address, spender: Address, amount: bigint): ExecCall {
   return {
