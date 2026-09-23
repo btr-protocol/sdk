@@ -39,8 +39,8 @@ export function hasZeroDelay(schedule: bigint): boolean {
 
 /**
  * AccessControl generation on `chainId`. Arc (5042002) predates the `perms` word and answers
- * `isGuardian` / `isRiskSteward` / `isDepositor` / `isKeeper` (`ACCESS_CONTROL_LEGACY_ABI`); every
- * other chain answers `perms(address)`. By chain, never by probing: a missing selector reverts, and
+ * `isGuardian` / `isRiskSteward` / `isDepositor` (`ACCESS_CONTROL_LEGACY_ABI`); every other chain
+ * answers `perms(address)`. By chain, never by probing: a missing selector reverts, and
  * a revert is not "no role".
  */
 export const acGeneration = (chainId?: number): 'legacy' | 'perms' =>

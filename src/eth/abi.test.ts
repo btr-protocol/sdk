@@ -88,6 +88,7 @@ describe('no hand-maintained mirrors of on-chain signatures', () => {
       'eth/layerzero-oft.ts',
       'eth/abi.ts', // type declarations, not fragments
       'router/index.ts', // WNATIVE_ABI (WETH9 wrap/unwrap)
+      'governance/index.ts', // ACCESS_CONTROL_LEGACY_ABI: Arc's retired getters, frozen on chain
     ]);
     const src = new URL('..', import.meta.url).pathname;
     const offenders = [...new Bun.Glob('**/*.ts').scanSync({ cwd: src })]

@@ -107,7 +107,6 @@ export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.
 export const PERM_GUARDIAN = 131072;
-export const PERM_INSTANT = 131071;
 export const PERM_KEEPER = 65536;
 export const PERM_RISK_STEWARD = 262144;
 

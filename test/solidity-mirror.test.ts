@@ -186,7 +186,7 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
 
   test('perms lanes match shared ConstantsLib.sol', () => {
     const c = constants(src(join(SHARED, 'evm', 'src', 'ConstantsLib.sol')));
-    for (const k of ['PERM_KEEPER', 'PERM_GUARDIAN', 'PERM_RISK_STEWARD', 'PERM_INSTANT'] as const) {
+    for (const k of ['PERM_KEEPER', 'PERM_GUARDIAN', 'PERM_RISK_STEWARD'] as const) {
       expect([k, c.get(k)]).toEqual([k, M[k]]);
     }
   });
