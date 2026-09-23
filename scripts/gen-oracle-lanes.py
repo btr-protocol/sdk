@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate src/venues/oracle-lanes.generated.ts from the dex-evm lane records.
 
-Inputs (SoT): dex-evm/deployments/<slug>-oracle-v<n>-lanes.json - the exact name the ceremony
+Inputs (SoT): dex-evm/deployments/<slug>.oracle-v<n>-lanes.json - the exact name the ceremony
 writes (`OracleLaneDeployBase._lanesPath`, off `.chain.slug`) - plus that chain's deployed oracle
 addresses (<chainId>.deploy.v<n>[ref].json). Run from sdk/: python3 scripts/gen-oracle-lanes.py
 
@@ -38,7 +38,7 @@ def lane_records(stem):
     """Every deployed chain's lane record for one generation, sorted so the output order is stable.
     The slug in the name is the ceremony's and nothing here needs to know it: each record states
     its own `chainId`, which is what the maps and the deploy-record names are keyed on."""
-    return sorted(glob.glob(os.path.join(DEX, f"*-oracle-{stem}-lanes.json")))
+    return sorted(glob.glob(os.path.join(DEX, f"*.oracle-{stem}-lanes.json")))
 
 
 def load(path):
@@ -99,6 +99,30 @@ for wire, stem, per_slot, domain in GENERATIONS:
                 continue
             maps.append(map_ts(wire, lanes, load(rec)["oracle"], per_slot, domain, role))
 
+# Wire 6 (ExternalOracleV5, 4 lanes/slot) writes no lane record: each tier's own deploy record
+# carries its `feeds` (sym -> globalIndex) and the chain manifest the class. The v6 lane exponent
+# is absolute, so every expBias is 0. A scaffold record (zero oracle) joins nothing and is skipped.
+for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
+    m = load(path)
+    if m.get("oracle", {}).get("wire") != 6:
+        continue
+    chain = str(m["chain"]["id"])
+    if want and chain not in want:
+        continue
+    seen.add(chain)
+    assets = m["assets"]
+    for role, stem in (("primary", "deploy"), ("reference", "deploy.v5ref")):
+        rec_path = os.path.join(DEX, f"{chain}.{stem}.json")
+        rec = load(rec_path) if os.path.exists(rec_path) else {}
+        if int(rec.get("oracle") or "0x0", 16) == 0:
+            continue
+        feeds = {
+            sym: {"globalIndex": f["globalIndex"], "expBias": 0, "cls": assets[sym]["cls"], "ref": assets[sym].get("ref")}
+            for sym, f in rec["feeds"].items()
+        }
+        lanes = {"chainId": m["chain"]["id"], "feeds": feeds}
+        maps.append(map_ts("v6", lanes, rec["oracle"], 4, "BTR ExternalOracleV4", role))
+
 # An unmatched filter would quietly rewrite the file with fewer chains than the operator asked for.
 if want - seen:
     raise SystemExit(f"no lane record in {DEX} for chain(s) {', '.join(sorted(want - seen))}")
@@ -108,7 +132,7 @@ if not maps:
 body = "\n".join(maps)
 
 out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
-// GENERATED from the dex-evm lane records (<slug>-oracle-v<n>-lanes.json) - never hand-edited.
+// GENERATED from the dex-evm lane records (<slug>.oracle-v<n>-lanes.json) - never hand-edited.
 // Regenerate: sdk/scripts/gen-oracle-lanes.py - it emits EVERY deployed chain, so a bare run is
 // always the whole table; an optional chain-id argument only filters it for inspection.
 //
@@ -125,8 +149,8 @@ out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
 import type {{ Address }} from '../eth/types.js';
 
 /** Wire generation. The tag is the BLOB version byte, not the contract's name:
- *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 speaks 'v5'. */
-export type OracleWire = 'v2' | 'v3' | 'v5';
+ *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 'v5', ExternalOracleV5 'v6'. */
+export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6';
 
 /** Which of a generation's two deployed instances a map addresses. */
 export type OracleRole = 'primary' | 'reference';
@@ -151,7 +175,7 @@ export interface OracleLaneMap {{
    *  matches the venue record's `contracts.oracle` / `contracts.refOracle`, so a
    *  generation cutover needs no code change. */
   oracle: Address;
-  /** 8 (V2, 28-bit lanes), 10 (V3, 22-bit lanes) or 8 (V4, 29-bit lanes). */
+  /** 8 (V2, 28-bit lanes), 10 (V3, 22-bit lanes), 8 (V4, 29-bit lanes) or 4 (V5, 32-bit lanes). */
   lanesPerSlot: number;
   /** EIP-712 domain name the push quorum signs under. */
   domainName: string;

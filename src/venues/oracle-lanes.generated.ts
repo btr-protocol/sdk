@@ -1,5 +1,5 @@
 // Oracle lane maps for the packed-slot push oracles, per chain.
-// GENERATED from the dex-evm lane records (<slug>-oracle-v<n>-lanes.json) - never hand-edited.
+// GENERATED from the dex-evm lane records (<slug>.oracle-v<n>-lanes.json) - never hand-edited.
 // Regenerate: sdk/scripts/gen-oracle-lanes.py - it emits EVERY deployed chain, so a bare run is
 // always the whole table; an optional chain-id argument only filters it for inspection.
 //
@@ -16,8 +16,8 @@
 import type { Address } from '../eth/types.js';
 
 /** Wire generation. The tag is the BLOB version byte, not the contract's name:
- *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 speaks 'v5'. */
-export type OracleWire = 'v2' | 'v3' | 'v5';
+ *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 'v5', ExternalOracleV5 'v6'. */
+export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6';
 
 /** Which of a generation's two deployed instances a map addresses. */
 export type OracleRole = 'primary' | 'reference';
@@ -42,7 +42,7 @@ export interface OracleLaneMap {
    *  matches the venue record's `contracts.oracle` / `contracts.refOracle`, so a
    *  generation cutover needs no code change. */
   oracle: Address;
-  /** 8 (V2, 28-bit lanes), 10 (V3, 22-bit lanes) or 8 (V4, 29-bit lanes). */
+  /** 8 (V2, 28-bit lanes), 10 (V3, 22-bit lanes), 8 (V4, 29-bit lanes) or 4 (V5, 32-bit lanes). */
   lanesPerSlot: number;
   /** EIP-712 domain name the push quorum signs under. */
   domainName: string;
