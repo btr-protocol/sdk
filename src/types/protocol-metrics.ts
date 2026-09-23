@@ -48,6 +48,7 @@ export type ProtocolTimeseriesMetric =
   | 'fee.lp.usd'
   | 'fee.proto.usd'
   | 'fee.total.usd'
+  | 'fee.toll.usd'
   | 'apr.fee'
   | 'apr.strategy'
   | 'tvl.usd'
@@ -55,7 +56,7 @@ export type ProtocolTimeseriesMetric =
   | 'reserves.usd'
   | 'debt.usd'
   | 'cov.c'
-  | 'skew.psi'
+  | 'skew.bps'
   | 'util.liq'
   | 'inv.ratio'
   | 'oracle.age'
@@ -74,6 +75,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'fee.lp.usd',
   'fee.proto.usd',
   'fee.total.usd',
+  'fee.toll.usd',
   'apr.fee',
   'apr.strategy',
   'tvl.usd',
@@ -81,7 +83,7 @@ export const PROTOCOL_TIMESERIES_METRICS = [
   'reserves.usd',
   'debt.usd',
   'cov.c',
-  'skew.psi',
+  'skew.bps',
   'util.liq',
   'inv.ratio',
   'oracle.age',
@@ -222,4 +224,93 @@ export interface ProtocolLiquidityHistory {
   to: number;
   source: MetricsSource;
   buckets: LiquidityFlowBucket[];
+}
+
+/** `Asset.flags`, decoded by the back one name per bit. */
+export interface LegFlags {
+  raw: number;
+  haltRisk: boolean;
+  haltGuardian: boolean;
+  haltAnchor: boolean;
+  swaps: boolean;
+  liabilitySwaps: boolean;
+  flash: boolean;
+  exotic: boolean;
+  depositGated: boolean;
+}
+
+/** One leg's live risk parameters, in display units (bps, whole tokens). Null = not read. */
+export interface LegRiskParams {
+  token: string;
+  curve: {
+    id: number;
+    preset: string | null;
+    segments: number | null;
+    dispRefBps: number | null;
+    wall: boolean | null;
+  };
+  minFeeBps: number;
+  minDispBps: number;
+  vegaBps: number;
+  kappaBps: number;
+  /** Keeper push trigger from the density fit; null without a fit row. */
+  thetaBps: number | null;
+  /** Whole base tokens; null = uncapped. */
+  depositCap: number | null;
+  /** 0 = off. */
+  maxLiabWeightBps: number;
+  minLiquidity: number;
+  flags: LegFlags;
+  oracle: {
+    feedId: string;
+    refFeedId: string;
+    primary: string;
+    refPrimary: string;
+    mode: 'external' | 'internal';
+    quoteUnit: 'anchor' | 'unitOfAccount';
+    /** 0 = disarmed. */
+    refBandBps: number;
+    gate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable';
+    halted: boolean | null;
+    ttlSecs: number | null;
+    maxDevBps: number | null;
+    sigmaFloorBps: number | null;
+  } | null;
+  hook: {
+    target: string;
+    preOutflow: boolean;
+    postInflow: boolean;
+    targetInvestedBps: number | null;
+    hysteresisBps: number | null;
+  } | null;
+}
+
+/** GET /v1/pools/{tag}/params: one pool read at one block. */
+export interface PoolRiskParams {
+  chainId: number;
+  block: number;
+  asOf: number;
+  pool: {
+    tag: string;
+    address: string;
+    base: string | null;
+    legs: number;
+    protoSharePct: number | null;
+    flashFeeBps: number | null;
+    flowCooldownSecs: number | null;
+    solvencyArmed: boolean | null;
+    lastGoodC: number | null;
+    /** Whole base tokens when every leg shares one cap (`depositCapUniform`); null = uncapped. */
+    depositCap: number | null;
+    depositCapUniform: boolean;
+    /** Null = legs differ; 0 = off. */
+    maxLiabWeightBps: number | null;
+    halted: number;
+    swapsOff: number;
+    flashOn: number;
+    depositGated: number;
+    feedGated: number;
+  };
+  /** Null = the leg's getAsset did not read. */
+  legs: Record<string, LegRiskParams | null>;
 }
