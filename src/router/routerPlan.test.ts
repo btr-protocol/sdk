@@ -530,6 +530,21 @@ describe('audit regressions', () => {
     expect(rp.parts[0].amountIn).toBe(1n);
   });
 
+  test('the direct path drops it too, and keeps the whole server floor on what is funded', () => {
+    const a = route([P1], ['USDC', 'USDT']);
+    const b = route([P2], ['USDC', 'USDT']);
+    const minOut = 99n * 10n ** 18n;
+    const opts = { slippageFrac: 0, tokenOf, isOfficialPool, maxTolPbps: 0 };
+    const legs = planToLegs(plan(100, 99, [part(a, 0.7, 70, 69), part(b, 0.3, 30, 30)]), {
+      ...opts,
+      amountInUnits: 1n,
+      serverFloors: { [USDT.toLowerCase()]: { amountOut: minOut, minOut, tolPbps: 0 } },
+    });
+    expect(legs?.map((l) => [l.pool, l.amountIn, l.minOut])).toEqual([[P2, 1n, minOut]]);
+    const dust = plan(1e-12, 1e-12, [part(a, 0.5, 5e-13, 5e-13), part(b, 0.5, 5e-13, 5e-13)]);
+    expect(planToLegs(dust, opts)).toBeNull();
+  });
+
   test('a plan whose every part rounds to zero is null, not an empty call', () => {
     // The float path (no `amountInUnits`) has no residual to fall back on, so an amount below the
     // token's smallest unit floors every part to nothing. Returning `{parts: []}` here would
@@ -653,8 +668,8 @@ describe('the calldata that actually executed on Arc', () => {
 });
 
 describe('one hop on one pool: direct Pool.swap encodes what Router.swap would', () => {
-  // The front sends a single-pool route direct (37.4k gas cheaper). That is only safe while both
-  // paths debit the same input and hold the user to the same floor, recipient and deadline.
+  // The front sends a single-pool route direct. That is only safe while both paths debit the same
+  // input and hold the user to the same floor, recipient and deadline.
   const args = (abi: typeof POOL_ABI, name: string, data: string): unknown[] => {
     const fn = abi.find((e) => e.type === 'function' && e.name === name) as {
       inputs: AbiParameter[];

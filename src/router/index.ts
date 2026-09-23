@@ -303,13 +303,27 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   const slip = opts.slippageFrac;
   assertSlip('planToLegs', slip);
   const legs: ExecLeg[] = [];
-  const parts = orderedParts(plan);
+  const ordered = orderedParts(plan);
   // INPUT-LEG SIZING. `plan.amountIn` is an f64 and the pay leg is what the wallet is debited, so
   // rebuilding it from that float is the one place a rounding step can push the swap ABOVE the
   // balance the caller checked. With `amountInUnits` the slices are carved from THAT bigint: each
   // is floored, the residual dust rides on the smallest (last) part, and Σ === amountInUnits to
   // the wei. Without it the old float path stands, for callers that have no exact total.
-  const partInUnits = inputCarver(plan, parts.length, opts.amountInUnits);
+  // Carved BEFORE the floors are allocated: a part floored to 0 wei is dropped, as
+  // `planToRouterPlan` drops it (a 0-wei `Pool.swap` reverts `ZeroValue`), and the server floor
+  // is then spread over the parts that are funded, so Σ leg floors still equals it.
+  const carve = inputCarver(plan, ordered.length, opts.amountInUnits);
+  const parts: SwapPlan['parts'] = [];
+  const partIn: bigint[] = [];
+  for (const [i, part] of ordered.entries()) {
+    const tin = part.route.legs[0] && opts.tokenOf(part.route.legs[0].tokenIn);
+    if (!tin) return null;
+    const amountIn = carve(part.fraction, i, tin.decimals);
+    if (amountIn <= 0n) continue;
+    parts.push(part);
+    partIn.push(amountIn);
+  }
+  if (ordered.length > 0 && parts.length === 0) return null;
   // SERVER FLOORS ARE END-TO-END. `/v2` authors ONE `min_out` per output token for the whole plan,
   // and `planToRouterPlan` floors the SUM of the parts landing that token. Encoding that floor on
   // EVERY part — or on a chained hop 2 — asks each slice to deliver the aggregate, so a split the
@@ -368,7 +382,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
         tokenOut: tout.address,
-        amountIn: partInUnits(part.fraction, i, tin.decimals),
+        amountIn: partIn[i],
         quotedOut,
         minOut: serverFloorByPart.get(i) ?? applySlip(quotedOut, slip),
         wrapIn: opts.nativeIn,
@@ -405,7 +419,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         pool: rl[0].poolAddr as Address,
         tokenIn: t1in.address,
         tokenOut: tmid.address,
-        amountIn: partInUnits(part.fraction, i, t1in.decimals),
+        amountIn: partIn[i],
         quotedOut: leg1Quoted,
         minOut: leg1MinOut,
         wrapIn: opts.nativeIn,
