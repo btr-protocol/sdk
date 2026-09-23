@@ -158,10 +158,24 @@ export {
 } from './liability.js';
 export type { YieldHookKind } from './hooks.js';
 export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
-export type { HookSlot, OracleConfig, RiskConfig } from './storage.js';
+export type {
+  Custody,
+  HookSlot,
+  MarkWord,
+  OracleConfig,
+  RiskConfig,
+} from './storage.js';
 export {
+  MARK_WORD,
   POOL_STORAGE,
+  POOL_STORAGE_V3,
   POOL_STRUCTS,
+  POOL_STRUCTS_V3,
+  decodeCustody,
+  decodeMark,
+  poolStorageOf,
+  readMarks,
+  readStorageVersion,
   HOOK_PRE_OUTFLOW,
   HOOK_POST_INFLOW,
   HOOK_FLAGS_MASK,

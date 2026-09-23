@@ -6,13 +6,19 @@ import { describe, expect, test } from 'bun:test';
 import { buildCurve } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
 import {
+  MARK_WORD,
   POOL_STORAGE,
+  POOL_STORAGE_V3,
   POOL_STRUCTS,
+  POOL_STRUCTS_V3,
   addressAt,
+  decodeCustody,
+  decodeMark,
   i8At,
   mappingBase,
   mappingBaseU16,
   readCurve,
+  readMarks,
   readSolvencyState,
   u8At,
   u16At,
@@ -94,6 +100,105 @@ test('packed field offsets match the Solidity struct packing', () => {
       flags: [0, 20],
       lastCreditAt: [0, 24],
     },
+  });
+});
+
+test('layout v3 slots match dex ArtifactGuards.t.sol', () => {
+  expect(POOL_STORAGE_V3).toEqual({
+    baseToken: 0n,
+    initialized: 0n,
+    protoSharePct: 0n,
+    flashFeePbps: 0n,
+    flowCooldownSecs: 0n,
+    solvencyArmed: 0n,
+    wnative: 1n,
+    treasury: 2n,
+    factory: 3n,
+    assets: 4n,
+    oracleConfigs: 5n,
+    curves: 6n,
+    custody: 7n,
+    assetHooks: 8n,
+    lpTokens: 9n,
+    poolAdmin: 10n,
+    // 11 is RESERVED.
+    legs: 12n,
+    lastGoodCWad: 13n,
+    marks: 14n,
+  });
+  expect(POOL_STRUCTS_V3.PoolStorage.poolAdmin).toEqual([10, 0]);
+  expect(POOL_STRUCTS_V3.Custody).toEqual({ protocolFees: [0, 0], invested: [0, 16] });
+  expect(POOL_STRUCTS_V3.Asset).toEqual(POOL_STRUCTS.Asset);
+  expect(POOL_STRUCTS_V3.OracleConfig).toEqual(POOL_STRUCTS.OracleConfig);
+  expect(POOL_STRUCTS_V3.HookSlot).toEqual(POOL_STRUCTS.HookSlot);
+});
+
+// Parity vectors shared with dex-evm test/unit/MarkWordLib.t.sol and core tests/storage.rs.
+describe('marks words (MarkWordLib)', () => {
+  test('offsets match dex abi/constants.json', () => {
+    expect(MARK_WORD).toEqual({
+      OBS_SHIFT: 128,
+      SIGMA_SHIFT: 160,
+      CONF_SHIFT: 187,
+      TTL_SHIFT: 203,
+      MAX_DEV_SHIFT: 219,
+      HALT_SHIFT: 230,
+      INTERNAL_SHIFT: 231,
+      UOA_SHIFT: 232,
+      REF_BAND_SHIFT: 233,
+      MAX_DEV_MAX: 2047,
+    });
+  });
+
+  test('decode the three MarkWordLib vectors', () => {
+    expect(
+      decodeMark('0x0000c90190708000100001406b49d21e00000000000000000de111a6b7de4000'),
+    ).toEqual({
+      mark1e18: 1_000_100_000_000_000_000n,
+      obs: 1_800_000_030,
+      sigmaPbps: 320,
+      confidenceBps: 2,
+      ttlSecs: 3600,
+      maxDevBps: 50,
+      halted: false,
+      internal: false,
+      uoa: true,
+      refBandBps: 100,
+    });
+    expect(
+      decodeMark('0x01fffefffffffffffdf5e100ffffffffffffffffffffffffffffffffffffffff'),
+    ).toEqual({
+      mark1e18: (1n << 128n) - 1n,
+      obs: 0xffffffff,
+      sigmaPbps: 100_000_000,
+      confidenceBps: 0xffff,
+      ttlSecs: 0xffff,
+      maxDevBps: 2047,
+      halted: true,
+      internal: true,
+      uoa: false,
+      refBandBps: 0xffff,
+    });
+    // Word 1 (reference feed): the same feed bits, no mirror.
+    expect(
+      decodeMark('0x000000400012c01f400000006b49d20000000000000000b2e4b323d9c5100000'),
+    ).toEqual({
+      mark1e18: 3300n * 10n ** 18n,
+      obs: 1_800_000_000,
+      sigmaPbps: 0,
+      confidenceBps: 1000,
+      ttlSecs: 600,
+      maxDevBps: 0,
+      halted: true,
+      internal: false,
+      uoa: false,
+      refBandBps: 0,
+    });
+  });
+
+  test('custody splits into protocolFees (low) and invested (high)', () => {
+    const w = `0x${((5_000_000n << 128n) | 123_000_000n).toString(16).padStart(64, '0')}` as const;
+    expect(decodeCustody(w)).toEqual({ protocolFees: 123_000_000n, invested: 5_000_000n });
   });
 });
 
@@ -193,24 +298,46 @@ describe('readCurve (NUQuarticLib.Curve storage decode)', () => {
   });
 });
 
-/** LEDA-7: the eth_getStorageAt reader for slot 14, over a mock that answers by slot. */
-describe('readSolvencyState — slot 14 lastGoodCWad', () => {
+/** The layout-versioned readers, over a mock that answers `storageVersion()` and reads by slot. */
+describe('versioned readers', () => {
   const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
   const word = (hex: string) => `0x${hex.padStart(64, '0')}` as `0x${string}`;
-  const providerWith = (slots: Map<bigint, string>): Eip1193Provider =>
+  const providerWith = (version: number, slots: Map<bigint, string>): Eip1193Provider =>
     ({
-      request: async ({ params }: { params: unknown[] }) =>
-        slots.get(BigInt(params[1] as string)) ?? word('0'),
+      request: async ({ method, params }: { method: string; params: unknown[] }) =>
+        method === 'eth_call'
+          ? word(version.toString(16))
+          : (slots.get(BigInt(params[1] as string)) ?? word('0')),
     }) as unknown as Eip1193Provider;
+  const rate = word((970n * 10n ** 15n).toString(16));
 
-  test('a stamped rate', async () => {
-    const slots = new Map<bigint, string>([[14n, word((970n * 10n ** 15n).toString(16))]]);
-    const st = await readSolvencyState(providerWith(slots), POOL);
-    expect(st).toEqual({ lastGoodCWad: 970n * 10n ** 15n });
+  test('lastGoodCWad: slot 14 on v2, 13 on v3', async () => {
+    expect(await readSolvencyState(providerWith(2, new Map([[14n, rate]])), POOL)).toEqual({
+      lastGoodCWad: 970n * 10n ** 15n,
+    });
+    expect(await readSolvencyState(providerWith(3, new Map([[13n, rate]])), POOL)).toEqual({
+      lastGoodCWad: 970n * 10n ** 15n,
+    });
+    expect(await readSolvencyState(providerWith(3, new Map([[14n, rate]])), POOL)).toEqual({
+      lastGoodCWad: 0n,
+    });
   });
 
   test('a never-observed rate reads 0', async () => {
-    const st = await readSolvencyState(providerWith(new Map()), POOL);
+    const st = await readSolvencyState(providerWith(2, new Map()), POOL);
     expect(st).toEqual({ lastGoodCWad: 0n });
+  });
+
+  test('readMarks: both words on v3, null on v2', async () => {
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    const base = mappingBase(TOKEN, POOL_STORAGE_V3.marks);
+    const slots = new Map([
+      [base, '0x0000c90190708000100001406b49d21e00000000000000000de111a6b7de4000'],
+      [base + 1n, '0x000000400012c01f400000006b49d20000000000000000b2e4b323d9c5100000'],
+    ]);
+    const m = await readMarks(providerWith(3, slots), POOL, TOKEN);
+    expect(m?.primary.mark1e18).toBe(1_000_100_000_000_000_000n);
+    expect(m?.ref.mark1e18).toBe(3300n * 10n ** 18n);
+    expect(await readMarks(providerWith(2, slots), POOL, TOKEN)).toBeNull();
   });
 });

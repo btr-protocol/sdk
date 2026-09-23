@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
 import { MAX_INTERIOR_SWING_PBPS } from '../src/amm/aimm';
 import { V6_MAX_SOURCE_AGE_SECS, V6_SOURCE_TS_FUTURE_SKEW_SECS } from '../src/oracle/wire';
+import { MARK_WORD } from '../src/pool/layout.v3.generated';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
@@ -204,6 +205,11 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     const budget = Math.floor(65_535 / (2 * depth + 1 - 3)); // uint16.max / MAX_INTERIOR_LEGS
     const P = 1_000_000;
     expect(MAX_INTERIOR_SWING_PBPS).toBe(Math.floor((2 * budget * P) / (2 * P + budget)));
+  });
+
+  test('MARK_WORD offsets match MarkWordLib.sol', () => {
+    const c = constants(src(join(DEX, 'src', 'libraries', 'MarkWordLib.sol')));
+    for (const [k, v] of Object.entries(MARK_WORD)) expect([k, c.get(k)]).toEqual([k, v]);
   });
 
   test('POOL_SCOPED_OPS is exactly what Admin._keyOf keys without a subject', () => {

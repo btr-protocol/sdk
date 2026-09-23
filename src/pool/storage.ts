@@ -3,7 +3,9 @@
  *
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). `POOL_STORAGE` (slots) and `POOL_STRUCTS`
  * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout`; they are the only
- * place either number appears, and every decoder reads them. An ABI diff cannot see packing, so
+ * place either number appears, and every decoder reads them. Two layouts are live, picked by
+ * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`, frozen) and v3
+ * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved). An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
@@ -32,8 +34,48 @@ function isNativeKey(token: Address): boolean {
  */
 import { HOOK_POST_INFLOW, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
+import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
+export {
+  MARK_WORD,
+  POOL_MAPPINGS_V3,
+  POOL_STORAGE_V3,
+  POOL_STRUCTS_V3,
+} from './layout.v3.generated.js';
+
+/** `Pool.storageVersion()`. */
+const STORAGE_VERSION_SELECTOR = '0x403ebd03';
+const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
+
+/**
+ * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), >= 3 = layout v3
+ * (`POOL_STORAGE_V3`). Memoised per provider and pool: a pool's layout moves only with an impl
+ * upgrade.
+ */
+export function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
+  const byPool = versions.get(provider) ?? new Map<string, Promise<number>>();
+  versions.set(provider, byPool);
+  const key = pool.toLowerCase();
+  const hit = byPool.get(key);
+  if (hit) return hit;
+  const v = (
+    provider.request({
+      method: 'eth_call',
+      params: [{ to: pool, data: STORAGE_VERSION_SELECTOR }, 'latest'],
+    }) as Promise<Hex>
+  ).then((r) => Number(BigInt(r)));
+  byPool.set(key, v);
+  v.catch(() => byPool.delete(key));
+  return v;
+}
+
+/** The absolute slot table a layout version selects. */
+export function poolStorageOf(
+  storageVersion: number,
+): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 {
+  return storageVersion >= 3 ? POOL_STORAGE_V3 : POOL_STORAGE;
+}
 
 /**
  * Per-asset yield-hook flag bits, generated from dex `libraries/PoolConstantsLib.sol`. Pool
@@ -301,11 +343,82 @@ export async function readOracleConfig(
   };
 }
 
-/** `PoolStorage.lastGoodCWad` (slot 14): the degraded same-asset exit cap (`exitCap`); 0 until an
- *  LP entrypoint has observed a rate. */
+/** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3): the degraded same-asset exit cap
+ *  (`exitCap`); 0 until an LP entrypoint has observed a rate. */
 export async function readSolvencyState(
   provider: Eip1193Provider,
   pool: Address,
 ): Promise<{ lastGoodCWad: bigint }> {
-  return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, POOL_STORAGE.lastGoodCWad)) };
+  const slot = poolStorageOf(await readStorageVersion(provider, pool)).lastGoodCWad;
+  return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, slot)) };
+}
+
+const U128 = (1n << 128n) - 1n;
+const field = (w: bigint, shift: number, width: number) =>
+  Number((w >> BigInt(shift)) & ((1n << BigInt(width)) - 1n));
+
+/** Decoded `IPool.Custody` (layout v3): one word per leg at `custody` (slot 7). */
+export interface Custody {
+  /** Escrowed protocol slice of the leg's balance, token units. */
+  protocolFees: bigint;
+  /** Tranche out on the leg's hook; `Asset.reserves = R_liq + invested`. */
+  invested: bigint;
+}
+
+export function decodeCustody(word: Hex): Custody {
+  const w = BigInt(word);
+  return { protocolFees: w & U128, invested: w >> 128n };
+}
+
+/** A `marks` word (layout v3): a feed exactly as the pool prices it, plus, on word 0 only, the
+ *  config mirror. The pool gates `now - obs` against `ttlSecs`. */
+export interface MarkWord {
+  mark1e18: bigint;
+  obs: number;
+  sigmaPbps: number;
+  confidenceBps: number;
+  ttlSecs: number;
+  maxDevBps: number;
+  halted: boolean;
+  /** `OracleConfig.mode == INTERNAL`: the leg quotes the 1.0 peg; this feed is its breaker. */
+  internal: boolean;
+  /** `OracleConfig.quoteUnit == UOA`: the mark is divided by the base mark. */
+  uoa: boolean;
+  /** 0 = band disarmed, and word 1 is then 0. */
+  refBandBps: number;
+}
+
+export function decodeMark(word: Hex): MarkWord {
+  const w = BigInt(word);
+  const m = MARK_WORD;
+  return {
+    mark1e18: w & U128,
+    obs: field(w, m.OBS_SHIFT, 32),
+    sigmaPbps: field(w, m.SIGMA_SHIFT, 27),
+    confidenceBps: field(w, m.CONF_SHIFT, 16),
+    ttlSecs: field(w, m.TTL_SHIFT, 16),
+    maxDevBps: field(w, m.MAX_DEV_SHIFT, 11),
+    halted: field(w, m.HALT_SHIFT, 1) === 1,
+    internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
+    uoa: field(w, m.UOA_SHIFT, 1) === 1,
+    refBandBps: field(w, m.REF_BAND_SHIFT, 16),
+  };
+}
+
+/** The pool's copy of a leg's two feeds; `null` on a v2 pool, which reads its oracle live. */
+export async function readMarks(
+  provider: Eip1193Provider,
+  pool: Address,
+  token: Address,
+): Promise<{ primary: MarkWord; ref: MarkWord } | null> {
+  if ((await readStorageVersion(provider, pool)) < 3) return null;
+  const base = mappingBase(
+    await resolveTokenStorageKey(provider, pool, token),
+    POOL_STORAGE_V3.marks,
+  );
+  const [w0, w1] = await Promise.all([
+    getStorageAt(provider, pool, base),
+    getStorageAt(provider, pool, base + 1n),
+  ]);
+  return { primary: decodeMark(w0), ref: decodeMark(w1) };
 }
