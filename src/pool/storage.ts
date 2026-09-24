@@ -382,7 +382,8 @@ const field = (w: bigint, shift: number, width: number) =>
 
 /** Decoded `IPool.Custody` (layout v3): one word per leg at `custody` (slot 7). */
 export interface Custody {
-  /** Escrowed protocol slice of the leg's balance, token units. */
+  /** Escrowed protocol slice of the leg's balance, token units. Includes a permanent 1-wei seed
+   *  once the leg has taken a deposit: claimable = max(protocolFees - 1, 0). */
   protocolFees: bigint;
   /** Tranche out on the leg's hook; `Asset.reserves = R_liq + invested`. */
   invested: bigint;
