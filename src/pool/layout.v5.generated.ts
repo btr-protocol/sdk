@@ -58,7 +58,8 @@ export const POOL_STRUCTS_V5 = {
  * `MarkStore` in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
  * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds both tiers in the
  * `MARK_WORD_V4` layout with the lane's σ floor at `MIN_SIGMA_SHIFT` in place of the mirror bits.
- * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7.
+ * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` holds both tiers' roster
+ * commitments: tier `t` in the u128 at bit `(2 - t) * 128`, the high 16 bytes of `keccak(roster)`.
  */
 export const MARK_STORE = {
   MS: 0x8fb4340288f7429bd33c13abd02aa3c2145e859f37a071b10e8e034e391167e9n,

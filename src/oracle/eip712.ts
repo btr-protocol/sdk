@@ -118,7 +118,7 @@ export function tierVerifier(factory: Address, tier: 1 | 2): Address {
 /**
  * The unsigned tail `MarkStore.push` checks against the tier's committed roster:
  * `nSigners u8 | signers | k u8 | nRelayers u8 | relayers` (addresses 20 B, signers ascending).
- * `keccak256` of it is the tier's auth word.
+ * Its `keccak256`'s high 16 bytes are the tier's half of the store's auth word (tier 1 high).
  */
 export function encodeRoster(signers: Address[], k: number, relayers: Address[]): Hex {
   const a = (x: Address) => x.slice(2).toLowerCase();
