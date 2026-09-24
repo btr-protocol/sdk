@@ -172,6 +172,72 @@ export const POOL_FACTORY_ABI = [
     type: 'function',
   },
   {
+    inputs: [
+      {
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+      {
+        internalType: 'uint256',
+        name: 't',
+        type: 'uint256',
+      },
+    ],
+    name: 'feedOf',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'mark1e18',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint32',
+            name: 'sigmaPbps',
+            type: 'uint32',
+          },
+          {
+            internalType: 'uint32',
+            name: 'updatedAtSecs',
+            type: 'uint32',
+          },
+          {
+            internalType: 'uint16',
+            name: 'ttlSecs',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'confidenceBps',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'flags',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'maxDevBps',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint48',
+            name: 'sourceTsMs',
+            type: 'uint48',
+          },
+        ],
+        internalType: 'struct IOracle.FeedData',
+        name: 'f',
+        type: 'tuple',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'getAllPoolsCount',
     outputs: [
@@ -179,6 +245,67 @@ export const POOL_FACTORY_ABI = [
         internalType: 'uint256',
         name: '',
         type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+    ],
+    name: 'getFeed',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'mark1e18',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint32',
+            name: 'sigmaPbps',
+            type: 'uint32',
+          },
+          {
+            internalType: 'uint32',
+            name: 'updatedAtSecs',
+            type: 'uint32',
+          },
+          {
+            internalType: 'uint16',
+            name: 'ttlSecs',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'confidenceBps',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'flags',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint16',
+            name: 'maxDevBps',
+            type: 'uint16',
+          },
+          {
+            internalType: 'uint48',
+            name: 'sourceTsMs',
+            type: 'uint48',
+          },
+        ],
+        internalType: 'struct IOracle.FeedData',
+        name: '',
+        type: 'tuple',
       },
     ],
     stateMutability: 'view',
@@ -319,6 +446,25 @@ export const POOL_FACTORY_ABI = [
         internalType: 'bool',
         name: '',
         type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+    ],
+    name: 'laneOf',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -509,6 +655,24 @@ export const POOL_FACTORY_ABI = [
   {
     inputs: [
       {
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+      {
+        internalType: 'uint8',
+        name: 'lane',
+        type: 'uint8',
+      },
+    ],
+    name: 'setFeedLane',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'address',
         name: 'newBase',
         type: 'address',
@@ -544,6 +708,25 @@ export const POOL_FACTORY_ABI = [
     ],
     stateMutability: 'view',
     type: 'function',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+      {
+        indexed: false,
+        internalType: 'uint8',
+        name: 'lane',
+        type: 'uint8',
+      },
+    ],
+    name: 'FeedLaneUpdated',
+    type: 'event',
   },
   {
     anonymous: false,
@@ -777,6 +960,17 @@ export const POOL_FACTORY_ABI = [
   {
     inputs: [],
     name: 'Expired',
+    type: 'error',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'bytes32',
+        name: 'feedId',
+        type: 'bytes32',
+      },
+    ],
+    name: 'FeedNotFound',
     type: 'error',
   },
   {
