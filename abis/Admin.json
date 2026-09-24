@@ -51,14 +51,9 @@
       {
         "components": [
           {
-            "internalType": "bytes32",
-            "name": "feedId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "primary",
-            "type": "address"
+            "internalType": "uint8",
+            "name": "lane",
+            "type": "uint8"
           },
           {
             "internalType": "uint8",
@@ -74,16 +69,6 @@
             "internalType": "uint16",
             "name": "refBandBps",
             "type": "uint16"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "refFeedId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "refPrimary",
-            "type": "address"
           }
         ],
         "internalType": "struct IPool.OracleConfig",

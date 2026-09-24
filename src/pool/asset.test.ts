@@ -24,6 +24,8 @@ const row = {
   flags: 7n,
   kappaCovBps: 1500n,
   maxLiabWeightBps: 0n,
+  oracleBits: 0n,
+  refBandBps: 0n,
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 

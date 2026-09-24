@@ -103,3 +103,27 @@ export function verifyQuorum(
     strictlyAscending,
   };
 }
+
+/**
+ * `MarkStore.tierVerifier(t)`: tier `t`'s EIP-712 `verifyingContract`. Tier 1 (primary) is the
+ * `PoolFactory`; tier 2 (reference) is `address(keccak256(factory ++ uint8(2)))`, a key-less
+ * address, so a signature never crosses tiers even when the rosters overlap.
+ */
+export function tierVerifier(factory: Address, tier: 1 | 2): Address {
+  if (tier === 1) return checksumAddress(factory);
+  const h = keccak256(`0x${factory.slice(2).toLowerCase()}${tier.toString(16).padStart(2, '0')}`);
+  return checksumAddress(`0x${h.slice(-40)}` as Address);
+}
+
+/**
+ * The unsigned tail `MarkStore.push` checks against the tier's committed roster:
+ * `nSigners u8 | signers | k u8 | nRelayers u8 | relayers` (addresses 20 B, signers ascending).
+ * `keccak256` of it is the tier's auth word.
+ */
+export function encodeRoster(signers: Address[], k: number, relayers: Address[]): Hex {
+  const a = (x: Address) => x.slice(2).toLowerCase();
+  const b = (n: number) => n.toString(16).padStart(2, '0');
+  return `0x${b(signers.length)}${signers.map(a).join('')}${b(k)}${b(relayers.length)}${relayers
+    .map(a)
+    .join('')}` as Hex;
+}

@@ -23,30 +23,28 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dexEvm = process.env.BTR_DEX_EVM ?? join(root, '..', 'dex-evm');
 const source = join(dexEvm, 'abi', 'constants.json');
 const out = join(root, 'src', 'abis', 'solidity.generated.ts');
-const v5Source = join(dexEvm, 'abi', 'ExternalOracleV5.json');
-const v5Out = join(root, 'src', 'abis', 'ExternalOracleV5.ts');
+const storeSource = join(dexEvm, 'abi', 'MarkStore.json');
+const storeOut = join(root, 'src', 'abis', 'MarkStore.ts');
 
 if (!existsSync(source)) {
   console.log(`gen-constants: ${source} absent — keeping the committed mirror`);
   process.exit(0);
 }
 
-// The V5 feed ADMIN surface, beside the vendored V4 read surface. Generations are not
-// interchangeable here: V4 spells the freeze `pauseFeed`/`FeedPaused` and V5 spells it
-// `haltFeed`/`FeedHalted`, and `updateFeed` gained `minSigmaPbps`. A caller drives the
-// generation its deployment record names — Arc is V4, BNB is V5 — so both ship.
-if (existsSync(v5Source)) {
-  const abi = readFileSync(v5Source, 'utf8').trimEnd();
+// The mark store's push + lane-governance surface (halt/unhalt/register/setBounds/setAuth), called
+// at the Pool impl. The Arc fleet is V4 and keeps `ExternalOracleV4.ts`; pick by the deployment
+// record's wire, never by assuming one.
+if (existsSync(storeSource)) {
+  const abi = readFileSync(storeSource, 'utf8').trimEnd();
   writeFileSync(
-    v5Out,
-    `// GENERATED from dex-evm/abi/ExternalOracleV5.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
-      `/**\n * ExternalOracleV5 - the deployed feed read + admin surface (beacon generation).\n *\n` +
-      ` * V4 is the Arc fleet and lives in \`ExternalOracleV4.ts\`; pick by the deployment record's\n` +
-      ` * oracle version, never by assuming one. Push paths are decoded from raw calldata\n` +
-      ` * (\`oracle/wire.ts\`), never through this ABI.\n */\n` +
-      `import type { Abi } from '../eth/abi.js';\n\nexport const EXTERNAL_ORACLE_V5_ABI: Abi = ${abi};\n`,
+    storeOut,
+    `// GENERATED from dex-evm/abi/MarkStore.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
+      `/**\n * MarkStore - both tiers' marks in the Pool impl: push + lane governance, called at the impl.\n *\n` +
+      ` * Reads go through \`PoolFactory.getFeed\`/\`feedOf\`. Push calldata is raw segments\n` +
+      ` * (\`oracle/wire.ts\`), never encoded through this ABI.\n */\n` +
+      `import type { Abi } from '../eth/abi.js';\n\nexport const MARK_STORE_ABI: Abi = ${abi};\n`,
   );
-  console.log('gen-constants: wrote src/abis/ExternalOracleV5.ts');
+  console.log('gen-constants: wrote src/abis/MarkStore.ts');
 }
 
 type Consts = {
@@ -106,7 +104,7 @@ group('`Asset.flags` / `RiskConfig.flags` bits and masks (PoolConstantsLib).', c
 group('Pool wire constants (PoolConstantsLib).', c.pool);
 group('Staleness (PricingLib).', c.pricing);
 group(
-  '`AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc\'s AccessControl predates the word, see `acGeneration`.',
+  "`AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.",
   c.perms,
 );
 
@@ -120,8 +118,12 @@ for (const [name, tiers] of Object.entries(c.delays)) {
 lines.push('} as const;');
 lines.push('');
 lines.push('/**');
-lines.push(' * Ops whose timelock key ignores `subject` (`Admin._keyOf` returns `_key(pool, opId)`). Every');
-lines.push(' * other op keys on `(pool, opId, subject)`, so cancelling one with `subject = 0` computes a key');
+lines.push(
+  ' * Ops whose timelock key ignores `subject` (`Admin._keyOf` returns `_key(pool, opId)`). Every',
+);
+lines.push(
+  ' * other op keys on `(pool, opId, subject)`, so cancelling one with `subject = 0` computes a key',
+);
 lines.push(' * nothing was queued under and reverts `NoPending` instead of vetoing.');
 lines.push(' */');
 lines.push('export const POOL_SCOPED_OPS: readonly OpType[] = [');
@@ -137,7 +139,7 @@ console.log(`gen-constants: wrote src/abis/solidity.generated.ts from ${source}`
 // Same posture `fetch-abis.ts` takes: the output is committed, so it has to satisfy `biome check`,
 // but biome may be absent in a Docker build layer — warn, never throw.
 try {
-  await $`bunx biome format --write ${[out, v5Out].filter((f) => existsSync(f))}`.cwd(root).quiet();
+  await $`bunx biome format --write ${[out, storeOut].filter((f) => existsSync(f))}`.cwd(root).quiet();
 } catch {
   console.log('gen-constants: biome format skipped (biome unavailable)');
 }

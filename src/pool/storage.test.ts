@@ -6,18 +6,22 @@ import { describe, expect, test } from 'bun:test';
 import { buildCurve } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
 import {
+  MARK_STORE,
   MARK_WORD,
   MARK_WORD_V4,
   POOL_STORAGE,
   POOL_STORAGE_V3,
   POOL_STORAGE_V4,
+  POOL_STORAGE_V5,
   POOL_STRUCTS,
   POOL_STRUCTS_V3,
   POOL_STRUCTS_V4,
   addressAt,
   decodeCustody,
+  decodeLegOracle,
   decodeMark,
   decodeMarkWord,
+  decodeStoreWord,
   i8At,
   laneFloat,
   mappingBase,
@@ -481,5 +485,51 @@ describe('versioned readers', () => {
     expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
     expect(m?.primary.refBandBps).toBe(100);
     expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
+  });
+
+  test('readMarks: the lane word in the impl store on v5', async () => {
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    const IMPL = `0x${'cc'.repeat(20)}`;
+    // Asset slot 2: lane 9 | UOA, band 100.
+    const slot2 = word(((100n << 240n) | (BigInt(0x80 | 9) << 232n)).toString(16));
+    const slots = new Map([
+      [mappingBase(TOKEN, POOL_STORAGE_V5.assets) + 2n, slot2],
+      [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, word(IMPL.slice(2))],
+      [MARK_STORE.MS + 9n, '0x000190012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234'],
+    ]);
+    const m = await readMarks(providerWith(5, slots), POOL, TOKEN);
+    expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
+    expect(m?.primary.sigmaPbps).toBe(400);
+    expect(m?.primary.uoa).toBe(true);
+    expect(m?.primary.refBandBps).toBe(100);
+    expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
+  });
+});
+
+describe('layout v5', () => {
+  test('store base is keccak256("btr.markstore") - 1', () => {
+    expect<bigint>(MARK_STORE.MS).toBe(
+      BigInt('0x8fb4340288f7429bd33c13abd02aa3c2145e859f37a071b10e8e034e391167ea') - 1n,
+    );
+  });
+
+  test('store word vectors match dex-evm MarkWordLib.t.sol and core', () => {
+    const raw = '0x000190012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234';
+    const leg = decodeStoreWord(raw, { internal: false, uoa: true, refBandBps: 100 });
+    expect(leg.primary.sigmaPbps).toBe(400);
+    expect(leg.primary.obs).toBe(1_800_000_030);
+    expect(leg.ref.obs).toBe(1_800_000_020);
+    expect(leg.primary.maxDevBps).toBe(50);
+    expect([leg.primary.ttlSecs, leg.ref.ttlSecs]).toEqual([3600, 600]);
+  });
+
+  test('Asset slot 2 carries the leg oracle wiring', () => {
+    const slot2 = `0x${((150n << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
+    expect(decodeLegOracle(slot2 as `0x${string}`)).toEqual({
+      lane: 7,
+      internal: true,
+      uoa: false,
+      refBandBps: 150,
+    });
   });
 });

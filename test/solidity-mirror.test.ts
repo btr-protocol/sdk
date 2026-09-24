@@ -197,10 +197,10 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     expect(c.get('MAX_STALE_GRACE_SECS')).toBe(M.MAX_STALE_GRACE_SECS);
   });
 
-  test('wire-v6 srcSecs bounds match ExternalOracleV5.sol', () => {
-    const c = constants(src(join(DEX, 'src', 'oracles', 'ExternalOracleV5.sol')));
+  test('wire-v6 srcSecs bounds match MarkStore.sol', () => {
+    const c = constants(src(join(DEX, 'src', 'oracles', 'MarkStore.sol')));
     expect(c.get('MAX_SOURCE_AGE_SECS')).toBe(V6_MAX_SOURCE_AGE_SECS);
-    expect(c.get('SOURCE_TS_FUTURE_SKEW_SECS')).toBe(V6_SOURCE_TS_FUTURE_SKEW_SECS);
+    expect(c.get('FUTURE_SKEW_SECS')).toBe(V6_SOURCE_TS_FUTURE_SKEW_SECS);
   });
 
   test('MAX_INTERIOR_SWING_PBPS is the PricingLib.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {

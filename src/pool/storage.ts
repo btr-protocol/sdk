@@ -5,8 +5,9 @@
  * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout`; they are the only
  * place either number appears, and every decoder reads them. Two layouts are live, picked by
  * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`, frozen), v3
- * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved) and v4
- * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0). An ABI diff cannot see packing, so
+ * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved), v4
+ * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0) and v5
+ * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`). An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
@@ -37,6 +38,7 @@ import { HOOK_POST_INFLOW, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.j
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
+import { MARK_STORE, POOL_STORAGE_V5, POOL_STRUCTS_V5 } from './layout.v5.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 export {
@@ -51,6 +53,12 @@ export {
   POOL_STORAGE_V4,
   POOL_STRUCTS_V4,
 } from './layout.v4.generated.js';
+export {
+  MARK_STORE,
+  POOL_MAPPINGS_V5,
+  POOL_STORAGE_V5,
+  POOL_STRUCTS_V5,
+} from './layout.v5.generated.js';
 
 /** `Pool.storageVersion()`. */
 const STORAGE_VERSION_SELECTOR = '0x403ebd03';
@@ -58,7 +66,7 @@ const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
 
 /**
  * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), 3 = layout v3 (`POOL_STORAGE_V3`),
- * >= 4 = layout v4 (`POOL_STORAGE_V4`). Memoised per provider and pool: a pool's layout moves only with an impl
+ * 4 = layout v4 (`POOL_STORAGE_V4`), >= 5 = layout v5 (`POOL_STORAGE_V5`). Memoised per provider and pool: a pool's layout moves only with an impl
  * upgrade.
  */
 export function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
@@ -81,7 +89,8 @@ export function readStorageVersion(provider: Eip1193Provider, pool: Address): Pr
 /** The absolute slot table a layout version selects. */
 export function poolStorageOf(
   storageVersion: number,
-): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 | typeof POOL_STORAGE_V4 {
+): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 | typeof POOL_STORAGE_V4 | typeof POOL_STORAGE_V5 {
+  if (storageVersion >= 5) return POOL_STORAGE_V5;
   if (storageVersion >= 4) return POOL_STORAGE_V4;
   return storageVersion === 3 ? POOL_STORAGE_V3 : POOL_STORAGE;
 }
@@ -459,7 +468,51 @@ export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } 
   };
 }
 
-/** The pool's copy of a leg's two feeds; `null` on a v2 pool, which reads its oracle live. */
+/** A layout-v5 leg's oracle wiring off its `Asset` slot-2 word. */
+export function decodeLegOracle(slot2: Hex): {
+  lane: number;
+  internal: boolean;
+  uoa: boolean;
+  refBandBps: number;
+} {
+  const f = POOL_STRUCTS_V5.Asset;
+  const b = u8At(slot2, f.oracleBits[1]);
+  return {
+    lane: b & MARK_STORE.LANE_MASK,
+    internal: (b & MARK_STORE.INTERNAL_BIT) !== 0,
+    uoa: (b & MARK_STORE.UOA_BIT) !== 0,
+    refBandBps: u16At(slot2, f.refBandBps[1]),
+  };
+}
+
+/** A store word as a pool prices it for one leg: σ floored at the lane's minSigma, the leg's own
+ *  config in the mirror fields. Byte-identical to dex-evm `MarkWordLib.compose`. */
+export function decodeStoreWord(
+  word: Hex,
+  leg: { internal: boolean; uoa: boolean; refBandBps: number },
+): { primary: MarkWord; ref: MarkWord } {
+  const out = decodeMarkWord(word);
+  const floor = Number(BigInt(word) >> BigInt(MARK_STORE.MIN_SIGMA_SHIFT));
+  out.primary.sigmaPbps = Math.max(out.primary.sigmaPbps, floor);
+  out.primary.internal = leg.internal;
+  out.primary.uoa = leg.uoa;
+  out.primary.refBandBps = leg.refBandBps;
+  return out;
+}
+
+/** ERC-1967 impl slot: a pool proxy's live impl, which carries the mark store. */
+const IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn;
+
+/** The store word of `lane` at `impl` (`PoolFactory.implementation()`). */
+export async function readStoreWord(
+  provider: Eip1193Provider,
+  impl: Address,
+  lane: number,
+): Promise<Hex> {
+  return getStorageAt(provider, impl, MARK_STORE.MS + BigInt(lane));
+}
+
+/** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live. */
 export async function readMarks(
   provider: Eip1193Provider,
   pool: Address,
@@ -468,6 +521,15 @@ export async function readMarks(
   const version = await readStorageVersion(provider, pool);
   if (version < 3) return null;
   const key = await resolveTokenStorageKey(provider, pool, token);
+  if (version >= 5) {
+    const [slot2, implWord] = await Promise.all([
+      getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V5.assets) + 2n),
+      getStorageAt(provider, pool, IMPL_SLOT),
+    ]);
+    const leg = decodeLegOracle(slot2);
+    const impl = addressAt(implWord, 0);
+    return decodeStoreWord(await readStoreWord(provider, impl, leg.lane), leg);
+  }
   if (version >= 4) {
     return decodeMarkWord(
       await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V4.marks)),

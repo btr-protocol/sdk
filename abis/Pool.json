@@ -16,8 +16,17 @@
         "name": "flash_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "logic_",
+        "type": "address",
+        "internalType": "address"
       }
     ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "fallback",
     "stateMutability": "nonpayable"
   },
   {
@@ -27,6 +36,19 @@
   {
     "type": "function",
     "name": "AC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "LOGIC",
     "inputs": [],
     "outputs": [
       {
@@ -169,14 +191,9 @@
         "internalType": "struct IPool.OracleConfig",
         "components": [
           {
-            "name": "feedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "primary",
-            "type": "address",
-            "internalType": "address"
+            "name": "lane",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "mode",
@@ -192,16 +209,6 @@
             "name": "refBandBps",
             "type": "uint16",
             "internalType": "uint16"
-          },
-          {
-            "name": "refFeedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "refPrimary",
-            "type": "address",
-            "internalType": "address"
           }
         ]
       },
@@ -280,13 +287,8 @@
     "outputs": [
       {
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "nonpayable"
@@ -311,14 +313,9 @@
         "internalType": "struct IPool.OracleConfig",
         "components": [
           {
-            "name": "feedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "primary",
-            "type": "address",
-            "internalType": "address"
+            "name": "lane",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "mode",
@@ -334,16 +331,6 @@
             "name": "refBandBps",
             "type": "uint16",
             "internalType": "uint16"
-          },
-          {
-            "name": "refFeedId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "refPrimary",
-            "type": "address",
-            "internalType": "address"
           }
         ]
       }
@@ -874,8 +861,8 @@
           },
           {
             "name": "liquidityIndexWad",
-            "type": "uint96",
-            "internalType": "uint96"
+            "type": "uint72",
+            "internalType": "uint72"
           },
           {
             "name": "minDispersionPbps",
@@ -924,6 +911,16 @@
           },
           {
             "name": "maxLiabWeightBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "oracleBits",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "refBandBps",
             "type": "uint16",
             "internalType": "uint16"
           }
@@ -1490,6 +1487,13 @@
   },
   {
     "type": "function",
+    "name": "publishMarks",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "resolve",
     "inputs": [
       {
@@ -1601,19 +1605,6 @@
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "syncMarks",
-    "inputs": [
-      {
-        "name": "assets",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {

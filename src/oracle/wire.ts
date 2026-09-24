@@ -4,7 +4,7 @@
  * V5 (`ExternalOracleV4.pushV4` / `pushSignedV4`): 8 x 29-bit lanes, wire v5 DIFF blobs, 11-byte
  * header, 5-byte price entries, `tsDs` = deciseconds since midnight UTC (cyclic, no epoch).
  *
- * V6 (`ExternalOracleV5.push`): 12-byte header (`srcSecs` = ABSOLUTE source second u32, A-262),
+ * V6 (`MarkStore.publishMarks`): 12-byte header (`srcSecs` = ABSOLUTE source second u32, A-262),
  * same 5/5/3-byte sections, but the price lane is a self-describing u32 (`exp7:u7 | mant:u25`,
  * `mark = mant << (exp7 - 16)`, no per-feed bias) and `nC == nP` is mandatory: price and conf are
  * walked in lockstep on the same `gi` sequence.
@@ -49,7 +49,7 @@ export const V6_BLOB_VERSION = 6;
 export const V6_HEADER_BYTES = 12; // ver u8 | seq u32 | srcSecs u32 | nP u8 | nS u8 | nC u8
 /** `mark = mant << (exp7 - 16)`: the self-describing exponent is absolute, no per-feed bias. */
 export const V6_EXP_OFFSET = 16;
-/** `ExternalOracleV5._checkHeader` bounds on `srcSecs` against `block.timestamp`. */
+/** `MarkStore._segment` bounds on `srcSecs` against `block.timestamp`. */
 export const V6_SOURCE_TS_FUTURE_SKEW_SECS = 5;
 export const V6_MAX_SOURCE_AGE_SECS = 120;
 
@@ -299,7 +299,7 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
   return out;
 }
 
-// ── wire v6 (ExternalOracleV5): 12B header (absolute srcSecs), self-describing exp7 lane, nC == nP
+// ── wire v6 (MarkStore): 12B header (absolute srcSecs), self-describing exp7 lane, nC == nP
 
 /** v5 sections with an ABSOLUTE clock (`version` is 6); the lane is a full-u32 `exp7:u7 | mant:u25`
  *  and `confs` is one per price entry in the same `gi` order. */

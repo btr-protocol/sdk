@@ -436,10 +436,11 @@ export function decodeFn<T = never>({
   if (outputs.length > 1) return decode('tuple', data, 0, outputs).val as T;
   const o = outputs[0];
   let d = clean(data);
-  // ponytail: live Arc pools pre-date `maxLiabWeightBps` and return a 14-word Asset; pad the
-  // missing trailing word (reads as 0 = cap disabled) until the pre-BNB Arc upgrade, then delete.
-  if (functionName === 'getAsset' && o.components?.length === 15 && d.length === 14 * 64)
-    d += '0'.repeat(64);
+  // ponytail: live Arc pools pre-date the Asset tail (`maxLiabWeightBps`, the oracle bits) and
+  // return 14 or 15 words; pad the missing trailing words (0 = cap off, no lane) until Arc leaves.
+  const words = o.components?.length ?? 0;
+  if (functionName === 'getAsset' && d.length >= 14 * 64 && d.length < words * 64)
+    d = d.padEnd(words * 64, '0');
   const start = isDynamicType(o.type, o.components) ? Number(BN(`0x${d.slice(0, 64)}`)) * 2 : 0;
   return decode(o.type, d, start, o.components).val as T;
 }
