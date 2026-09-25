@@ -160,67 +160,114 @@ describe('quoteAllExactIn separates a protocol halt from a transport failure', (
 // ── planToLegs ───────────────────────────────────────────────────────────────
 
 const POOL = '0x2222222222222222222222222222222222222222';
+const POOL2 = '0x3333333333333333333333333333333333333333';
+const ROGUE = '0x6666666666666666666666666666666666666666';
 const meta: Record<string, { address: Address; decimals: number }> = {
   A: { address: TOKEN_A, decimals: 18 },
   B: { address: TOKEN_B, decimals: 18 },
   C: { address: ALICE, decimals: 18 },
 };
 const tokenOf = (s: string) => meta[s];
-/** Every pool in these fixtures is the factory's; the allowlist itself is tested separately. */
-const isOfficialPool = () => true;
+/** Every pool is the factory's unless a test overrides `isOfficialPool`. */
+const legsOf = (plan: never, o: Partial<Parameters<typeof planToLegs>[1]> = {}) =>
+  planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool: () => true, ...o });
 
-const directPlan = (amountIn: number, amountOut: number) =>
+/** Direct A→B part on `poolAddr`. */
+const directPlan = (amountIn: number, amountOut: number, poolAddr = POOL) =>
   ({
     amountIn,
     parts: [
       {
         fraction: 1,
-        route: { legs: [{ tokenIn: 'A', tokenOut: 'B', poolAddr: POOL }] },
+        route: { legs: [{ tokenIn: 'A', tokenOut: 'B', poolAddr }] },
         quote: { amountOut, fills: [{ amountOut }] },
       },
     ],
   }) as never;
 
-describe('planToLegs validates slippage and derives minOut in bigint space', () => {
-  test('slippageFrac >= 1 throws instead of yielding minOut = 0', () => {
-    // The pre-fix path computed amountOut * (1 - 1) = 0 and shipped a batch with no floor.
-    expect(() =>
-      planToLegs(directPlan(100, 100), { slippageFrac: 1, tokenOf, isOfficialPool }),
-    ).toThrow(/\[0, 1\)/);
-    expect(() =>
-      planToLegs(directPlan(100, 100), { slippageFrac: 1.5, tokenOf, isOfficialPool }),
-    ).toThrow();
-  });
+/** Cross part: A→B on POOL, then B→C on POOL2. */
+const crossPlan = () =>
+  ({
+    amountIn: 100,
+    parts: [
+      {
+        fraction: 1,
+        route: {
+          legs: [
+            { tokenIn: 'A', tokenOut: 'B', poolAddr: POOL },
+            { tokenIn: 'B', tokenOut: 'C', poolAddr: POOL2 },
+          ],
+        },
+        quote: { amountOut: 98, fills: [{ amountOut: 99 }, { amountOut: 98 }] },
+      },
+    ],
+  }) as never;
 
-  test('a negative or NaN slippageFrac throws', () => {
-    expect(() =>
-      planToLegs(directPlan(100, 100), { slippageFrac: -0.01, tokenOf, isOfficialPool }),
-    ).toThrow();
-    expect(() =>
-      planToLegs(directPlan(100, 100), { slippageFrac: Number.NaN, tokenOf, isOfficialPool }),
-    ).toThrow();
-  });
+describe('planToLegs validates slippage and derives minOut in bigint space', () => {
+  // >= 1: the pre-fix path computed amountOut * (1 - 1) = 0 and shipped a batch with no floor.
+  test.each([1, 1.5, -0.01, Number.NaN])('slippageFrac %p throws', (slippageFrac) =>
+    expect(() => legsOf(directPlan(100, 100), { slippageFrac })).toThrow(/\[0, 1\)/),
+  );
 
   test('slippageFrac = 0 is legal and leaves minOut at the full quote', () => {
-    const legs = planToLegs(directPlan(100, 100), { slippageFrac: 0, tokenOf, isOfficialPool });
-    expect(legs?.[0].minOut).toBe(100n * 10n ** 18n);
+    expect(legsOf(directPlan(100, 100))?.[0].minOut).toBe(100n * 10n ** 18n);
   });
 
   test('minOut survives above 1e21 units, where toFixed used to go exponential', () => {
     // 1e6 tokens at 18 decimals = 1e24 units. The old float+toFixed path produced "1e+24"
     // and parseUnits could not read it, so the floor came out garbage.
-    const legs = planToLegs(directPlan(1e6, 1e6), { slippageFrac: 0.005, tokenOf, isOfficialPool });
-    const expected = (1_000_000n * 10n ** 18n * 995_000n) / 1_000_000n;
-    expect(legs?.[0].minOut).toBe(expected);
-    expect(legs?.[0].minOut.toString()).not.toContain('e');
+    const legs = legsOf(directPlan(1e6, 1e6), { slippageFrac: 0.005 });
+    expect(legs?.[0].minOut).toBe((1_000_000n * 10n ** 18n * 995_000n) / 1_000_000n);
     expect(legs?.[0].amountIn).toBe(1_000_000n * 10n ** 18n);
   });
 
   test('minOut rounds DOWN, never above what the quote promised', () => {
-    const legs = planToLegs(directPlan(1, 1), { slippageFrac: 0.005, tokenOf, isOfficialPool });
-    expect(legs?.[0].minOut).toBeLessThan(10n ** 18n);
+    const legs = legsOf(directPlan(1, 1), { slippageFrac: 0.005 });
     expect(legs?.[0].minOut).toBe((10n ** 18n * 995_000n) / 1_000_000n);
   });
+
+  test('toUnits: >18 decimals throws instead of silently clamping to 18', () => {
+    const bad = { ...meta, B: { address: TOKEN_B, decimals: 24 } };
+    expect(() => legsOf(directPlan(100, 99), { tokenOf: (s: string) => bad[s] })).toThrow(
+      /\[0, 18\]/,
+    );
+  });
+});
+
+describe('planToLegs routes only through pools the caller vouches for', () => {
+  const isOfficialPool = (p: Address) => p.toLowerCase() === POOL.toLowerCase();
+
+  test('a pool outside the allowlist yields no plan at all', () => {
+    expect(legsOf(directPlan(100, 99, ROGUE), { isOfficialPool })).toBeNull();
+  });
+
+  test('the same plan on an allowlisted pool builds', () => {
+    const legs = legsOf(directPlan(100, 99), { isOfficialPool });
+    expect(legs?.map((l) => l.pool.toLowerCase())).toEqual([POOL.toLowerCase()]);
+  });
+
+  test('one rejected hop of a cross kills the WHOLE plan, never just that hop', () => {
+    // Fails closed: a partial plan would deliver the intermediate asset and call it the swap.
+    expect(legsOf(crossPlan(), { isOfficialPool })).toBeNull();
+  });
+});
+
+// A-926 (no server floor → refused) is pinned in src/router/routerPlan.test.ts.
+test('a chained hop 2 is funded by hop 1 floor and floored on the server number', () => {
+  const c = meta.C;
+  const amountOut = 98n * 10n ** BigInt(c.decimals);
+  const floor = { amountOut, minOut: (amountOut * 99n) / 100n, tolPbps: 10_000 };
+  const legs = legsOf(crossPlan(), {
+    slippageFrac: 0.5, // ignored on a chained part: the server tolerance scales hop 1
+    serverFloors: { [c.address.toLowerCase()]: floor },
+    maxTolPbps: floor.tolPbps,
+  });
+  expect(legs?.length).toBe(2);
+  const [l1, l2] = legs as NonNullable<typeof legs>;
+  expect(l1.minOut).toBe((l1.quotedOut * 99n) / 100n);
+  expect(l2.amountIn).toBe(l1.minOut);
+  expect(l2.minOut).toBe(floor.minOut);
+  expect(l2.quotedOut).toBe(amountOut);
 });
 
 /**
@@ -296,111 +343,6 @@ describe('chain resolution refuses to guess', () => {
 });
 
 // ── Pool-address provenance, chained floors, unwrap direction ─────────────────
-
-const ROGUE = '0x6666666666666666666666666666666666666666';
-
-/** Direct part whose pool is `poolAddr`, so the allowlist is the only thing under test. */
-const planOnPool = (poolAddr: string) =>
-  ({
-    amountIn: 100,
-    parts: [
-      {
-        fraction: 1,
-        route: { legs: [{ tokenIn: 'A', tokenOut: 'B', poolAddr }] },
-        quote: { amountOut: 99, fills: [{ amountOut: 99 }] },
-      },
-    ],
-  }) as never;
-
-/** Cross part: A→B on POOL, then B→C on POOL2. */
-const POOL2 = '0x3333333333333333333333333333333333333333';
-const crossPlan = () =>
-  ({
-    amountIn: 100,
-    parts: [
-      {
-        fraction: 1,
-        route: {
-          legs: [
-            { tokenIn: 'A', tokenOut: 'B', poolAddr: POOL },
-            { tokenIn: 'B', tokenOut: 'C', poolAddr: POOL2 },
-          ],
-        },
-        quote: { amountOut: 98, fills: [{ amountOut: 99 }, { amountOut: 98 }] },
-      },
-    ],
-  }) as never;
-
-describe('planToLegs routes only through pools the caller vouches for', () => {
-  const officialOnly = (p: Address) => p.toLowerCase() === POOL.toLowerCase();
-
-  test('a pool outside the allowlist yields no plan at all', () => {
-    expect(
-      planToLegs(planOnPool(ROGUE), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool: officialOnly,
-      }),
-    ).toBeNull();
-  });
-
-  test('the same plan on an allowlisted pool builds', () => {
-    const legs = planToLegs(planOnPool(POOL), {
-      slippageFrac: 0,
-      tokenOf,
-      isOfficialPool: officialOnly,
-    });
-    expect(legs?.length).toBe(1);
-    expect(legs?.[0].pool.toLowerCase()).toBe(POOL.toLowerCase());
-  });
-
-  test('one rejected hop of a cross kills the WHOLE plan, never just that hop', () => {
-    // Fails closed: a partial plan would deliver the intermediate asset and call it the swap.
-    expect(
-      planToLegs(crossPlan(), { slippageFrac: 0, tokenOf, isOfficialPool: officialOnly }),
-    ).toBeNull();
-  });
-});
-
-describe('a chained second hop is floored by the server or not at all', () => {
-  // A-926. The no-server fallback floored hop 2 at q2·(1−s)² (hop 1's floor funds hop 2, then s
-  // again) while the UI promised q2·(1−s): ~2× the tolerance extractable, authored by the SDK.
-  test('no server floor: the chained plan is refused, never floored locally', () => {
-    expect(planToLegs(crossPlan(), { slippageFrac: 0.01, tokenOf, isOfficialPool })).toBeNull();
-  });
-
-  test('with a server floor hop 2 is funded by hop 1 floor and floored on the server number', () => {
-    const c = meta.C;
-    const amountOut = 98n * 10n ** BigInt(c.decimals);
-    const floor = { amountOut, minOut: (amountOut * 99n) / 100n, tolPbps: 10_000 };
-    const legs = planToLegs(crossPlan(), {
-      slippageFrac: 0.5, // ignored on a chained part: the server tolerance scales hop 1
-      tokenOf,
-      isOfficialPool,
-      serverFloors: { [c.address.toLowerCase()]: floor },
-      maxTolPbps: floor.tolPbps,
-    });
-    expect(legs?.length).toBe(2);
-    const [l1, l2] = legs as NonNullable<typeof legs>;
-    expect(l1.minOut).toBe((l1.quotedOut * 99n) / 100n);
-    expect(l2.amountIn).toBe(l1.minOut);
-    expect(l2.minOut).toBe(floor.minOut);
-    expect(l2.quotedOut).toBe(amountOut);
-  });
-});
-
-describe('toUnits refuses a scale it cannot represent', () => {
-  test('>18 decimals throws instead of silently clamping to 18', () => {
-    const bad = { ...meta, B: { address: TOKEN_B, decimals: 24 } };
-    expect(() =>
-      planToLegs(planOnPool(POOL), {
-        slippageFrac: 0,
-        tokenOf: (s: string) => bad[s],
-        isOfficialPool,
-      }),
-    ).toThrow(/\[0, 18\]/);
-  });
-});
 
 describe('a nativeOut batch refuses to unwrap on someone else s behalf', () => {
   const WNATIVE = '0x4444444444444444444444444444444444444444' as Address;
