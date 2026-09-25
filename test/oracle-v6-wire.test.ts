@@ -27,17 +27,10 @@ import {
   encodeLane,
 } from '../src/oracle/wire';
 import GOLDEN from './fixtures/oracle-v6-wire-golden.json';
+import { bytesToHex, hexToBytes, mutated } from './fx';
 
 const BLOB_HEX = GOLDEN.blobHex as Hex;
-const BLOB_HASHED = BLOB_HEX.slice(2);
-const BLOB_BYTES = Uint8Array.from(
-  (BLOB_HASHED.match(/../g) ?? []).map((x) => Number.parseInt(x, 16)),
-);
-
-const hexToBytes = (h: string): Uint8Array =>
-  Uint8Array.from((h.slice(2).match(/../g) ?? []).map((x) => Number.parseInt(x, 16)));
-const bytesToHex = (b: Uint8Array): Hex =>
-  `0x${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
+const BLOB_BYTES = hexToBytes(BLOB_HEX);
 
 // Byte-exact golden. The fixture is vendored from dex-evm, so the whole of it is pinned by digest
 // rather than one literal: a re-copy that moves ANY byte — a lane, an expected mark, the blob —
@@ -129,11 +122,7 @@ describe('wire v6 blob', () => {
   });
 
   it('fails closed on version, nP == 0, length, gi order, nC and price/conf lockstep', () => {
-    const bad = (mut: (b: Uint8Array) => void): Uint8Array => {
-      const c = Uint8Array.from(BLOB_BYTES);
-      mut(c);
-      return c;
-    };
+    const bad = (mut: (b: Uint8Array) => void) => mutated(BLOB_BYTES, mut);
     expect(() => decodeBlobV6(bad((b) => (b[0] = 5)))).toThrow(/version/);
     // _checkHeader: nP == 0 reverts even with sigma entries present
     expect(() =>

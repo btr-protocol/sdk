@@ -26,6 +26,7 @@ import {
   reconSecsFromDs,
 } from '../src/oracle/wire';
 import GOLDEN from './fixtures/oracle-v5-wire-golden.json';
+import { bytesToHex, hexToBytes, mutated } from './fx';
 
 interface LaneVector {
   name: string;
@@ -43,11 +44,6 @@ const LANES = GOLDEN.lanes as LaneVector[];
 const BLOB = GOLDEN.blob;
 const BLOB_HEX = BLOB.hex as Hex;
 const BLOB_HASH = BLOB.keccak256 as Hex;
-
-const hexToBytes = (h: string): Uint8Array =>
-  Uint8Array.from((h.slice(2).match(/../g) ?? []).map((x) => Number.parseInt(x, 16)));
-const bytesToHex = (b: Uint8Array): Hex =>
-  `0x${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
 
 // Byte-exact golden, pinned as literals so a regenerated fixture cannot drift silently:
 // hex and keccak must BOTH match, or the TS codec no longer reads chain-accepted bytes.
@@ -183,11 +179,7 @@ describe('wire v5 blob', () => {
   });
 
   it('fails closed on version, tsDs, empty, length, reserved bits and gi order', () => {
-    const bad = (mut: (b: Uint8Array) => void): Uint8Array => {
-      const c = Uint8Array.from(bytes);
-      mut(c);
-      return c;
-    };
+    const bad = (mut: (b: Uint8Array) => void) => mutated(bytes, mut);
     expect(() => decodeBlobV5(bad((b) => (b[0] = 4)))).toThrow(/version/);
     // tsDs = 864000 = 0x0D2F00, one past the day
     expect(() =>
