@@ -472,10 +472,13 @@ describe('versioned readers', () => {
   const word = (hex: string) => `0x${hex.padStart(64, '0')}` as `0x${string}`;
   const providerWith = (version: number, slots: Map<bigint, string>): Eip1193Provider =>
     ({
-      request: async ({ method, params }: { method: string; params: unknown[] }) =>
-        method === 'eth_call'
-          ? word(version.toString(16))
-          : (slots.get(BigInt(params[1] as string)) ?? word('0')),
+      request: async ({ method, params }: { method: string; params: unknown[] }) => {
+        if (method !== 'eth_call') return slots.get(BigInt(params[1] as string)) ?? word('0');
+        // a D2b store reverts `classes()`
+        if ((params[0] as { data: string }).data === '0x31e77853')
+          throw Object.assign(new Error('execution reverted'), { code: 3 });
+        return word(version.toString(16));
+      },
     }) as unknown as Eip1193Provider;
   const rate = word((970n * 10n ** 15n).toString(16));
 
@@ -664,5 +667,31 @@ describe('P8 mark store', () => {
     expect(m).toEqual(want);
     expect(m!.primary.mark1e18 > 0n && m!.ref.mark1e18 > 0n).toBe(true);
     expect(m!.primary.ttlSecs).toBe(600);
+  });
+
+  test('readMarks: classes() neither reverting nor P8 fails closed', async () => {
+    const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    const pad = (h: string) => `0x${h.padStart(64, '0')}`;
+    const at = (classes: () => unknown) =>
+      ({
+        request: async ({ method, params }: { method: string; params: unknown[] }) => {
+          if (method !== 'eth_call') return pad('0');
+          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('5');
+        },
+      }) as unknown as Eip1193Provider;
+    // right id, no lane classed: Pool's constructor rejects it, so no layout is known
+    const unclassed = `0x${'00'.repeat(96)}${CLASSES.slice(2 + 192)}`;
+    await expect(readMarks(at(() => unclassed), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    const rpc = Object.assign(new Error('relay: upstream revert-proxy timeout'), { code: -32603 });
+    await expect(
+      readMarks(
+        at(() => {
+          throw rpc;
+        }),
+        POOL,
+        TOKEN,
+      ),
+    ).rejects.toBe(rpc);
   });
 });

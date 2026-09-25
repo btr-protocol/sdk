@@ -546,19 +546,24 @@ export function p8StoreWord(pw: Hex, rw: Hex, lane: number, c: P8Classes): Hex {
   return `0x${w.toString(16).padStart(64, '0')}`;
 }
 
-/** The impl store's P8 class table; `null` for a D2b store, which reverts `classes()`. */
+/** The impl store's P8 class table; `null` for a D2b store, which reverts `classes()`. Throws on
+ *  a failed read or a table without the P8 id: neither layout, so no mark (fail closed). */
 async function readP8Classes(provider: Eip1193Provider, impl: Address): Promise<P8Classes | null> {
+  let r: Hex;
   try {
-    const r = (await provider.request({
+    r = (await provider.request({
       method: 'eth_call',
       params: [{ to: impl, data: CLASSES_SELECTOR }, 'latest'],
     })) as Hex;
-    return decodeP8Classes(r);
   } catch (e) {
-    // a revert is the D2b answer; a failed read is not
-    if (/revert/i.test(String((e as { message?: unknown })?.message ?? e))) return null;
+    // EIP-1474 code 3, or geth's bare "execution reverted" for an empty revert
+    const { code, message } = (e ?? {}) as { code?: unknown; message?: unknown };
+    if (code === 3 || /^execution reverted/i.test(String(message ?? ''))) return null;
     throw e;
   }
+  const c = decodeP8Classes(r);
+  if (!c) throw new Error(`classes() of ${impl} is not a P8 table`);
+  return c;
 }
 
 /** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live. */
