@@ -363,34 +363,6 @@
   },
   {
     "type": "function",
-    "name": "adminSetAssetParams",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "minLiquidity",
-        "type": "uint128",
-        "internalType": "uint128"
-      },
-      {
-        "name": "minFeePbps",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
-        "name": "vegaBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "adminSetBaseToken",
     "inputs": [
       {
@@ -2366,5 +2338,77 @@
     "type": "error",
     "name": "InvalidPath",
     "inputs": []
+  },
+  {
+    "type": "function",
+    "name": "adminSetAssetParams",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minFeePbps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "vegaBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopDiscBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "swapCoop",
+    "inputs": [
+      {
+        "name": "tokenIn",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenOut",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amountIn",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "basis",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   }
 ]

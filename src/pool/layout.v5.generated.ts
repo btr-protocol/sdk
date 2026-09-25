@@ -2,7 +2,8 @@
 // `out/Pool.sol/Pool.json`. No mark lives in the pool: slot 5 is reserved, the leg's oracle wiring
 // sits in `Asset` slot 2 and the marks live once, in the Pool impl's `MarkStore`
 // (`MARK_STORE`, one word per lane at `MS + lane`). Slot 6 is reserved too: each curve is an
-// immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `storage.test.ts` restates it by hand.
+// immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `coop` (slot 13) = a leg's
+// `swapCoop` terms, `discBps | rebateBps << 16`. `storage.test.ts` restates it by hand.
 
 import { POOL_STRUCTS_V4 } from './layout.v4.generated.js';
 
@@ -24,10 +25,11 @@ export const POOL_STORAGE_V5 = {
   lpTokens: 9n,
   poolAdmin: 10n,
   legs: 12n,
+  coop: 13n,
 } as const;
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
-export const POOL_MAPPINGS_V5 = ['assets', 'custody', 'assetHooks', 'lpTokens'] as const;
+export const POOL_MAPPINGS_V5 = ['assets', 'custody', 'assetHooks', 'lpTokens', 'coop'] as const;
 
 /** In-struct `[slot, byteOffset]`: v4's, with `Asset` slot 2 repacked around a uint72 index and
  *  the leg's oracle wiring on its tail. */

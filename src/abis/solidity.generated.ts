@@ -70,8 +70,9 @@ export const Tier = {
 export type Tier = (typeof Tier)[keyof typeof Tier];
 
 // `Asset.flags` / `RiskConfig.flags` bits and masks (PoolConstantsLib).
+export const COOP_ENABLED_BIT = 2048;
 export const DEPOSIT_GATED_BIT = 512;
-export const ENABLE_MASK = 112;
+export const ENABLE_MASK = 2160;
 export const FEED_HALT_BIT = 1;
 export const FLASH_ENABLED_BIT = 64;
 export const GATE_MASK = 1536;
@@ -82,7 +83,7 @@ export const HALT_RISK_BIT = 1;
 export const HALT_SETTABLE_MASK = 3;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 1911;
+export const KNOWN_FLAGS_MASK = 3959;
 export const LIABILITY_SWAP_ENABLED_BIT = 32;
 export const SWAP_ENABLED_BIT = 16;
 export const SWAP_GATED_BIT = 1024;
@@ -105,6 +106,7 @@ export const MAX_STALE_GRACE_SECS = 30;
 export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.
+export const LANE_ARB_OP = 4096;
 export const PERM_GUARDIAN = 131072;
 export const PERM_KEEPER = 65536;
 export const PERM_RISK_STEWARD = 262144;

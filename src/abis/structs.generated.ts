@@ -51,7 +51,10 @@ export type RiskFencesFields =
   | 'minFeeHardMaxPbps'
   | 'vegaHardMinBps'
   | 'vegaHardMaxBps'
-  | 'maxDeltaBps';
+  | 'maxDeltaBps'
+  | 'maxCoopDiscBps'
+  | 'minCoopRebateBps'
+  | 'maxCoopRebateBps';
 
 export type SwapQuoteFields =
   | 'amountOut'

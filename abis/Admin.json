@@ -626,39 +626,6 @@
         "type": "address"
       },
       {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint128",
-        "name": "minLiquidity",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint16",
-        "name": "minFeePbps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "vegaBps",
-        "type": "uint16"
-      }
-    ],
-    "name": "requestAssetParams",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
         "internalType": "uint8",
         "name": "opType",
         "type": "uint8"
@@ -693,48 +660,63 @@
     "type": "function"
   },
   {
+    "type": "function",
+    "name": "riskFences",
     "inputs": [
       {
-        "internalType": "address",
         "name": "pool",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "address",
         "name": "token",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "name": "riskFences",
     "outputs": [
       {
-        "internalType": "uint16",
         "name": "minFeeHardMinPbps",
-        "type": "uint16"
+        "type": "uint16",
+        "internalType": "uint16"
       },
       {
-        "internalType": "uint16",
         "name": "minFeeHardMaxPbps",
-        "type": "uint16"
+        "type": "uint16",
+        "internalType": "uint16"
       },
       {
-        "internalType": "uint16",
         "name": "vegaHardMinBps",
-        "type": "uint16"
+        "type": "uint16",
+        "internalType": "uint16"
       },
       {
-        "internalType": "uint16",
         "name": "vegaHardMaxBps",
-        "type": "uint16"
+        "type": "uint16",
+        "internalType": "uint16"
       },
       {
-        "internalType": "uint16",
         "name": "maxDeltaBps",
-        "type": "uint16"
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "maxCoopDiscBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "minCoopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "maxCoopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
     "inputs": [
@@ -745,39 +727,6 @@
       }
     ],
     "name": "sealBootstrap",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint128",
-        "name": "minLiquidity",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint16",
-        "name": "minFeePbps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint16",
-        "name": "vegaBps",
-        "type": "uint16"
-      }
-    ],
-    "name": "setAssetParamsBounded",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -879,56 +828,6 @@
       }
     ],
     "name": "setRiskConfigTighten",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "components": [
-          {
-            "internalType": "uint16",
-            "name": "minFeeHardMinPbps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "minFeeHardMaxPbps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "vegaHardMinBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "vegaHardMaxBps",
-            "type": "uint16"
-          },
-          {
-            "internalType": "uint16",
-            "name": "maxDeltaBps",
-            "type": "uint16"
-          }
-        ],
-        "internalType": "struct IAdmin.RiskFences",
-        "name": "f",
-        "type": "tuple"
-      }
-    ],
-    "name": "setRiskFences",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1809,5 +1708,156 @@
     ],
     "name": "ThresholdViolation",
     "type": "error"
+  },
+  {
+    "type": "function",
+    "name": "requestAssetParams",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minFeePbps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "vegaBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopDiscBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setAssetParamsBounded",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minFeePbps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "vegaBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopDiscBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setRiskFences",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "f",
+        "type": "tuple",
+        "internalType": "struct IAdmin.RiskFences",
+        "components": [
+          {
+            "name": "minFeeHardMinPbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "minFeeHardMaxPbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "vegaHardMinBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "vegaHardMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxDeltaBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxCoopDiscBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "minCoopRebateBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxCoopRebateBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]
