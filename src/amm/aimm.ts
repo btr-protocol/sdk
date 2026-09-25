@@ -237,6 +237,9 @@ export interface PoolLeg {
   refBandBps?: number;
   /** `oracleBits` bit 6 (INTERNAL, priced at 1.0): peg test tightens to min(code·250, band). */
   internal?: boolean;
+  /** `oracleBits` bit 7 (UOA): the lane attests USD and `twap` is that over `baseMark`; the chain
+   *  peg-tests the USD mark, so the wire sends `twap·baseMark` as `peg_mark`. */
+  uoa?: boolean;
   baseMark?: number;
   baseRefBandBps?: number;
 }
@@ -392,6 +395,7 @@ interface SpokeWire {
   proto_share_pct: number;
   ref_band_bps: number;
   internal: boolean;
+  peg_mark: string | null;
   decimals?: number;
 }
 /**
@@ -685,6 +689,7 @@ interface QuoteRequestWire {
   proto_share_pct: number;
   ref_band_bps: number;
   internal: boolean;
+  peg_mark: string | null;
   base_mark: string | null;
   base_ref_band_bps: number;
 }
@@ -772,9 +777,12 @@ const baseDepegWire = (leg?: PoolLeg) => ({
   base_mark: leg?.baseMark != null ? wadHex(leg.baseMark) : null,
   base_ref_band_bps: leg?.baseRefBandBps ?? 0,
 });
+const pegMarkWire = (leg: PoolLeg): string | null =>
+  leg.uoa && leg.baseMark != null ? wadHex(leg.twap * leg.baseMark) : null;
 const depegWire = (leg: PoolLeg) => ({
   ref_band_bps: leg.refBandBps ?? 0,
   internal: leg.internal ?? false,
+  peg_mark: pegMarkWire(leg),
   ...baseDepegWire(leg),
 });
 
@@ -880,6 +888,7 @@ export function poolStateToWire(
       proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
       ref_band_bps: leg.refBandBps ?? 0,
       internal: leg.internal ?? false,
+      peg_mark: pegMarkWire(leg),
       decimals: leg.decimals,
     })),
   };

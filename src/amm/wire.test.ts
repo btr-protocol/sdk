@@ -105,7 +105,23 @@ describe('depeg wire', () => {
 
   test('unknown base mark goes out null (no base check), bands default 0', () => {
     const b = legToQuoteBody(state(HUB).legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
-    expect(b).toMatchObject({ ref_band_bps: 0, internal: false, base_mark: null, base_ref_band_bps: 0 });
+    expect(b).toMatchObject({
+      ref_band_bps: 0,
+      internal: false,
+      peg_mark: null,
+      base_mark: null,
+      base_ref_band_bps: 0,
+    });
+  });
+
+  test('a UOA leg sends its USD mark (twap·baseMark) as peg_mark', () => {
+    const s = banded();
+    Object.assign(s.legs.USDT, { uoa: true, twap: 2 });
+    const b = legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
+    expect(b.peg_mark).toBe('0xde0b6b3a7640000'); // 2 · 0.5 = 1.0 USD
+    expect(poolStateToWire('p', undefined, s, meta, 6).spokes[0].peg_mark).toBe(b.peg_mark);
+    Object.assign(s.legs.USDT, { baseMark: undefined });
+    expect(legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT).peg_mark).toBeNull();
   });
 });
 
