@@ -87,6 +87,25 @@
   },
   {
     "type": "function",
+    "name": "adminClaimTreasury",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "adminClearAssetHook",
     "inputs": [
       {
@@ -119,30 +138,6 @@
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "adminCollectProtocolFees",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "recipient",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -356,6 +351,44 @@
         "name": "flags",
         "type": "uint32",
         "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "adminSetAssetParams",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "minLiquidity",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minFeePbps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "vegaBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopDiscBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "coopRebateBps",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -1068,25 +1101,6 @@
   },
   {
     "type": "function",
-    "name": "getProtocolFees",
-    "inputs": [
-      {
-        "name": "tk",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getRiskFlags",
     "inputs": [
       {
@@ -1518,6 +1532,40 @@
   },
   {
     "type": "function",
+    "name": "swapCoop",
+    "inputs": [
+      {
+        "name": "tokenIn",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenOut",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amountIn",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "basis",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "swapLiability",
     "inputs": [
       {
@@ -1557,10 +1605,23 @@
   },
   {
     "type": "function",
-    "name": "syncUntracked",
+    "name": "treasury",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "treasuryShares",
     "inputs": [
       {
-        "name": "token",
+        "name": "tk",
         "type": "address",
         "internalType": "address"
       }
@@ -1570,19 +1631,6 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "treasury",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -1751,19 +1799,6 @@
   },
   {
     "type": "event",
-    "name": "LegsBackfilled",
-    "inputs": [
-      {
-        "name": "legs",
-        "type": "address[]",
-        "indexed": false,
-        "internalType": "address[]"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "PoolInitialized",
     "inputs": [
       {
@@ -1811,22 +1846,6 @@
       }
     ],
     "anonymous": false
-  },
-  {
-    "type": "error",
-    "name": "ExcessiveAmount",
-    "inputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "limit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   },
   {
     "type": "error",
@@ -1892,22 +1911,6 @@
   },
   {
     "type": "error",
-    "name": "NotFound",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum ErrLib.Resource"
-      },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "NotOwner",
     "inputs": []
   },
@@ -1967,6 +1970,19 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "LegsBackfilled",
+    "inputs": [
+      {
+        "name": "legs",
+        "type": "address[]",
+        "indexed": false,
+        "internalType": "address[]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "AlreadyConfigured",
     "inputs": [
@@ -2000,6 +2016,22 @@
   },
   {
     "type": "error",
+    "name": "ExcessiveAmount",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidAnchor",
     "inputs": [
       {
@@ -2022,6 +2054,22 @@
   {
     "type": "error",
     "name": "NotConfigured",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint8",
+        "internalType": "enum ErrLib.Resource"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotFound",
     "inputs": [
       {
         "name": "resource",
@@ -2184,6 +2232,67 @@
   },
   {
     "type": "event",
+    "name": "Swapped",
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "tokenIn",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "tokenOut",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amounts",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "fees",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "prices",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "outBook",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "outState",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Swept",
     "inputs": [
       {
@@ -2258,67 +2367,6 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "Swapped",
-    "inputs": [
-      {
-        "name": "sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "recipient",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "tokenIn",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "tokenOut",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "amounts",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "fees",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "prices",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "outBook",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "outState",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "BaseDepegged",
     "inputs": [
@@ -2338,77 +2386,5 @@
     "type": "error",
     "name": "InvalidPath",
     "inputs": []
-  },
-  {
-    "type": "function",
-    "name": "adminSetAssetParams",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "minLiquidity",
-        "type": "uint128",
-        "internalType": "uint128"
-      },
-      {
-        "name": "minFeePbps",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
-        "name": "vegaBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
-        "name": "coopDiscBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
-        "name": "coopRebateBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "swapCoop",
-    "inputs": [
-      {
-        "name": "tokenIn",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "tokenOut",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amountIn",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "basis",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
   }
 ]
