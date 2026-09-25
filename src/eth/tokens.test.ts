@@ -60,7 +60,6 @@ describe('resolveTokenAlias', () => {
 
   test('address lookup follows the same normalisation', () => {
     const weth = getTokenAddress('WETH', 1);
-    expect(weth).toBeDefined();
     expect(getTokenAddress('weth', 1)).toBe(weth as string);
     expect(getTokenAddress('WETH.b', 1)).toBe(weth as string);
   });

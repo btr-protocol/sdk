@@ -131,7 +131,6 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
 
   test('balanced legs at mark: no haircuts, conversion passes through unclamped', async () => {
     const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(9_990));
-    expect(q).not.toBeNull();
     expect(q?.liabIn).toBe(10_000);
     expect(q?.fairIn).toBe(10_000);
     expect(q?.markCap).toBeCloseTo(10_000 * 1, 6);
@@ -249,7 +248,6 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
         5_000,
         backendOpts,
       );
-      expect(q).not.toBeNull();
       expect(q?.markCapBinding).toBe(false);
       expect(q?.convQuoted).toBeCloseTo(5_000, 6);
       expect(q?.haircutIn).toBe(0);

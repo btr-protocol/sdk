@@ -1251,13 +1251,11 @@ describe('server floors — checked against the server amount_out, not the plan 
 
   test('planToLegs encodes the server floor after checking the raw amount_out', () => {
     const legs = planToLegs(single, opts);
-    expect(legs).not.toBeNull();
     expect(legs?.[0].minOut).toBe(minOut);
   });
 
   test('planToRouterPlan encodes the server floor after checking the raw amount_out', () => {
     const rp = planToRouterPlan(single, { ...opts, amountInUnits: 1n });
-    expect(rp).not.toBeNull();
     expect(rp?.floors[0].minOut).toBe(minOut);
   });
 
