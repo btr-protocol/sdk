@@ -188,7 +188,6 @@ export {
   readMarks,
   readStorageVersion,
   HOOK_PRE_OUTFLOW,
-  HOOK_POST_INFLOW,
   HOOK_FLAGS_MASK,
   mappingBase,
   mappingBaseU16,

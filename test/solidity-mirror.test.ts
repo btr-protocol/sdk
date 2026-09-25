@@ -177,7 +177,6 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
       'QUOTE_UNIT_ANCHOR',
       'QUOTE_UNIT_UOA',
       'HOOK_PRE_OUTFLOW',
-      'HOOK_POST_INFLOW',
       'HOOK_FLAGS_MASK',
     ] as const) {
       expect([k, c.get(k)]).toEqual([k, M[k]]);

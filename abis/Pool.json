@@ -1248,7 +1248,7 @@
   },
   {
     "type": "function",
-    "name": "hookDeploy",
+    "name": "hookInvest",
     "inputs": [
       {
         "name": "token",
@@ -1266,7 +1266,7 @@
   },
   {
     "type": "function",
-    "name": "hookRecall",
+    "name": "hookLiquidate",
     "inputs": [
       {
         "name": "token",

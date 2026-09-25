@@ -4,44 +4,11 @@
  * IPoolHooks
  * @module @btr-protocol/sdk/abis
  *
- * Per-asset yield-hook callback surface (preOutflow recall + postInflow deploy). Pool→hook direction. Flags: HOOK_PRE_OUTFLOW / HOOK_POST_INFLOW.
+ * Per-asset yield-hook callback surface (preOutflow liquidate; investing is keeper-only). Pool→hook direction. Flag: HOOK_PRE_OUTFLOW.
  * Source: backend ABI service
  */
 
 export const POOL_HOOKS_ABI = [
-  {
-    type: 'function',
-    name: 'postInflow',
-    inputs: [
-      {
-        name: 'pool',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'sender',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'amountIn',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'lpMinted',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
   {
     type: 'function',
     name: 'preOutflow',
