@@ -274,8 +274,10 @@ export interface LegRiskParams {
     refPrimary: string;
     mode: 'external' | 'internal';
     quoteUnit: 'anchor' | 'unitOfAccount';
-    /** 0 = disarmed. */
+    /** Band vs the lane's R tier, bits 0..11 of `Asset.refBandBps`; 0 = disarmed. */
     refBandBps: number;
+    /** Bits 12..15: peg test at `depegCode·250` bps vs 1.0; 0 = off. */
+    depegCode: number;
     gate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable';
     /** Ref feed state; null when refBandBps = 0. */
     refGate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable' | null;
