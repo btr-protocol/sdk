@@ -286,8 +286,8 @@ export interface LegRiskParams {
     target: string;
     preOutflow: boolean;
     postInflow: boolean;
-    targetInvestedBps: number | null;
-    hysteresisBps: number | null;
+    /** `YieldHookLib.Curve`: target liquid share L(R), band L·(1±w); tMin, t0 in token base units. */
+    curve: { tMin: string; t0: string; l0Bps: number; lMinBps: number; wBps: number } | null;
   } | null;
 }
 
