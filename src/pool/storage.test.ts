@@ -562,7 +562,7 @@ describe('layout v5', () => {
   });
 
   test('Asset slot 2 carries the leg oracle wiring', () => {
-    const slot2 = `0x${((150n << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
+    const slot2 = `0x${((((4n << 12n) | 150n) << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
     expect(decodeLegOracle(slot2 as `0x${string}`)).toEqual({
       lane: 7,
       internal: true,

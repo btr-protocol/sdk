@@ -446,7 +446,7 @@ export function decodeLegOracle(slot2: Hex): {
     lane: b & MARK_STORE.LANE_MASK,
     internal: (b & MARK_STORE.INTERNAL_BIT) !== 0,
     uoa: (b & MARK_STORE.UOA_BIT) !== 0,
-    refBandBps: u16At(slot2, f.refBandBps[1]),
+    refBandBps: u16At(slot2, f.refBandBps[1]) & 0xfff, // 12..15 = depeg code
   };
 }
 
