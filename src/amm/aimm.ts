@@ -232,6 +232,11 @@ export interface PoolLeg {
   kappaCovBps: number;
   confidence?: number;
   staleExcess?: number;
+  /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
+   *  leg the chain would revert on past its band. Absent = 0 / no base check. */
+  refBandBps?: number;
+  baseMark?: number;
+  baseRefBandBps?: number;
 }
 
 /** The hub's own book. It is an ENDPOINT, not a spoke: it carries liabilities, a coverage wall
@@ -383,6 +388,7 @@ interface SpokeWire {
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
+  ref_band_bps: number;
   decimals?: number;
 }
 /**
@@ -415,6 +421,8 @@ export interface NamedPoolWire {
   /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
    *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
   base_decimals?: number | null;
+  base_mark: string | null;
+  base_ref_band_bps: number;
   spokes: SpokeWire[];
 }
 export interface RouteRequestWire {
@@ -672,6 +680,9 @@ interface QuoteRequestWire {
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
+  ref_band_bps: number;
+  base_mark: string | null;
+  base_ref_band_bps: number;
 }
 
 /** One hop of a {@link quotePathAsync} request: a `/quote` body plus the hop's own scales. */
@@ -748,8 +759,16 @@ export function legToQuoteBody(
     confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
+    ...depegWire(leg),
   };
 }
+
+const wadHex = (x: number): string => toHex(BigInt(Math.round(x * 1e18)));
+const baseDepegWire = (leg?: PoolLeg) => ({
+  base_mark: leg?.baseMark != null ? wadHex(leg.baseMark) : null,
+  base_ref_band_bps: leg?.baseRefBandBps ?? 0,
+});
+const depegWire = (leg: PoolLeg) => ({ ref_band_bps: leg.refBandBps ?? 0, ...baseDepegWire(leg) });
 
 /** Single-leg exact-in quote over POST /v1/quote. `counterparty`: see {@link legToQuoteBody}. */
 export function quoteLegAsync(
@@ -833,6 +852,7 @@ export function poolStateToWire(
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
     base_decimals: hubDecimals,
+    ...baseDepegWire(Object.values(state.legs)[0]),
     spokes: Object.values(state.legs).map((leg) => ({
       token: leg.token,
       address: meta.addressOf(leg.token),
@@ -850,6 +870,7 @@ export function poolStateToWire(
       confidence_bps: leg.confidence ?? null,
       stale_excess: leg.staleExcess ?? 0,
       proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
+      ref_band_bps: leg.refBandBps ?? 0,
       decimals: leg.decimals,
     })),
   };
