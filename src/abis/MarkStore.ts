@@ -350,6 +350,19 @@ export const MARK_STORE_ABI: Abi = [
     anonymous: false,
     inputs: [
       {
+        indexed: false,
+        internalType: 'uint64',
+        name: 'srcSecs',
+        type: 'uint64',
+      },
+    ],
+    name: 'MarksPublished',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
         indexed: true,
         internalType: 'address',
         name: 'from',
