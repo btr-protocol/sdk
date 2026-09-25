@@ -9,7 +9,6 @@
 
 import {
   type DepthBookWire,
-  type DepthCurve,
   type DepthLevel,
   type DepthRequestWire,
   type NamedPoolWire,
@@ -30,7 +29,7 @@ export interface AggRow {
   cum: number;
 }
 
-export interface DepthPool {
+interface DepthPool {
   tag: string;
   state: import('../amm/aimm.js').PoolState;
 }
@@ -246,157 +245,10 @@ export interface AggregatedDepthBook {
   routeCount?: number;
 }
 
-export interface BookPart {
-  mark: number;
-  mid: number;
-  spreadBps: number;
-  bid: number;
-  ask: number;
-  bidNet: number;
-  askNet: number;
-  asks: Row[];
-  bids: Row[];
-  w: number;
-}
-
-export function bookPartFromCurve(curve: DepthCurve): BookPart | null {
-  if (!(curve.mid > 0) || (!curve.asks.length && !curve.bids.length)) return null;
-  const asks = depthLevelsToRows(curve.asks);
-  const bids = depthLevelsToRows(curve.bids);
-  const w = asks.reduce((s, r) => s + r.size, 0) + bids.reduce((s, r) => s + r.size, 0);
-  if (!(w > 0)) return null;
-  return {
-    mark: curve.mark,
-    mid: curve.mid,
-    spreadBps: curve.spreadBps,
-    bid: curve.bids[0]?.price ?? 0,
-    ask: curve.asks[0]?.price ?? 0,
-    bidNet: curve.bids[0]?.netPrice ?? 0,
-    askNet: curve.asks[0]?.netPrice ?? 0,
-    asks,
-    bids,
-    w,
-  };
-}
-
-export function assembleAggBook(
-  parts: BookPart[],
-  opts?: AggregateDepthOpts,
-): AggregatedDepthBook | null {
-  const hasAsks = parts.some((p) => p.asks.some((r) => r.cum > 0));
-  const hasBids = parts.some((p) => p.bids.some((r) => r.cum > 0));
-  if (!hasAsks && !hasBids) return null;
-
-  let markNum = 0;
-  let midNum = 0;
-  let spreadNum = 0;
-  let wSum = 0;
-  for (const p of parts) {
-    markNum += p.mark * p.w;
-    midNum += p.mid * p.w;
-    spreadNum += p.spreadBps * p.w;
-    wSum += p.w;
-  }
-  if (wSum <= 0) return null;
-  const mark = markNum / wSum;
-  const spreadBps = spreadNum / wSum;
-
-  const touch = (pick: (p: BookPart) => number, side: 'bid' | 'ask'): number => {
-    let best = 0;
-    for (const p of parts) {
-      const px = pick(p);
-      if (!(px > 0)) continue;
-      best = best === 0 ? px : side === 'bid' ? Math.max(best, px) : Math.min(best, px);
-    }
-    return best;
-  };
-  const bid = touch((p) => p.bid, 'bid');
-  const ask = touch((p) => p.ask, 'ask');
-
-  let mid = midNum / wSum;
-  if (bid > 0 && ask > 0) mid = Math.min(Math.max(mid, Math.min(bid, ask)), Math.max(bid, ask));
-  else if (bid > 0) mid = Math.max(mid, bid);
-  else if (ask > 0) mid = Math.min(mid, ask);
-
-  let below = 0;
-  let above = 0;
-  for (const p of parts) {
-    const bidNear = p.bids[0]?.price ?? mid;
-    const askNear = p.asks[0]?.price ?? mid;
-    const bidFar = p.bids[p.bids.length - 1]?.price ?? mid;
-    const askFar = p.asks[p.asks.length - 1]?.price ?? mid;
-    below = Math.max(below, bidNear - bidFar);
-    above = Math.max(above, askFar - askNear);
-  }
-  const halfSpan = Math.max(below, above);
-  const ladderOpts =
-    opts?.ladder ?? (halfSpan > 0 ? { targetFrac: (halfSpan * 2) / 28 / mid } : undefined);
-  let ladder = stepLadder(mid, ladderOpts);
-  const minUseful = halfSpan > 0 ? halfSpan / MAX_AGG_LEVELS : 0;
-  if (minUseful > 0) {
-    const steps = ladder.steps.filter((s) => s >= minUseful * 0.99);
-    if (steps.length >= 3) {
-      const defStep = ladder.steps[ladder.defaultIdx];
-      let defaultIdx = steps.findIndex((s) => s >= defStep - 1e-12 * Math.max(1, defStep));
-      if (defaultIdx < 0) defaultIdx = Math.min(steps.length - 1, Math.floor(steps.length / 2));
-      ladder = { steps, defaultIdx };
-    }
-  }
-
-  const idx = opts?.stepIdx ?? ladder.defaultIdx;
-  const step =
-    opts?.step != null && opts.step > 0
-      ? opts.step
-      : ladder.steps[Math.min(Math.max(0, idx), ladder.steps.length - 1)];
-
-  const bidTok = mergeAgg(
-    parts.map((p) => aggregate(p.bids, step, 'bid', 'base')),
-    'bid',
-  );
-  const askTok = mergeAgg(
-    parts.map((p) => aggregate(p.asks, step, 'ask', 'base')),
-    'ask',
-  );
-  const bidNet = touch((p) => p.bidNet, 'bid');
-  const askNet = touch((p) => p.askNet, 'ask');
-
-  const askQuoteMul = ask > 0 && askNet > 0 ? ask / askNet : 1;
-  const useQuote = opts?.unit === 'base';
-  const bidDisp = useQuote
-    ? mergeAgg(
-        parts.map((p) => aggregate(p.bids, step, 'bid', 'quote')),
-        'bid',
-      )
-    : bidTok;
-  const askDisp = useQuote
-    ? mergeAgg(
-        parts.map((p) => aggregate(p.asks, step, 'ask', 'quote')),
-        'ask',
-      ).map((r) => ({ price: r.price, size: r.size * askQuoteMul, cum: r.cum * askQuoteMul }))
-    : askTok;
-
-  return {
-    mark,
-    mid,
-    spreadBps,
-    bid,
-    ask,
-    bidNet,
-    askNet,
-    step,
-    bids: bidTok,
-    asks: askTok,
-    bidDisp,
-    askDisp,
-    ladder: opts?.step != null && opts.step > 0 ? null : ladder,
-    poolCount: parts.length,
-  };
-}
-
 // ── Single-sourced async dispatch (the only depthAsync call site) ────────────
 
 /** One POST /v1/depth round trip. Every async entry below funnels through here. */
-export function fetchDepthBook(
+function fetchDepthBook(
   wires: NamedPoolWire[],
   from: string,
   to: string,
@@ -404,17 +256,6 @@ export function fetchDepthBook(
 ): Promise<DepthBookWire> {
   const body: DepthRequestWire = { pools: wires, from, to };
   return depthAsync(body, base);
-}
-
-/** Combined book for (from, to) across every pool that holds the pair, via POST /v1/depth. */
-export async function aggregateDepthAsync(
-  pools: DepthPool[],
-  from: string,
-  to: string,
-  req: { wires: NamedPoolWire[]; base?: string },
-): Promise<DepthBookWire | null> {
-  void pools;
-  return fetchDepthBook(req.wires, from, to, req.base);
 }
 
 /** Aggregate virtual depth across every pool holding (from, to), via POST /v1/depth. */
@@ -431,7 +272,7 @@ export async function aggregateDepthCurvesAsync(
   return fetchDepthBook(wires, from, to, opts?.base);
 }
 
-export interface PairDepthOpts extends AggregateDepthOpts {
+interface PairDepthOpts extends AggregateDepthOpts {
   base?: string;
 }
 
@@ -471,7 +312,6 @@ export async function aggregatePairDepthAsync(
     const bid = inv(wire.ask);
     const ask = inv(wire.bid);
     const mid = inv(wire.mid);
-    const t = bids;
     return {
       mark: inv(wire.mark),
       mid,

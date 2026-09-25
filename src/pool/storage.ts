@@ -70,7 +70,7 @@ const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
  * 4 = layout v4 (`POOL_STORAGE_V4`), >= 5 = layout v5 (`POOL_STORAGE_V5`). Memoised per provider and pool: a pool's layout moves only with an impl
  * upgrade.
  */
-export function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
+function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
   const byPool = versions.get(provider) ?? new Map<string, Promise<number>>();
   versions.set(provider, byPool);
   const key = pool.toLowerCase();
@@ -88,7 +88,7 @@ export function readStorageVersion(provider: Eip1193Provider, pool: Address): Pr
 }
 
 /** The absolute slot table a layout version selects. */
-export function poolStorageOf(
+function poolStorageOf(
   storageVersion: number,
 ): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 | typeof POOL_STORAGE_V4 | typeof POOL_STORAGE_V5 {
   if (storageVersion >= 5) return POOL_STORAGE_V5;
@@ -110,27 +110,6 @@ export interface HookSlot {
   flags: number;
   /** Unix seconds of the last `hookCreditYield` rate bucket; 0 until the leg is seeded. */
   lastCreditAt: number;
-}
-
-/** Decode a packed HookSlot word (offsets: POOL_STRUCTS.HookSlot). */
-export function decodeHookSlot(word: Hex): HookSlot {
-  const f = POOL_STRUCTS.HookSlot;
-  return {
-    target: addressAt(word, f.target[1]),
-    flags: u32At(word, f.flags[1]),
-    lastCreditAt: u32At(word, f.lastCreditAt[1]),
-  };
-}
-
-/** Read the per-asset HookSlot (assetHooks mapping). `target == address(0)` ⇒ no hook. */
-export async function readAssetHook(
-  provider: Eip1193Provider,
-  pool: Address,
-  token: Address,
-): Promise<HookSlot> {
-  const key = await resolveTokenStorageKey(provider, pool, token);
-  const word = await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE.assetHooks));
-  return decodeHookSlot(word);
 }
 
 /** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
@@ -170,7 +149,7 @@ export function mappingBase(key: Address, mappingSlot: bigint): bigint {
  * Resolve the storage mapping key for a token. Native (EIP-7528 / address(0)) is stored under
  * `PoolStorage.wnative`: same as Solidity deposit/swap paths that wrap before mapping lookup.
  */
-export async function resolveTokenStorageKey(
+async function resolveTokenStorageKey(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
@@ -239,25 +218,6 @@ function i64AtBits(word: bigint, shift: number): bigint {
   return u >= 1n << 63n ? u - (1n << 64n) : u;
 }
 
-/**
- * Read the asset's pricing-shape pointer (`Asset.curveId`): index into `PoolStorage.curves`.
- * 0 = no curve (fallback quote).
- */
-export async function readAssetCurveId(
-  provider: Eip1193Provider,
-  pool: Address,
-  token: Address,
-): Promise<number> {
-  const [slot, offset] = POOL_STRUCTS.Asset.curveId;
-  const key = await resolveTokenStorageKey(provider, pool, token);
-  const word = await getStorageAt(
-    provider,
-    pool,
-    mappingBase(key, POOL_STORAGE.assets) + BigInt(slot),
-  );
-  return u16At(word, offset);
-}
-
 /** Solady SSTORE2's CREATE3 proxy init-code hash (`CREATE3_PROXY_INITCODE_HASH`). */
 const CREATE3_PROXY_INITCODE_HASH = keccak256('0x67363d3d37363d34f03d5260086018f3');
 
@@ -306,7 +266,7 @@ export async function readCurve(
 }
 
 /** Header word + segment words → curve; null on header 0 or fewer words than `m` claims. */
-export function decodeCurve(words: bigint[]): QuarticCurve | null {
+function decodeCurve(words: bigint[]): QuarticCurve | null {
   const header = words[0] ?? 0n;
   if (header === 0n) return null;
   const m = Number(header & 0xffn);
@@ -336,31 +296,6 @@ export function decodeCurve(words: bigint[]): QuarticCurve | null {
     });
   }
   return { m, boundaries, dispRef, flags, segs };
-}
-
-/**
- * Per-leg risk fields. The `riskConfigs` mapping is GONE: `flags` and `kappaCovBps` were folded
- * into `Asset` slot 2, so this reads that word instead. Kept as its own function rather than
- * folded into `getAsset` because it is one raw `eth_getStorageAt` against a slot the SDK already
- * pins, where `getAsset` is a full `eth_call` returning fourteen fields; callers that want only
- * the coverage wall (front's per-asset risk cache) should not pay for the rest.
- */
-export async function readRiskConfig(
-  provider: Eip1193Provider,
-  pool: Address,
-  token: Address,
-): Promise<RiskConfig> {
-  const key = await resolveTokenStorageKey(provider, pool, token);
-  const f = POOL_STRUCTS.Asset;
-  const word = await getStorageAt(
-    provider,
-    pool,
-    mappingBase(key, POOL_STORAGE.assets) + BigInt(f.flags[0]),
-  );
-  return {
-    flags: u16At(word, f.flags[1]),
-    kappaCovBps: u16At(word, f.kappaCovBps[1]),
-  };
 }
 
 export async function readOracleConfig(
@@ -425,7 +360,7 @@ export function decodeCustody(word: Hex): Custody {
 
 /** A `marks` word (layout v3): a feed exactly as the pool prices it, plus, on word 0 only, the
  *  config mirror. The pool gates `now - obs` against `ttlSecs`. */
-export interface MarkWord {
+interface MarkWord {
   mark1e18: bigint;
   obs: number;
   sigmaPbps: number;
@@ -534,11 +469,7 @@ export function decodeStoreWord(
 const IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn;
 
 /** The store word of `lane` at `impl` (`PoolFactory.implementation()`). */
-export async function readStoreWord(
-  provider: Eip1193Provider,
-  impl: Address,
-  lane: number,
-): Promise<Hex> {
+async function readStoreWord(provider: Eip1193Provider, impl: Address, lane: number): Promise<Hex> {
   return getStorageAt(provider, impl, MARK_STORE.MS + BigInt(lane));
 }
 

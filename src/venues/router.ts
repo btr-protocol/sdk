@@ -53,7 +53,7 @@ export interface BestVenueQuote {
  *  (depeg, stale feed, paused, outside reservation); `transport` is the RPC failing to
  *  answer. Collapsing the two silently delists a halted venue as if it were merely
  *  unreachable, which is how a deliberate protocol stop turns into a routing no-op. */
-export interface VenueSkip {
+interface VenueSkip {
   kind: 'halt' | 'transport';
   pool: Address;
   tag: string;
@@ -61,7 +61,7 @@ export interface VenueSkip {
   reason: string;
 }
 
-export interface QuoteBestOpts {
+interface QuoteBestOpts {
   /** Chain the quotes are for. REQUIRED and has no default: the venue set is per-chain, and a
    *  defaulted chain quotes one chain's pools for a caller running on another. */
   chainId: number;

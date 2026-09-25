@@ -10,39 +10,11 @@ import type { Address } from '../eth/index.js';
 
 export const BPS_PRECISION = 10_000n;
 export const PRECISION_1E18 = 10n ** 18n;
-export const PRECISION_1E8 = 10n ** 8n;
-
-// Default gas limits
-export const DEFAULT_GAS_LIMIT = 500_000n;
-export const SWAP_GAS_LIMIT = 300_000n;
-export const DEPOSIT_GAS_LIMIT = 250_000n;
-export const WITHDRAW_GAS_LIMIT = 250_000n;
-
-// Time constants (seconds)
-export const ONE_MINUTE = 60;
-export const FIVE_MINUTES = 300;
-export const ONE_HOUR = 3600;
-export const ONE_DAY = 86400;
-
-// Time constants (milliseconds)
-export const MS_PER_SECOND = 1_000;
-export const MS_PER_MINUTE = 60_000;
-export const MS_PER_HOUR = 3_600_000;
 export const MS_PER_DAY = 86_400_000;
 
 // Time helpers: single source for "now" timestamps.
 export const nowMs = (): number => Date.now();
-export const nowSec = (): number => Math.floor(Date.now() / 1000);
-
-// Oracle constants
-export const DEFAULT_ORACLE_STALENESS = ONE_DAY; // 24 hours
-export const DEFAULT_PRICE_DIVERGENCE_BPS = 500; // 5%
-
-// Supported chains, derived from the canonical CHAINS registry in eth/chains.ts.
-// Kept as a numeric array (single source of truth = CHAINS).
-// For named accessors (ETHEREUM, ARBITRUM, ...) import from `@btr-protocol/sdk/eth` directly.
-import { CHAINS } from '../eth/chains.js';
-export const SUPPORTED_CHAINS: readonly number[] = Object.keys(CHAINS).map(Number);
+export const nowSec = (): number => Math.floor(Date.now() / 1000); // 5%
 
 /**
  * Canonical BTR brand identity. Single source of truth across front/back/docs.
@@ -62,42 +34,13 @@ export const BRAND = Object.freeze({
   supportEmail: 'tech@btr.markets',
 });
 
-/**
- * Canonical AI provider base URLs. Single source of truth for any back/front
- * consumer needing to talk to an upstream chat/inference API. Override via env
- * at the consumer level; these are the defaults.
- */
-export const AI_PROVIDERS = Object.freeze({
-  zai: 'https://api.z.ai/api/coding/paas/v4',
-  gmi: 'https://api.gmi-serving.com/v1',
-});
-
 export type SupportedChainId = number;
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
 
-export type TokenAddress = Address;
-export type PoolAddress = Address;
-
-// Note: legacy single-chain `TokenInfo` removed. Use `TokenMetadata` from
-// `@btr-protocol/sdk/eth` (multi-chain registry) for token metadata.
-
-export interface PoolAsset {
-  reserves: bigint;
-  fastTWAP: bigint;
-  slowTWAP: bigint;
-  fastVolatility: number;
-  slowVolatility: number;
-  targetAllocation: number;
-  segments: number;
-  isActive: boolean;
-  isPaused: boolean;
-  isFrozen: boolean;
-  hooks: Address;
-  lastOracleUpdate: number;
-}
+type TokenAddress = Address;
 
 export interface SwapQuote {
   tokenIn: TokenAddress;
@@ -106,23 +49,4 @@ export interface SwapQuote {
   amountOut: bigint;
   priceImpact: number;
   fee: bigint;
-}
-
-export interface OraclePrice {
-  price: bigint;
-  timestamp: number;
-  symbol: string;
-}
-
-/**
- * Contract addresses for a BTR DEX deployment
- * These should be injected at build time and remain consistent across all environments
- */
-export interface ContractAddresses {
-  factory: Address; // Factory contract for creating pools
-  pool: Address; // Main BTR pool contract
-  usdc: Address; // USDC token contract
-  wbtc: Address; // WBTC token contract
-  eth: Address; // ETH/WETH token contract
-  deployer: Address; // Deployer/admin address
 }

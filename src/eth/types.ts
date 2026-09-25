@@ -72,7 +72,7 @@ export interface TypedDataDomain {
   salt?: Hex;
 }
 
-export interface TypedDataField {
+interface TypedDataField {
   name: string;
   type: string;
 }
@@ -83,13 +83,6 @@ export interface TypedData {
   primaryType: string;
   message: Record<string, unknown>;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Viem-compatible Types (for guardian/oracle compatibility)
-// ─────────────────────────────────────────────────────────────
-
-export type PublicClient = Eip1193Provider;
-export type WalletClient = Eip1193Provider;
 export type Hash = Hex;
 
 // ─────────────────────────────────────────────────────────────
@@ -104,10 +97,6 @@ export function isAddress(value: string): value is Address {
  *  address equality — compare via this or `eqAddr`, never inline toLowerCase. */
 export function normalizeAddress<A extends string>(address: A): string {
   return address.trim().toLowerCase();
-}
-
-export function isHex(value: string): value is Hex {
-  return /^0x[a-fA-F0-9]*$/.test(value);
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ import { nxrMark } from './nxr.js';
 
 export type VenueKind = 'btr';
 
-export interface VenuePool {
+interface VenuePool {
   venue: VenueKind;
   tag: string;
   address: Address;
@@ -39,7 +39,7 @@ export function deployedChainIds(): number[] {
     .sort((a, b) => a - b);
 }
 
-export interface BtrChain {
+interface BtrChain {
   chainId: number;
   /** `dex-evm/deployments/chains.json` slug; names `<slug>.manifest.json`. */
   slug: string;

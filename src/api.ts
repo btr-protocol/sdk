@@ -24,7 +24,7 @@ export function withChainId(path: string, chainId: number): string {
 }
 
 /** A response that keeps the status and `Retry-After` instead of collapsing to an `Error`. */
-export interface RawResponse {
+interface RawResponse {
   ok: boolean;
   status: number;
   retryAfterSecs: number | undefined;

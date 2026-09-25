@@ -103,16 +103,6 @@ export function parseUnits(value: string, decimals: number): bigint {
   return BigInt(intPart + padded);
 }
 
-/** Format from wei to ether (18 decimals) */
-export function formatEther(value: bigint): string {
-  return formatUnits(value, 18);
-}
-
-/** Parse ether decimal to wei */
-export function parseEther(value: string): bigint {
-  return parseUnits(value, 18);
-}
-
 // ─────────────────────────────────────────────────────────────
 // Numbers
 // ─────────────────────────────────────────────────────────────

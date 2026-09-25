@@ -26,7 +26,7 @@
 import type { Hex } from '../eth/types.js';
 import { pad } from '../utils/encoding.js';
 
-export interface MitchTicker {
+interface MitchTicker {
   instrumentType: number;
   baseClass: number;
   baseId: number;

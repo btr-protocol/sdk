@@ -44,7 +44,7 @@ export type AbiParameter = {
  * `constructor` / `receive` / `fallback` entries plus extra JSON fields
  * (`stateMutability`, `internalType`); those ride along untouched.
  */
-export type AbiOther = { type?: string } & Record<string, unknown>;
+type AbiOther = { type?: string } & Record<string, unknown>;
 
 export type Abi = readonly (AbiFunction | AbiEvent | AbiError | AbiOther)[];
 
@@ -541,7 +541,7 @@ export function encodeEventTopics(event: AbiEvent, args: Record<string, unknown>
 /**
  * Get error signature (used in error decoding)
  */
-export function getErrorSignature(error: AbiError): string {
+function getErrorSignature(error: AbiError): string {
   return `${error.name}(${(error.inputs || []).map(canonicalType).join(',')})`;
 }
 

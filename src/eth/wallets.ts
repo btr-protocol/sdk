@@ -37,7 +37,7 @@ export interface WalletInfo {
   detected: boolean;
 }
 
-export interface Eip6963Detail {
+interface Eip6963Detail {
   info: { uuid: string; name: string; icon: string; rdns: string };
   provider: Eip1193Provider;
 }
@@ -450,7 +450,7 @@ if (typeof window !== 'undefined') {
 // Convert EIP-6963 to WalletInfo
 // ─────────────────────────────────────────────────────────────
 
-export function toWalletInfo(detail: Eip6963Detail): WalletInfo {
+function toWalletInfo(detail: Eip6963Detail): WalletInfo {
   const id = ALIASES.get(detail.info.rdns.toLowerCase())?.id || detail.info.rdns;
   const def = byId.get(id);
   return {
@@ -502,7 +502,7 @@ export type AccountClass = 'eoa' | 'contract' | '7702';
 export type WalletChain = 'evm';
 
 /** The connected wallet, as the low-entropy values telemetry is allowed to carry. */
-export interface WalletIdentity {
+interface WalletIdentity {
   /** Stable lowercase slug: `metamask`, `rabby`, `safe`, … Empty when nothing is connected. */
   id: string;
   chain: WalletChain;
@@ -571,7 +571,7 @@ const SAFE_HOSTS = ['app.safe.global', 'safe.global'];
  * says. Deliberately narrow: being in SOME iframe proves nothing, so an unknown embedder falls
  * through to the normal resolution rather than being guessed at.
  */
-export function isSafeApp(): boolean {
+function isSafeApp(): boolean {
   try {
     if (typeof window === 'undefined' || window.self === window.top) return false;
     const origins = window.location.ancestorOrigins;
@@ -584,7 +584,7 @@ export function isSafeApp(): boolean {
 }
 
 /** Where a wallet id may be read from, richest source first. */
-export interface WalletIdSources {
+interface WalletIdSources {
   /** The LIVE provider the app is connected through, never a scan of what is installed. */
   provider?: Eip1193Provider | null;
   /** WalletConnect `session.peer.metadata.name`, when the connection came over WC. */

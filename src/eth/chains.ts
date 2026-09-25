@@ -16,28 +16,13 @@ export type { Address } from './types';
 // Constants
 // ─────────────────────────────────────────────────────────────
 
-export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
-
-/**
- * Canonical chain allowlist for BTR swap (atomic + intent).
- * SVM intentionally excluded: UI shows it greyed w/ "Coming soon".
- * Consumed by front (`TokenSelector`); mainnets only.
- */
-export const SWAP_ALLOWED_EVM_CHAINS: readonly number[] = Object.freeze([
-  1, // Ethereum mainnet
-  8453, // Base
-  56, // BNB Chain
-  42161, // Arbitrum
-  999, // HyperEVM
-  43114, // Avalanche
-  137, // Polygon
-]);
+const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
 
-export interface ChainConfig {
+interface ChainConfig {
   id: number;
   name: string;
   /** Glyph file stem, when it is not the slugged name. Never a path: the renderer owns the
@@ -404,25 +389,11 @@ export const CHAINS: Record<number, ChainConfig> = {
   },
 };
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-export type ChainId = keyof typeof CHAINS;
-
 /**
  * Get chain config by ID
  */
 export function getChain(id: number): ChainConfig | undefined {
   return CHAINS[id];
-}
-
-/**
- * Get RPC URL for chain (primary)
- */
-export function getRpcUrl(chainId: number, index = 0): string | undefined {
-  const chain = CHAINS[chainId];
-  return chain?.rpcUrls[index] ?? chain?.rpcUrls[0];
 }
 
 /**
@@ -462,125 +433,10 @@ export function getExplorerAddressUrl(
 }
 
 /**
- * Get wrapped native token address
- */
-export function getWrappedNative(chainId: number): Address | undefined {
-  return CHAINS[chainId]?.wrappedNative;
-}
-
-/**
  * Get multicall3 address for chain
  */
 export function getMulticall3(chainId: number): Address {
   return CHAINS[chainId]?.multicall3 ?? MULTICALL3_ADDRESS;
-}
-
-/**
- * List all supported chain IDs
- */
-export function getSupportedChainIds(): number[] {
-  return Object.keys(CHAINS).map(Number);
-}
-
-/**
- * List all mainnet chain IDs (excluding testnets)
- */
-export function getMainnetChainIds(): number[] {
-  return Object.entries(CHAINS)
-    .filter(([, c]) => !c.testnet)
-    .map(([id]) => Number(id));
-}
-
-/**
- * Check if a chain is a testnet or local development network
- */
-export function isTestOrLocalChain(chainId: number): boolean {
-  const chain = CHAINS[chainId];
-  if (!chain) return false;
-
-  // Check testnet flag
-  if (chain.testnet) return true;
-
-  // Check name patterns for local dev networks
-  const nameLower = chain.name.toLowerCase();
-  const localPatterns = ['local', 'anvil', 'ganache', 'hardhat', 'truffle'];
-  if (localPatterns.some((pattern) => nameLower.includes(pattern))) return true;
-
-  // Check for testnet in name
-  if (chain.name.includes('Testnet')) return true;
-
-  return false;
-}
-
-/**
- * Detect forked chain ID from Anvil RPC
- * Anvil can be queried for the forked chain ID via eth_chainId on the fork
- */
-export async function detectAnvilFork(rpcUrl = 'http://localhost:8545'): Promise<number | null> {
-  try {
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'anvil_metadata',
-        params: [],
-        id: 1,
-      }),
-    });
-
-    if (response.ok) {
-      const data = (await response.json()) as { result?: { forkChainId?: unknown } };
-      // Anvil metadata returns fork info
-      return data.result?.forkChainId ? Number(data.result.forkChainId) : null;
-    }
-
-    // Fallback: try to get chain ID directly
-    const chainIdResponse = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'eth_chainId',
-        params: [],
-        id: 1,
-      }),
-    });
-
-    if (chainIdResponse.ok) {
-      const chainIdData = (await chainIdResponse.json()) as { result?: string };
-      const chainId = Number.parseInt(chainIdData.result ?? '', 16);
-      // If it's not 31337, it might be a fork
-      return chainId !== 31337 ? chainId : null;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get chain config for Anvil, with fork detection
- * If Anvil is forking a chain, returns the forked chain's metadata
- */
-export async function getAnvilChainConfig(rpcUrl = 'http://localhost:8545'): Promise<ChainConfig> {
-  const forkedChainId = await detectAnvilFork(rpcUrl);
-
-  if (forkedChainId && CHAINS[forkedChainId]) {
-    // Return forked chain config but with Anvil's RPC URL and ID
-    const forkedChain = CHAINS[forkedChainId];
-    return {
-      ...forkedChain,
-      id: 31337,
-      name: `Anvil (${forkedChain.name} Fork)`,
-      rpcUrls: [rpcUrl],
-      testnet: true,
-    };
-  }
-
-  // Return default Anvil config
-  return CHAINS[31337];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -592,34 +448,4 @@ export interface ChainInfo {
   name: string;
   icon: string;
   nativeSymbol: string;
-}
-
-/**
- * Get simplified chain info for UI display
- */
-export function getChainInfo(chainId: number): ChainInfo | undefined {
-  const chain = CHAINS[chainId];
-  if (!chain) return undefined;
-  return {
-    id: chain.id,
-    name: chain.name,
-    icon: getChainIcon(chainId),
-    nativeSymbol: chain.nativeCurrency.symbol,
-  };
-}
-
-/**
- * Get all chains as simplified info objects
- */
-export function getAllChainInfo(): Record<number, ChainInfo> {
-  const result: Record<number, ChainInfo> = {};
-  for (const [id, chain] of Object.entries(CHAINS)) {
-    result[Number(id)] = {
-      id: chain.id,
-      name: chain.name,
-      icon: getChainIcon(Number(id)),
-      nativeSymbol: chain.nativeCurrency.symbol,
-    };
-  }
-  return result;
 }

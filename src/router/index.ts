@@ -59,7 +59,7 @@ export interface ExecLeg {
   chained?: boolean;
 }
 
-export interface ExecCall {
+interface ExecCall {
   to: Address;
   data: Hex;
   value: bigint;
@@ -575,7 +575,7 @@ export function totalValue(calls: ExecCall[]): bigint {
 // shared deadline per atomic batch, no on-chain router. Approval logic is REUSED
 // (buildApprovalCalls), never duplicated.
 
-export interface MarketMintArgs {
+interface MarketMintArgs {
   /** 'market': Route A, [approve?, swap(X→target)…, deposit(target)]. */
   mode: 'market';
   /** Market legs ending in `depositToken` (planToLegs output). */
@@ -585,7 +585,7 @@ export interface MarketMintArgs {
    *  the user as target tokens. Deposits mint at index by design; no price guard exists. */
   depositAmount: bigint;
 }
-export interface TransferMintArgs {
+interface TransferMintArgs {
   /** 'transfer': Route B, [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
    *  needs no allowance. Non-batchable for fresh deposits (anti-JIT); see lpRoutes gating. */
   mode: 'transfer';
@@ -646,7 +646,7 @@ export function buildDepositCalls(
   ];
 }
 
-export interface CrossRedeemArgs {
+interface CrossRedeemArgs {
   /** 'cross': Route A', [withdrawTo]. Single call, no approvals. */
   mode: 'cross';
   tokenFrom: Address;
@@ -654,7 +654,7 @@ export interface CrossRedeemArgs {
   lpAmount: bigint;
   minAmountOut: bigint;
 }
-export interface TransferRedeemArgs {
+interface TransferRedeemArgs {
   /** 'transfer': Route B', [swapLiability, withdraw]. No approvals. Same anti-JIT caveat as
    *  Route B: the tail withdraw burns just-minted shares, so this runs sequentially after the
    *  cooldown, not atomically. */
@@ -714,7 +714,6 @@ export function buildRedeemCalls(
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
 export type {
   NamedPool,
-  RouteLeg,
   Route,
   LegFill,
   RouteQuote,
@@ -725,11 +724,8 @@ export { poolHas, poolHolding } from './route.js';
 export type {
   Row,
   AggRow,
-  DepthPool,
   AggregateDepthOpts,
   AggregatedDepthBook,
-  BookPart,
-  PairDepthOpts,
 } from './depth.js';
 export {
   niceStep,
@@ -737,14 +733,10 @@ export {
   aggregate,
   mergeAgg,
   depthLevelsToRows,
-  bookPartFromCurve,
-  assembleAggBook,
-  fetchDepthBook,
-  aggregateDepthAsync,
   aggregateDepthCurvesAsync,
   aggregatePairDepthAsync,
 } from './depth.js';
-export type { LpRouteOpts, LpRouteStep, RankedLpRoute, RankedLpPlan } from './lpRoutes.js';
+export type { LpRouteOpts, RankedLpRoute, RankedLpPlan } from './lpRoutes.js';
 export { hexToF64, toRawHex, wirePlanToSwap, rankDeposit, rankRedeem } from './lpRoutes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -771,20 +763,20 @@ export { hexToF64, toRawHex, wirePlanToSwap, rankDeposit, rankRedeem } from './l
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One hop. `tokenIn` is implicit — the part's input first, the previous hop's output after. */
-export interface RouterHop {
+interface RouterHop {
   pool: Address;
   tokenOut: Address;
 }
 
 /** One independent path. Parts do not feed each other, so a call may carry several inputs. */
-export interface RouterPart {
+interface RouterPart {
   tokenIn: Address;
   amountIn: bigint;
   hops: RouterHop[];
 }
 
 /** The end-to-end promise, per OUTPUT TOKEN across the whole call. */
-export interface RouterFloor {
+interface RouterFloor {
   token: Address;
   minOut: bigint;
 }

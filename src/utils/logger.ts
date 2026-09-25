@@ -10,74 +10,9 @@
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogEntry {
-  timestamp: string;
-  level: LogLevel;
-  context?: string;
-  message: string;
-  data?: unknown;
-}
-
-let defaultContext: string | undefined;
-let minLevel: LogLevel = 'info';
-
-function formatLog(entry: LogEntry): string {
-  const ctx = entry.context ? `[${entry.context}] ` : '';
-  return `${ctx}${entry.message}`;
-}
-
-function consoleMethod(level: LogLevel): (...args: unknown[]) => void {
-  switch (level) {
-    case 'debug':
-      return console.debug;
-    case 'info':
-      return console.info;
-    case 'warn':
-      return console.warn;
-    case 'error':
-      return console.error;
-  }
-}
-
-function shouldLog(level: LogLevel): boolean {
-  const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-  return levels.indexOf(level) >= levels.indexOf(minLevel);
-}
-
 function log(level: LogLevel, message: string, data?: unknown, context?: string): void {
-  if (!shouldLog(level)) return;
-
-  const entry: LogEntry = {
-    timestamp: new Date().toISOString(),
-    level,
-    context: context ?? defaultContext,
-    message,
-    data,
-  };
-
-  const method = consoleMethod(level);
-  method(formatLog(entry), data ?? '');
-}
-
-/**
- * Set the default context for all logs
- */
-export function setContext(context: string): void {
-  defaultContext = context;
-}
-
-/**
- * Clear the default context
- */
-export function clearContext(): void {
-  defaultContext = undefined;
-}
-
-/**
- * Set the minimum log level
- */
-export function setLogLevel(level: LogLevel): void {
-  minLevel = level;
+  if (level === 'debug') return; // min level = info
+  console[level](context ? `[${context}] ${message}` : message, data ?? '');
 }
 
 /**

@@ -3,14 +3,7 @@
  * Zero dependencies
  */
 
-import type {
-  Address,
-  Eip1193Provider,
-  Hex,
-  TransactionReceipt,
-  TransactionRequest,
-  TypedData,
-} from './types';
+import type { Address, Eip1193Provider, Hex, TransactionRequest, TypedData } from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Internal Helpers
@@ -41,14 +34,8 @@ export const getChainId = (p: Eip1193Provider) =>
 export const getGasPrice = (p: Eip1193Provider) => cmd<string>(p, 'eth_gasPrice').then(toBig);
 export const getBlockNumber = (p: Eip1193Provider) => cmd<string>(p, 'eth_blockNumber').then(toBig);
 
-export const getNativeBalance = (p: Eip1193Provider, addr: Address) =>
-  cmd<string>(p, 'eth_getBalance', [addr, 'latest']).then(toBig);
-
-export const getTransactionCount = (p: Eip1193Provider, addr: Address) =>
+const getTransactionCount = (p: Eip1193Provider, addr: Address) =>
   cmd<string>(p, 'eth_getTransactionCount', [addr, 'latest']).then(toInt);
-
-export const getTransactionReceipt = (p: Eip1193Provider, hash: Hex) =>
-  cmd<TransactionReceipt | null>(p, 'eth_getTransactionReceipt', [hash]);
 
 /** Deployed bytecode at `addr`, `0x` for an EOA. The ONE `eth_getCode` in the SDK: the
  *  contract test and the EIP-7702 delegation test both read the same reply. */
@@ -214,6 +201,3 @@ export const onAccountsChanged = (p: Eip1193Provider, cb: (accs: Address[]) => v
 
 export const onChainChanged = (p: Eip1193Provider, cb: (id: number) => void) =>
   sub(p, 'chainChanged', (id: unknown) => cb(typeof id === 'string' ? toInt(id) : (id as number)));
-
-export const onDisconnect = (p: Eip1193Provider, cb: (err: unknown) => void) =>
-  sub(p, 'disconnect', cb);

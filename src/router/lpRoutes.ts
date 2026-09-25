@@ -69,7 +69,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
   };
 }
 
-export interface LpRouteStep {
+interface LpRouteStep {
   kind: 'swap' | 'deposit' | 'withdraw' | 'withdrawTo' | 'swapLiability';
   poolTag: string;
   poolAddr?: string;

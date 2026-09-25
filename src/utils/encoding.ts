@@ -1,25 +1,4 @@
-/**
- * Encoding utilities: Hex and Compact Formats
- * Keccak256 is exported from @sdk/eth (uses @noble/hashes)
- */
-
-// ─────────────────────────────────────────────────────────────
-// Hex Encoding/Decoding
-// ─────────────────────────────────────────────────────────────
-
-export function hexToNumber(hex: string): number {
-  return Number.parseInt(hex, 16);
-}
-
 export function numberToHex(num: number | bigint): `0x${string}` {
-  return `0x${num.toString(16)}`;
-}
-
-export function hexToBigInt(hex: string): bigint {
-  return BigInt(hex);
-}
-
-export function bigIntToHex(num: bigint): `0x${string}` {
   return `0x${num.toString(16)}`;
 }
 

@@ -67,47 +67,9 @@ export type ProtocolTimeseriesMetric =
   | 'holders.lp.usd'
   | ProtocolLiquidityMetric;
 
-export const PROTOCOL_TIMESERIES_METRICS = [
-  'vol.usd',
-  'vol.usd.asset',
-  'swap.count',
-  'swap.traders',
-  'fee.lp.usd',
-  'fee.proto.usd',
-  'fee.total.usd',
-  'fee.toll.usd',
-  'apr.fee',
-  'apr.strategy',
-  'tvl.usd',
-  'depth.usd',
-  'reserves.usd',
-  'debt.usd',
-  'cov.c',
-  'skew.bps',
-  'util.liq',
-  'inv.ratio',
-  'oracle.age',
-  'mm.fee.paid',
-  'mm.spread.avg',
-  'mm.spread.quoted',
-  'holders.active',
-  'holders.lp.usd',
-  'liq.dep.usd',
-  'liq.wd.usd',
-  'liq.net.usd',
-  'liq.events',
-] as const satisfies readonly ProtocolTimeseriesMetric[];
-
 /** LP flow taxonomy (dex_liquidity_1m). Also served as timeseries; the paged bucket
  *  listing stays on GET /v1/liquidity. */
 export type ProtocolLiquidityMetric = 'liq.dep.usd' | 'liq.wd.usd' | 'liq.net.usd' | 'liq.events';
-
-export const PROTOCOL_LIQUIDITY_METRICS = [
-  'liq.dep.usd',
-  'liq.wd.usd',
-  'liq.net.usd',
-  'liq.events',
-] as const satisfies readonly ProtocolLiquidityMetric[];
 
 /** Minimum shape required to display APR legs without fabricating totals. */
 export interface AprLegs {
@@ -116,7 +78,7 @@ export interface AprLegs {
   stale: boolean;
 }
 
-export interface ApyBreakdown {
+interface ApyBreakdown {
   apy: number | null;
   swapFeeApr: number | null;
   rehypoApr: number | null;
@@ -233,7 +195,7 @@ export interface ProtocolLiquidityHistory {
 }
 
 /** `Asset.flags`, decoded by the back one name per bit. */
-export interface LegFlags {
+interface LegFlags {
   raw: number;
   /** `HALT_BIT`: raised by the guardian, the owner or the pool's seat. */
   halted: boolean;

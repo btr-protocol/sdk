@@ -22,13 +22,9 @@
  *   - permessage-deflate ON at WS layer compresses runs of similar prices ~3-5x further
  */
 
-export const TICK_FRAME_BYTES = 28;
+const TICK_FRAME_BYTES = 28;
 
-export const TICK_FLAG_STALE = 0x01;
-export const TICK_FLAG_HALTED = 0x02;
-export const TICK_FLAG_SYNTH = 0x04;
-
-export interface TickWire {
+interface TickWire {
   ts: number; // unix ms
   sid: number; // u16 symbol id
   bid: number;
@@ -37,21 +33,8 @@ export interface TickWire {
   conf: number; // u8
 }
 
-/** Encode a tick into a 28-byte buffer (allocates if `out` omitted). */
-export function encodeTick(t: TickWire, out?: Uint8Array, offset = 0): Uint8Array {
-  const buf = out ?? new Uint8Array(TICK_FRAME_BYTES);
-  const view = new DataView(buf.buffer, buf.byteOffset + offset, TICK_FRAME_BYTES);
-  view.setBigUint64(0, BigInt(t.ts), true);
-  view.setUint16(8, t.sid, true);
-  view.setFloat64(10, t.bid, true);
-  view.setFloat64(18, t.ask, true);
-  view.setUint8(26, t.flags & 0xff);
-  view.setUint8(27, t.conf & 0xff);
-  return buf;
-}
-
 /** Decode a 28-byte tick frame starting at `offset`. */
-export function decodeTick(buf: Uint8Array | ArrayBuffer, offset = 0): TickWire {
+function decodeTick(buf: Uint8Array | ArrayBuffer, offset = 0): TickWire {
   const view =
     buf instanceof ArrayBuffer
       ? new DataView(buf, offset, TICK_FRAME_BYTES)

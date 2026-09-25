@@ -28,7 +28,7 @@
  * non-overlapping. Absent = the tape never stops. Sole home for BTR market hours: NXR measures them
  * (`.s10` tick_count buckets) but serves them on no endpoint.
  */
-export type MarketSession = readonly (readonly [number, number])[];
+type MarketSession = readonly (readonly [number, number])[];
 const DAY_MIN = 1440;
 /** FX majors. Sun 21:00 to Fri 22:00 UTC: the venue week is pinned to 17:00 New York, so both
  *  edges move an hour across US DST (21:00 on EDT, 22:00 on EST). Each edge takes the value
@@ -48,7 +48,7 @@ const BRL_SESSION: MarketSession = [1, 2, 3, 4, 5].map(
 // underlying ever goes dark, the mark reads STALE, a fault, which is the honest display.
 
 /** One resolved mark source: which pair to fetch and how to turn it into the feed's quantity. */
-export interface NxrPair {
+interface NxrPair {
   /** The pair the feed is DENOMINATED in: what the mark means, and what is written to the record. */
   nxrSymbol: string;
   /** The pair actually SERVED, when NXR only carries the reciprocal. The fetched mid is inverted
@@ -60,7 +60,7 @@ export interface NxrPair {
   quoteVia?: string;
 }
 
-export interface NxrMark extends NxrPair {
+interface NxrMark extends NxrPair {
   /** The same asset on the USDC BASIS, for a chain whose pools consume a mark as attested
    *  (quoteUnit 0). Absent = the asset has no USDC-denominated source and cannot be listed there;
    *  callers must fail rather than fall back to the USD row, which is the silent-mispricing case. */

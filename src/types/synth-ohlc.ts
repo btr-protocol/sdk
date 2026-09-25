@@ -41,14 +41,14 @@ export interface OhlcLite {
   c: number;
 }
 
-export interface OhlcWithRange extends OhlcLite {
+interface OhlcWithRange extends OhlcLite {
   /** Synth log-range R_S = √(4·ln(2)·V) (debugging / vol diagnostics). */
   range?: number;
 }
 
-export type VarianceEstimator = 'parkinson' | 'rs';
+type VarianceEstimator = 'parkinson' | 'rs';
 
-export interface SynthOpts {
+interface SynthOpts {
   /** Per-leg variance estimator. Default 'rs' (drift-robust). */
   estimator?: VarianceEstimator;
   /**
@@ -86,7 +86,7 @@ function legVariance(k: OhlcLite, estimator: VarianceEstimator): number {
  * @param opts - estimator + ρ callback (defaults: 'rs', ρ=0)
  * @returns synth OHLC or null
  */
-export function reconstructSynthOhlc(
+function reconstructSynthOhlc(
   legs: readonly Leg[],
   legOhlc: Readonly<Record<string, OhlcLite>>,
   opts: SynthOpts = {},
@@ -147,7 +147,7 @@ export function reconstructSynthOhlc(
  * @param opts - estimator + ρ callback
  * @returns array of synth OHLC w/ ts (bucket-start), asc-sorted
  */
-export function reconstructSynthSeries(
+function reconstructSynthSeries(
   legs: readonly Leg[],
   legSeries: Readonly<Record<string, ReadonlyArray<OhlcLite & { ts: number }>>>,
   tfMs: number,
@@ -311,7 +311,7 @@ export interface LegTick {
 }
 
 /** Composed synth tick: product/ratio of leg ticks. */
-export interface SynthTick {
+interface SynthTick {
   mid: number;
   bid: number;
   ask: number;

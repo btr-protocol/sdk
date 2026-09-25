@@ -192,7 +192,7 @@ export function buildCurve(
 export const MAX_INTERIOR_SWING_PBPS = 10_862;
 export const MAX_DISPERSION_PBPS = 900_000;
 
-export const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
+const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
 
 export function dispersionCap(c: QuarticCurve): number {
   const span = curveSpanQ(c);
@@ -236,7 +236,7 @@ export interface PoolLeg {
 
 /** The hub's own book. It is an ENDPOINT, not a spoke: it carries liabilities, a coverage wall
  *  and a vega, and every one of them prices a swap that touches the base. */
-export interface HubBook {
+interface HubBook {
   res: number;
   liab: number;
   vegaBps: number;
@@ -284,13 +284,6 @@ export interface DepthCurve {
   maxTokBid: number;
   maxTokAsk: number;
   unit: 'token' | 'base';
-}
-
-export interface LegRisk {
-  sigma: number;
-  minFeePbps: number;
-  confidence?: number;
-  staleExcess?: number;
 }
 
 export function premiumBps(price: number, mark: number): number {
@@ -359,7 +352,7 @@ export function invertDepthCurve(c: DepthCurve): DepthCurve {
 
 // ── Backend wire (mirror of btr-quote serde structs) ─────────────────────────
 
-export interface SegWire {
+interface SegWire {
   c0: string;
   c1: string;
   c2: string;
@@ -372,14 +365,14 @@ export interface CurveWire {
   segs: SegWire[];
   m: number;
 }
-export interface PricingWire {
+interface PricingWire {
   curve: CurveWire;
   min_dispersion_pbps: number;
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
 }
-export interface SpokeWire {
+interface SpokeWire {
   token: string;
   address?: string | null;
   pricing: PricingWire;
@@ -402,7 +395,7 @@ export interface SpokeWire {
  *   which on a spoke→base sell is the hub. The base carries a wall like every other listed asset
  *   (`PoolConfigLib.requireNeverDepletable` rejects κ=0 at every writer).
  */
-export interface EndpointWire {
+interface EndpointWire {
   reserves: string;
   liabilities: string;
   vega_bps: number;
@@ -433,7 +426,7 @@ export interface RouteRequestWire {
   min_gain_bps?: number;
   max_routes?: number;
 }
-export interface LegWire {
+interface LegWire {
   pool_tag: string;
   token_in: string;
   token_out: string;
@@ -442,7 +435,7 @@ export interface LegWire {
   /** A-188: clamped at the delivering book's coverage argmax; `amount_out` is not a price. */
   saturated: boolean;
 }
-export interface SplitPartWire {
+interface SplitPartWire {
   legs: LegWire[];
   fraction: string;
   amount_out: string;
@@ -452,13 +445,13 @@ export interface QuoteRouteWire {
   amount_in: string;
   amount_out: string;
 }
-export interface RouteResponseWire {
+interface RouteResponseWire {
   best_amount_out: string;
   best_is_split: boolean;
   best_parts: SplitPartWire[];
   singles: QuoteRouteWire[];
 }
-export interface DepthRowWire {
+interface DepthRowWire {
   price: number;
   size: number;
   cum: number;
@@ -500,7 +493,7 @@ export function backendBase(explicit?: string): string {
 
 let quote429Until = 0;
 
-export function noteQuote429(ms = 20_000): void {
+function noteQuote429(ms = 20_000): void {
   quote429Until = Math.max(quote429Until, Date.now() + ms);
 }
 
@@ -556,14 +549,6 @@ async function post<T>(
 /** The backend said the pools cannot fill this size (HTTP 422, reason `capacity`). */
 export const isNoCapacityError = (e: unknown): boolean =>
   e instanceof Error && /^btr-quote HTTP 422 \S+ capacity$/.test(e.message);
-
-/** Single-pool exact-in quote over POST /v1/quote. */
-export function quoteAsync(
-  body: Record<string, unknown>,
-  base?: string,
-): Promise<Record<string, unknown>> {
-  return post<Record<string, unknown>>(backendBase(base), '/quote', body);
-}
 
 /**
  * A whole path, settled ONCE over POST /v1/quote-path.
@@ -623,7 +608,7 @@ const toU128Hex = (v: number): string => {
  *  zero inventory skew on it. On an antisymmetric curve it IS exactly BPS/2, which is why pinning
  *  5000 went unnoticed: every live curve is symmetric. An asymmetric one moved the centre and the
  *  wire kept saying 5000. */
-export function medianQ(c: QuarticCurve): number {
+function medianQ(c: QuarticCurve): number {
   let lo = 0;
   let hi = BPS;
   while (lo < hi) {
@@ -669,7 +654,7 @@ export interface WireMeta {
   decimalsOf: (sym: string) => number;
 }
 
-export interface QuoteRequestWire {
+interface QuoteRequestWire {
   curve: CurveWire;
   min_dispersion_pbps: number;
   vega_bps: number;

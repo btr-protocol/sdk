@@ -13,9 +13,9 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
  * Encode a single item (string, number, bigint, or Uint8Array)
  */
 /** One RLP-encodable scalar. */
-export type RlpScalar = string | number | bigint | Uint8Array;
+type RlpScalar = string | number | bigint | Uint8Array;
 /** A scalar or a (recursively nested) list. `[]` is the EMPTY LIST, `0x80` is the empty string. */
-export type RlpItem = RlpScalar | readonly RlpItem[];
+type RlpItem = RlpScalar | readonly RlpItem[];
 
 function encodeItem(input: RlpItem): Uint8Array {
   // A nested list is a list, not a string: an empty accessList MUST encode as 0xc0. Encoding it

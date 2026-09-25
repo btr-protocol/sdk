@@ -602,43 +602,6 @@ for (const [symbol, token] of Object.entries(TOKENS)) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Token Lists
-// ─────────────────────────────────────────────────────────────
-
-/** Canonical tokens (excludes wrappers) */
-export const CANONICAL_TOKENS = Object.keys(TOKENS).filter((s) => !TOKENS[s].wrapperOf);
-
-/** All tokens including wrappers */
-export const ALL_TOKENS = Object.keys(TOKENS);
-
-/** Base tokens for pair generation */
-export const BASE_TOKENS = [
-  'BTC',
-  'ETH',
-  'SOL',
-  'BNB',
-  'AAVE',
-  'PENDLE',
-  'ENA',
-  'UNI',
-  'CAKE',
-  'CRV',
-  'LINK',
-  'ZRO',
-  'AXL',
-  'MORPHO',
-  'HYPE',
-  'SUI',
-  'ZEC',
-  'ARB',
-  'XAUT',
-  'PAXG',
-];
-
-/** Quote currencies for pair generation */
-export const QUOTE_TOKENS = ['USDC', 'USDT', 'ETH', 'BTC', 'USDE', 'USD'];
-
-// ─────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────
 
@@ -655,22 +618,6 @@ export function getTokenIcon(symbol: string): string {
  */
 export function getTokenAddress(symbol: string, chainId: number | string): string | undefined {
   return tokenBySymbol(symbol)?.addresses[chainId.toString()];
-}
-
-/**
- * Get all tokens available on a chain
- */
-export function getAllTokensForChain(chainId: number | string): Record<string, string> {
-  const result: Record<string, string> = {};
-  const chainIdStr = chainId.toString();
-
-  for (const [symbol, token] of Object.entries(TOKENS)) {
-    if (token.addresses[chainIdStr]) {
-      result[symbol] = token.addresses[chainIdStr];
-    }
-  }
-
-  return result;
 }
 
 /** Registry key by upper-cased key, so a mixed-case entry is reachable from any casing. */
@@ -696,7 +643,7 @@ export function canonicalTokenSymbol(symbol: string): string {
 }
 
 /** Registry entry for a symbol in any casing, with or without the `.b` faucet suffix. */
-export function tokenBySymbol(symbol: string): TokenMetadata | undefined {
+function tokenBySymbol(symbol: string): TokenMetadata | undefined {
   return TOKENS[canonicalTokenSymbol(symbol)];
 }
 

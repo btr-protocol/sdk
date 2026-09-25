@@ -13,18 +13,18 @@ import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types'
 // Types
 // ─────────────────────────────────────────────────────────────
 
-export interface ContractConfig {
+interface ContractConfig {
   address: Address;
   abi: Abi;
   provider: Eip1193Provider;
   account?: Address;
 }
 
-export interface ReadOptions {
+interface ReadOptions {
   blockTag?: 'latest' | 'pending' | 'earliest' | Hex;
 }
 
-export interface WriteOptions {
+interface WriteOptions {
   value?: bigint;
   gas?: bigint;
   gasPrice?: bigint;
@@ -180,14 +180,6 @@ export class Contract {
     const fn = this.getFunction(functionName);
     return fn?.stateMutability === 'view' || fn?.stateMutability === 'pure';
   }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-export function getContract(config: ContractConfig): Contract {
-  return new Contract(config);
 }
 
 export async function readContract<T = unknown>(

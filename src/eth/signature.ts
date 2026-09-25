@@ -13,7 +13,7 @@ import type { Address, Hex } from './types';
  * @param message - Original message string that was signed
  * @returns Recovered Ethereum address
  */
-export function recoverAddress(signature: Hex, message: string): Address {
+function recoverAddress(signature: Hex, message: string): Address {
   // Decode signature
   const sigBytes = hexToBytes(signature.slice(2)); // remove 0x
 

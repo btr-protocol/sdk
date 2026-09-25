@@ -47,20 +47,6 @@ export function sum(arr: number[]): number {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Percentage Calculations
-// ─────────────────────────────────────────────────────────────
-
-export function calcPercent(partialValue: number, totalValue: number): number {
-  if (totalValue === 0) return 0;
-  return (100 * partialValue) / totalValue;
-}
-
-export function calcPercentChange(oldValue: number, newValue: number): number {
-  if (oldValue === 0) return newValue === 0 ? 0 : 100;
-  return ((newValue - oldValue) / Math.abs(oldValue)) * 100;
-}
-
-// ─────────────────────────────────────────────────────────────
 // Rounding Functions
 // ─────────────────────────────────────────────────────────────
 
@@ -78,58 +64,6 @@ export function ceil(n: number, scale: number): number {
 export function floor(n: number, scale: number): number {
   const multiplier = 10 ** scale;
   return Math.floor((n + Number.EPSILON) * multiplier) / multiplier;
-}
-
-export function roundAutoPrecision(n: number | undefined | null): number {
-  if (n == null || !Number.isFinite(n)) return 0;
-  return round(n, precision(n));
-}
-
-// ─────────────────────────────────────────────────────────────
-// Number Analysis
-// ─────────────────────────────────────────────────────────────
-
-export function getDigits(x: number): number {
-  if (x === 0) return 1;
-  return Math.floor(Math.log10(Math.abs(x))) + 1;
-}
-
-export function getTrailingZeros(s: string): number {
-  let n = 0;
-  while (s.charAt(s.length - n - 1) === '0') n++;
-  return n;
-}
-
-export function getScale(n: number, maxPrecision = 16): number {
-  if (!Number.isFinite(n)) return 0;
-  const digits = Math.round(Math.abs(n)).toString().length;
-  const roundingScale = Math.max(maxPrecision - digits, 1);
-  const s = round(n, roundingScale).toFixed(roundingScale);
-  const floatIndex = s.indexOf('.') + 1;
-  return floatIndex > 0 ? s.length - floatIndex - getTrailingZeros(s) : 0;
-}
-
-/**
- * Get the order of magnitude of a number
- * Examples:
- *   0.001 -> 0.001
- *   0.05 -> 0.01
- *   0.5 -> 0.1
- *   5 -> 1
- *   50 -> 10
- *   500 -> 100
- *   5000 -> 1000
- */
-export function getMagnitude(n: number): number {
-  if (n === 0) return 1;
-  const abs = Math.abs(n);
-  if (abs >= 1) {
-    const digits = Math.floor(Math.log10(abs));
-    return 10 ** digits;
-  }
-  // Count leading zeros after decimal
-  const leadingZeros = Math.floor(-Math.log10(abs));
-  return 10 ** -(leadingZeros + 1);
 }
 
 /**
@@ -162,11 +96,11 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function lerp(a: number, b: number, t: number): number {
+function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function inverseLerp(a: number, b: number, value: number): number {
+function inverseLerp(a: number, b: number, value: number): number {
   if (a === b) return 0;
   return (value - a) / (b - a);
 }
@@ -179,50 +113,6 @@ export function remap(
   outMax: number,
 ): number {
   return lerp(outMin, outMax, inverseLerp(inMin, inMax, value));
-}
-
-// ─────────────────────────────────────────────────────────────
-// Nice Numbers for Chart Axes
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Find a "nice" number for axis ticks
- * Based on Graphics Gems algorithm
- */
-export function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else {
-    if (fraction <= 1) niceFraction = 1;
-    else if (fraction <= 2) niceFraction = 2;
-    else if (fraction <= 5) niceFraction = 5;
-    else niceFraction = 10;
-  }
-
-  return niceFraction * 10 ** exponent;
-}
-
-/**
- * Calculate nice axis bounds and tick interval
- */
-export function niceScale(
-  min: number,
-  max: number,
-  maxTicks = 10,
-): { min: number; max: number; tickSpacing: number } {
-  const range = niceNum(max - min, false);
-  const tickSpacing = niceNum(range / (maxTicks - 1), true);
-  const niceMin = Math.floor(min / tickSpacing) * tickSpacing;
-  const niceMax = Math.ceil(max / tickSpacing) * tickSpacing;
-
-  return { min: niceMin, max: niceMax, tickSpacing };
 }
 
 // ─────────────────────────────────────────────────────────────

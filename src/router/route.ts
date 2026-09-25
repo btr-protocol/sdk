@@ -19,7 +19,7 @@ export interface NamedPool {
   state: PoolState;
 }
 
-export interface RouteLeg {
+interface RouteLeg {
   poolTag: string;
   poolAddr?: string;
   tokenIn: string;

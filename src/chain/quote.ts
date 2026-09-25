@@ -16,7 +16,7 @@ import { ChainError, parseChainError } from './errors.js';
 
 export type Slippage = { mode: 'spread'; pct: number } | { mode: 'relative'; pbps: number };
 
-export interface BlockRef {
+interface BlockRef {
   number: number;
   timestamp: number;
 }
@@ -41,13 +41,13 @@ export interface QuotedAmount {
   min_out: string;
 }
 
-export type QuoteAmountResult = QuotedAmount | { refused: Refused };
+type QuoteAmountResult = QuotedAmount | { refused: Refused };
 
 export function isRefused(a: QuoteAmountResult): a is { refused: Refused } {
   return 'refused' in a;
 }
 
-export interface ChainQuoteRequest {
+interface ChainQuoteRequest {
   chain_id: number;
   token_in: string;
   token_out: string;
@@ -83,19 +83,19 @@ export interface ChainPart {
   hops: ChainHop[];
 }
 
-export interface ChainFloor {
+interface ChainFloor {
   token: string;
   amount_out: string;
   tol_pbps: number;
   min_out: string;
 }
 
-export interface ChainRouteSelection {
+interface ChainRouteSelection {
   parts: ChainPart[];
   floors: ChainFloor[];
 }
 
-export interface ChainRouteRequest {
+interface ChainRouteRequest {
   chain_id: number;
   token_in: string;
   token_out: string;
@@ -105,7 +105,7 @@ export interface ChainRouteRequest {
   slippage: Slippage;
 }
 
-export interface ChainRouteResponse {
+interface ChainRouteResponse {
   chain_id: number;
   block: BlockRef;
   source: 'chain';
@@ -114,7 +114,7 @@ export interface ChainRouteResponse {
   refused: Refused[];
 }
 
-export interface ChainClientOpts {
+interface ChainClientOpts {
   signal?: AbortSignal;
   timeoutMs?: number;
   /** Injectable clock (tests); defaults to `Date.now`. */

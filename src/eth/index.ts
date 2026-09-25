@@ -18,21 +18,17 @@ export type Input = string | Uint8Array;
 export type {
   Address,
   Hex,
-  PublicClient,
-  WalletClient,
   Hash,
   Eip1193Provider,
   TransactionRequest,
   TransactionReceipt,
   Log,
   TypedDataDomain,
-  TypedDataField,
   TypedData,
 } from './types';
 
 export {
   isAddress,
-  isHex,
   zeroAddress,
   isZeroAddress,
   NATIVE_TOKEN,
@@ -55,58 +51,36 @@ export function checksumAddress(address: string): Address {
 }
 
 // Chains
-export type { ChainConfig, ChainId, ChainInfo } from './chains';
+export type { ChainInfo } from './chains';
 export {
   CHAINS,
-  SWAP_ALLOWED_EVM_CHAINS,
   getChain,
-  getChainInfo,
-  getAllChainInfo,
   chainIconSlug,
   getChainIcon,
   getChainMonoIcon,
-  getRpcUrl,
   getAllRpcs,
   getExplorerUrl,
   getExplorerTxUrl,
   getExplorerAddressUrl,
-  getWrappedNative,
   getMulticall3,
-  getSupportedChainIds,
-  getMainnetChainIds,
-  isTestOrLocalChain,
-  detectAnvilFork,
-  getAnvilChainConfig,
 } from './chains';
 
 // Tokens
 export type { TokenMetadata } from './tokens';
 export {
   TOKENS,
-  CANONICAL_TOKENS,
-  ALL_TOKENS,
-  BASE_TOKENS,
-  QUOTE_TOKENS,
   getTokenIcon,
   getTokenAddress,
-  getAllTokensForChain,
   canonicalTokenSymbol,
-  tokenBySymbol,
   resolveTokenAlias,
   tokenMatchesSearch,
 } from './tokens';
 
 // Contracts (deployed addresses)
-export type { SupportedChainId, ContractName, DexContractKey } from './contracts';
+export type { SupportedChainId } from './contracts';
 export {
   CONTRACTS,
-  CONTRACT_KEYS,
-  CONTRACT_ENV_VARS,
-  CONTRACT_VITE_ENV_VARS,
-  LIFI_DIAMOND,
   getContractAddress,
-  isChainSupported,
-  SUPPORTED_CONTRACT_CHAIN_IDS,
   getBtrPoolFactory,
   getBtrAdmin,
   getBtrAccessControl,
@@ -128,12 +102,7 @@ export {
 
 // Token Standards
 export { ERC20_ABI } from './erc20';
-export { ERC721_ABI } from './erc721';
-export { ERC1155_ABI } from './erc1155';
-export { ERC777_ABI } from './erc777';
 export { ERC4626_ABI } from './erc4626';
-export { ERC7540_ABI } from './erc7540';
-export { LAYERZERO_OFT_ABI } from './layerzero-oft';
 
 // RPC
 export {
@@ -142,9 +111,6 @@ export {
   getChainId,
   getGasPrice,
   getBlockNumber,
-  getNativeBalance,
-  getTransactionCount,
-  getTransactionReceipt,
   getNonce,
   getCode,
   ethCall,
@@ -160,14 +126,12 @@ export {
   waitForTransaction,
   onAccountsChanged,
   onChainChanged,
-  onDisconnect,
 } from './rpc';
 
 // Transport (resilient HTTP JSON-RPC: timeout/retry/failover/batch, typed errors)
 export type { TransportOpts } from './transport';
 export {
   httpTransport,
-  RpcError,
   RpcRevertError,
   RpcRateLimitError,
   RpcTimeoutError,
@@ -175,14 +139,12 @@ export {
 } from './transport';
 
 // Signature Verification
-export { recoverAddress, verifySignature } from './signature';
+export { verifySignature } from './signature';
 
 // Contract
-export type { ContractConfig, ReadOptions, WriteOptions } from './contract';
 export {
   Contract,
   ContractRevertError,
-  getContract,
   readContract,
   writeContract,
 } from './contract';
@@ -204,17 +166,13 @@ export {
 // Wallets
 export type {
   WalletInfo,
-  Eip6963Detail,
   AccountClass,
   WalletChain,
-  WalletIdentity,
-  WalletIdSources,
 } from './wallets';
 export {
   WALLETS,
   slug,
   walletId,
-  isSafeApp,
   resolveWallet,
   accountClass,
   WC_ICONS,
@@ -227,7 +185,6 @@ export {
   getTooltip,
   detectLegacy,
   eip6963Providers,
-  toWalletInfo,
   mergeWallets,
 } from './wallets';
 
@@ -238,18 +195,13 @@ export {
 export {
   formatUnits,
   parseUnits,
-  formatEther,
-  parseEther,
 } from '../utils/format.js';
 
 export {
   toHex,
   concat,
   pad,
-  hexToNumber,
   numberToHex,
-  hexToBigInt,
-  bigIntToHex,
 } from '../utils/encoding.js';
 
 // ─────────────────────────────────────────────────────────────

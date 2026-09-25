@@ -25,23 +25,19 @@ import { EIP712_DOMAIN_TYPEHASH, type Eip712Domain } from './eip712';
 export type PushWire = 'v5' | 'v6';
 
 /** keccak256("BatchQuoteV4(bytes32 blobHash)") - the wire-v5 push typehash (ExternalOracleV4). */
-export const BATCH_TYPEHASH_V4 = keccak256Input('BatchQuoteV4(bytes32 blobHash)');
-/** keccak256("SessionGrant(address relay,uint48 expiresAt,uint32 maxSeq,uint16 nonce)") */
-export const SESSION_TYPEHASH = keccak256Input(
-  'SessionGrant(address relay,uint48 expiresAt,uint32 maxSeq,uint16 nonce)',
-);
+const BATCH_TYPEHASH_V4 = keccak256Input('BatchQuoteV4(bytes32 blobHash)');
 
 export const V5_BLOB_VERSION = 5;
 export const V5_HEADER_BYTES = 11; // ver u8 | seq u32 | tsDs u24 | nP u8 | nS u8 | nC u8
-export const V5_PRICE_ENTRY_BYTES = 5; // gi u8 | lane u32 (top 3 bits zero)
-export const V5_SIGMA_ENTRY_BYTES = 5; // gi u8 | sigmaPbps u32
-export const V5_CONF_ENTRY_BYTES = 3; // gi u8 | confBps u16
+const V5_PRICE_ENTRY_BYTES = 5; // gi u8 | lane u32 (top 3 bits zero)
+const V5_SIGMA_ENTRY_BYTES = 5; // gi u8 | sigmaPbps u32
+const V5_CONF_ENTRY_BYTES = 3; // gi u8 | confBps u16
 /** ExternalOracleV4.LANES_PER_SLOT - 8, down from V3's 10 (wider lanes). */
 export const V5_LANES_PER_SLOT = 8;
 /** 29 significant lane bits; the top 3 of the u32 entry are reserved and MUST be zero. */
 export const V5_LANE_MASK = (1 << 29) - 1;
 /** Mantissa MSB (bit 24): set ⇔ live price; clear + nonzero = a sentinel-write the chain skips. */
-export const V5_MANT_MSB = 1 << 24;
+const V5_MANT_MSB = 1 << 24;
 /** Deciseconds in a day: the modulus of the v5 `tsDs` field (u20 value, zero-padded to u24). */
 export const V5_DAY_DS = 864_000;
 
@@ -124,13 +120,13 @@ export function encodeLane(value1e18: bigint, expBias: number, wire: PushWire): 
 // ── wire v5 (ExternalOracleV4): 11B header, 5B price entries, 29-bit lanes ───────────────────
 
 /** A price entry: `gi:u8 | lane:u32` with the top 3 bits zero (29 significant lane bits). */
-export interface V5PriceEntry {
+interface V5PriceEntry {
   gi: number;
   /** raw 29-bit lane; 0 (or mantissa MSB unset) = STALE sentinel. Decode with {@link decodeLane}. */
   lane: number;
 }
 
-export interface V5Blob {
+interface V5Blob {
   /** Always 5. The version byte, not the oracle's name (the contract is ExternalOracleV4). */
   version: number;
   seq: number;
@@ -303,7 +299,7 @@ export function encodeBlobV5(b: Omit<V5Blob, 'version'>): Uint8Array {
 
 /** v5 sections with an ABSOLUTE clock (`version` is 6); the lane is a full-u32 `exp7:u7 | mant:u25`
  *  and `confs` is one per price entry in the same `gi` order. */
-export type V6Blob = Omit<V5Blob, 'tsDs'> & {
+type V6Blob = Omit<V5Blob, 'tsDs'> & {
   /** Absolute source second (unix), the header's u32. No reconstruction, no day ambiguity. */
   srcSecs: number;
 };
@@ -365,25 +361,5 @@ export function domainSeparator(domain: Eip712Domain): Hex {
 export function pushDigest(blob: Hex | Uint8Array, domain: Eip712Domain): Hex {
   const blobHash = keccak256(toBytes(blob));
   const structHash = keccak256(concat([BATCH_TYPEHASH_V4, blobHash]));
-  return keccak256(concat(['0x1901', domainSeparator(domain), structHash]));
-}
-
-/**
- * The digest a quorum signs to open a V4 push session (`openSession`). Verifying THIS - the
- * grant - is the honest client-side proof for session pushes, which carry no calldata sigs.
- */
-export function sessionGrantDigest(
-  domain: Eip712Domain,
-  grant: { relay: string; expiresAt: number | bigint; maxSeq: number; nonce: number },
-): Hex {
-  const structHash = keccak256(
-    concat([
-      SESSION_TYPEHASH,
-      pad(grant.relay as Hex),
-      pad(numberToHex(BigInt(grant.expiresAt))),
-      pad(numberToHex(BigInt(grant.maxSeq))),
-      pad(numberToHex(BigInt(grant.nonce))),
-    ]),
-  );
   return keccak256(concat(['0x1901', domainSeparator(domain), structHash]));
 }

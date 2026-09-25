@@ -6,7 +6,7 @@
  * and the server's `{error}` code become one closed union, so a caller branches on a value.
  */
 
-export type ChainErrorKind =
+type ChainErrorKind =
   | 'bad_request'
   | 'not_found'
   | 'no_route'

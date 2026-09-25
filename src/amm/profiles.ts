@@ -3,12 +3,12 @@ import { type AimmProfile, type QuarticCurve, buildCurve, dispersionCap } from '
 const BOOTSTRAP_INTERIOR = [2000, 4000, 6000, 8000];
 const rampWQ = (step: bigint): bigint[] =>
   Array.from({ length: 9 }, (_, i) => BigInt(i - 4) * step);
-export const BOOTSTRAP_VOLATILE_CURVE: QuarticCurve = buildCurve(
+const BOOTSTRAP_VOLATILE_CURVE: QuarticCurve = buildCurve(
   BOOTSTRAP_INTERIOR,
   rampWQ(125_000_000_000n),
   1000,
 );
-export const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
+const BOOTSTRAP_STABLE_CURVE: QuarticCurve = buildCurve(
   BOOTSTRAP_INTERIOR,
   rampWQ(12_500_000_000n),
   100,

@@ -74,7 +74,7 @@ export interface MulticallResult {
 /** Max calls per aggregate3. Keeps calldata + node response under typical eth_call limits. */
 export const MC3_CHUNK = 200;
 
-export interface MulticallOpt {
+interface MulticallOpt {
   addr?: Address;
   chainId?: number;
   block?: string;

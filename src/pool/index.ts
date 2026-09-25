@@ -156,12 +156,9 @@ export {
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
 } from './liability.js';
-export type { YieldHookKind } from './hooks.js';
-export { YIELD_HOOK_KINDS, YIELD_HOOK_ADAPTER } from './hooks.js';
 export type {
   Custody,
   HookSlot,
-  MarkWord,
   OracleConfig,
   RiskConfig,
 } from './storage.js';
@@ -183,23 +180,14 @@ export {
   MARK_STORE,
   POOL_STORAGE_V5,
   POOL_STRUCTS_V5,
-  readStoreWord,
-  poolStorageOf,
   readMarks,
-  readStorageVersion,
   HOOK_PRE_OUTFLOW,
   HOOK_FLAGS_MASK,
   mappingBase,
   mappingBaseU16,
-  resolveTokenStorageKey,
-  readAssetCurveId,
   curvePointer,
-  decodeCurve,
   readCurve,
   readOracleConfig,
-  readRiskConfig,
-  readAssetHook,
-  decodeHookSlot,
   getStorageAt,
 } from './storage.js';
 
@@ -304,21 +292,13 @@ export { NATIVE_TOKEN };
 const isNative = (token: Address) => token.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
-
-/** Opt-out sentinel for the trailing `deadline` param. `beforeDeadline` is a bare
- *  `block.timestamp > deadline` compare, so any far-future value opts out; uint32-max is the
- *  cheapest one. type(uint256).max is 32 nonzero calldata bytes (512 gas), this is 4 nonzero +
- *  28 zero (176 gas): same semantics, 336 gas less. Pool.sol natspec still says
- *  type(uint256).max; that is descriptive, not enforced.
- *  ponytail: expires 2106-02-07, widen to uint40 if anything is still running. */
-export const NO_DEADLINE: bigint = 0xffffffffn;
 /** Default tx validity window (seconds) when no deadline is supplied. */
-export const DEFAULT_DEADLINE_S = 600;
+const DEFAULT_DEADLINE_S = 600;
 /** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now. */
 export const defaultDeadline = (): bigint =>
   BigInt(Math.floor(Date.now() / 1000) + DEFAULT_DEADLINE_S);
 
-export interface SwapParams {
+interface SwapParams {
   tokenIn: Address;
   tokenOut: Address;
   amountIn: bigint;
@@ -328,12 +308,12 @@ export interface SwapParams {
   deadline?: bigint;
 }
 
-export interface DepositParams {
+interface DepositParams {
   token: Address;
   amount: bigint;
 }
 
-export interface WithdrawParams {
+interface WithdrawParams {
   token: Address;
   lpAmount: bigint;
   minAmountOut: bigint;
