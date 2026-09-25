@@ -473,6 +473,94 @@ async function readStoreWord(provider: Eip1193Provider, impl: Address, lane: num
   return getStorageAt(provider, impl, MARK_STORE.MS + BigInt(lane));
 }
 
+/** `MarkP8Lib.CONF_LO`/`CONF_HI` unpacked: bps of P8 conf codes 32..60. */
+export const P8_CONF_TABLE = [
+  36, 40, 45, 50, 56, 63, 71, 80, 90, 100, 112, 125, 140, 160, 180, 200, 225, 250, 280, 320, 360,
+  400, 450, 500, 560, 640, 720, 850, 1000,
+] as const;
+
+/** `MarkStoreP8.classes()`: laneCls (3 bits per lane) | classes 1..5 | 6..7 (47 bits each: ttl u12 |
+ *  maxDev u11 at 12 | minSigma u24 at 23). */
+export type P8Classes = { laneCls: bigint; clsA: bigint; clsB: bigint };
+
+const CLASSES_SELECTOR = '0x31e77853';
+const P8_STORE_ID = keccak256(new TextEncoder().encode('btr.markstore.p8'));
+
+/** The P8 class table off a `classes()` return; `null` for any other store id. */
+export function decodeP8Classes(ret: Hex): P8Classes | null {
+  const w = (i: number) => BigInt(`0x${ret.slice(2 + 64 * i, 66 + 64 * i) || '0'}`);
+  if (ret.length < 258 || w(3) !== BigInt(P8_STORE_ID) || w(0) === 0n) return null;
+  return { laneCls: w(0), clsA: w(1), clsB: w(2) };
+}
+
+/** `lane`'s class `(ttl, maxDev, minSigma)`; all 0 when unlisted. */
+export function p8ClassOf(c: P8Classes, lane: number): [number, number, number] {
+  const k = Number((c.laneCls >> BigInt(3 * lane)) & 7n);
+  const v = k === 0 ? 0n : k < 6 ? c.clsA >> BigInt(47 * (k - 1)) : c.clsB >> BigInt(47 * (k - 6));
+  return [Number(v & 0xfffn), Number((v >> 12n) & 0x7ffn), Number((v >> 23n) & 0xffffffn)];
+}
+
+/** P8 conf code → bps: exact below 32, the table to 60, 65535 from 61. */
+export function p8Conf(code: number): number {
+  return code < 32 ? code : code < 61 ? P8_CONF_TABLE[code - 32]! : 0xffff;
+}
+
+/** P8 σ8 → pbps; 0 reads the class floor. */
+export function p8Sigma(s8: number, floor: number): number {
+  return s8 === 0 ? floor : (16 | (s8 & 15)) * 2 ** ((s8 >> 4) + 2);
+}
+
+/** Tier `t` (1 = P, 2 = R) word slot of `lane` in a P8 store: 4 lanes per word. */
+export function p8TierSlot(tier: 1 | 2, lane: number): bigint {
+  return MARK_STORE.MS + (BigInt(tier - 1) << 4n) + BigInt(lane >> 2);
+}
+
+/** `lane`'s store word from its P8 tier words: `Pool.fallback`'s decode plus the class minSigma at
+ *  `MIN_SIGMA_SHIFT` (the D2b field), so `decodeStoreWord` reads it unchanged. Byte-identical to
+ *  core `p8::store_word`. Lane at 56j: mant u24 | e6 24 | age u12 30 | σ8 42 | st u6 50 (62 halted,
+ *  63 dark); clock u32 at 224. */
+export function p8StoreWord(pw: Hex, rw: Hex, lane: number, c: P8Classes): Hex {
+  const sh = BigInt(56 * (lane & 3));
+  const [P, R] = [BigInt(pw), BigInt(rw)];
+  const [p, r] = [(P >> sh) & ((1n << 56n) - 1n), (R >> sh) & ((1n << 56n) - 1n)];
+  const M30 = 0x3fffffffn;
+  if ((p & M30) === 0n && p >> 50n < 62n) return `0x${'0'.repeat(64)}`;
+  const [ttl, maxDev, floor] = p8ClassOf(c, lane);
+  const tier = (v: bigint, tw: bigint, cs: bigint): bigint => {
+    const st = v >> 50n;
+    const obs = ((tw >> 224n) - ((v >> 30n) & 0xfffn)) & 0xffffffffn;
+    const live = st < 62n && (v & M30) !== 0n;
+    const f = ((v & 0xffffffn) | ((v & 0x3f000000n) << 1n)) + 0x21000000n;
+    return (obs << 32n) | (live ? f | (BigInt(p8Conf(Number(st))) << cs) : 0n);
+  };
+  const w =
+    tier(p, P, 91n) |
+    (tier(r, R, 64n) << 135n) |
+    (BigInt(p8Sigma(Number((p >> 42n) & 0xffn), floor)) << 64n) |
+    (BigInt(ttl) << 107n) |
+    (BigInt(ttl) << 215n) |
+    (BigInt(maxDev) << 123n) |
+    (BigInt(p >> 50n === 62n) << 134n) |
+    (BigInt(r >> 50n === 62n) << 231n) |
+    (BigInt(floor) << BigInt(MARK_STORE.MIN_SIGMA_SHIFT));
+  return `0x${w.toString(16).padStart(64, '0')}`;
+}
+
+/** The impl store's P8 class table; `null` for a D2b store, which reverts `classes()`. */
+async function readP8Classes(provider: Eip1193Provider, impl: Address): Promise<P8Classes | null> {
+  try {
+    const r = (await provider.request({
+      method: 'eth_call',
+      params: [{ to: impl, data: CLASSES_SELECTOR }, 'latest'],
+    })) as Hex;
+    return decodeP8Classes(r);
+  } catch (e) {
+    // a revert is the D2b answer; a failed read is not
+    if (/revert/i.test(String((e as { message?: unknown })?.message ?? e))) return null;
+    throw e;
+  }
+}
+
 /** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live. */
 export async function readMarks(
   provider: Eip1193Provider,
@@ -489,7 +577,13 @@ export async function readMarks(
     ]);
     const leg = decodeLegOracle(slot2);
     const impl = addressAt(implWord, 0);
-    return decodeStoreWord(await readStoreWord(provider, impl, leg.lane), leg);
+    const cls = await readP8Classes(provider, impl);
+    if (!cls) return decodeStoreWord(await readStoreWord(provider, impl, leg.lane), leg);
+    const [pw, rw] = await Promise.all([
+      getStorageAt(provider, impl, p8TierSlot(1, leg.lane)),
+      getStorageAt(provider, impl, p8TierSlot(2, leg.lane)),
+    ]);
+    return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls), leg);
   }
   if (version >= 4) {
     return decodeMarkWord(

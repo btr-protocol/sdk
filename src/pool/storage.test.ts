@@ -9,6 +9,7 @@ import {
   MARK_STORE,
   MARK_WORD,
   MARK_WORD_V4,
+  P8_CONF_TABLE,
   POOL_STORAGE,
   POOL_STORAGE_V3,
   POOL_STORAGE_V4,
@@ -22,11 +23,16 @@ import {
   decodeLegOracle,
   decodeMark,
   decodeMarkWord,
+  decodeP8Classes,
   decodeStoreWord,
   i8At,
   laneFloat,
   mappingBase,
   mappingBaseU16,
+  p8ClassOf,
+  p8Conf,
+  p8StoreWord,
+  p8TierSlot,
   readCurve,
   readMarks,
   readSolvencyState,
@@ -569,5 +575,94 @@ describe('layout v5', () => {
       uoa: false,
       refBandBps: 150,
     });
+  });
+});
+
+/** P8 words dumped from dex-evm `MarkStoreP8Migrate.t.sol` (`_populate` + `_migrate`) at
+ *  1_790_005_070; `W` = `Pool.fallback`'s answer per lane. Same fixture as core `p8_fixture`. */
+describe('P8 mark store', () => {
+  const CLASSES = `0x${[
+    '000000000000000000000000000000000000000000000000000000000a692249',
+    '00000000050032e100000a0065c200002581909600007d03212c000050032e10',
+    '0000000000000000000000000000000000000000000028019708000050032e10',
+    'd2902ddffc7ba527eb1ed63e8bf88f092300c656f2f2fbbec7791fea29ab5061',
+  ].join('')}` as `0x${string}`;
+  const P = [
+    '0x6ab14f4e1cf411a3bc223484f407a3bc2d931cf411a3bc22340cf7ffe3bc16d6',
+    '0x6ab14f4e1cf411acffcb6afcf411afb1b967fcf411ad043c0af8f411b474bb55',
+    '0x6ab14f4e0000000000000000000000000000fc03ffc00000001cf411af9131e6',
+  ] as const;
+  const R = [
+    '0x6ab14f4e14f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d6',
+    '0x6ab14f4e08f411acffcb6afcf411afb1b96708f411ad043c0a08f411b474bb55',
+    '0x6ab14f4e0000000000000000000000000000fc03ffc000000014f7ffef9127a1',
+  ] as const;
+  const W = [
+    '00000007080002b5589fa7b3de0b6b0190708000180003a06ab13f4f67bc16d6',
+    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
+    '00000007080002b5589fa7b3de0b6b0190708001400003a06ab14f3067bc2d93',
+    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
+    '000000012c00013558a78444ba5daac32012c000000003a06ab14f0800000000',
+    '000000012c00013558a7843d821e05032012c000000003a06ab14f0800000000',
+    '000000012c00003558a78400000000032012c000000003a06ab14f0800000000',
+    '000000012c00013558a7843cffe5b5032012c000380003a06ab14f0879ffcb6a',
+    '000000012c0002b5589fa7bfc893d0832012c000380003a06ab14f087f9131e6',
+    '0000000708000035589fa7800000000190708000000000a06ab13f4f00000000',
+  ];
+  const cls = decodeP8Classes(CLASSES)!;
+
+  test('store words = Pool.fallback + the class σ floor', () => {
+    for (let l = 0; l < 10; l++) {
+      const floor = p8ClassOf(cls, l)[2];
+      const want = `0x${floor.toString(16).padStart(6, '0')}${W[l]!.slice(6)}`;
+      expect<string>(p8StoreWord(P[l >> 2]!, R[l >> 2]!, l, cls)).toBe(want);
+    }
+  });
+
+  test('codecs, class table, slots, store id', () => {
+    let lo = 0n;
+    let hi = 0n;
+    P8_CONF_TABLE.forEach((v, i) => {
+      if (i < 25) lo |= BigInt(v) << BigInt(10 * i);
+      else hi |= BigInt(v) << BigInt(10 * (i - 25));
+    });
+    expect(lo).toBe(0x2307d1c264168501183e8e1320b42808c1f4701905a140470fc380c82d0a024n);
+    expect(hi).toBe(0xfa352b4280n);
+    expect([p8Conf(31), p8Conf(32), p8Conf(60), p8Conf(61)]).toEqual([31, 36, 1000, 0xffff]);
+    expect(p8ClassOf(cls, 0)).toEqual([3600, 50, 160]);
+    expect(p8ClassOf(cls, 7)).toEqual([600, 100, 300]);
+    expect(p8ClassOf(cls, 10)).toEqual([0, 0, 0]);
+    expect(p8TierSlot(2, 5)).toBe(MARK_STORE.MS + 17n);
+    expect(decodeP8Classes(`0x${'00'.repeat(128)}`)).toBeNull();
+  });
+
+  test('readMarks: v5 pool on a P8 impl reads both tier words', async () => {
+    const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    const pad = (h: string) => `0x${h.padStart(64, '0')}`;
+    const slots = new Map<bigint, string>([
+      [mappingBase(TOKEN, POOL_STORAGE_V5.assets) + 2n, pad((BigInt(7) << 232n).toString(16))],
+      [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, pad('cc'.repeat(20))],
+      [p8TierSlot(1, 7), P[1]],
+      [p8TierSlot(2, 7), R[1]],
+    ]);
+    const provider = {
+      request: async ({ method, params }: { method: string; params: unknown[] }) => {
+        if (method === 'eth_call') {
+          const { data } = params[0] as { data: string };
+          return data === '0x31e77853' ? CLASSES : pad('5');
+        }
+        return slots.get(BigInt(params[1] as string)) ?? pad('0');
+      },
+    } as unknown as Eip1193Provider;
+    const m = await readMarks(provider, POOL, TOKEN);
+    const want = decodeStoreWord(p8StoreWord(P[1], R[1], 7, cls), {
+      internal: false,
+      uoa: false,
+      refBandBps: 0,
+    });
+    expect(m).toEqual(want);
+    expect(m!.primary.mark1e18 > 0n && m!.ref.mark1e18 > 0n).toBe(true);
+    expect(m!.primary.ttlSecs).toBe(600);
   });
 });
