@@ -47,6 +47,8 @@ const META: Record<string, TokenMeta> = {
 const tokenOf = (s: string) => META[s];
 /** Every pool in these fixtures is the factory's; the allowlist itself is tested separately. */
 const isOfficialPool = () => true;
+const O = { tokenOf, isOfficialPool };
+const O0 = { slippageFrac: 0, ...O };
 
 /** A route through `pools`, visiting `tokens` — tokens.length === pools.length + 1. */
 const route = (pools: (Address | undefined)[], tokens: string[]) => ({
@@ -61,10 +63,26 @@ const route = (pools: (Address | undefined)[], tokens: string[]) => ({
 });
 
 type Rt = ReturnType<typeof route>;
-const part = (rt: Rt, fraction: number, amountIn: number, amountOut: number) => ({
+/** `hopOut[i]` = leg i's quoted output; leg i+1 spends it. Omitted = no per-leg fills. */
+const part = (
+  rt: Rt,
+  fraction: number,
+  amountIn: number,
+  amountOut: number,
+  hopOut: number[] = [],
+) => ({
   route: rt,
   fraction,
-  quote: { route: rt, amountIn, amountOut, fills: [] },
+  quote: {
+    route: rt,
+    amountIn,
+    amountOut,
+    fills: hopOut.map((o, i) => ({
+      leg: rt.legs[i],
+      amountIn: i ? hopOut[i - 1] : amountIn,
+      amountOut: o,
+    })),
+  },
 });
 
 const plan = (amountIn: number, amountOut: number, parts: ReturnType<typeof part>[]): SwapPlan => ({
@@ -88,8 +106,7 @@ describe('planToRouterPlan', () => {
     const rp = must(
       planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
         slippageFrac: 0.25,
-        tokenOf,
-        isOfficialPool,
+        ...O,
       }),
     );
     expect(rp.parts.length).toBe(1);
@@ -103,13 +120,7 @@ describe('planToRouterPlan', () => {
 
   test('a three-hop route is carried whole — the two-hop cap of the leg path is gone', () => {
     const rt = route([P1, P2, P3], ['USDC', 'DAI', 'BNB', 'USDT']);
-    const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    );
+    const rp = must(planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), O0));
     expect(rp.parts.length).toBe(1);
     expect(rp.parts[0].hops.map((h) => h.pool)).toEqual([P1, P2, P3]);
     expect(rp.parts[0].hops.map((h) => h.tokenOut)).toEqual([DAI, WNATIVE, USDT]);
@@ -124,8 +135,7 @@ describe('planToRouterPlan', () => {
     const rp = must(
       planToRouterPlan(plan(1000, 990, [part(a, 0.7, 700, 693), part(b, 0.3, 300, 297)]), {
         slippageFrac: 0.5,
-        tokenOf,
-        isOfficialPool,
+        ...O,
       }),
     );
     expect(rp.parts.length).toBe(2);
@@ -137,11 +147,7 @@ describe('planToRouterPlan', () => {
     const a = route([P1], ['USDC', 'USDT']);
     const b = route([P2], ['USDC', 'DAI']);
     const rp = must(
-      planToRouterPlan(plan(1000, 990, [part(a, 0.6, 600, 594), part(b, 0.4, 400, 396)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
+      planToRouterPlan(plan(1000, 990, [part(a, 0.6, 600, 594), part(b, 0.4, 400, 396)]), O0),
     );
     expect(rp.floors.length).toBe(2);
     expect(new Set(rp.floors.map((f) => f.token))).toEqual(new Set([USDT, DAI]));
@@ -151,11 +157,10 @@ describe('planToRouterPlan', () => {
     const small = route([P1], ['USDC', 'USDT']);
     const big = route([P2], ['USDC', 'USDT']);
     const rp = must(
-      planToRouterPlan(plan(1000, 990, [part(small, 0.25, 250, 247), part(big, 0.75, 750, 743)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
+      planToRouterPlan(
+        plan(1000, 990, [part(small, 0.25, 250, 247), part(big, 0.75, 750, 743)]),
+        O0,
+      ),
     );
     expect(rp.parts[0].hops[0].pool).toBe(P2);
   });
@@ -174,58 +179,21 @@ describe('planToRouterPlan', () => {
           part(b, 1 / 3, 10.35, 33),
           part(c, 1 / 3, 10.35, 33),
         ]),
-        { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: exact },
+        { ...O0, amountInUnits: exact },
       ),
     );
     expect(rp.parts.reduce((s, p) => s + p.amountIn, 0n)).toBe(exact);
   });
 
-  test('a missing pool address refuses the whole plan rather than dropping a hop', () => {
-    const rt = route([P1, undefined], ['USDC', 'DAI', 'USDT']);
-    expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    ).toBeNull();
-  });
-
-  test('an unknown token symbol refuses the plan', () => {
-    const rt = route([P1], ['USDC', 'NOPE']);
-    expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    ).toBeNull();
-  });
-
-  test('the native sentinel is refused — it is not a contract to transferFrom', () => {
-    const rt = route([P1], ['GHOST', 'USDT']);
-    expect(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    ).toBeNull();
-    const out = route([P1], ['USDC', 'GHOST']);
-    expect(
-      planToRouterPlan(plan(100, 99, [part(out, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    ).toBeNull();
-  });
-
-  test('an empty plan is null, not an empty call', () => {
-    expect(
-      planToRouterPlan(plan(100, 99, []), { slippageFrac: 0, tokenOf, isOfficialPool }),
-    ).toBeNull();
-  });
+  const one = (pools: (Address | undefined)[], toks: string[]) =>
+    plan(100, 99, [part(route(pools, toks), 1, 100, 99)]);
+  test.each([
+    ['a missing pool address (never drop a hop)', one([P1, undefined], ['USDC', 'DAI', 'USDT'])],
+    ['an unknown token symbol', one([P1], ['USDC', 'NOPE'])],
+    ['the native sentinel in (not a transferFrom target)', one([P1], ['GHOST', 'USDT'])],
+    ['the native sentinel out', one([P1], ['USDC', 'GHOST'])],
+    ['an empty plan (not an empty call)', plan(100, 99, [])],
+  ] as const)('refuses %s', (_, p) => expect(planToRouterPlan(p, O0)).toBeNull());
 
   test('a slippage outside [0,1) throws rather than silently flooring at zero', () => {
     const rt = route([P1], ['USDC', 'USDT']);
@@ -246,9 +214,7 @@ describe('planToRouterPlan', () => {
     const b = route([P2], ['BNB', 'USDT']);
     const rp = must(
       planToRouterPlan(plan(3, 99, [part(a, 2 / 3, 2, 66), part(b, 1 / 3, 1, 33)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeIn: true,
         amountInUnits: 3_000_000_000_000_000_000n,
       }),
@@ -262,8 +228,7 @@ describe('planToRouterPlan', () => {
     const rp = must(
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
         slippageFrac: 0.5,
-        tokenOf,
-        isOfficialPool,
+        ...O,
         nativeOut: true,
       }),
     );
@@ -277,9 +242,7 @@ describe('planToRouterPlan', () => {
     // nativeIn, but the plan spends two different assets: wrapping either amount is wrong.
     expect(
       planToRouterPlan(plan(100, 99, [part(a, 0.5, 50, 49), part(b, 0.5, 50, 50)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeIn: true,
       }),
     ).toBeNull();
@@ -288,9 +251,7 @@ describe('planToRouterPlan', () => {
     const d = route([P2], ['USDC', 'USDT']);
     expect(
       planToRouterPlan(plan(100, 99, [part(c, 0.5, 50, 1), part(d, 0.5, 50, 49)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeOut: true,
       }),
     ).toBeNull();
@@ -301,11 +262,7 @@ describe('buildRouterApprovalCalls', () => {
   const threeHop = must(
     planToRouterPlan(
       plan(100, 99, [part(route([P1, P2, P3], ['USDC', 'DAI', 'BNB', 'USDT']), 1, 100, 99)]),
-      {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      },
+      O0,
     ),
   );
 
@@ -334,11 +291,7 @@ describe('buildRouterApprovalCalls', () => {
     const a = route([P1], ['USDC', 'DAI']);
     const b = route([P2], ['USDT', 'DAI']);
     const rp = must(
-      planToRouterPlan(plan(100, 99, [part(a, 0.5, 50, 49), part(b, 0.5, 50, 50)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
+      planToRouterPlan(plan(100, 99, [part(a, 0.5, 50, 49), part(b, 0.5, 50, 50)]), O0),
     );
     const calls = buildRouterApprovalCalls(ROUTER, rp, {});
     expect(calls.length).toBe(2);
@@ -357,9 +310,7 @@ describe('buildRouterApprovalCalls', () => {
     const rt = route([P1], ['BNB', 'USDT']);
     const rp = must(
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -378,9 +329,7 @@ describe('buildRouterApprovalCalls', () => {
     const rt = route([P1], ['BNB', 'USDT']);
     const rp = must(
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -392,13 +341,7 @@ describe('buildRouterApprovalCalls', () => {
 describe('buildRouterSwapExecCalls', () => {
   test('the whole route is ONE call to the router', () => {
     const rt = route([P1, P2, P3], ['USDC', 'DAI', 'BNB', 'USDT']);
-    const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    );
+    const rp = must(planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), O0));
     const calls = buildRouterSwapExecCalls(ROUTER, rp, { recipient: USER });
     expect(calls.length).toBe(1);
     expect(calls[0].to).toBe(ROUTER);
@@ -410,9 +353,7 @@ describe('buildRouterSwapExecCalls', () => {
     const rt = route([P1], ['USDC', 'BNB']);
     const rp = must(
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeOut: true,
       }),
     );
@@ -436,9 +377,7 @@ describe('buildRouterSwapExecCalls', () => {
     const rt = route([P1], ['USDC', 'BNB']);
     const rp = must(
       planToRouterPlan(plan(100, 2, [part(rt, 1, 100, 2)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeOut: true,
       }),
     );
@@ -462,13 +401,7 @@ describe('buildRouterSwapExecCalls', () => {
 
   test('the deadline is read at call time, not baked in earlier', () => {
     const rt = route([P1], ['USDC', 'USDT']);
-    const rp = must(
-      planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    );
+    const rp = must(planToRouterPlan(plan(100, 99, [part(rt, 1, 100, 99)]), O0));
     // `parts` and `floors` are dynamic, so their contents sit at the TAIL and only their offsets
     // are in the head: deadline is head word 4, not the last word of the calldata.
     const deadlineOf = (data: string): bigint =>
@@ -489,9 +422,7 @@ describe('buildRouterCalls', () => {
     const rt = route([P1], ['BNB', 'USDT']);
     const rp = must(
       planToRouterPlan(plan(1, 99, [part(rt, 1, 1, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         nativeIn: true,
         amountInUnits: 10n ** 18n,
       }),
@@ -519,9 +450,7 @@ describe('audit regressions', () => {
     const b = route([P2], ['USDC', 'USDT']);
     const rp = must(
       planToRouterPlan(plan(100, 99, [part(a, 0.7, 70, 69), part(b, 0.3, 30, 30)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
+        ...O0,
         amountInUnits: 1n,
       }),
     );
@@ -534,7 +463,7 @@ describe('audit regressions', () => {
     const a = route([P1], ['USDC', 'USDT']);
     const b = route([P2], ['USDC', 'USDT']);
     const minOut = 99n * 10n ** 18n;
-    const opts = { slippageFrac: 0, tokenOf, isOfficialPool, maxTolPbps: 0 };
+    const opts = { ...O0, maxTolPbps: 0 };
     const legs = planToLegs(plan(100, 99, [part(a, 0.7, 70, 69), part(b, 0.3, 30, 30)]), {
       ...opts,
       amountInUnits: 1n,
@@ -554,11 +483,7 @@ describe('audit regressions', () => {
     expect(
       planToRouterPlan(
         plan(1e-12, 1e-12, [part(a, 0.5, 5e-13, 5e-13), part(b, 0.5, 5e-13, 5e-13)]),
-        {
-          slippageFrac: 0,
-          tokenOf,
-          isOfficialPool,
-        },
+        O0,
       ),
     ).toBeNull();
   });
@@ -574,13 +499,7 @@ describe('audit regressions', () => {
       tokens: ['USDC', 'DAI', 'BNB'],
       hops: 2,
     };
-    expect(
-      planToRouterPlan(plan(100, 99, [part(broken, 1, 100, 99)]), {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-      }),
-    ).toBeNull();
+    expect(planToRouterPlan(plan(100, 99, [part(broken, 1, 100, 99)]), O0)).toBeNull();
   });
 
   test('the ABI carries every error the contract can revert with', () => {
@@ -682,8 +601,7 @@ describe('one hop on one pool: direct Pool.swap encodes what Router.swap would',
   const minOut = (amountOut * (1_000_000n - BigInt(tolPbps))) / 1_000_000n;
   const opts = {
     slippageFrac: 0.005,
-    tokenOf,
-    isOfficialPool,
+    ...O,
     amountInUnits: 1_000_000_000n,
     serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
     maxTolPbps: tolPbps,
@@ -727,79 +645,32 @@ describe('one hop on one pool: direct Pool.swap encodes what Router.swap would',
 });
 
 describe('planToLegs', () => {
-  const direct = (poolAddr: string | undefined, tokenIn: string, tokenOut: string) => ({
-    legs: [{ poolTag: 't', poolAddr, tokenIn, tokenOut }],
-    tokens: [tokenIn, tokenOut],
-    hops: 1,
-  });
   const mustLegs = (legs: ExecLeg[] | null): ExecLeg[] => {
     if (!legs) throw new Error('expected legs');
     return legs;
   };
+  const e18 = (n: bigint) => n * 10n ** 18n;
+  /** A server floor on `token`: quoted `out`, floor `min` (18-dec whole units). */
+  const floorOn = (token: Address, out: bigint, min: bigint, tolPbps: number) => ({
+    serverFloors: { [token.toLowerCase()]: { amountOut: e18(out), minOut: e18(min), tolPbps } },
+    maxTolPbps: tolPbps,
+  });
 
   test('direct part → 1 leg, float→bigint via token decimals, per-leg slippage floor', () => {
-    const route = direct(POOL_S, 'USDC', 'USDT');
-    const plan: SwapPlan = {
-      amountIn: 100,
-      amountOut: 99,
-      isSplit: false,
-      parts: [
-        {
-          route,
-          fraction: 1,
-          quote: { route, amountIn: 100, amountOut: 99, fills: [] },
-        },
-      ],
-    };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0.25, tokenOf, isOfficialPool }));
+    const p = plan(100, 99, [part(route([POOL_S], ['USDC', 'USDT']), 1, 100, 99)]);
+    const legs = mustLegs(planToLegs(p, { slippageFrac: 0.25, ...O }));
     expect(legs.length).toBe(1);
     expect(legs[0].amountIn).toBe(100_000_000n); // 100 USDC @ 6 decimals
     expect(legs[0].minOut).toBe(74_250_000_000_000_000_000n); // 99·0.75 @ 18 decimals
     expect(legs[0].wrapIn).toBeUndefined();
   });
 
-  const crossRoute = {
-    legs: [
-      { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
-      { poolTag: 's', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
-    ],
-    tokens: ['BNB', 'USDC', 'USDT'],
-    hops: 2,
-  };
-  const crossPlan: SwapPlan = {
-    amountIn: 1,
-    amountOut: 599,
-    isSplit: false,
-    parts: [
-      {
-        route: crossRoute,
-        fraction: 1,
-        quote: {
-          route: crossRoute,
-          amountIn: 1,
-          amountOut: 599,
-          fills: [
-            { leg: crossRoute.legs[0], amountIn: 1, amountOut: 600 },
-            { leg: crossRoute.legs[1], amountIn: 600, amountOut: 599 },
-          ],
-        },
-      },
-    ],
-  };
-  const crossFloors = {
-    [USDT.toLowerCase()]: { amountOut: 599n * 10n ** 18n, minOut: 599n * 10n ** 18n, tolPbps: 0 },
-  };
+  const crossRoute = route([POOL_V, POOL_S], ['BNB', 'USDC', 'USDT']);
+  const crossPlan = plan(1, 599, [part(crossRoute, 1, 1, 599, [600, 599])]);
 
   test('cross-pool part → 2 legs; leg2.amountIn = leg1.minOut; wrap flags leg1 only', () => {
     const legs = mustLegs(
-      planToLegs(crossPlan, {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        nativeIn: true,
-        serverFloors: crossFloors,
-        maxTolPbps: 0,
-      }),
+      planToLegs(crossPlan, { ...O0, nativeIn: true, ...floorOn(USDT, 599n, 599n, 0) }),
     );
     expect(legs.length).toBe(2);
     expect(legs[0].wrapIn).toBe(true);
@@ -812,95 +683,36 @@ describe('planToLegs', () => {
   // funds hop 2, then `s` again on top — while the UI promised `q2·(1−s)`: ~2× the tolerance
   // extractable, authored by the SDK. The SDK never authors a floor (L-43): null instead.
   test('a chained part with no server floor is refused, not floored by the SDK', () => {
-    expect(
-      planToLegs(crossPlan, { slippageFrac: 0.01, tokenOf, isOfficialPool, nativeIn: true }),
-    ).toBeNull();
+    expect(planToLegs(crossPlan, { slippageFrac: 0.01, ...O, nativeIn: true })).toBeNull();
   });
 
-  // A part longer than this builder encodes used to be silently truncated to its first two legs,
-  // delivering the INTERMEDIATE token and calling it the swap. `/route` takes `max_hops` as a
-  // request parameter, so a 3-leg part is reachable; it must fail closed. `planToRouterPlan` is
-  // the path that encodes any number of hops.
-  test('a cross part whose first hop quotes nothing is refused, not encoded as a zero leg', () => {
-    // `leg1MinOut` would be 0n, funding hop 2 with nothing and flooring it at 0: a guaranteed
-    // `ZeroValue`/`ThresholdViolation` with no protection. Fail closed.
-    const rt = {
-      legs: [
-        { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'BNB', tokenOut: 'USDC' },
-        { poolTag: 's', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
-      ],
-      tokens: ['BNB', 'USDC', 'USDT'],
-      hops: 2,
-    };
-    const plan: SwapPlan = {
-      amountIn: 1,
-      amountOut: 0,
-      isSplit: false,
-      parts: [
-        {
-          route: rt,
-          fraction: 1,
-          quote: {
-            route: rt,
-            amountIn: 1,
-            amountOut: 0,
-            fills: [
-              { leg: rt.legs[0], amountIn: 1, amountOut: 0 },
-              { leg: rt.legs[1], amountIn: 0, amountOut: 0 },
-            ],
-          },
-        },
-      ],
-    };
-    expect(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool })).toBeNull();
-  });
-
-  test('a part with more legs than this builder encodes is refused, not truncated', () => {
-    const three = {
-      legs: [
-        { poolTag: 'a', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
-        { poolTag: 'b', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'BNB' },
-        { poolTag: 'c', poolAddr: POOL_S, tokenIn: 'BNB', tokenOut: 'USDC' },
-      ],
-      tokens: ['USDC', 'USDT', 'BNB', 'USDC'],
-      hops: 3,
-    };
-    const plan: SwapPlan = {
-      amountIn: 1000,
-      amountOut: 998,
-      isSplit: false,
-      parts: [
-        {
-          route: three,
-          fraction: 1,
-          quote: { route: three, amountIn: 1000, amountOut: 998, fills: [] },
-        },
-      ],
-    };
-    expect(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool })).toBeNull();
-  });
+  // Refusals, each fail-closed:
+  // - first hop quotes nothing: `leg1MinOut` would be 0n, funding hop 2 with nothing and flooring
+  //   it at 0 — a guaranteed `ZeroValue`/`ThresholdViolation` with no protection.
+  // - more legs than this builder encodes: used to be silently truncated to its first two legs,
+  //   delivering the INTERMEDIATE token. `/route` takes `max_hops` as a request parameter, so a
+  //   3-leg part is reachable; `planToRouterPlan` is the path that encodes any number of hops.
+  const one = (pools: (Address | undefined)[], toks: string[]) =>
+    plan(1, 1, [part(route(pools, toks), 1, 1, 1)]);
+  test.each([
+    [
+      'a cross part whose first hop quotes nothing',
+      plan(1, 0, [part(crossRoute, 1, 1, 0, [0, 0])]),
+    ],
+    [
+      'a part with more legs than this builder encodes',
+      one([POOL_S, POOL_V, POOL_S], ['USDC', 'USDT', 'BNB', 'USDC']),
+    ],
+    ['a missing pool address', one([undefined], ['USDC', 'USDT'])],
+    ['missing token meta', one([POOL_S], ['USDC', 'WOOF'])],
+  ] as const)('refuses %s', (_, p) => expect(planToLegs(p, O0)).toBeNull());
 
   test('split parts emit largest first', () => {
-    const rs = direct(POOL_S, 'USDC', 'USDT');
-    const rv = direct(POOL_V, 'USDC', 'USDT');
-    const plan: SwapPlan = {
-      amountIn: 1000,
-      amountOut: 998,
-      isSplit: true,
-      parts: [
-        {
-          route: rv,
-          fraction: 0.25,
-          quote: { route: rv, amountIn: 250, amountOut: 249, fills: [] },
-        },
-        {
-          route: rs,
-          fraction: 0.75,
-          quote: { route: rs, amountIn: 750, amountOut: 749, fills: [] },
-        },
-      ],
-    };
-    const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }));
+    const p = plan(1000, 998, [
+      part(route([POOL_V], ['USDC', 'USDT']), 0.25, 250, 249),
+      part(route([POOL_S], ['USDC', 'USDT']), 0.75, 750, 749),
+    ]);
+    const legs = mustLegs(planToLegs(p, O0));
     expect(legs.map((l) => l.pool)).toEqual([POOL_S, POOL_V]);
     expect(legs[0].amountIn).toBe(750_000_000n);
   });
@@ -915,113 +727,45 @@ describe('planToLegs', () => {
   describe('amountInUnits pins the pay leg to the wei', () => {
     const BALANCE = 31_049_999_999_999_999_999n; // 18-dec faucet twin, chip reads "31.05"
     const FLOAT_IN = Number.parseFloat('31.049999999999999999'); // === 31.05
-    const rs = direct(POOL_S, 'USDT', 'USDC'); // USDT is the 18-decimal leg in META
-    const plan: SwapPlan = {
-      amountIn: FLOAT_IN,
-      amountOut: 31,
-      isSplit: false,
-      parts: [
-        {
-          route: rs,
-          fraction: 1,
-          quote: { route: rs, amountIn: FLOAT_IN, amountOut: 31, fills: [] },
-        },
-      ],
-    };
+    const rs = route([POOL_S], ['USDT', 'USDC']); // USDT is the 18-decimal leg in META
+    const p = plan(FLOAT_IN, 31, [part(rs, 1, FLOAT_IN, 31)]);
+    const approvals = (legs: ExecLeg[]) =>
+      buildSwapCalls(legs, { recipient: USER })
+        .filter((c) => c.data.startsWith(APPROVE_SEL))
+        .map((c) => approveAmount(c.data));
 
     test('the f64 path overshoots the balance - the bug this pins', () => {
-      const legs = mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }));
+      const legs = mustLegs(planToLegs(p, O0));
       expect(legs[0].amountIn).toBe(31_050_000_000_000_000_000n);
       expect(legs[0].amountIn).toBeGreaterThan(BALANCE); // → TransferFromFailed()
     });
 
     test('exact units → amountIn IS the balance, and the approval covers exactly it', () => {
-      const legs = mustLegs(
-        planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
-      );
+      const legs = mustLegs(planToLegs(p, { ...O0, amountInUnits: BALANCE }));
       expect(legs[0].amountIn).toBe(BALANCE);
-      expect(legs[0].amountIn).toBeLessThanOrEqual(BALANCE);
-      const approves = buildSwapCalls(legs, { recipient: USER }).filter((c) =>
-        c.data.startsWith(APPROVE_SEL),
-      );
-      expect(approves.length).toBe(1);
-      expect(approveAmount(approves[0].data)).toBe(BALANCE);
+      expect(approvals(legs)).toEqual([BALANCE]);
     });
 
     test('split parts sum back to the exact total, none of them over it', () => {
-      const rv = direct(POOL_V, 'USDT', 'USDC');
       // 1/3 : 2/3 - fractions with no exact f64 (or decimal) representation.
       const third = 1 / 3;
-      const splitPlan: SwapPlan = {
-        amountIn: FLOAT_IN,
-        amountOut: 31,
-        isSplit: true,
-        parts: [
-          {
-            route: rv,
-            fraction: third,
-            quote: { route: rv, amountIn: FLOAT_IN * third, amountOut: 10, fills: [] },
-          },
-          {
-            route: rs,
-            fraction: 1 - third,
-            quote: {
-              route: rs,
-              amountIn: FLOAT_IN * (1 - third),
-              amountOut: 21,
-              fills: [],
-            },
-          },
-        ],
-      };
-      const legs = mustLegs(
-        planToLegs(splitPlan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: BALANCE }),
-      );
+      const split = plan(FLOAT_IN, 31, [
+        part(route([POOL_V], ['USDT', 'USDC']), third, FLOAT_IN * third, 10),
+        part(rs, 1 - third, FLOAT_IN * (1 - third), 21),
+      ]);
+      const legs = mustLegs(planToLegs(split, { ...O0, amountInUnits: BALANCE }));
       expect(legs.length).toBe(2);
-      const total = legs.reduce((s, l) => s + l.amountIn, 0n);
-      expect(total).toBe(BALANCE); // to the wei - no dust lost, none invented
+      expect(legs.reduce((s, l) => s + l.amountIn, 0n)).toBe(BALANCE); // no dust lost or invented
       for (const l of legs) expect(l.amountIn).toBeLessThan(BALANCE);
       // Σ of the per-(token,pool) approvals is also exactly the balance: distinct spenders.
-      const approves = buildSwapCalls(legs, { recipient: USER }).filter((c) =>
-        c.data.startsWith(APPROVE_SEL),
-      );
-      expect(approves.reduce((s, c) => s + approveAmount(c.data), 0n)).toBe(BALANCE);
+      expect(approvals(legs).reduce((s, a) => s + a, 0n)).toBe(BALANCE);
     });
 
     test('a 2-leg part debits the wallet exactly once, at the exact size', () => {
-      const cross = {
-        legs: [
-          { poolTag: 'v', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'BNB' },
-          { poolTag: 's', poolAddr: POOL_S, tokenIn: 'BNB', tokenOut: 'USDC' },
-        ],
-        tokens: ['USDT', 'BNB', 'USDC'],
-        hops: 2,
-      };
-      const crossPlan: SwapPlan = {
-        amountIn: FLOAT_IN,
-        amountOut: 31,
-        isSplit: false,
-        parts: [
-          {
-            route: cross,
-            fraction: 1,
-            quote: {
-              route: cross,
-              amountIn: FLOAT_IN,
-              amountOut: 31,
-              fills: [
-                { leg: cross.legs[0], amountIn: FLOAT_IN, amountOut: 0.5 },
-                { leg: cross.legs[1], amountIn: 0.5, amountOut: 31 },
-              ],
-            },
-          },
-        ],
-      };
+      const cross = route([POOL_V, POOL_S], ['USDT', 'BNB', 'USDC']);
       const legs = mustLegs(
-        planToLegs(crossPlan, {
-          slippageFrac: 0,
-          tokenOf,
-          isOfficialPool,
+        planToLegs(plan(FLOAT_IN, 31, [part(cross, 1, FLOAT_IN, 31, [0.5, 31])]), {
+          ...O0,
           amountInUnits: BALANCE,
           serverFloors: {
             [USDC.toLowerCase()]: { amountOut: 31_000_000n, minOut: 31_000_000n, tolPbps: 0 },
@@ -1034,14 +778,10 @@ describe('planToLegs', () => {
     });
 
     test('an absent or zero exact total leaves the float path alone', () => {
-      expect(
-        mustLegs(planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool }))[0].amountIn,
-      ).toBe(31_050_000_000_000_000_000n);
-      expect(
-        mustLegs(
-          planToLegs(plan, { slippageFrac: 0, tokenOf, isOfficialPool, amountInUnits: 0n }),
-        )[0].amountIn,
-      ).toBe(31_050_000_000_000_000_000n);
+      for (const amountInUnits of [undefined, 0n])
+        expect(mustLegs(planToLegs(p, { ...O0, amountInUnits }))[0].amountIn).toBe(
+          31_050_000_000_000_000_000n,
+        );
     });
   });
 
@@ -1049,174 +789,44 @@ describe('planToLegs', () => {
   // `planToRouterPlan` floors the SUM of the parts landing it. Encoding that floor on every part
   // asks each slice to deliver the aggregate, so a split the server accepted reverts
   // `ThresholdViolation`. These pin the leg path to the router path's aggregate semantics.
+  const split7030 = (outB: number) =>
+    plan(1000, 990, [
+      part(route([POOL_S], ['USDC', 'USDT']), 0.7, 700, 700),
+      part(route([POOL_V], ['USDC', 'USDT']), 0.3, 300, outB),
+    ]);
+  const floor990 = (token: Address) => ({ ...O0, ...floorOn(token, 1000n, 990n, 10_000) });
+
   test('a split meets the server floor in AGGREGATE — no part carries the whole floor', () => {
-    const a = direct(POOL_S, 'USDC', 'USDT');
-    const b = direct(POOL_V, 'USDC', 'USDT');
-    const splitPlan: SwapPlan = {
-      amountIn: 1000,
-      amountOut: 990,
-      isSplit: true,
-      parts: [
-        { route: a, fraction: 0.7, quote: { route: a, amountIn: 700, amountOut: 700, fills: [] } },
-        { route: b, fraction: 0.3, quote: { route: b, amountIn: 300, amountOut: 300, fills: [] } },
-      ],
-    };
-    const floors = {
-      [USDT.toLowerCase()]: {
-        amountOut: 1000n * 10n ** 18n,
-        minOut: 990n * 10n ** 18n,
-        tolPbps: 10_000,
-      },
-    };
-    const legs = mustLegs(
-      planToLegs(splitPlan, {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        serverFloors: floors,
-        maxTolPbps: 10_000,
-      }),
-    );
-    expect(legs.length).toBe(2);
+    const legs = mustLegs(planToLegs(split7030(300), floor990(USDT)));
     // Each slice is floored on its own share, not the aggregate: 700·0.99 and 300·0.99.
-    expect(legs[0].minOut).toBe(693n * 10n ** 18n);
-    expect(legs[1].minOut).toBe(297n * 10n ** 18n);
-    for (const l of legs) expect(l.minOut).toBeLessThan(990n * 10n ** 18n); // would have reverted
-    // Σ === the server floor exactly, so the aggregate still meets the promise.
-    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(990n * 10n ** 18n);
+    expect(legs.map((l) => l.minOut)).toEqual([e18(693n), e18(297n)]); // Σ === 990, each < 990
   });
 
   test('an aggregate below the server floor is NOT lowered — it reverts instead', () => {
-    const a = direct(POOL_S, 'USDC', 'USDT');
-    const b = direct(POOL_V, 'USDC', 'USDT');
     // Parts quote 900 in total; the server floor is 990. The floor is authoritative: the builder
     // must not scale it down to the stale replica, so the encoded batch cannot meet it and reverts.
-    const splitPlan: SwapPlan = {
-      amountIn: 1000,
-      amountOut: 990,
-      isSplit: true,
-      parts: [
-        { route: a, fraction: 0.7, quote: { route: a, amountIn: 700, amountOut: 700, fills: [] } },
-        { route: b, fraction: 0.3, quote: { route: b, amountIn: 300, amountOut: 200, fills: [] } },
-      ],
-    };
-    const floors = {
-      [USDT.toLowerCase()]: {
-        amountOut: 1000n * 10n ** 18n,
-        minOut: 990n * 10n ** 18n,
-        tolPbps: 10_000,
-      },
-    };
-    const legs = mustLegs(
-      planToLegs(splitPlan, {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        serverFloors: floors,
-        maxTolPbps: 10_000,
-      }),
-    );
-    const aggregate = 900n * 10n ** 18n;
-    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(990n * 10n ** 18n);
-    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBeGreaterThan(aggregate);
+    const legs = mustLegs(planToLegs(split7030(200), floor990(USDT)));
+    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(e18(990n));
     for (const l of legs) expect(l.minOut).toBeGreaterThan(l.quotedOut);
   });
 
   test('a chained hop 2 carries its slice of the server floor, funded by hop 1', () => {
-    const a = {
-      legs: [
-        { poolTag: 'v1', poolAddr: POOL_V, tokenIn: 'USDC', tokenOut: 'USDT' },
-        { poolTag: 's1', poolAddr: POOL_S, tokenIn: 'USDT', tokenOut: 'DAI' },
-      ],
-      tokens: ['USDC', 'USDT', 'DAI'],
-      hops: 2,
-    };
-    const b = {
-      legs: [
-        { poolTag: 'v2', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'USDT' },
-        { poolTag: 's2', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'DAI' },
-      ],
-      tokens: ['USDC', 'USDT', 'DAI'],
-      hops: 2,
-    };
-    const splitPlan: SwapPlan = {
-      amountIn: 1000,
-      amountOut: 990,
-      isSplit: true,
-      parts: [
-        {
-          route: a,
-          fraction: 0.7,
-          quote: {
-            route: a,
-            amountIn: 700,
-            amountOut: 700,
-            fills: [{ leg: a.legs[0], amountIn: 700, amountOut: 800 }],
-          },
-        },
-        {
-          route: b,
-          fraction: 0.3,
-          quote: {
-            route: b,
-            amountIn: 300,
-            amountOut: 300,
-            fills: [{ leg: b.legs[0], amountIn: 300, amountOut: 400 }],
-          },
-        },
-      ],
-    };
-    const floors = {
-      [DAI.toLowerCase()]: {
-        amountOut: 1000n * 10n ** 18n,
-        minOut: 990n * 10n ** 18n,
-        tolPbps: 10_000,
-      },
-    };
-    const legs = mustLegs(
-      planToLegs(splitPlan, {
-        slippageFrac: 0,
-        tokenOf,
-        isOfficialPool,
-        serverFloors: floors,
-        maxTolPbps: 10_000,
-      }),
-    );
+    const toks = ['USDC', 'USDT', 'DAI'];
+    const p = plan(1000, 990, [
+      part(route([POOL_V, POOL_S], toks), 0.7, 700, 700, [800]),
+      part(route([POOL_S, POOL_V], toks), 0.3, 300, 300, [400]),
+    ]);
+    const legs = mustLegs(planToLegs(p, floor990(DAI)));
     expect(legs.length).toBe(4);
     // Hop 1 is funded from the wallet, floored on its own quote at the server tolerance.
-    expect(legs[0].minOut).toBe(792n * 10n ** 18n); // 800·0.99 USDT
-    expect(legs[2].minOut).toBe(396n * 10n ** 18n); // 400·0.99 USDT
+    expect(legs[0].minOut).toBe(e18(792n)); // 800·0.99 USDT
+    expect(legs[2].minOut).toBe(e18(396n)); // 400·0.99 USDT
     // Hop 2 spends hop 1's floor and carries only its part's slice of the end-to-end floor.
     expect(legs[1].amountIn).toBe(legs[0].minOut);
     expect(legs[3].amountIn).toBe(legs[2].minOut);
-    expect(legs[1].minOut).toBe(693n * 10n ** 18n); // 700/1000 of 990 DAI
-    expect(legs[3].minOut).toBe(297n * 10n ** 18n); // residual, so Σ === 990
-    for (const l of [legs[1], legs[3]]) expect(l.minOut).toBeLessThan(990n * 10n ** 18n);
-    expect(legs[1].minOut + legs[3].minOut).toBe(990n * 10n ** 18n);
-    expect(legs[1].chained).toBe(true);
-    expect(legs[3].chained).toBe(true);
-  });
-
-  test('missing pool address or token meta → null', () => {
-    const noAddr = direct(undefined, 'USDC', 'USDT');
-    const noMeta = direct(POOL_S, 'USDC', 'WOOF');
-    const part = (route: typeof noAddr) => ({
-      route,
-      fraction: 1,
-      quote: { route, amountIn: 1, amountOut: 1, fills: [] },
-    });
-    expect(
-      planToLegs(
-        { amountIn: 1, amountOut: 1, isSplit: false, parts: [part(noAddr)] },
-        { slippageFrac: 0, tokenOf, isOfficialPool },
-      ),
-    ).toBeNull();
-    expect(
-      planToLegs(
-        { amountIn: 1, amountOut: 1, isSplit: false, parts: [part(noMeta)] },
-        { slippageFrac: 0, tokenOf, isOfficialPool },
-      ),
-    ).toBeNull();
+    expect(legs[1].minOut).toBe(e18(693n)); // 700/1000 of 990 DAI
+    expect(legs[3].minOut).toBe(e18(297n)); // residual, so Σ === 990
+    expect(legs[1].chained && legs[3].chained).toBe(true);
   });
 });
 
@@ -1242,8 +852,7 @@ describe('server floors — checked against the server amount_out, not the plan 
 
   const opts = {
     slippageFrac: 0.01,
-    tokenOf,
-    isOfficialPool,
+    ...O,
     serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
     maxTolPbps: tolPbps,
   };
