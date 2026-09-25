@@ -260,7 +260,7 @@ export interface LegRiskParams {
   vegaBps: number;
   kappaBps: number;
   /** Keeper push trigger from the density fit; null without a fit row. */
-  thetaBps: number | null;
+  fitThetaBps: number | null;
   /** Whole base tokens; null = uncapped. */
   depositCap: number | null;
   /** 0 = off. */
@@ -277,6 +277,8 @@ export interface LegRiskParams {
     /** 0 = disarmed. */
     refBandBps: number;
     gate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable';
+    /** Ref feed state; null when refBandBps = 0. */
+    refGate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable' | null;
     halted: boolean | null;
     ttlSecs: number | null;
     maxDevBps: number | null;
@@ -304,6 +306,8 @@ export interface PoolRiskParams {
     address: string;
     base: string | null;
     legs: number;
+    /** Legs whose getAsset read back; the rest did not decode. */
+    listed: number;
     protoSharePct: number | null;
     flashFeeBps: number | null;
     flowCooldownSecs: number | null;
