@@ -15,7 +15,7 @@ import type { Eip1193Provider } from './types';
 // Typed errors
 // ─────────────────────────────────────────────────────────────
 
-class RpcError extends Error {
+export class RpcError extends Error {
   constructor(
     message: string,
     readonly code?: number,
