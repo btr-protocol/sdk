@@ -31,6 +31,7 @@ import {
   mappingBaseU16,
   p8ClassOf,
   p8Conf,
+  p8Sigma,
   p8StoreWord,
   p8TierSlot,
   readCurve,
@@ -632,6 +633,7 @@ describe('P8 mark store', () => {
     expect(lo).toBe(0x2307d1c264168501183e8e1320b42808c1f4701905a140470fc380c82d0a024n);
     expect(hi).toBe(0xfa352b4280n);
     expect([p8Conf(31), p8Conf(32), p8Conf(60), p8Conf(61)]).toEqual([31, 36, 1000, 0xffff]);
+    expect([p8Sigma(0x20, 160), p8Sigma(0x20, 5000)]).toEqual([256, 5000]);
     expect(p8ClassOf(cls, 0)).toEqual([3600, 50, 160]);
     expect(p8ClassOf(cls, 7)).toEqual([600, 100, 300]);
     expect(p8ClassOf(cls, 10)).toEqual([0, 0, 0]);

@@ -505,9 +505,9 @@ export function p8Conf(code: number): number {
   return code < 32 ? code : code < 61 ? P8_CONF_TABLE[code - 32]! : 0xffff;
 }
 
-/** P8 σ8 → pbps; 0 reads the class floor. */
+/** P8 σ8 → pbps, never below the class floor (0 reads it exactly). */
 export function p8Sigma(s8: number, floor: number): number {
-  return s8 === 0 ? floor : (16 | (s8 & 15)) * 2 ** ((s8 >> 4) + 2);
+  return s8 === 0 ? floor : Math.max(floor, (16 | (s8 & 15)) * 2 ** ((s8 >> 4) + 2));
 }
 
 /** Tier `t` (1 = P, 2 = R) word slot of `lane` in a P8 store: 4 lanes per word. */
