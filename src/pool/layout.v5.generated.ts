@@ -1,7 +1,8 @@
 // `PoolStorage` layout v5 (`Pool.storageVersion() >= 5`, BNB): solc `storageLayout` of dex-evm
 // `out/Pool.sol/Pool.json`. No mark lives in the pool: slot 5 is reserved, the leg's oracle wiring
 // sits in `Asset` slot 2 and the marks live once, in the Pool impl's `MarkStore`
-// (`MARK_STORE`, one word per lane at `MS + lane`). `storage.test.ts` restates it by hand.
+// (`MARK_STORE`, one word per lane at `MS + lane`). Slot 6 is reserved too: each curve is an
+// immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `storage.test.ts` restates it by hand.
 
 import { POOL_STRUCTS_V4 } from './layout.v4.generated.js';
 
@@ -18,7 +19,6 @@ export const POOL_STORAGE_V5 = {
   treasury: 2n,
   factory: 3n,
   assets: 4n,
-  curves: 6n,
   custody: 7n,
   assetHooks: 8n,
   lpTokens: 9n,
@@ -27,7 +27,7 @@ export const POOL_STORAGE_V5 = {
 } as const;
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
-export const POOL_MAPPINGS_V5 = ['assets', 'curves', 'custody', 'assetHooks', 'lpTokens'] as const;
+export const POOL_MAPPINGS_V5 = ['assets', 'custody', 'assetHooks', 'lpTokens'] as const;
 
 /** In-struct `[slot, byteOffset]`: v4's, with `Asset` slot 2 repacked around a uint72 index and
  *  the leg's oracle wiring on its tail. */

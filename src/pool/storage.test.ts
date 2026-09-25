@@ -17,6 +17,7 @@ import {
   POOL_STRUCTS_V3,
   POOL_STRUCTS_V4,
   addressAt,
+  curvePointer,
   decodeCustody,
   decodeLegOracle,
   decodeMark,
@@ -403,8 +404,10 @@ describe('readCurve (NUQuarticLib.Curve storage decode)', () => {
     return words;
   }
 
+  // A v2 pool: `storageVersion()` answers 2, storage reads by slot.
   const providerFor = (words: Map<bigint, bigint>): Eip1193Provider => ({
-    request: async ({ params }) => {
+    request: async ({ method, params }) => {
+      if (method === 'eth_call') return `0x${'2'.padStart(64, '0')}`;
       const slot = BigInt((params as string[])[1]);
       return `0x${(words.get(slot) ?? 0n).toString(16).padStart(64, '0')}`;
     },
@@ -419,6 +422,41 @@ describe('readCurve (NUQuarticLib.Curve storage decode)', () => {
 
   test('unset curve (header 0) returns null', async () => {
     expect(await readCurve(providerFor(new Map()), POOL, 3)).toBeNull();
+  });
+
+  // Layout v5: one eth_getCode at the pool's CREATE3 blob. Written by forge
+  // (`NUQuarticLib.pack` of the BNB manifest's bell_100_inv, `SSTORE2.writeDeterministic` from pool
+  // 0x…aa at salt 3); the same fixture pins core `tests/storage.rs`.
+  const BLOB =
+    '0x00000064138e0000000000000000000000000000000000001ead1c3513850fac05fffffffff7a546d500000003ed6755ec0000000d5dcceef7ffffffe8b789180000000000000000000000000000000000000000000000000000000000406338600000000003b01367000000005260da54000000056edb68d5fffffffa3ac5dc180000000000000000ffffffffffffffffffff1106a1533e07fffffffff2689b6ffffffffdb8ac136c000000003ca1e6da0000000d56999a6efffffffff21ace170000000000000000ffffffffffffffffffff05a947e5e42100000000dd3600b80000000006eb5211ffffffffe2c2975200000002f6f274080000000c1b3863830000000000000000ffffffffffffffffffff3c5dc12db4a4fffffffffdc44b1cffffffffb10d6f3bffffffff0378f1960000000973c3adae0000000ef99d0c0a0000000000000000ffffffffffffffffffff5dd4e2c164eb00000000268fcd77';
+  const POINTER = '0x67203ddaCBdF2A9eF8289C271525271F4e0c0F0d';
+  const v5 = (code: string): Eip1193Provider => ({
+    request: async ({ method, params }) => {
+      if (method === 'eth_call') return `0x${'5'.padStart(64, '0')}`;
+      if (method === 'eth_getCode') {
+        return (params as string[])[0].toLowerCase() === POINTER.toLowerCase() ? code : '0x';
+      }
+      throw new Error(`v5 reads no storage: ${method}`);
+    },
+  });
+
+  test('v5: the blob at curvePointer decodes to the manifest row', async () => {
+    const wQ = [
+      -100000000000n,
+      -85647928386n,
+      -64270702607n,
+      -27155504938n,
+      27575155385n,
+      58719227779n,
+      81435312874n,
+      92315558630n,
+      100000000000n,
+    ];
+    expect(curvePointer(POOL, 3).toLowerCase()).toBe(POINTER.toLowerCase());
+    expect(await readCurve(v5(BLOB), POOL, 3)).toEqual(
+      buildCurve([4012, 4997, 7221, 7853], wQ, 100, 0),
+    );
+    expect(await readCurve(v5(BLOB), POOL, 4)).toBeNull();
   });
 });
 

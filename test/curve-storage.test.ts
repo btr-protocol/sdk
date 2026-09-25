@@ -50,6 +50,8 @@ function wordProvider(words: string[] = fx.words): Eip1193Provider & { reads: bi
   return {
     reads,
     request: async ({ method, params }: { method: string; params?: unknown[] }) => {
+      // A v2 pool: the storage-mapped curve these words were dumped from (v5 reads a blob).
+      if (method === 'eth_call') return `0x${'2'.padStart(64, '0')}` as Hex;
       if (method !== 'eth_getStorageAt') throw new Error(`unexpected ${method}`);
       const slot = BigInt((params as [Address, Hex, string])[1]);
       reads.push(slot);

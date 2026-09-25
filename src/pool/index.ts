@@ -34,7 +34,7 @@ export interface Asset {
   minLiquidity: bigint;
   liquidityIndexWad: bigint;
   minDispersionPbps: number;
-  /** Pricing-shape pointer into PoolStorage.curves (shared curve table). Never 0 on a listed leg:
+  /** Shared curve id (`readCurve`; the v5 blob sits at `curvePointer`). Never 0 on a listed leg:
    *  `PoolConfigLib.validateCurveAssign` refuses the assignment, so there is no curve-less quote. */
   curveId: number;
   minFeePbps: number;
@@ -193,6 +193,8 @@ export {
   mappingBaseU16,
   resolveTokenStorageKey,
   readAssetCurveId,
+  curvePointer,
+  decodeCurve,
   readCurve,
   readOracleConfig,
   readRiskConfig,

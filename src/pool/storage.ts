@@ -18,6 +18,7 @@
 import { BPS, type QuarticCurve, type QuarticSeg } from '../amm/aimm.js';
 import { encodeAbiParameters } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
+import { getCode } from '../eth/rpc.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
 
 /** EIP-7528 native sentinel + Solidity address(0): both map to PoolStorage.wnative. */
@@ -257,10 +258,26 @@ export async function readAssetCurveId(
   return u16At(word, offset);
 }
 
+/** Solady SSTORE2's CREATE3 proxy init-code hash (`CREATE3_PROXY_INITCODE_HASH`). */
+const CREATE3_PROXY_INITCODE_HASH = keccak256('0x67363d3d37363d34f03d5260086018f3');
+
 /**
- * Read + decode a shared curve (`NUQuarticLib.Curve` @ curves[curveId], slot 6):
- * header slot + the 2m live segment slots (of the fixed uint256[28] block). Returns null when
- * the curve is unset (header 0: Pricing falls back to the linear-impact quote).
+ * Layout v5: the account holding `pool`'s curve `curveId` (`NUQuarticLib.ptr`, the SSTORE2 CREATE3
+ * address the pool deploys at salt `bytes32(uint256(curveId))`). Immutable once written.
+ */
+export function curvePointer(pool: Address, curveId: number): Address {
+  const salt = curveId.toString(16).padStart(64, '0');
+  const proxy = keccak256(
+    `0xff${pool.slice(2).toLowerCase()}${salt}${CREATE3_PROXY_INITCODE_HASH.slice(2)}`,
+  ).slice(26);
+  return `0x${keccak256(`0xd694${proxy}01`).slice(26)}` as Address;
+}
+
+/**
+ * Read + decode a shared curve: on v5 the SSTORE2 blob at `curvePointer` (one `eth_getCode`: a STOP
+ * byte, then header + 2 words per segment), on v2–v4 `NUQuarticLib.Curve` @ curves[curveId],
+ * slot 6 (header slot + the 2m live words of the fixed uint256[28] block). Returns null when the
+ * curve is not installed (header 0 / no code).
  * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
  */
 export async function readCurve(
@@ -268,23 +285,35 @@ export async function readCurve(
   pool: Address,
   curveId: number,
 ): Promise<QuarticCurve | null> {
+  if ((await readStorageVersion(provider, pool)) >= 5) {
+    const code = (await getCode(provider, curvePointer(pool, curveId))).slice(4); // 0x + STOP
+    const words = Array.from({ length: code.length >> 6 }, (_, i) =>
+      BigInt(`0x${code.slice(64 * i, 64 * i + 64)}`),
+    );
+    return decodeCurve(words);
+  }
   const base = mappingBaseU16(curveId, POOL_STORAGE.curves);
   // ONE transport round-trip: the segment block is a FIXED uint256[28] slot run (m ≤ 14), so the
   // header and every possible segment word are fetched speculatively together. The transport's
   // tick-batch coalesces these into a single JSON-RPC POST; per-slot eth_getStorageAt cannot ride
-  // Multicall3 aggregate3 (raw storage, no view getter by policy - see module header). The old
-  // header-first read cost two sequential round-trips per curve.
+  // Multicall3 aggregate3 (raw storage, no view getter by policy - see module header).
   const words = await Promise.all(
     Array.from({ length: 1 + CURVE_SEG_SLOTS }, (_, i) =>
       getStorageAt(provider, pool, base + BigInt(i)),
     ),
   );
-  const header = BigInt(words[0]);
+  return decodeCurve(words.map((w) => BigInt(w)));
+}
+
+/** Header word + segment words → curve; null on header 0 or fewer words than `m` claims. */
+export function decodeCurve(words: bigint[]): QuarticCurve | null {
+  const header = words[0] ?? 0n;
   if (header === 0n) return null;
   const m = Number(header & 0xffn);
+  if (words.length < 1 + 2 * m) return null;
   // The directory holds the m-1 INTERIOR boundaries only; the last right edge is the BPS constant,
-  // never stored (NUQuarticLib.set: "interior boundaries only; b_m = SC.BPS"). Those freed bits carry
-  // the median at 216, so reading m entries here both loses b_m and mis-reads the median as one.
+  // never stored. Those freed bits carry the median at 216, so reading m entries here both loses
+  // b_m and mis-reads the median as one.
   const boundaries: number[] = [];
   for (let j = 1; j < m; j++) {
     boundaries.push(Number((header >> BigInt(8 + 16 * (j - 1))) & 0xffffn));
@@ -294,8 +323,8 @@ export async function readCurve(
   const flags = Number((header >> 248n) & 0xffn);
   const segs: QuarticSeg[] = [];
   for (let i = 0; i < m; i++) {
-    const a = BigInt(words[1 + 2 * i]);
-    const b = BigInt(words[2 + 2 * i]);
+    const a = words[1 + 2 * i];
+    const b = words[2 + 2 * i];
     const sRaw = (b >> 64n) & ((1n << 128n) - 1n);
     segs.push({
       c0: i64AtBits(a, 0),
