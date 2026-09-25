@@ -60,7 +60,7 @@ function constants(code: string): Map<string, number> {
 /** Tiny integer evaluator: decimal literals (with `_` separators), identifiers already resolved,
  *  `<<`, `|`, `&`, parentheses. Anything else yields undefined and the constant is skipped. */
 function evaluate(expr: string, env: Map<string, number>): number | undefined {
-  // `\w+` would swallow the `_` in `HALT_RISK_BIT`; numeric separators are stripped per token.
+  // `\w+` would swallow the `_` in `HALT_ANCHOR_BIT`; numeric separators are stripped per token.
   const toks = expr
     .replace(/\/\/[^\n]*/g, '')
     .trim()
@@ -151,8 +151,7 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     // `setHalt` may clear (the anchor latch is outside it); both are derived on chain from the
     // bits, so they are derived here too rather than copied.
     for (const k of [
-      'HALT_RISK_BIT',
-      'HALT_GUARDIAN_BIT',
+      'HALT_BIT',
       'HALT_ANCHOR_BIT',
       'HALT_MASK',
       'HALT_SETTABLE_MASK',

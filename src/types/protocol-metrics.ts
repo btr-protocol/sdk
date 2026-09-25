@@ -235,8 +235,8 @@ export interface ProtocolLiquidityHistory {
 /** `Asset.flags`, decoded by the back one name per bit. */
 export interface LegFlags {
   raw: number;
-  haltRisk: boolean;
-  haltGuardian: boolean;
+  /** `HALT_BIT`: raised by the guardian, the owner or the pool's seat. */
+  halted: boolean;
   haltAnchor: boolean;
   swaps: boolean;
   liabilitySwaps: boolean;
