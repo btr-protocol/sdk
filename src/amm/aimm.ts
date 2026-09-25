@@ -235,6 +235,8 @@ export interface PoolLeg {
   /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
    *  leg the chain would revert on past its band. Absent = 0 / no base check. */
   refBandBps?: number;
+  /** `oracleBits` bit 6 (INTERNAL, priced at 1.0): peg test tightens to min(code·250, band). */
+  internal?: boolean;
   baseMark?: number;
   baseRefBandBps?: number;
 }
@@ -389,6 +391,7 @@ interface SpokeWire {
   stale_excess: number;
   proto_share_pct: number;
   ref_band_bps: number;
+  internal: boolean;
   decimals?: number;
 }
 /**
@@ -681,6 +684,7 @@ interface QuoteRequestWire {
   stale_excess: number;
   proto_share_pct: number;
   ref_band_bps: number;
+  internal: boolean;
   base_mark: string | null;
   base_ref_band_bps: number;
 }
@@ -768,7 +772,11 @@ const baseDepegWire = (leg?: PoolLeg) => ({
   base_mark: leg?.baseMark != null ? wadHex(leg.baseMark) : null,
   base_ref_band_bps: leg?.baseRefBandBps ?? 0,
 });
-const depegWire = (leg: PoolLeg) => ({ ref_band_bps: leg.refBandBps ?? 0, ...baseDepegWire(leg) });
+const depegWire = (leg: PoolLeg) => ({
+  ref_band_bps: leg.refBandBps ?? 0,
+  internal: leg.internal ?? false,
+  ...baseDepegWire(leg),
+});
 
 /** Single-leg exact-in quote over POST /v1/quote. `counterparty`: see {@link legToQuoteBody}. */
 export function quoteLegAsync(
@@ -871,6 +879,7 @@ export function poolStateToWire(
       stale_excess: leg.staleExcess ?? 0,
       proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
       ref_band_bps: leg.refBandBps ?? 0,
+      internal: leg.internal ?? false,
       decimals: leg.decimals,
     })),
   };

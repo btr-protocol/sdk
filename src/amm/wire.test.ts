@@ -80,6 +80,7 @@ describe('depeg wire', () => {
     const s = state(HUB);
     Object.assign(s.legs.USDT, {
       refBandBps: (4 << 12) | 50,
+      internal: true,
       baseMark: 0.5,
       baseRefBandBps: 8 << 12,
     });
@@ -89,6 +90,7 @@ describe('depeg wire', () => {
   test('pools and spokes carry ref_band_bps + base_mark + base_ref_band_bps', () => {
     const w = poolStateToWire('p', undefined, banded(), meta, 6);
     expect(w.spokes[0].ref_band_bps).toBe((4 << 12) | 50);
+    expect(w.spokes[0].internal).toBe(true);
     expect(w.base_mark).toBe('0x6f05b59d3b20000');
     expect(w.base_ref_band_bps).toBe(8 << 12);
   });
@@ -96,13 +98,14 @@ describe('depeg wire', () => {
   test('legs carry the same three fields', () => {
     const b = legToQuoteBody(banded().legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
     expect(b.ref_band_bps).toBe((4 << 12) | 50);
+    expect(b.internal).toBe(true);
     expect(b.base_mark).toBe('0x6f05b59d3b20000');
     expect(b.base_ref_band_bps).toBe(8 << 12);
   });
 
   test('unknown base mark goes out null (no base check), bands default 0', () => {
     const b = legToQuoteBody(state(HUB).legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
-    expect(b).toMatchObject({ ref_band_bps: 0, base_mark: null, base_ref_band_bps: 0 });
+    expect(b).toMatchObject({ ref_band_bps: 0, internal: false, base_mark: null, base_ref_band_bps: 0 });
   });
 });
 
