@@ -50,9 +50,13 @@ function enumMembers(code: string, name: string): string[] {
 function constants(code: string): Map<string, number> {
   const out = new Map<string, number>();
   const re = /(?:u?int\d*)\s+(?:internal|private|public)\s+constant\s+(\w+)\s*=\s*([^;]+);/g;
-  for (const m of code.matchAll(re)) {
-    const v = evaluate(m[2], out);
-    if (v !== undefined) out.set(m[1], v);
+  // Fixpoint: a constant may reference one declared further down (KNOWN_FLAGS_MASK ← DEPEG_MASK).
+  for (let n = -1; n !== out.size; ) {
+    n = out.size;
+    for (const m of code.matchAll(re)) {
+      const v = out.has(m[1]) ? undefined : evaluate(m[2], out);
+      if (v !== undefined) out.set(m[1], v);
+    }
   }
   return out;
 }
