@@ -684,7 +684,13 @@ describe('P8 mark store', () => {
       }) as unknown as Eip1193Provider;
     // right id, no lane classed: Pool's constructor rejects it, so no layout is known
     const unclassed = `0x${'00'.repeat(96)}${CLASSES.slice(2 + 192)}`;
-    await expect(readMarks(at(() => unclassed), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    await expect(
+      readMarks(
+        at(() => unclassed),
+        POOL,
+        TOKEN,
+      ),
+    ).rejects.toThrow('not a P8 table');
     const rpc = Object.assign(new Error('relay: upstream revert-proxy timeout'), { code: -32603 });
     await expect(
       readMarks(
