@@ -336,7 +336,7 @@ export async function swap(
 ): Promise<Hex> {
   const calldata = encodeFn({
     abi: POOL_ABI,
-    functionName: 'swap',
+    functionName: 'swap_qe',
     args: [
       params.tokenIn,
       params.tokenOut,

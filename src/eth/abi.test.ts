@@ -63,16 +63,16 @@ describe('getSelector', () => {
 // signatures must exist in exactly one place, the generated ABIs under src/abis.
 describe('no hand-maintained mirrors of on-chain signatures', () => {
   test('POOL_ABI is the sole source of the swap signature', () => {
-    const swaps = (POOL_ABI as unknown as AbiFunction[]).filter((f) => f.name === 'swap');
+    const swaps = (POOL_ABI as unknown as AbiFunction[]).filter((f) => f.name === 'swap_qe');
     expect(swaps.length).toBe(1); // no overloads: one signature to keep straight
-    const sig = `swap(${(swaps[0]?.inputs ?? []).map(canonicalType).join(',')})`;
-    // Pinned by hand off Pool.sol: 6 args, trailing deadline.
-    expect(sig).toBe('swap(address,address,uint256,uint256,address,uint256)');
-    expect(getPlan(POOL_ABI, 'swap').selector).toBe('0x9908fc8b');
+    const sig = `swap_qe(${(swaps[0]?.inputs ?? []).map(canonicalType).join(',')})`;
+    // Pinned by hand off Pool.sol: 6 args, trailing deadline; name suffix mined for dispatch order.
+    expect(sig).toBe('swap_qe(address,address,uint256,uint256,address,uint256)');
+    expect(getPlan(POOL_ABI, 'swap_qe').selector).toBe('0x01dc30b8');
     // The 5-arg form hashes to a real-looking selector `Pool` does not implement. `Pool` has
     // no catch-all entrypoint, so it reverts empty rather than executing something else.
     expect(getSelector('swap(address,address,uint256,uint256,address)')).toBe('0xd5bcb9b5');
-    expect(getPlan(POOL_ABI, 'swap').selector).not.toBe('0xd5bcb9b5');
+    expect(getPlan(POOL_ABI, 'swap_qe').selector).not.toBe('0xd5bcb9b5');
   });
 
   test('only external-standard modules declare ABI fragments outside src/abis', () => {

@@ -57,7 +57,7 @@ const err = (name: string, inputs: { name: string; type: string }[]): unknown =>
 export const ABI_FALLBACKS: Record<string, unknown[]> = {
   Pool: [
     fn(
-      'swap',
+      'swap_qe',
       [
         T('tokenIn', 'address'),
         T('tokenOut', 'address'),

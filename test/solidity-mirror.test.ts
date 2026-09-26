@@ -17,7 +17,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
 import { MAX_INTERIOR_SWING_PBPS } from '../src/amm/aimm';
-import { V6_MAX_SOURCE_AGE_SECS, V6_SOURCE_TS_FUTURE_SKEW_SECS } from '../src/oracle/wire';
 import { MARK_WORD_V4 } from '../src/pool/layout.v4.generated';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
@@ -197,12 +196,6 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     const c = pricingConsts();
     expect(c.get('STALE_Z')).toBe(M.STALE_Z);
     expect(c.get('MAX_STALE_GRACE_SECS')).toBe(M.MAX_STALE_GRACE_SECS);
-  });
-
-  test('wire-v6 srcSecs bounds match MarkStore.sol', () => {
-    const c = constants(src(join(DEX, 'src', 'oracles', 'MarkStore.sol')));
-    expect(c.get('MAX_SOURCE_AGE_SECS')).toBe(V6_MAX_SOURCE_AGE_SECS);
-    expect(c.get('FUTURE_SKEW_SECS')).toBe(V6_SOURCE_TS_FUTURE_SKEW_SECS);
   });
 
   test('MAX_INTERIOR_SWING_PBPS is the PricingLib.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {

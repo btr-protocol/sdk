@@ -184,14 +184,14 @@ const swapCalldata = (
 ): Hex =>
   encodeFn({
     abi: POOL_ABI,
-    functionName: 'swap',
+    functionName: 'swap_qe',
     args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
   });
 
-/** Selector and byte length of `swap(address,address,uint256,uint256,address,uint256)`. */
+/** Selector and byte length of `swap_qe(address,address,uint256,uint256,address,uint256)`. */
 const SWAP_SELECTOR = getSelector(
   getFunctionSignature({
-    name: 'swap',
+    name: 'swap_qe',
     inputs: [
       { type: 'address' },
       { type: 'address' },

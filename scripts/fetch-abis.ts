@@ -59,7 +59,7 @@ const TARGETS = [
     file: 'src/abis/Pool.ts',
     doc: 'Flat pool surface (swap/deposit/withdraw/view + pool-scoped admin entrypoints); library events and errors merged in.',
     fns: [
-      'swap',
+      'swap_qe',
       'deposit',
       'withdraw',
       'withdrawTo',
@@ -70,7 +70,7 @@ const TARGETS = [
       'getCoverageRatio',
       'getLPBalance',
     ],
-    pins: { 'swap(address,address,uint256,uint256,address,uint256)': '0x9908fc8b' },
+    pins: { 'swap_qe(address,address,uint256,uint256,address,uint256)': '0x01dc30b8' },
   },
   {
     name: 'Admin',

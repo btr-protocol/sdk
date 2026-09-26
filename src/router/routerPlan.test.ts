@@ -613,7 +613,7 @@ describe('one hop on one pool: direct Pool.swap encodes what Router.swap would',
     const call = { recipient: USER, sender: USER, deadline: 1_788_180_882n };
     const direct = buildSwapExecCalls(legs, call);
     expect(direct.map((c) => c.to)).toEqual([P1]);
-    const [tin, tout, amountIn, floor, to, deadline] = args(POOL_ABI, 'swap', direct[0].data);
+    const [tin, tout, amountIn, floor, to, deadline] = args(POOL_ABI, 'swap_qe', direct[0].data);
     const [parts, floors, rTo, rDeadline] = args(
       ROUTER_ABI,
       'swap',

@@ -427,7 +427,7 @@ describe('the venue swap deadline is a send-time window, not a quote-time one', 
     amountOut: 999_000n,
     calldata: encodeFn({
       abi: POOL_ABI,
-      functionName: 'swap',
+      functionName: 'swap_qe',
       args: [TOKEN_A, TOKEN_B, 1_000_000n, 990_000n, ALICE, deadline],
     }),
   });

@@ -8,7 +8,7 @@ const WNATIVE = '0x0000000000000000000000000000000000000003' as const;
 const POOL_S = '0x0000000000000000000000000000000000000010' as const;
 const POOL_V = '0x0000000000000000000000000000000000000020' as const;
 
-const SWAP_SEL = '0x9908fc8b'; // swap(address,address,uint256,uint256,address,uint256)
+const SWAP_SEL = '0x01dc30b8'; // swap_qe(address,address,uint256,uint256,address,uint256)
 const APPROVE_SEL = '0x095ea7b3'; // approve(address,uint256)
 const DEPOSIT_SEL = '0xd0e30db0'; // deposit()
 const WITHDRAW_SEL = '0x2e1a7d4d'; // withdraw(uint256)

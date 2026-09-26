@@ -547,7 +547,7 @@ export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
     to: leg.pool,
     data: encodeFn({
       abi: POOL_ABI,
-      functionName: 'swap',
+      functionName: 'swap_qe',
       args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
     }),
     value: 0n,
