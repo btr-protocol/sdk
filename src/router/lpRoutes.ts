@@ -19,9 +19,9 @@ import {
   type LiabLeg,
   WAD,
   backendConvert,
-  exitCap,
   exitValue,
   legCoverage,
+  poolExitCap,
   poolSolvency,
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
@@ -35,9 +35,6 @@ export interface LpRouteOpts {
   liabilityEnabled?: (symbol: string) => boolean;
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
-  /** `PoolStorage.lastGoodCWad` per pool tag: the degraded same-asset exit cap when a mark is
-   *  unusable. Absent reads as never-observed (1), the chain's own fallback for a zero slot. */
-  lastGoodCWad?: (poolTag: string) => bigint | undefined;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: BackendConvertOpts & { meta: WireMeta };
 }
@@ -579,7 +576,7 @@ async function transferExit(
   const exitOut = exitValue(
     q.liabOut,
     legCoverage(toLeg.reserves, toLeg.liabilities + q.liabOut),
-    exitCap(c),
+    c,
   );
   shell.steps[0].amountOut = q.lpAmountOut;
   shell.steps[0].minOut = q.lpAmountOut * (1 - slip);
@@ -623,9 +620,9 @@ export async function rankRedeem(
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
     const slip = opts.slippageFrac;
-    // `exitMu`: in-kind at `min(c_leg, cap)`, where the cap degrades to `lastGoodCWad` (never a
-    // bare 1) when a mark is unusable. The same-asset hatch stays open in that state.
-    const cap = exitCap(poolSolvency(holder.state), opts.lastGoodCWad?.(holder.tag));
+    // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
+    // the hatch stays open. The exit toll is not modelled: the caller's slippage must cover it.
+    const cap = poolExitCap(holder.state);
     const actual = exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap);
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);

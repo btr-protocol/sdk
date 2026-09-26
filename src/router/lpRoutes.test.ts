@@ -564,12 +564,10 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
     const dep = await rankDeposit(dark, 'NZDF', 'NZDF', 5_000, BE);
     expect(dep.best).toBeNull();
     expect(dep.routes[0]?.reason).toBe('feed-unavailable');
-    // Degraded same-asset: min(c_leg, min(1, lastGoodC)).
-    const same = await rankRedeem(dark, 'NZDF', 'NZDF', 5_000, {
-      ...BE,
-      lastGoodCWad: () => 960_000_000_000_000_000n,
-    });
-    expect(same.best?.out).toBeCloseTo(4_800, 6);
+    // Degraded same-asset: min(c_leg, C_lower), C_lower = min(C_usable, dark c_k = 0.6).
+    const short = [pool('core', { audfMark: 0, audfRes: 600_000 })];
+    const same = await rankRedeem(short, 'NZDF', 'NZDF', 5_000, BE);
+    expect(same.best?.out).toBeCloseTo(3_000, 6);
   });
 
   test('a deposit mints face amt / C', async () => {

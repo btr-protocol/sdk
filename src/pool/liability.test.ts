@@ -80,12 +80,16 @@ describe('LEDA-7: the ONE off-chain replica of pool-level settlement', () => {
     expect(exitValue(1_000, legCoverage(5, 0), 0.95)).toBeCloseTo(950, 9);
   });
 
-  test('the degraded cap is min(1, lastGoodC), never a bare 1 over a known shortfall', () => {
-    expect(exitCap(1.07)).toBe(1.07);
-    expect(exitCap(null, 970_000_000_000_000_000n)).toBeCloseTo(0.97, 12);
-    expect(exitCap(null, 1_050_000_000_000_000_000n)).toBe(1);
-    expect(exitCap(null, 0n)).toBe(1);
-    expect(exitCap(null)).toBe(1);
+  test('the degraded cap is the sweep lower bound min(C_usable, min dark c_k)', () => {
+    expect(exitCap(1_070, 1_000)).toBeCloseTo(1.07, 12);
+    expect(exitCap(0, 0)).toBe(1);
+    // Usable 100/100, dark leg R 30 / L 100: chain pays 0.3, never a stale stamp.
+    expect(exitCap(100, 100, [0.3])).toBeCloseTo(0.3, 12);
+    // Every leg over-covered: the bound is C_usable, not capped at 1.
+    expect(exitCap(120, 100, [1.5])).toBeCloseTo(1.2, 12);
+    // Claimless dark leg (c_k = ∞) and no usable claim: unbounded, exitMu pays c_leg.
+    expect(exitCap(50, 0, [Number.POSITIVE_INFINITY])).toBe(Number.POSITIVE_INFINITY);
+    expect(exitCap(0, 0, [0.4])).toBeCloseTo(0.4, 12);
   });
 });
 

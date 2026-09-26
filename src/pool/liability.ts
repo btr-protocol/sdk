@@ -74,13 +74,30 @@ export function poolSolvency(state: PoolState): number | null {
   return Number.isFinite(c) ? c : null;
 }
 
-/** `PoolSolvencyLib.previewCap`: the live rate when there is one, else the degraded fallback
- *  `min(1, lastGoodC)` with a never-observed (0) slot reading 1. Never a bare 1 over a known
- *  `lastGoodCWad < 1`: that would pay MORE for an oracle outage than for a healthy pool. */
-export function exitCap(c: number | null, lastGoodCWad?: bigint): number {
-  if (c !== null) return c;
-  const g = lastGoodCWad === undefined ? 0 : Number(lastGoodCWad) / WAD;
-  return g === 0 || g > 1 ? 1 : g;
+/** `PoolSolvencyLib.previewCap` from the sweep's sums: `nav`/`claim` over the usable legs (hub
+ *  included), `darkCk` = each unusable leg's `c_k = R/L` (∞ at L = 0; 0/0 legs skipped). With no dark
+ *  leg it is C (1 on an empty book); else C's lower bound `min(C_usable, min c_k)`, since the true C is
+ *  a mediant of them whatever the dark marks read. Excludes the exit toll (`exitSpreadPbps`). */
+export function exitCap(nav: number, claim: number, darkCk: number[] = []): number {
+  const lo = Math.min(...darkCk);
+  if (darkCk.length === 0) return claim > 0 ? nav / claim : 1;
+  return Math.min(claim > 0 ? nav / claim : nav > 0 ? Number.POSITIVE_INFINITY : lo, lo);
+}
+
+/** {@link exitCap} over a `PoolState`: a leg whose `twap` is not a positive number is dark. */
+export function poolExitCap(state: PoolState): number {
+  let nav = state.hub?.res ?? 0;
+  let claim = state.hub?.liab ?? 0;
+  const dark: number[] = [];
+  for (const leg of Object.values(state.legs)) {
+    if (leg.res === 0 && leg.liab === 0) continue;
+    if (!(Number.isFinite(leg.twap) && leg.twap > 0)) dark.push(legCoverage(leg.res, leg.liab));
+    else {
+      nav += leg.res * leg.twap;
+      claim += leg.liab * leg.twap;
+    }
+  }
+  return exitCap(nav, claim, dark);
 }
 
 /** `PoolLiquidityLib.exitMu` in face units: the SAME-ASSET payout `face · min(c_leg, cap)`.
