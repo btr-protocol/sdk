@@ -1,6 +1,6 @@
-// GENERATED from dex-evm/abi/MarkStore.json by `bun scripts/gen-constants.ts`. Do not edit.
+// GENERATED from dex-evm/abi/MarkStoreP8.json by `bun scripts/gen-constants.ts`. Do not edit.
 /**
- * MarkStore - both tiers' marks in the Pool impl: push + lane governance, called at the impl.
+ * MarkStoreP8 - both tiers' marks in the Pool impl: push + lane governance, called at the impl.
  *
  * Reads go through `PoolFactory.getFeed`/`feedOf`. Push calldata is raw segments
  * (`oracle/wire.ts`), never encoded through this ABI.
@@ -19,6 +19,16 @@ export const MARK_STORE_ABI: Abi = [
         internalType: 'address',
         name: 'factory',
         type: 'address',
+      },
+      {
+        internalType: 'uint256',
+        name: 'laneCls',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256[7]',
+        name: 'cls',
+        type: 'uint256[7]',
       },
     ],
     stateMutability: 'nonpayable',
@@ -48,6 +58,34 @@ export const MARK_STORE_ABI: Abi = [
     name: 'cancel',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'classes',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
     type: 'function',
   },
   {
@@ -115,19 +153,22 @@ export const MARK_STORE_ABI: Abi = [
         type: 'uint8',
       },
       {
-        internalType: 'uint16',
-        name: 'ttlSecs',
-        type: 'uint16',
+        internalType: 'uint8',
+        name: 'tierMask',
+        type: 'uint8',
       },
+    ],
+    name: 'reanchor',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
       {
-        internalType: 'uint16',
-        name: 'maxDevBps',
-        type: 'uint16',
-      },
-      {
-        internalType: 'uint32',
-        name: 'minSigmaPbps',
-        type: 'uint32',
+        internalType: 'uint8',
+        name: 'lane',
+        type: 'uint8',
       },
     ],
     name: 'register',
@@ -159,34 +200,6 @@ export const MARK_STORE_ABI: Abi = [
       },
     ],
     name: 'setAuth',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'uint8',
-        name: 'lane',
-        type: 'uint8',
-      },
-      {
-        internalType: 'uint16',
-        name: 'ttlSecs',
-        type: 'uint16',
-      },
-      {
-        internalType: 'uint16',
-        name: 'maxDevBps',
-        type: 'uint16',
-      },
-      {
-        internalType: 'uint32',
-        name: 'minSigmaPbps',
-        type: 'uint32',
-      },
-    ],
-    name: 'setBounds',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -270,37 +283,6 @@ export const MARK_STORE_ABI: Abi = [
       },
       {
         indexed: false,
-        internalType: 'uint16',
-        name: 'ttlSecs',
-        type: 'uint16',
-      },
-      {
-        indexed: false,
-        internalType: 'uint16',
-        name: 'maxDevBps',
-        type: 'uint16',
-      },
-      {
-        indexed: false,
-        internalType: 'uint32',
-        name: 'minSigmaPbps',
-        type: 'uint32',
-      },
-    ],
-    name: 'BoundsUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'lane',
-        type: 'uint256',
-      },
-      {
-        indexed: false,
         internalType: 'uint256',
         name: 'tierMask',
         type: 'uint256',
@@ -324,39 +306,8 @@ export const MARK_STORE_ABI: Abi = [
         name: 'lane',
         type: 'uint256',
       },
-      {
-        indexed: false,
-        internalType: 'uint16',
-        name: 'ttlSecs',
-        type: 'uint16',
-      },
-      {
-        indexed: false,
-        internalType: 'uint16',
-        name: 'maxDevBps',
-        type: 'uint16',
-      },
-      {
-        indexed: false,
-        internalType: 'uint32',
-        name: 'minSigmaPbps',
-        type: 'uint32',
-      },
     ],
-    name: 'LaneRegistered',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: 'uint64',
-        name: 'srcSecs',
-        type: 'uint64',
-      },
-    ],
-    name: 'MarksPublished',
+    name: 'LaneListed',
     type: 'event',
   },
   {
@@ -418,6 +369,11 @@ export const MARK_STORE_ABI: Abi = [
   {
     inputs: [],
     name: 'InvalidBlobHeader',
+    type: 'error',
+  },
+  {
+    inputs: [],
+    name: 'InvalidConfig',
     type: 'error',
   },
   {

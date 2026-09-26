@@ -23,7 +23,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dexEvm = process.env.BTR_DEX_EVM ?? join(root, '..', 'dex-evm');
 const source = join(dexEvm, 'abi', 'constants.json');
 const out = join(root, 'src', 'abis', 'solidity.generated.ts');
-const storeSource = join(dexEvm, 'abi', 'MarkStore.json');
+const storeSource = join(dexEvm, 'abi', 'MarkStoreP8.json');
 const storeOut = join(root, 'src', 'abis', 'MarkStore.ts');
 
 if (!existsSync(source)) {
@@ -31,15 +31,15 @@ if (!existsSync(source)) {
   process.exit(0);
 }
 
-// The mark store's push + lane-governance surface (halt/unhalt/register/setBounds/setAuth), called
-// at the Pool impl. The Arc fleet is V4 and keeps `ExternalOracleV4.ts`; pick by the deployment
+// The launch mark store's (P8) push + lane-governance surface (halt/unhalt/register/reanchor/
+// setAuth), called at the Pool impl. The Arc fleet is V4 and keeps `ExternalOracleV4.ts`; pick by the deployment
 // record's wire, never by assuming one.
 if (existsSync(storeSource)) {
   const abi = readFileSync(storeSource, 'utf8').trimEnd();
   writeFileSync(
     storeOut,
-    `// GENERATED from dex-evm/abi/MarkStore.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
-      `/**\n * MarkStore - both tiers' marks in the Pool impl: push + lane governance, called at the impl.\n *\n` +
+    `// GENERATED from dex-evm/abi/MarkStoreP8.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
+      `/**\n * MarkStoreP8 - both tiers' marks in the Pool impl: push + lane governance, called at the impl.\n *\n` +
       ` * Reads go through \`PoolFactory.getFeed\`/\`feedOf\`. Push calldata is raw segments\n` +
       ` * (\`oracle/wire.ts\`), never encoded through this ABI.\n */\n` +
       `import type { Abi } from '../eth/abi.js';\n\nexport const MARK_STORE_ABI: Abi = ${abi};\n`,
