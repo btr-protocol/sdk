@@ -84,7 +84,10 @@ export function exitCap(nav: number, claim: number, darkCk: number[] = []): numb
   return Math.min(claim > 0 ? nav / claim : nav > 0 ? Number.POSITIVE_INFINITY : lo, lo);
 }
 
-/** {@link exitCap} over a `PoolState`: a leg whose `twap` is not a positive number is dark. */
+/** {@link exitCap} over a `PoolState`: a leg whose `twap` is not a positive number is dark. Reads
+ *  the stored `res`; the chain caps it at `invested + balanceOf` (`_backedReserves`), so a leg whose
+ *  token lost balance (fee-on-transfer, negative rebase, clawback) quotes high here; the exit's
+ *  slippage floor covers the gap. */
 export function poolExitCap(state: PoolState): number {
   let nav = state.hub?.res ?? 0;
   let claim = state.hub?.liab ?? 0;
