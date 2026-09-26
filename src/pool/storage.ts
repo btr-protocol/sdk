@@ -468,11 +468,6 @@ export function decodeStoreWord(
 /** ERC-1967 impl slot: a pool proxy's live impl, which carries the mark store. */
 const IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn;
 
-/** The store word of `lane` at `impl` (`PoolFactory.implementation()`). */
-async function readStoreWord(provider: Eip1193Provider, impl: Address, lane: number): Promise<Hex> {
-  return getStorageAt(provider, impl, MARK_STORE.MS + BigInt(lane));
-}
-
 /** `MarkP8Lib.CONF_LO`/`CONF_HI` unpacked: bps of P8 conf codes 32..60. */
 export const P8_CONF_TABLE = [
   36, 40, 45, 50, 56, 63, 71, 80, 90, 100, 112, 125, 140, 160, 180, 200, 225, 250, 280, 320, 360,
@@ -546,21 +541,13 @@ export function p8StoreWord(pw: Hex, rw: Hex, lane: number, c: P8Classes): Hex {
   return `0x${w.toString(16).padStart(64, '0')}`;
 }
 
-/** The impl store's P8 class table; `null` for a D2b store, which reverts `classes()`. Throws on
- *  a failed read or a table without the P8 id: neither layout, so no mark (fail closed). */
-async function readP8Classes(provider: Eip1193Provider, impl: Address): Promise<P8Classes | null> {
-  let r: Hex;
-  try {
-    r = (await provider.request({
-      method: 'eth_call',
-      params: [{ to: impl, data: CLASSES_SELECTOR }, 'latest'],
-    })) as Hex;
-  } catch (e) {
-    // EIP-1474 code 3, or geth's bare "execution reverted" for an empty revert
-    const { code, message } = (e ?? {}) as { code?: unknown; message?: unknown };
-    if (code === 3 || /^execution reverted/i.test(String(message ?? ''))) return null;
-    throw e;
-  }
+/** The impl store's P8 class table, the only layout `Pool`'s constructor admits. Throws on a failed
+ *  or reverted read or a table without the P8 id: no mark (fail closed). */
+async function readP8Classes(provider: Eip1193Provider, impl: Address): Promise<P8Classes> {
+  const r = (await provider.request({
+    method: 'eth_call',
+    params: [{ to: impl, data: CLASSES_SELECTOR }, 'latest'],
+  })) as Hex;
   const c = decodeP8Classes(r);
   if (!c) throw new Error(`classes() of ${impl} is not a P8 table`);
   return c;
@@ -583,7 +570,6 @@ export async function readMarks(
     const leg = decodeLegOracle(slot2);
     const impl = addressAt(implWord, 0);
     const cls = await readP8Classes(provider, impl);
-    if (!cls) return decodeStoreWord(await readStoreWord(provider, impl, leg.lane), leg);
     const [pw, rw] = await Promise.all([
       getStorageAt(provider, impl, p8TierSlot(1, leg.lane)),
       getStorageAt(provider, impl, p8TierSlot(2, leg.lane)),

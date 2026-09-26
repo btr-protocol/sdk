@@ -475,9 +475,6 @@ describe('versioned readers', () => {
     ({
       request: async ({ method, params }: { method: string; params: unknown[] }) => {
         if (method !== 'eth_call') return slots.get(BigInt(params[1] as string)) ?? word('0');
-        // a D2b store reverts `classes()`
-        if ((params[0] as { data: string }).data === '0x31e77853')
-          throw Object.assign(new Error('execution reverted'), { code: 3 });
         return word(version.toString(16));
       },
     }) as unknown as Eip1193Provider;
@@ -531,24 +528,6 @@ describe('versioned readers', () => {
     ]);
     const m = await readMarks(providerWith(4, slots), POOL, TOKEN);
     expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
-    expect(m?.primary.refBandBps).toBe(100);
-    expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
-  });
-
-  test('readMarks: the lane word in the impl store on v5', async () => {
-    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
-    const IMPL = `0x${'cc'.repeat(20)}`;
-    // Asset slot 2: lane 9 | UOA, band 100.
-    const slot2 = word(((100n << 240n) | (BigInt(0x80 | 9) << 232n)).toString(16));
-    const slots = new Map([
-      [mappingBase(TOKEN, POOL_STORAGE_V5.assets) + 2n, slot2],
-      [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, word(IMPL.slice(2))],
-      [MARK_STORE.MS + 9n, '0x000190012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234'],
-    ]);
-    const m = await readMarks(providerWith(5, slots), POOL, TOKEN);
-    expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
-    expect(m?.primary.sigmaPbps).toBe(400);
-    expect(m?.primary.uoa).toBe(true);
     expect(m?.primary.refBandBps).toBe(100);
     expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
   });
@@ -671,7 +650,7 @@ describe('P8 mark store', () => {
     expect(m!.primary.ttlSecs).toBe(600);
   });
 
-  test('readMarks: classes() neither reverting nor P8 fails closed', async () => {
+  test('readMarks: classes() reverted or not P8 fails closed', async () => {
     const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
@@ -701,5 +680,16 @@ describe('P8 mark store', () => {
         TOKEN,
       ),
     ).rejects.toBe(rpc);
+    // a revert is not a D2b store (none exist): no one-word-per-lane read of the packed P8 words
+    const reverted = Object.assign(new Error('execution reverted'), { code: 3 });
+    await expect(
+      readMarks(
+        at(() => {
+          throw reverted;
+        }),
+        POOL,
+        TOKEN,
+      ),
+    ).rejects.toBe(reverted);
   });
 });
