@@ -18,6 +18,12 @@
  * This script therefore needs no per-chain feed table and cannot exit 1 on a chain simply for not
  * being the one it was originally written against.
  *
+ * On-chain mode (`DEPLOY_RECORD=<chainId>.deploy.json RPC_URL=...`): once the oracle is live, every
+ * non-hub mark is read from `getFeed(feed_<SYM>)` on the record's `poolFactory`, the same P-tier word
+ * the pool prices from, gated `mark > 0`, not halted, `age < ttl - 300 s`. NXR is not called. Pool
+ * seeding MUST use this mode: the REST ticker and the signed row can differ in source and liveness
+ * (EUR-USDC dead on a weekend while EURC, signed from USDC-EUR, is fresh).
+ *
  * Auth: NXR serves /v1/price anonymously; if NXR_API_KEY is exported it is sent as the API key
  * header. Never inline a key here.
  *
@@ -43,6 +49,7 @@ import {
   nxrPair,
   sessionOpenLabel,
 } from '../src/venues/nxr.js';
+import { gateFeed, readFeed } from './seed-feed.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
  *  file and is checked against the deploy manifest, so one chain can never write another's
@@ -66,6 +73,12 @@ const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
 // names the same file for the fetcher and the deploy scripts.
 const MANIFEST = resolve(DEX, process.env.MANIFEST || `deployments/${CHAIN.manifest}`);
 const OUT = resolve(DEX, process.env.SEED_MARKS || `deployments/${CHAIN.chainId}.seed-marks.json`);
+const REC = process.env.DEPLOY_RECORD ? resolve(DEX, process.env.DEPLOY_RECORD) : null;
+const RPC = process.env.RPC_URL?.trim();
+if (REC && !RPC) {
+  console.error('DEPLOY_RECORD set without RPC_URL: on-chain seed marks need both');
+  process.exit(1);
+}
 const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$/, '');
 
 /** Peg band for an asset that declares no scale band of its own; matches the Solidity [0.98,1.02]
@@ -171,6 +184,19 @@ async function fetchMid(pair: string, shut: boolean): Promise<{ mid: number } | 
   return { mid: j.mid };
 }
 
+// On-chain mode: the record names the factory and every feed id. Its chainId must match, or the
+// marks come from another chain's store.
+const rec: (Record<string, unknown> & { poolFactory: string; chainId: number }) | null = REC
+  ? await Bun.file(REC).json()
+  : null;
+if (
+  rec &&
+  (Number(rec.chainId) !== CHAIN.chainId || !/^0x[0-9a-fA-F]{40}$/.test(String(rec.poolFactory)))
+) {
+  console.error(`${REC}: chainId ${rec.chainId} != ${CHAIN.chainId} or poolFactory unset`);
+  process.exit(1);
+}
+
 for (const f of roster) {
   // The hub is an identity feed by construction: never fetched, never off 1.
   if (f.hub) {
@@ -182,6 +208,32 @@ for (const f of roster) {
   // carries no price at all. `nxrQuote` names the served ticker when NXR only carries the
   // reciprocal of the pair the feed is denominated in; the mid is reciprocated back. `quoteVia`
   // names a BRIDGE leg instead, and the mark is the product: the two are mutually exclusive.
+  if (rec) {
+    const feed = rec[`feed_${f.symbol}`];
+    if (typeof feed !== 'string') {
+      errs.push(`${f.symbol}: no feed_${f.symbol} in ${REC}`);
+      continue;
+    }
+    let g: ReturnType<typeof gateFeed>;
+    try {
+      g = gateFeed(await readFeed(RPC!, rec.poolFactory, feed), Math.floor(Date.now() / 1000));
+    } catch (e) {
+      errs.push(`${f.symbol}: ${(e as Error).message}`);
+      continue;
+    }
+    if ('err' in g) {
+      errs.push(`${f.symbol}: on-chain ${g.err}`);
+      continue;
+    }
+    const mid = Number(g.mark1e18) / 1e18;
+    const [lo, hi] = f.band ?? PEG;
+    if (mid < lo || mid > hi) {
+      errs.push(`${f.symbol}: on-chain mid ${mid} outside plausible [${lo}, ${hi}]`);
+      continue;
+    }
+    marks[f.symbol] = { ticker: `getFeed ${feed}`, mid, mark1e18: g.mark1e18.toString() };
+    continue;
+  }
   const quoted = f.nxrQuote ?? f.nxrSymbol;
   const shut = closedUntil(f.symbol) !== null;
   if (shut)
@@ -231,7 +283,7 @@ if (errs.length) {
 
 const snapshot = {
   chainId: CHAIN.chainId,
-  source: `${NXR}/v1/price`,
+  source: rec ? `getFeed@${rec.poolFactory} (${RPC})` : `${NXR}/v1/price`,
   fetchedAt: fetchedAt.toISOString(),
   // AssetLib._seedMarks checks freshness against this, in ms since epoch — `fetchedAt` is for
   // humans and the SCAFFOLD sentinel; this is what the ceremony actually gates on.
