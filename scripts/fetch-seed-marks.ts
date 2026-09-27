@@ -298,7 +298,7 @@ if (errs.length) {
 
 const snapshot = {
   chainId: CHAIN.chainId,
-  source: rec ? `getFeed@${rec.poolFactory} (${RPC})` : `${NXR}/v1/price`,
+  source: rec ? `getFeed@${rec.poolFactory} chain ${CHAIN.chainId}` : `${NXR}/v1/price`,
   fetchedAt: fetchedAt.toISOString(),
   // AssetLib._seedMarks checks freshness against this, in ms since epoch — `fetchedAt` is for
   // humans and the SCAFFOLD sentinel; this is what the ceremony actually gates on.
