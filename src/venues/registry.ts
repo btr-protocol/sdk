@@ -87,14 +87,6 @@ export function chainVenue(chainId: number): ChainVenue {
   return v;
 }
 
-/** The chain's native USDC (Arc's gas token), NOT the pool base: Arc's live base is USDC.b. */
-export function nativeUsdc(chainId: number): Address {
-  const v = chainVenue(chainId);
-  const usdc = v.tokens.USDC;
-  if (!usdc) throw new Error(`chain ${chainId} deployment carries no native USDC`);
-  return usdc;
-}
-
 /** ExternalOracle address. */
 export function activeOracle(chainId: number): Address {
   const v = chainVenue(chainId);
@@ -127,8 +119,8 @@ export function activeRefMarksUsd(chainId: number): Record<string, number> {
 /**
  * `ExternalOracle.getFeed` key for a token symbol; null when the chain has no feed for it.
  *
- * The base resolves to its signed `USDC-USD` reference: there is no `USDC/USDC` identity feed, and
- * `PricingLib._denominate` divides every usd-quoted asset by that reference.
+ * `USDC` resolves to its signed `USDC-USD` reference. A hub that owns no feed (Arc's `USDCB`)
+ * resolves to null: callers keep its static ref mark.
  */
 export function activeFeedId(chainId: number, symbol: string): Hex | null {
   const v = chainVenue(chainId);
@@ -137,9 +129,7 @@ export function activeFeedId(chainId: number, symbol: string): Hex | null {
 
 /**
  * The MITCH `tickerId` (decimal string) for a token symbol; null when the chain has no feed for it.
- *
- * Same `<SYM>-USDC` then `<SYM>-USD` resolution as `activeFeedId`, so the base still resolves to
- * its signed `USDC-USD` reference. Absent for a deployment record recorded before the migration.
+ * Same resolution as `activeFeedId` (a feedless hub resolves to null).
  */
 export function activeTickerId(chainId: number, symbol: string): string | null {
   const t = chainVenue(chainId).tickerIds;

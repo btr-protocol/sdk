@@ -78,9 +78,8 @@ describe('MITCH feed identity', () => {
   });
 
   test('a real keccak feedId is NOT read as a MITCH id', () => {
-    // Both schemes are live during the overlap, so this discrimination is load-bearing.
-    const keccak = Object.values(DEPLOYED_VENUES[ARC]!.feedIds)[0]!;
-    expect(keccak).toMatch(/^0x[0-9a-fA-F]{64}$/);
+    // keccak('USDT-USDC'), the pre-mark-store Arc id: discrimination stays load-bearing.
+    const keccak = '0xfa722ae80d6181ca931f45c80582c173b9c19cd30c1632e864e8f48ea62a6548';
     expect(isMitchFeedId(keccak)).toBe(false);
     expect(mitchTickerOfFeedId(keccak)).toBeNull();
   });
