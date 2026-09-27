@@ -35,7 +35,7 @@
  * because NXR signs market marks, not rungs).
  */
 
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   type MarkBasis,
   closedUntil,
@@ -62,15 +62,10 @@ if (!CHAIN) {
 
 const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
 // The Solidity halves (AssetLib._manifest/_seedMarksPath) resolve MANIFEST/SEED_MARKS against the
-// forge working directory dex/evm. Mirror them so one env override names the same file for the
-// fetcher and the deploy scripts, instead of two different defaults.
-const EVM = join(DEX, 'evm');
-const MANIFEST = process.env.MANIFEST
-  ? join(EVM, process.env.MANIFEST)
-  : join(EVM, `deployments/${CHAIN.manifest}`);
-const OUT = process.env.SEED_MARKS
-  ? join(EVM, process.env.SEED_MARKS)
-  : join(EVM, `deployments/${CHAIN.chainId}.seed-marks.json`);
+// forge root, the dex-evm repo (absolute paths pass through). Mirror them so one env override
+// names the same file for the fetcher and the deploy scripts.
+const MANIFEST = resolve(DEX, process.env.MANIFEST || `deployments/${CHAIN.manifest}`);
+const OUT = resolve(DEX, process.env.SEED_MARKS || `deployments/${CHAIN.chainId}.seed-marks.json`);
 const NXR = (process.env.NXR_REST_URL || 'https://api.nxrates.com').replace(/\/$/, '');
 
 /** Peg band for an asset that declares no scale band of its own; matches the Solidity [0.98,1.02]
