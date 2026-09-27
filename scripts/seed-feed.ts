@@ -9,6 +9,8 @@
 export const GET_FEED = '0x280aebcf';
 /** Headroom under ttl a seed mark must keep: a mark closer to expiry can lapse mid-ceremony. */
 export const TTL_HEADROOM_SECS = 300;
+/** The lane age saturates at 4095 s; from 4090 s on `updatedAtSecs` is only an upper bound. */
+export const AGE_SATURATES_SECS = 4090;
 
 /** Decode an `IOracle.FeedData` return and gate it: mark > 0, not halted, `now - updatedAt < ttl - 300`.
  *  Field order (8 static words): mark1e18, sigmaPbps, updatedAtSecs, ttlSecs, confidenceBps,
@@ -29,6 +31,8 @@ export function gateFeed(
   if (halted) return { err: 'feed halted' };
   if (at > nowSecs + 60) return { err: `updatedAt ${at} is ahead of local clock ${nowSecs}` };
   const ageSecs = Math.max(0, nowSecs - at);
+  if (ageSecs >= AGE_SATURATES_SECS)
+    return { err: `mark age ${ageSecs}s is past the saturated lane age` };
   if (!(ageSecs < ttlSecs - TTL_HEADROOM_SECS))
     return {
       err: `mark ${ageSecs}s old, bound ttl-${TTL_HEADROOM_SECS} = ${ttlSecs - TTL_HEADROOM_SECS}s`,
@@ -36,23 +40,16 @@ export function gateFeed(
   return { mark1e18, ageSecs, ttlSecs };
 }
 
-/** One `eth_call getFeed(feedId)`; retried because Arc RPC drops reads. A read that never answers is
- *  an error, never an empty mark. */
-export async function readFeed(rpc: string, factory: string, feedId: string): Promise<string> {
-  const id = feedId.replace(/^0x/, '');
-  if (!/^[0-9a-fA-F]{64}$/.test(id)) throw new Error(`bad feed id ${feedId}`);
+/** One JSON-RPC call, retried because Arc RPC drops reads. A read that never answers is an error,
+ *  never an empty value. */
+async function rpcCall(rpc: string, method: string, params: unknown[]): Promise<string> {
   let last = '';
   for (let i = 0; i < 3; i++) {
     try {
       const r = await fetch(rpc, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_call',
-          params: [{ to: factory, data: GET_FEED + id }, 'latest'],
-        }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
         signal: AbortSignal.timeout(8_000),
       });
       const j = (await r.json()) as { result?: string; error?: { message?: string } };
@@ -62,5 +59,17 @@ export async function readFeed(rpc: string, factory: string, feedId: string): Pr
       last = (e as Error).message;
     }
   }
-  throw new Error(`getFeed ${feedId}: ${last}`);
+  throw new Error(`${method}: ${last}`);
+}
+
+/** The RPC's own chain id: a record's chainId says nothing about which chain the URL serves. */
+export const rpcChainId = async (rpc: string) =>
+  Number(BigInt(await rpcCall(rpc, 'eth_chainId', [])));
+
+/** One `eth_call getFeed(feedId)`; retried because Arc RPC drops reads. A read that never answers is
+ *  an error, never an empty mark. */
+export async function readFeed(rpc: string, factory: string, feedId: string): Promise<string> {
+  const id = feedId.replace(/^0x/, '');
+  if (!/^[0-9a-fA-F]{64}$/.test(id)) throw new Error(`bad feed id ${feedId}`);
+  return rpcCall(rpc, 'eth_call', [{ to: factory, data: GET_FEED + id }, 'latest']);
 }

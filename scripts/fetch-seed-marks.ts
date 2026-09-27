@@ -49,7 +49,7 @@ import {
   nxrPair,
   sessionOpenLabel,
 } from '../src/venues/nxr.js';
-import { gateFeed, readFeed } from './seed-feed.js';
+import { gateFeed, readFeed, rpcChainId } from './seed-feed.js';
 
 /** Deploy targets. `chainId` is pinned because it is not a copy of anything: it names the output
  *  file and is checked against the deploy manifest, so one chain can never write another's
@@ -73,6 +73,11 @@ const DEX = process.env.DEX_DIR || join(import.meta.dir, '../../dex-evm');
 // names the same file for the fetcher and the deploy scripts.
 const MANIFEST = resolve(DEX, process.env.MANIFEST || `deployments/${CHAIN.manifest}`);
 const OUT = resolve(DEX, process.env.SEED_MARKS || `deployments/${CHAIN.chainId}.seed-marks.json`);
+// Set-but-empty is an operator error, not a request for NXR: it must never fall back silently.
+if (process.env.DEPLOY_RECORD === '') {
+  console.error('DEPLOY_RECORD is set but empty');
+  process.exit(1);
+}
 const REC = process.env.DEPLOY_RECORD ? resolve(DEX, process.env.DEPLOY_RECORD) : null;
 const RPC = process.env.RPC_URL?.trim();
 if (REC && !RPC) {
@@ -196,6 +201,16 @@ if (
   console.error(`${REC}: chainId ${rec.chainId} != ${CHAIN.chainId} or poolFactory unset`);
   process.exit(1);
 }
+if (rec) {
+  const id = await rpcChainId(RPC!).catch((e: Error) => {
+    console.error(`RPC_URL chain id unreadable: ${e.message}`);
+    process.exit(1);
+  });
+  if (id !== CHAIN.chainId) {
+    console.error(`RPC_URL serves chain ${id}, not ${CHAIN.chainId}`);
+    process.exit(1);
+  }
+}
 
 for (const f of roster) {
   // The hub is an identity feed by construction: never fetched, never off 1.
@@ -276,7 +291,7 @@ for (const f of roster) {
 // Refuse to write a partial snapshot: a missing mark would silently fall back to a default
 // somewhere downstream, which is the failure mode this whole artifact exists to remove.
 if (errs.length) {
-  console.error(`NXR seed marks NOT written (${errs.length} problem(s)):`);
+  console.error(`${rec ? 'on-chain' : 'NXR'} seed marks NOT written (${errs.length} problem(s)):`);
   for (const e of errs) console.error(`  ${e}`);
   process.exit(1);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { TTL_HEADROOM_SECS, gateFeed } from '../scripts/seed-feed';
+import { AGE_SATURATES_SECS, TTL_HEADROOM_SECS, gateFeed, readFeed } from '../scripts/seed-feed';
 
 // Encode FeedData as the 8 static words getFeed returns.
 const enc = (mark: bigint, at: number, ttl: number, flags = 0) =>
@@ -28,5 +28,15 @@ describe('on-chain seed mark gate', () => {
     expect('err' in gateFeed(enc(1n, NOW + 120, 3600), NOW)).toBe(true);
     expect('err' in gateFeed('0x', NOW)).toBe(true);
     expect('err' in gateFeed(enc(1n, NOW, 3600).slice(0, -2), NOW)).toBe(true);
+  });
+  test('saturated lane age fails even under a long ttl', () => {
+    expect('err' in gateFeed(enc(1n, NOW - AGE_SATURATES_SECS, 65535), NOW)).toBe(true);
+    expect('err' in gateFeed(enc(1n, NOW - AGE_SATURATES_SECS + 1, 65535), NOW)).toBe(false);
+  });
+  test('readFeed rejects a malformed id and throws when the RPC never answers', async () => {
+    await expect(readFeed('http://127.0.0.1:9', '0x0', '0x12')).rejects.toThrow('bad feed id');
+    await expect(readFeed('http://127.0.0.1:9', '0x0', `0x${'0'.repeat(64)}`)).rejects.toThrow(
+      'eth_call',
+    );
   });
 });
