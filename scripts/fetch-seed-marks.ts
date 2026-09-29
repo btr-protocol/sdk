@@ -4,6 +4,7 @@
  *   bun run scripts/fetch-seed-marks.ts            # arc (default) → 5042002.seed-marks.json
  *   bun run scripts/fetch-seed-marks.ts arc        # same, explicit
  *   bun run scripts/fetch-seed-marks.ts bnb        # bnb → 56.seed-marks.json
+ *   bun run scripts/fetch-seed-marks.ts monad      # monad → 143.seed-marks.json
  *   CHAIN=arc bun run scripts/fetch-seed-marks.ts  # same, via env
  *
  * Both halves of the ceremony read this file: the oracle deploy seeds every feed from it, and
@@ -58,6 +59,7 @@ import { gateFeed, readFeed, rpcChainId } from './seed-feed.js';
 const CHAINS = {
   arc: { chainId: 5_042_002, manifest: 'arc.manifest.json', basis: 'USDC' },
   bnb: { chainId: 56, manifest: 'bnb.manifest.json', basis: 'USDC' },
+  monad: { chainId: 143, manifest: 'monad.manifest.json', basis: 'USDC' },
 } as const satisfies Record<string, { chainId: number; manifest: string; basis: MarkBasis }>;
 
 const chainArg = (process.argv[2] || process.env.CHAIN || 'arc').toLowerCase();

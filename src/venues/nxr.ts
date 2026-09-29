@@ -129,6 +129,10 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   CBBTC: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   BNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   XAUT: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
+  // Monad legs. MITCH ids per monad.manifest.json (probed 2026-09-29): WMON 457965716382941184 =
+  // MON-USDC, XAUT0 454557230336835584 = XAUT-USDC.
+  WMON: { nxrSymbol: 'MON-USDC', band: [0.001, 1], refUsd: 0.028 },
+  XAUT0: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
   // BSC wrapped/bridged legs mark their underlying. Each pair is the one bnb.manifest.json's MITCH
   // ticker id names (NXR /v1/price echoes the id): WBNB 434436167548534784 = BNB-USDC, BTCB
   // 435315776850755584 = BTC-USDC, ETH 438724262896861184 = ETH-USDC (probed 2026-09-22).
