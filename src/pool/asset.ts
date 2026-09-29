@@ -11,6 +11,8 @@ const ASSET_NUMBER_FIELDS = [
   'flags',
   'kappaCovBps',
   'maxLiabWeightBps',
+  'oracleBits',
+  'refBandBps',
 ] as const satisfies readonly (keyof Asset)[];
 
 /** A decoded `getAsset` tuple, shaped as `Asset` says. The ABI decoder returns EVERY uint as a

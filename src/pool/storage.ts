@@ -5,7 +5,7 @@
  * (in-struct [slot, byteOffset]) come from solc's own `storageLayout`; they are the only place
  * either number appears, and every decoder reads them. `POOL_STRUCTS.Asset` is the one live
  * `Asset` layout, shared by every version. `PoolStorage` slots are picked by
- * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`), v3
+ * `Pool.storageVersion()` (`readStorageVersion`): v2 (`layout.generated.ts`), v3
  * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved), v4
  * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0) and v5
  * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`). An ABI diff cannot see packing, so
@@ -36,7 +36,8 @@ function isNativeKey(token: Address): boolean {
  * so a repack cannot silently desync them. Re-exported here because every decoder below reads them
  * and callers import them from this module.
  */
-import { HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
+import { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
+import type { Assert, FieldsMatch, OracleConfigFields } from '../abis/structs.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
@@ -98,11 +99,10 @@ function poolStorageOf(
 
 /**
  * Per-asset yield-hook flag bits, generated from dex `libraries/PoolConstantsLib.sol`. Pool
- * dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set.
+ * dispatches a hook CALL only when `HookSlot.target != 0` AND the matching bit is set;
+ * `HOOK_FLAGS_MASK` = known bits, dex rejects unknown bits at adminSetAssetHook.
  */
-export { HOOK_PRE_OUTFLOW };
-/** Known-bits mask; dex rejects unknown bits at adminSetAssetHook. */
-export const HOOK_FLAGS_MASK = HOOK_PRE_OUTFLOW;
+export { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW };
 
 /** Decoded `IPool.HookSlot` (single packed storage word). */
 export interface HookSlot {
@@ -120,19 +120,30 @@ export interface RiskConfig {
   kappaCovBps: number;
 }
 
+/** `IPool.OracleConfig` as a layout-v5 pool stores it, in `Asset` slot 2. */
 export interface OracleConfig {
+  /** Store lane (< 64) carrying the leg's P and R tiers. */
+  lane: number;
+  /** 0 = EXTERNAL, 1 = INTERNAL (quote = 1.0 peg; the P mark gates depeg only). */
+  mode: number;
+  /** 0 = ANCHOR_UNIT, 1 = UNIT_OF_ACCOUNT (the pool divides by the base's own mark). */
+  quoteUnit: number;
+  /** Depeg band vs the lane's R tier, bps. 0 = disarmed. */
+  refBandBps: number;
+}
+
+export type _OracleConfigMatchesAbi = Assert<FieldsMatch<OracleConfig, OracleConfigFields>>;
+
+/** The `oracleConfigs` mapping entry of layout v2..v4 (slot 5; reserved from v5). */
+export interface LegacyOracleConfig {
   feedId: Hex;
   refFeedId: Hex;
   primary: Address;
   refBandBps: number;
   mode: number;
-  /**
-   * DEN-01 mark denomination (`uint8`, the byte the former `bool usdQuoted` occupied):
-   * 0 = ANCHOR_UNIT (mark already in anchor units), 1 = UNIT_OF_ACCOUNT (`<TOKEN>-USD`, so the
-   * pool divides by the base's own USD mark at consumption).
-   */
+  /** 0 = ANCHOR_UNIT, 1 = UNIT_OF_ACCOUNT. */
   quoteUnit: number;
-  /** Ref-band oracle instance (independent signer set); zero address = legacy fallback to primary. */
+  /** Ref-band oracle instance; zero address = fallback to primary. */
   refPrimary: Address;
 }
 
@@ -298,15 +309,29 @@ function decodeCurve(words: bigint[]): QuarticCurve | null {
   return { m, boundaries, dispRef, flags, segs };
 }
 
+/** A leg's oracle config: v5 off `Asset` slot 2, v2..v4 off the `oracleConfigs` entry. */
 export async function readOracleConfig(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
-): Promise<OracleConfig> {
-  const key = await resolveTokenStorageKey(provider, pool, token);
+): Promise<OracleConfig | LegacyOracleConfig> {
+  const [version, key] = await Promise.all([
+    readStorageVersion(provider, pool),
+    resolveTokenStorageKey(provider, pool, token),
+  ]);
+  if (version >= 5) {
+    const leg = decodeLegOracle(
+      await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V5.assets) + 2n),
+    );
+    return {
+      lane: leg.lane,
+      mode: leg.internal ? 1 : 0,
+      quoteUnit: leg.uoa ? 1 : 0,
+      refBandBps: leg.refBandBps,
+    };
+  }
   const base = mappingBase(key, POOL_STORAGE.oracleConfigs);
   const f = POOL_STRUCTS.OracleConfig;
-  // Slots: 0=feedId, 1=refFeedId, 2=primary|refBandBps|mode|quoteUnit (packed), 3=refPrimary.
   const at = (slot: number) => getStorageAt(provider, pool, base + BigInt(slot));
   const [feedId, refFeedId, packed, refWord] = await Promise.all([
     at(f.feedId[0]),

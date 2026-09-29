@@ -36,6 +36,7 @@ import {
   p8TierSlot,
   readCurve,
   readMarks,
+  readOracleConfig,
   readSolvencyState,
   u8At,
   u16At,
@@ -518,6 +519,24 @@ describe('versioned readers', () => {
     expect(m?.primary.mark1e18).toBe(1_000_100_000_000_000_000n);
     expect(m?.ref.mark1e18).toBe(3300n * 10n ** 18n);
     expect(await readMarks(providerWith(2, slots), POOL, TOKEN)).toBeNull();
+  });
+
+  test('readOracleConfig: v5 off Asset slot 2, v2 off slot 5', async () => {
+    const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
+    // oracleBits = lane 5 | INTERNAL | UOA at byte 29; refBandBps 150 | depeg code 3 at byte 30.
+    const slot2 = word(((0xc5n << 232n) | ((150n | (3n << 12n)) << 240n)).toString(16));
+    const v5 = new Map([[mappingBase(TOKEN, 4n) + 2n, slot2]]);
+    expect(await readOracleConfig(providerWith(5, v5), POOL, TOKEN)).toEqual({
+      lane: 5,
+      mode: 1,
+      quoteUnit: 1,
+      refBandBps: 150,
+    });
+    const packed = word(((1n << 176n) | (0x42n << 0n)).toString(16));
+    const v2 = new Map([[mappingBase(TOKEN, 5n) + 1n, packed]]);
+    const legacy = await readOracleConfig(providerWith(2, v2), POOL, TOKEN);
+    expect('lane' in legacy).toBe(false);
+    expect(legacy).toMatchObject({ refBandBps: 1, mode: 0, quoteUnit: 0 });
   });
 
   test('readMarks: one word at slot 13 on v4', async () => {

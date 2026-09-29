@@ -17,7 +17,9 @@ export type AssetFields =
   | 'deadSeedPow10'
   | 'flags'
   | 'kappaCovBps'
-  | 'maxLiabWeightBps';
+  | 'maxLiabWeightBps'
+  | 'oracleBits'
+  | 'refBandBps';
 
 export type DepositResultFields = 'lpAmount' | 'actualDeposit' | 'deadLp';
 
@@ -31,18 +33,11 @@ export type FeedDataFields =
   | 'maxDevBps'
   | 'sourceTsMs';
 
-export type FeeParamsFields = 'protoSharePct' | 'flashFeePbps';
+export type FeeParamsFields = 'protoSharePct' | 'flashFeePbps' | 'flowCooldownSecs';
 
 export type HookSlotFields = 'target' | 'flags' | 'lastCreditAt';
 
-export type OracleConfigFields =
-  | 'feedId'
-  | 'primary'
-  | 'mode'
-  | 'quoteUnit'
-  | 'refBandBps'
-  | 'refFeedId'
-  | 'refPrimary';
+export type OracleConfigFields = 'lane' | 'mode' | 'quoteUnit' | 'refBandBps';
 
 export type RiskConfigFields = 'flags' | 'kappaCovBps' | 'depositCapCode' | 'maxLiabWeightBps';
 

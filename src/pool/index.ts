@@ -51,6 +51,10 @@ export interface Asset {
   kappaCovBps: number;
   /** Per-leg ceiling on this leg's share of the pool claim book (bps of B). 0 = disabled (default). */
   maxLiabWeightBps: number;
+  /** Oracle wiring: store lane 0..5 | INTERNAL 6 | UOA 7 (`decodeLegOracle`). */
+  oracleBits: number;
+  /** Depeg band vs the lane's R tier, bps (low 12 bits; 12..15 = depeg code). 0 = disarmed. */
+  refBandBps: number;
 }
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
@@ -159,6 +163,7 @@ export {
 export type {
   Custody,
   HookSlot,
+  LegacyOracleConfig,
   OracleConfig,
   RiskConfig,
 } from './storage.js';

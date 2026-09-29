@@ -1,7 +1,9 @@
-// Interface snapshot of the deployed BTR contracts. The backend serves ABIs live
-// (`GET {api}/v1/abis/{name}`); these static copies exist for offline typing.
+// `PoolStorage` layout v2 (`Pool.storageVersion() == 2`) ONLY: slots and `PoolStorage` offsets
+// here are wrong on v3+ (see `layout.v{3,4,5}.generated.ts`). `POOL_STRUCTS.Asset` and
+// `HookSlot` are the live layouts shared by every version; `OracleConfig` is v2..v4 storage
+// (slot 5 is reserved from v5, where the wiring sits in `Asset` slot 2).
 
-/** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
+/** Absolute slots of every layout-v2 `IPool.PoolStorage` field, mappings included. */
 export const POOL_STORAGE = {
   baseToken: 0n,
   initialized: 0n,
