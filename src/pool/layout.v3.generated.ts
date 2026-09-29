@@ -1,6 +1,9 @@
 // `PoolStorage` layout v3 (`Pool.storageVersion() >= 3`, BNB): solc `storageLayout` of dex-evm
 // `out/Pool.sol/Pool.json`, and `abi/constants.json` `marks` for the two `marks` words. Layout v2
-// (Arc) stays in `layout.generated.ts`, frozen. `storage.test.ts` restates both by hand.
+// (Arc) stays in `layout.generated.ts`, which also holds the one live `Asset` layout.
+// `storage.test.ts` restates both by hand.
+
+import { POOL_STRUCTS } from './layout.generated.js';
 
 /** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
 export const POOL_STORAGE_V3 = {
@@ -53,23 +56,7 @@ export const POOL_STRUCTS_V3 = {
     factory: [3, 0],
     poolAdmin: [10, 0],
   },
-  Asset: {
-    reserves: [0, 0],
-    liabilities: [0, 16],
-    anchor: [1, 0],
-    minLiquidity: [1, 20],
-    liquidityIndexWad: [2, 0],
-    minDispersionPbps: [2, 12],
-    curveId: [2, 16],
-    minFeePbps: [2, 18],
-    vegaBps: [2, 20],
-    depositCapCode: [2, 22],
-    decimals: [2, 24],
-    deadSeedPow10: [2, 25],
-    flags: [2, 26],
-    kappaCovBps: [2, 28],
-    maxLiabWeightBps: [2, 30],
-  },
+  Asset: POOL_STRUCTS.Asset,
   OracleConfig: {
     feedId: [0, 0],
     primary: [1, 0],

@@ -5,8 +5,6 @@
 // immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `coop` (slot 13) = a leg's
 // `swapCoop` terms, `discBps | rebateBps << 16`. `storage.test.ts` restates it by hand.
 
-import { POOL_STRUCTS_V4 } from './layout.v4.generated.js';
-
 /** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
 export const POOL_STORAGE_V5 = {
   baseToken: 0n,
@@ -30,31 +28,6 @@ export const POOL_STORAGE_V5 = {
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
 export const POOL_MAPPINGS_V5 = ['assets', 'custody', 'assetHooks', 'lpTokens', 'coop'] as const;
-
-/** In-struct `[slot, byteOffset]`: v4's, with `Asset` slot 2 repacked around a uint72 index and
- *  the leg's oracle wiring on its tail. */
-export const POOL_STRUCTS_V5 = {
-  ...POOL_STRUCTS_V4,
-  Asset: {
-    reserves: [0, 0],
-    liabilities: [0, 16],
-    anchor: [1, 0],
-    minLiquidity: [1, 20],
-    liquidityIndexWad: [2, 0],
-    minDispersionPbps: [2, 9],
-    curveId: [2, 13],
-    minFeePbps: [2, 15],
-    vegaBps: [2, 17],
-    depositCapCode: [2, 19],
-    decimals: [2, 21],
-    deadSeedPow10: [2, 22],
-    flags: [2, 23],
-    kappaCovBps: [2, 25],
-    maxLiabWeightBps: [2, 27],
-    oracleBits: [2, 29],
-    refBandBps: [2, 30],
-  },
-} as const satisfies Record<string, Record<string, readonly [number, number]>>;
 
 /**
  * `MarkStore` in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's

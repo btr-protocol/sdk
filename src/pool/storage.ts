@@ -2,9 +2,10 @@
  * PoolStorage slot readers: Solana-style deterministic layout, no Solidity getters.
  *
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). `POOL_STORAGE` (slots) and `POOL_STRUCTS`
- * (in-struct [slot, byteOffset]) are GENERATED from solc's own `storageLayout`; they are the only
- * place either number appears, and every decoder reads them. Two layouts are live, picked by
- * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`, frozen), v3
+ * (in-struct [slot, byteOffset]) come from solc's own `storageLayout`; they are the only place
+ * either number appears, and every decoder reads them. `POOL_STRUCTS.Asset` is the one live
+ * `Asset` layout, shared by every version. `PoolStorage` slots are picked by
+ * `Pool.storageVersion()` (`readStorageVersion`): v2 (Arc, `layout.generated.ts`), v3
  * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved), v4
  * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0) and v5
  * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`). An ABI diff cannot see packing, so
@@ -39,7 +40,7 @@ import { HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
-import { MARK_STORE, POOL_STORAGE_V5, POOL_STRUCTS_V5 } from './layout.v5.generated.js';
+import { MARK_STORE, POOL_STORAGE_V5 } from './layout.v5.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 export {
@@ -58,7 +59,6 @@ export {
   MARK_STORE,
   POOL_MAPPINGS_V5,
   POOL_STORAGE_V5,
-  POOL_STRUCTS_V5,
 } from './layout.v5.generated.js';
 
 /** `Pool.storageVersion()`. */
@@ -433,14 +433,14 @@ export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } 
   };
 }
 
-/** A layout-v5 leg's oracle wiring off its `Asset` slot-2 word. */
+/** A leg's oracle wiring off its `Asset` slot-2 word. */
 export function decodeLegOracle(slot2: Hex): {
   lane: number;
   internal: boolean;
   uoa: boolean;
   refBandBps: number;
 } {
-  const f = POOL_STRUCTS_V5.Asset;
+  const f = POOL_STRUCTS.Asset;
   const b = u8At(slot2, f.oracleBits[1]);
   return {
     lane: b & MARK_STORE.LANE_MASK,

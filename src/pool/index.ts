@@ -183,7 +183,6 @@ export {
   p8StoreWord,
   p8TierSlot,
   POOL_STORAGE_V5,
-  POOL_STRUCTS_V5,
   readMarks,
   HOOK_PRE_OUTFLOW,
   HOOK_FLAGS_MASK,
