@@ -1,8 +1,8 @@
 // Pool/Admin are gitignored build artifacts (`bun run fetch-abis`, backend getAbi SSoT, content-
 // pinned by `abis.lock.json`); the rest below are static offline-trust surfaces (ExternalOracleV4
 // reads the chain with zero server trust). The V1 `EXTERNAL_ORACLE_ABI` is gone: nothing imported
-// it. BOTH oracle generations ship: Arc runs V4 (`pauseFeed`/`FeedPaused`), new chains run the mark
-// store in the Pool impl (`halt(lane, tierMask)`, `setBounds`). Pick by deployment record.
+// it. Live chains run the mark store in the Pool impl (`halt`/`unhalt(lane, tierMask)`, `reanchor`);
+// the V4 ABI (`pauseFeed`/`FeedPaused`) stays for reading the retired Arc oracle's history.
 /**
  * Contract ABIs
  * @module @btr-protocol/sdk/abis

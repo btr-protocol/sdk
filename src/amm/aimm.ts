@@ -8,6 +8,9 @@
 //   premiumBps) + the integer curve codec (evalQ/areaQ/scaleY/buildCurve + caps,
 //   owned by the storage readers) + thin async fetchers over `POST /v1/quote|route|depth`.
 
+import { MAX_DISPERSION_PBPS } from '../abis/solidity.generated.js';
+
+export { MAX_DISPERSION_PBPS };
 export const BPS = 1e4;
 export const PBPS = 1e6;
 
@@ -190,7 +193,6 @@ export function buildCurve(
 
 /** `PricingLib.MAX_INTERIOR_SWING_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
 export const MAX_INTERIOR_SWING_PBPS = 10_862;
-export const MAX_DISPERSION_PBPS = 900_000;
 
 const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
 
