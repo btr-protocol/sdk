@@ -127,6 +127,16 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
+  143: {
+    id: 143,
+    name: 'Monad',
+    rpcUrls: ['https://rpc3.monad.xyz', 'https://rpc-mainnet.monadinfra.com'],
+    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+    blockExplorerUrls: ['https://monadvision.com', 'https://monadscan.com'],
+    wrappedNative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
+    multicall3: MULTICALL3_ADDRESS,
+  },
+
   137: {
     id: 137,
     name: 'Polygon',
