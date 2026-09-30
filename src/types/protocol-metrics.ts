@@ -230,10 +230,13 @@ export interface LegRiskParams {
   minLiquidity: number;
   flags: LegFlags;
   oracle: {
-    feedId: string;
-    refFeedId: string;
-    primary: string;
-    refPrimary: string;
+    /** The leg's feed off the deployment record (a MITCH id padded to 32 bytes); null when the record names none. */
+    feedId: string | null;
+    refFeedId: string | null;
+    primary: string | null;
+    refPrimary: string | null;
+    /** Global lane index the leg's mark is addressed by; null before layout v5. */
+    lane: number | null;
     mode: 'external' | 'internal';
     quoteUnit: 'anchor' | 'unitOfAccount';
     /** Band vs the lane's R tier, bits 0..11 of `Asset.refBandBps`; 0 = disarmed. */
