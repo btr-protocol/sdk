@@ -18,8 +18,7 @@
       "symbol": "USDS-USD"
     },
     "usdc": {
-      "symbol": "USDS-USDT",
-      "quote_via": "USDT-USDC"
+      "symbol": "USDS-USDC"
     }
   },
   "DAI": {
@@ -32,8 +31,7 @@
       "symbol": "USD1-USD"
     },
     "usdc": {
-      "symbol": "USD1-USDT",
-      "quote_via": "USDT-USDC"
+      "symbol": "USD1-USDC"
     }
   },
   "USDG": {
@@ -46,8 +44,7 @@
       "symbol": "PYUSD-USD"
     },
     "usdc": {
-      "symbol": "PYUSD-USDT",
-      "quote_via": "USDT-USDC"
+      "symbol": "PYUSD-USDC"
     }
   },
   "RLUSD": {
@@ -172,8 +169,7 @@
       "symbol": "PAXG-USD"
     },
     "usdc": {
-      "symbol": "PAXG-USDT",
-      "quote_via": "USDT-USDC"
+      "symbol": "PAXG-USDC"
     }
   },
   "NVDA": {

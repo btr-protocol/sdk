@@ -28,16 +28,13 @@ describe('NXR mark sources', () => {
   });
 
   // The live Arc roster grew from the original four-core ceremony set. Keep a structural pin:
-  // every symbol must resolve to a USDC mark (directly or through an approved bridge), without
+  // every symbol must resolve to a USDC mark, without
   // freezing the deployment roster and forcing ceremony edits into SDK tests.
   test('every live arc roster symbol maps to a USDC-denominated pair', () => {
     const syms = roster('arc');
     if (!syms.length) return;
     expect(syms.length).toBeGreaterThan(0);
-    const pair = (s: string) => {
-      const p = nxrPair(s, s === 'USDC' ? 'USD' : 'USDC')!;
-      return p.quoteVia ? `${p.nxrSymbol} x ${p.quoteVia}` : p.nxrSymbol;
-    };
+    const pair = (s: string) => nxrPair(s, s === 'USDC' ? 'USD' : 'USDC')!.nxrSymbol;
     for (const sym of syms) expect(pair(sym), sym).toMatch(/USDC|USD$/);
     // Held out of the four-core roster but keeping their NXR_MARKS rows, so re-listing is a roster
     // line and nothing more. Each is held for its own reason and none of them is USDC-seedable
@@ -85,20 +82,12 @@ describe('NXR mark sources', () => {
   // USD mark under a USDC-quoted feed is off by the USD/USDC basis with no on-chain correction
   // left, i.e. silently mispriced from the first swap. Neither the scale band nor the peg clamp
   // can see it, so it has to be caught here.
-  test('every USDC-basis pair is denominated in USDC, directly or through a chaining bridge', () => {
+  test('every USDC-basis pair is denominated in USDC', () => {
     for (const [sym, m] of Object.entries(NXR_MARKS)) {
       const p = nxrPair(sym, 'USDC');
       if (!p) continue; // no USDC source: correctly unlistable on such a chain
-      // A bridge only composes if the legs MEET: `USDS-USDT` x `USDT-USDC` is USDS-USDC, while
-      // `USDS-USDT` x `EUR-USDC` is a product of two unrelated rates.
-      if (p.quoteVia) {
-        expect(p.nxrSymbol.split('-')[1], sym).toBe(p.quoteVia.split('-')[0]);
-        expect(p.quoteVia.split('-')[1], sym).toBe('USDC');
-      } else {
-        expect(p.nxrSymbol.split('-')[1], sym).toBe('USDC');
-      }
-      // invert and bridge are different operations on different pairs; a row carrying both is
-      // ambiguous, and every USDC cross is served the right way up in any case.
+      expect(p.nxrSymbol.split('-')[1], sym).toBe('USDC');
+      // every USDC cross is served the right way up, so the USDC row never needs inverting.
       expect(p.nxrQuote, `${sym} USDC row must not need inverting`).toBeUndefined();
       expect(m.refUsd, sym).toBeDefined();
     }

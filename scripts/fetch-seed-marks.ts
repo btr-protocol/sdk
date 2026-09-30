@@ -144,10 +144,10 @@ const roster = assets.map(([symbol, a]) => {
     );
     process.exit(1);
   }
-  // nxrQuote/quoteVia are cleared before the basis pair is applied: a spread does not REMOVE a
+  // nxrQuote is cleared before the basis pair is applied: a spread does not REMOVE a
   // key the basis row omits, so `CAD-USDC` would silently inherit the USD row's
   // `nxrQuote: 'USD-CAD'` and be seeded upside down.
-  return { symbol, hub: a.hub === true, ...full, nxrQuote: undefined, quoteVia: undefined, ...m };
+  return { symbol, hub: a.hub === true, ...full, nxrQuote: undefined, ...m };
 });
 
 const errs: string[] = [];
@@ -223,8 +223,7 @@ for (const f of roster) {
   // /v1/price/{ticker} is the only endpoint serving a live px:
   // {ticker,mid,bid,ask,ci,confidence,flags,age_ms,status}. /v1/tickers/detail is a CATALOGUE and
   // carries no price at all. `nxrQuote` names the served ticker when NXR only carries the
-  // reciprocal of the pair the feed is denominated in; the mid is reciprocated back. `quoteVia`
-  // names a BRIDGE leg instead, and the mark is the product: the two are mutually exclusive.
+  // reciprocal of the pair the feed is denominated in; the mid is reciprocated back.
   if (rec) {
     const feed = rec[`feed_${f.symbol}`];
     if (typeof feed !== 'string') {
@@ -263,15 +262,7 @@ for (const f of roster) {
     errs.push(`${f.symbol} (${got.err})`);
     continue;
   }
-  let mid = f.nxrQuote ? 1 / got.mid : got.mid;
-  if (f.quoteVia) {
-    const bridge = await fetchMid(f.quoteVia, shut);
-    if ('err' in bridge) {
-      errs.push(`${f.symbol} bridge (${bridge.err})`);
-      continue;
-    }
-    mid *= bridge.mid;
-  }
+  const mid = f.nxrQuote ? 1 / got.mid : got.mid;
 
   const [lo, hi] = f.band ?? PEG;
   if (mid < lo || mid > hi) {
@@ -281,9 +272,8 @@ for (const f of roster) {
     continue;
   }
   marks[f.symbol] = {
-    // The pair the mark IS, so the record states its own denomination: a bridged mark records the
-    // composition it came from, not just its first leg.
-    ticker: f.quoteVia ? `${f.nxrSymbol} x ${f.quoteVia}` : f.nxrSymbol,
+    // The pair the mark IS, so the record states its own denomination.
+    ticker: f.nxrSymbol,
     mid,
     // 1e18 fixed point, the unit both deploy scripts consume (M.encodeB64(x, 18)).
     mark1e18: BigInt(Math.round(mid * 1e18)).toString(),

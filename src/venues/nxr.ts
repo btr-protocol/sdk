@@ -54,10 +54,6 @@ interface NxrPair {
   /** The pair actually SERVED, when NXR only carries the reciprocal. The fetched mid is inverted
    *  back into `nxrSymbol` (see the FX rows). Absent = `nxrSymbol` is served directly. */
   nxrQuote?: string;
-  /** Bridge leg for a composed mark: the mark is `mid(nxrSymbol) * mid(quoteVia)`. Used where an
-   *  asset's only first-class tape is quoted in something other than the unit the feed needs:
-   *  `USDS-USDT` x `USDT-USDC` is `USDS-USDC`. Mutually exclusive with `nxrQuote`. */
-  quoteVia?: string;
 }
 
 interface NxrMark extends NxrPair {
@@ -87,18 +83,15 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // ── peg stables. The USD row is Pyth `X-USD`, correct only where the pool re-denominates
   // on-chain (PricingLib._denominate divides by the USDC-USD reference); it is NOT the retired
   // "USDC≈1 proxy", which was extractable (DEN-01, 2026-07-29). The `usdc` row is the pair for a
-  // pool that consumes the mark as attested, and only the five Arc lists carry one. USDS, PYUSD and USD1
-  // bridge through USDT: USDS and PYUSD because their `-USDC` and `-USD` are both compose-on-read
-  // (flags 128), which the signer cannot resolve at all, and USD1 because `USD1-USDC` is flags 64
-  // but DEAD: sampled 6x over 36s its age only climbed, 368s to 408s, while `USD1-USDT` stayed
-  // fresh. USDT and RLUSD are first-class USDC tape.
+  // pool that consumes the mark as attested, and only the five Arc lists carry one. USDT and
+  // RLUSD are quoted in USDC outright; NXR composes any other `-USDC` cross from its USD tickers.
   USDT: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
   USDE: PEG_STABLE('USDE-USD'),
-  USDS: PEG_STABLE('USDS-USD', { nxrSymbol: 'USDS-USDT', quoteVia: 'USDT-USDC' }),
+  USDS: PEG_STABLE('USDS-USD', { nxrSymbol: 'USDS-USDC' }),
   DAI: PEG_STABLE('DAI-USD'),
-  USD1: PEG_STABLE('USD1-USD', { nxrSymbol: 'USD1-USDT', quoteVia: 'USDT-USDC' }),
+  USD1: PEG_STABLE('USD1-USD', { nxrSymbol: 'USD1-USDC' }),
   USDG: PEG_STABLE('USDG-USD'),
-  PYUSD: PEG_STABLE('PYUSD-USD', { nxrSymbol: 'PYUSD-USDT', quoteVia: 'USDT-USDC' }),
+  PYUSD: PEG_STABLE('PYUSD-USD', { nxrSymbol: 'PYUSD-USDC' }),
   RLUSD: PEG_STABLE('RLUSD-USD', { nxrSymbol: 'RLUSD-USDC' }),
   USDF: PEG_STABLE('USDF-USD'),
   U: PEG_STABLE('U-USD'),
@@ -139,11 +132,9 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   WBNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   BTCB: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   ETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
-  // PAXG's only first-class tape is USDT-quoted: `PAXG-USD` and `PAXG-USDC` are both
-  // compose-on-read (flags 128), which the signer cannot resolve at all.
   PAXG: {
     nxrSymbol: 'PAXG-USD',
-    usdc: { nxrSymbol: 'PAXG-USDT', quoteVia: 'USDT-USDC' },
+    usdc: { nxrSymbol: 'PAXG-USDC' },
     band: [1_500, 10_000],
     refUsd: 4040,
   },
@@ -258,7 +249,7 @@ export function nxrPair(symbol: string, basis: MarkBasis = 'USD'): NxrPair | nul
   if (!m) return null;
   if (basis === 'USD') return m;
   if (m.usdc) return m.usdc;
-  return m.nxrSymbol.endsWith('-USDC') && !m.nxrQuote && !m.quoteVia ? m : null;
+  return m.nxrSymbol.endsWith('-USDC') && !m.nxrQuote ? m : null;
 }
 
 /**
