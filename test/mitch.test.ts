@@ -12,6 +12,7 @@ import {
   decodeMitchTicker,
   encodeMitchTicker,
   isMitchFeedId,
+  mitchAssetClassName,
   mitchFeedId,
   mitchInstrumentName,
   mitchTickerOfFeedId,
@@ -33,6 +34,12 @@ describe('MITCH ticker codec', () => {
       quoteId: 18501,
       subType: 0,
     });
+  });
+
+  test('names the asset class of the pinned vector, and an unassigned code honestly', () => {
+    expect(mitchAssetClassName(decodeMitchTicker(WETH_USDC).baseClass)).toBe('Crypto assets');
+    expect(mitchAssetClassName(3)).toBe('Forex');
+    expect(mitchAssetClassName(15)).toBe('Unknown(0xf)');
   });
 
   test('accepts the decimal STRING the venue table stores', () => {

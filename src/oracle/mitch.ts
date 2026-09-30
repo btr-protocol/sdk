@@ -62,6 +62,29 @@ export function mitchInstrumentName(t: number): string {
   return INSTRUMENT_NAMES[t] ?? `Unknown(0x${(t & 0xf).toString(16)})`;
 }
 
+/** MITCH asset classes (4-bit base/quote class), mirroring `core/src/mitch.rs` `ASSET_CLASSES`. */
+const ASSET_CLASS_NAMES: readonly string[] = [
+  'Equities',
+  'Corporate bonds',
+  'Sovereign debt',
+  'Forex',
+  'Commodities',
+  'Real estate',
+  'Crypto assets',
+  'Private markets',
+  'Collectibles',
+  'Infrastructure',
+  'Indices/products',
+  'Structured products',
+  'Cash equivalents',
+  'Loans/receivables',
+];
+
+/** Human name for an asset class code; `Unknown(0xN)` for a code the spec has not assigned. */
+export function mitchAssetClassName(c: number): string {
+  return ASSET_CLASS_NAMES[c] ?? `Unknown(0x${(c & 0xf).toString(16)})`;
+}
+
 /** Widen whatever the caller has - decimal string, number, bigint - to the u64. */
 function toU64(id: bigint | string | number): bigint {
   const v = typeof id === 'bigint' ? id : BigInt(id);
