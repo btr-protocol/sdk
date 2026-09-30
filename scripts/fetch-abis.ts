@@ -251,8 +251,7 @@ for (const t of TARGETS) {
     // The vendored fallback is a hot-path MINIMUM, so it cannot carry the pin of the real ABI.
     // Silently writing it is how a build produced a working binary against an ABI nobody reviewed.
     throw new Error(
-      `fetch-abis: ${t.name} unavailable (${tried.join('; ')}) and the vendored fallback is STALE — ` +
-        'set BTR_ABI_ALLOW_STALE=1 to build against it deliberately',
+      `fetch-abis: ${t.name} unavailable (${tried.join('; ')}) and the vendored fallback is STALE — set BTR_ABI_ALLOW_STALE=1 to build against it deliberately`,
     );
   }
   checkShape(t, fb as unknown[]);
@@ -267,7 +266,7 @@ for (const t of TARGETS) {
 
 if (REPIN) {
   writeFileSync(lockPath, `${JSON.stringify({ ...lock, ...repinned }, null, 2)}\n`);
-  console.log(`fetch-abis: abis.lock.json re-pinned — REVIEW THE DIFF before committing`);
+  console.log('fetch-abis: abis.lock.json re-pinned — REVIEW THE DIFF before committing');
 }
 
 try {

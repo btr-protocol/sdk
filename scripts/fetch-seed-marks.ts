@@ -136,11 +136,7 @@ const roster = assets.map(([symbol, a]) => {
   const full = nxrMark(symbol);
   if (!m || !full) {
     console.error(
-      `${MANIFEST}: symbol ${symbol} has no ${basis}-basis NXR mark source — add it to` +
-        ` src/venues/nxr.ts NXR_MARKS${basis === 'USDC' ? ' (the `usdc` row)' : ''}.` +
-        ` Probe the EXPLICIT pair first: a delimiter-less near-miss answers 200 with another` +
-        ` asset's mid, so "it returns a price" is not evidence the pair exists. Confirm it also` +
-        ` answers flags 64 — a flags-128 compose-on-read cross has no snapshot and cannot be signed.`,
+      `${MANIFEST}: symbol ${symbol} has no ${basis}-basis NXR mark source — add it to src/venues/nxr.ts NXR_MARKS${basis === 'USDC' ? ' (the `usdc` row)' : ''}. Probe the EXPLICIT pair first: a delimiter-less near-miss answers 200 with another asset's mid, so "it returns a price" is not evidence the pair exists. Confirm it also answers flags 64 — a flags-128 compose-on-read cross has no snapshot and cannot be signed.`,
     );
     process.exit(1);
   }

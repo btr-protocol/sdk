@@ -38,11 +38,7 @@ if (existsSync(storeSource)) {
   const abi = readFileSync(storeSource, 'utf8').trimEnd();
   writeFileSync(
     storeOut,
-    `// GENERATED from dex-evm/abi/MarkStoreP8.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n` +
-      `/**\n * MarkStoreP8 - both tiers' marks in the Pool impl: push + lane governance, called at the impl.\n *\n` +
-      ` * Reads go through \`PoolFactory.getFeed\`/\`feedOf\`. Push calldata is raw segments\n` +
-      ` * (\`oracle/wire.ts\`), never encoded through this ABI.\n */\n` +
-      `import type { Abi } from '../eth/abi.js';\n\nexport const MARK_STORE_ABI: Abi = ${abi};\n`,
+    `// GENERATED from dex-evm/abi/MarkStoreP8.json by \`bun scripts/gen-constants.ts\`. Do not edit.\n/**\n * MarkStoreP8 - both tiers' marks in the Pool impl: push + lane governance, called at the impl.\n *\n * Reads go through \`PoolFactory.getFeed\`/\`feedOf\`. Push calldata is raw segments\n * (\`oracle/wire.ts\`), never encoded through this ABI.\n */\nimport type { Abi } from '../eth/abi.js';\n\nexport const MARK_STORE_ABI: Abi = ${abi};\n`,
   );
   console.log('gen-constants: wrote src/abis/MarkStore.ts');
 }
@@ -139,7 +135,9 @@ console.log(`gen-constants: wrote src/abis/solidity.generated.ts from ${source}`
 // Same posture `fetch-abis.ts` takes: the output is committed, so it has to satisfy `biome check`,
 // but biome may be absent in a Docker build layer — warn, never throw.
 try {
-  await $`bunx biome format --write ${[out, storeOut].filter((f) => existsSync(f))}`.cwd(root).quiet();
+  await $`bunx biome format --write ${[out, storeOut].filter((f) => existsSync(f))}`
+    .cwd(root)
+    .quiet();
 } catch {
   console.log('gen-constants: biome format skipped (biome unavailable)');
 }

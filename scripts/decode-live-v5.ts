@@ -29,5 +29,7 @@ console.log(`version    ${(d as unknown as { version: number }).version}`);
 console.log(`seq        ${d.seq}`);
 console.log(`prices     ${d.prices.length}  sigmas ${d.sigmas.length}  confs ${d.confs.length}`);
 console.log(`gi         ${d.prices.map((p) => p.gi).join(',')}`);
-console.log(`exponents  ${uniq.join(',')}${uniq.length === 1 && uniq[0] === 7 ? '   <- all centred at 7' : '   <- NOT all 7'}`);
+console.log(
+  `exponents  ${uniq.join(',')}${uniq.length === 1 && uniq[0] === 7 ? '   <- all centred at 7' : '   <- NOT all 7'}`,
+);
 if (uniq.length !== 1 || uniq[0] !== 7) process.exitCode = 1;
