@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { withChainId } from '../src/api.js';
-import { BTR_CHAINS, chainVenue, defaultChainId, deployedChainIds } from '../src/venues/index.js';
+import {
+  BTR_CHAINS,
+  chainVenue,
+  defaultChainId,
+  deployedChainIds,
+  lpToken,
+} from '../src/venues/index.js';
 
 describe('served chains', () => {
   test('lists BNB, Arc, Monad, live iff a record exists', () => {
@@ -48,4 +54,12 @@ describe('quote posts keep the chain', () => {
     }
     expect(seen).toBe('/api/v1/route?chainId=56');
   });
+});
+
+test('lpToken: B{code}-{SYM} on a BTR core, LP-{SYM} elsewhere', () => {
+  expect(lpToken(chainVenue(143).lp['btr-core'], 'USDC')).toEqual({
+    symbol: 'BC-USDC',
+    name: 'BTR Core Pool USDC',
+  });
+  expect(lpToken(undefined, 'USDC')).toEqual({ symbol: 'LP-USDC' });
 });

@@ -28,6 +28,8 @@ export interface ChainVenue {
   tickerIds: Record<string, string>;
   /** Pool tag ⇒ the symbols the manifest scripts for that core, broadcast or not. */
   rosters: Record<string, string[]>;
+  /** Pool tag ⇒ manifest `pools.<key>.{code,name}`, input of `lpToken`. */
+  lp: Record<string, { code: string; name: string }>;
   /** Broadcast cores only: the routable set. */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names read off the reference tier, union of every core's `<key>RefFeeds`. */
@@ -80,6 +82,12 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
     },
     rosters: {
       'btr-core': ['USDC', 'WMON', 'CBBTC', 'WBTC', 'WETH', 'XAUT0'],
+    },
+    lp: {
+      'btr-core': {
+        code: 'C',
+        name: 'Core',
+      },
     },
     pools: [
       {
@@ -210,6 +218,24 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
         'ORCL',
         'META',
       ],
+    },
+    lp: {
+      'btr-stable-core': {
+        code: 'S',
+        name: 'Stable',
+      },
+      'btr-fx-core': {
+        code: 'F',
+        name: 'Forex',
+      },
+      'btr-crypto-core': {
+        code: 'X',
+        name: 'Crypto',
+      },
+      'btr-stocks-core': {
+        code: 'E',
+        name: 'Equity',
+      },
     },
     pools: [
       {

@@ -166,3 +166,15 @@ export function staticVenuePools(chainId: number): VenuePool[] {
     tokens: p.symbols.map((s) => v.tokens[s]!).filter(Boolean),
   }));
 }
+
+/** LP receipt symbol + name, same rule as the pool contract: a BTR core (manifest `code`/`name`)
+ *  mints `B{code}-{SYM}` / `BTR {name} Pool {SYM}`; any other pool `LP-{SYM}`. Display comes from
+ *  here, never from the receipt's `symbol()` (legacy Arc receipts still answer `bLP-{SYM}`). */
+export function lpToken(
+  meta: { code: string; name: string } | undefined,
+  sym: string,
+): { symbol: string; name?: string } {
+  return meta
+    ? { symbol: `B${meta.code}-${sym}`, name: `BTR ${meta.name} Pool ${sym}` }
+    : { symbol: `LP-${sym}` };
+}

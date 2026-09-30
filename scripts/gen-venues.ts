@@ -20,6 +20,7 @@ type Venue = {
   feedIds: Record<string, string>;
   tickerIds: Record<string, string>;
   rosters: Record<string, string[]>;
+  lp: Record<string, { code: string; name: string }>;
   pools: Array<{ tag: string; address: string; symbols: string[] }>;
   refFeeds: string[];
 };
@@ -88,12 +89,17 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
     }
 
     const rosters: Record<string, string[]> = {};
+    const lp: Venue['lp'] = {};
     const live: Venue['pools'] = [];
     const refFeeds: string[] = [];
     for (const k of coreKeys) {
       const tag = poolTag(k)!;
       const assets: string[] = man.pools[k].assets;
       rosters[tag] = assets;
+      const { code, name } = man.pools[k];
+      if (typeof code !== 'string' || !code || typeof name !== 'string' || !name)
+        throw new Error(`gen-venues: ${slug} manifest pools.${k} lacks code/name`);
+      lp[tag] = { code, name };
       const addr = pools[k];
       if (typeof addr !== 'string' || !ADDR.test(addr) || ZERO.test(addr)) continue;
       for (const s of assets)
@@ -110,6 +116,7 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
       feedIds,
       tickerIds,
       rosters,
+      lp,
       pools: live,
       refFeeds,
     };
@@ -147,6 +154,8 @@ export interface ChainVenue {
   tickerIds: Record<string, string>;
   /** Pool tag ⇒ the symbols the manifest scripts for that core, broadcast or not. */
   rosters: Record<string, string[]>;
+  /** Pool tag ⇒ manifest \`pools.<key>.{code,name}\`, input of \`lpToken\`. */
+  lp: Record<string, { code: string; name: string }>;
   /** Broadcast cores only: the routable set. */
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names read off the reference tier, union of every core's \`<key>RefFeeds\`. */
