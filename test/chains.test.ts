@@ -5,6 +5,7 @@ import {
   chainVenue,
   defaultChainId,
   deployedChainIds,
+  lpReceipt,
   lpToken,
 } from '../src/venues/index.js';
 
@@ -62,4 +63,20 @@ test('lpToken: B{code}-{SYM} on a BTR core, LP-{SYM} elsewhere', () => {
     name: 'BTR Core Pool USDC',
   });
   expect(lpToken(undefined, 'USDC')).toEqual({ symbol: 'LP-USDC' });
+});
+
+test('lpReceipt: SYM is the manifest listed symbol, key matched case-insensitively', () => {
+  expect(lpReceipt(143, 'btr-core', 'WMON')).toEqual({
+    symbol: 'BC-WMON',
+    name: 'BTR Core Pool WMON',
+  });
+  expect(lpReceipt(143, 'btr-core', 'XAUT0').symbol).toBe('BC-XAUT');
+  expect(lpReceipt(143, 'btr-core', 'cbBTC').symbol).toBe('BC-cbBTC');
+  expect(lpReceipt(5042002, 'btr-stable-core', 'USDCB')).toEqual({
+    symbol: 'BS-USDC',
+    name: 'BTR Stable Pool USDC',
+  });
+  expect(lpReceipt(5042002, 'btr-fx-core', 'EURC').symbol).toBe('BF-EURC');
+  expect(lpReceipt(5042002, 'btr-nope', 'USDCB').symbol).toBe('LP-USDC');
+  expect(lpReceipt(1, 'btr-core', 'USDC')).toEqual({ symbol: 'LP-USDC' });
 });

@@ -17,6 +17,7 @@ type Venue = {
   chainId: number;
   contracts: Record<string, string>;
   tokens: Record<string, string>;
+  symbols: Record<string, string>;
   feedIds: Record<string, string>;
   tickerIds: Record<string, string>;
   rosters: Record<string, string[]>;
@@ -63,7 +64,14 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
 
     const coreKeys = Object.keys(man.pools).filter((k) => poolTag(k));
     const tokens: Record<string, string> = {};
-    for (const [s, t] of Object.entries<{ addr: string }>(man.tokens)) tokens[s] = t.addr;
+    const symbols: Record<string, string> = {};
+    for (const [s, t] of Object.entries<{ addr: string; symbol: string }>(man.tokens)) {
+      if (s === '_doc') continue;
+      if (typeof t.symbol !== 'string' || !t.symbol)
+        throw new Error(`gen-venues: ${slug} manifest tokens.${s} lacks symbol`);
+      tokens[s] = t.addr;
+      symbols[s] = t.symbol;
+    }
 
     const contracts: Record<string, string> = {};
     for (const rec of [pools, deploy])
@@ -113,6 +121,7 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
       chainId: Number(id),
       contracts: sortedContracts,
       tokens,
+      symbols,
       feedIds,
       tickerIds,
       rosters,
@@ -148,6 +157,8 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Manifest tokens by symbol. The hub (roster index 0) is the base of every core. */
   tokens: Record<string, Address>;
+  /** Token key ⇒ manifest \`tokens.<key>.symbol\`, the listed SYM in the LP receipt (\`USDCB\` ⇒ \`USDC\`). */
+  symbols: Record<string, string>;
   /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ feedId, in globalIndex order. */
   feedIds: Record<string, Hex>;
   /** Same keys ⇒ MITCH tickerId (decimal string; feedId = bytes32(ticker)). */

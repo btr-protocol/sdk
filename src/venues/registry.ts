@@ -178,3 +178,17 @@ export function lpToken(
     ? { symbol: `B${meta.code}-${sym}`, name: `BTR ${meta.name} Pool ${sym}` }
     : { symbol: `LP-${sym}` };
 }
+
+/** `lpToken` for one leg of a pool: SYM is the manifest's listed symbol for `tokenKey` (any
+ *  casing), not the key (`USDCB` ⇒ `BS-USDC`). Display only, so a chain or core with no record
+ *  answers `LP-{SYM}` instead of throwing. */
+export function lpReceipt(
+  chainId: number,
+  poolTag: string,
+  tokenKey: string,
+): { symbol: string; name?: string } {
+  const v = DEPLOYED_VENUES[chainId];
+  const want = tokenKey.toLowerCase();
+  const key = Object.keys(v?.symbols ?? {}).find((k) => k.toLowerCase() === want);
+  return lpToken(v?.lp[poolTag], (key && v?.symbols[key]) || tokenKey);
+}

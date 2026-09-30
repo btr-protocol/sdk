@@ -22,6 +22,8 @@ export interface ChainVenue {
   contracts: Record<string, Address>;
   /** Manifest tokens by symbol. The hub (roster index 0) is the base of every core. */
   tokens: Record<string, Address>;
+  /** Token key ⇒ manifest `tokens.<key>.symbol`, the listed SYM in the LP receipt (`USDCB` ⇒ `USDC`). */
+  symbols: Record<string, string>;
   /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ feedId, in globalIndex order. */
   feedIds: Record<string, Hex>;
   /** Same keys ⇒ MITCH tickerId (decimal string; feedId = bytes32(ticker)). */
@@ -63,6 +65,14 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       WBTC: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c',
       WETH: '0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242',
       XAUT0: '0x01bFF41798a0BcF287b996046Ca68b395DbC1071',
+    },
+    symbols: {
+      USDC: 'USDC',
+      WMON: 'WMON',
+      CBBTC: 'cbBTC',
+      WBTC: 'WBTC',
+      WETH: 'WETH',
+      XAUT0: 'XAUT',
     },
     feedIds: {
       'USDC-USD': '0x0000000000000000000000000000000000000000000000000648453138900000',
@@ -144,6 +154,34 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       MSFT: '0x83E43A65ce9E5aE1872a2363eD74D67C5A30fdb5',
       ORCL: '0x56F81D0831b9352e023266b72F38b4657baA32E8',
       META: '0x2767f2e94a7cF7935d59DdD7A5A30138369846e2',
+    },
+    symbols: {
+      USDCB: 'USDC',
+      EURC: 'EURC',
+      USDT: 'USDT',
+      USDS: 'USDS',
+      USD1: 'USD1',
+      PYUSD: 'PYUSD',
+      QCAD: 'QCAD',
+      AUDF: 'AUDF',
+      JPYC: 'JPYC',
+      KRW1: 'KRW1',
+      WETH: 'WETH',
+      WBTC: 'WBTC',
+      CBBTC: 'cbBTC',
+      BNB: 'BNB',
+      XAUT: 'XAUT',
+      PAXG: 'PAXG',
+      INTC: 'INTC',
+      AMD: 'AMD',
+      NVDA: 'NVDA',
+      ASML: 'ASML',
+      SPCX: 'SPCX',
+      AVGO: 'AVGO',
+      TSLA: 'TSLA',
+      MSFT: 'MSFT',
+      ORCL: 'ORCL',
+      META: 'META',
     },
     feedIds: {
       'USDC-USD': '0x0000000000000000000000000000000000000000000000000648453138900000',
