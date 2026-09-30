@@ -301,7 +301,7 @@ describe('chain resolution refuses to guess', () => {
   });
 
   test('the error names what IS deployed, so the operator sees the mismatch', () => {
-    expect(() => chainVenue(0)).toThrow(/deployed: \[5042002\]/);
+    expect(() => chainVenue(0)).toThrow(/deployed: \[143, 5042002\]/);
   });
 
   test('every deployed chain resolves an oracle and at least one pool', () => {

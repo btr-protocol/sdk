@@ -47,11 +47,12 @@ interface BtrChain {
   status: 'live' | 'pending';
 }
 
-/** Every chain the one BTR deployment serves, in default order: BNB first once live, then Arc. */
+/** Every chain the one BTR deployment serves, in default order: BNB first once live, then Arc, then Monad. */
 export const BTR_CHAINS: readonly BtrChain[] = (
   [
     [56, 'bnb'],
     [5042002, 'arc'],
+    [143, 'monad'],
   ] as const
 ).map(([chainId, slug]) => ({
   chainId,
@@ -59,7 +60,7 @@ export const BTR_CHAINS: readonly BtrChain[] = (
   status: DEPLOYED_VENUES[chainId] ? 'live' : 'pending',
 }));
 
-/** The first live served chain: Arc until BNB's record is transcribed, then BNB. */
+/** The first live served chain: Arc until BNB's record lands, then BNB. */
 export function defaultChainId(): number {
   const c = BTR_CHAINS.find((c) => c.status === 'live');
   if (!c) throw new Error('no served BTR chain has a deployment record');

@@ -3,12 +3,18 @@ import { withChainId } from '../src/api.js';
 import { BTR_CHAINS, chainVenue, defaultChainId, deployedChainIds } from '../src/venues/index.js';
 
 describe('served chains', () => {
-  test('lists BNB then Arc, live iff a record exists', () => {
+  test('lists BNB, Arc, Monad, live iff a record exists', () => {
     expect(BTR_CHAINS).toEqual([
       { chainId: 56, slug: 'bnb', status: 'pending' },
       { chainId: 5042002, slug: 'arc', status: 'live' },
+      { chainId: 143, slug: 'monad', status: 'live' },
     ]);
-    expect(deployedChainIds()).toEqual([5042002]);
+    expect(deployedChainIds()).toEqual([143, 5042002]);
+  });
+
+  test('every deployed chain is a served chain', () => {
+    const served = BTR_CHAINS.map((c) => c.chainId);
+    for (const id of deployedChainIds()) expect(served).toContain(id);
   });
 
   test('default = first live chain', () => {
