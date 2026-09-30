@@ -163,6 +163,8 @@ export const addChain = (p: Eip1193Provider, chain: { chainId: number; [key: str
 // Utilities
 // ─────────────────────────────────────────────────────────────
 
+/** Polls for the receipt, every 2s for the first 30s then every 10s; throws `Tx <hash> timed out` after `timeout` ms. A caller
+ *  that must not treat that as a verdict (multisig, stuck fee) loops on it. */
 export const waitForTransaction = async (
   p: Eip1193Provider,
   hash: Hex,
@@ -170,19 +172,20 @@ export const waitForTransaction = async (
   timeout = 60000,
 ): Promise<unknown> => {
   const start = Date.now();
+  const pause = () => new Promise((r) => setTimeout(r, Date.now() - start < 30000 ? 2000 : 10000));
   while (Date.now() - start < timeout) {
     const r = await cmd<unknown>(p, 'eth_getTransactionReceipt', [hash]);
     if (r) {
       if (confirms > 1) {
         const current = await getBlockNumber(p);
         if (current - toBig((r as { blockNumber: string }).blockNumber) + 1n < BigInt(confirms)) {
-          await new Promise((r) => setTimeout(r, 2000));
+          await pause();
           continue;
         }
       }
       return r;
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    await pause();
   }
   throw new Error(`Tx ${hash} timed out`);
 };

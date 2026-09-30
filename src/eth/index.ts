@@ -87,7 +87,7 @@ export {
 } from './contracts';
 
 // ABI
-export type { Abi, AbiFunction } from './abi';
+export type { Abi, AbiEvent, AbiFunction } from './abi';
 export {
   getSelector,
   encode,
@@ -175,14 +175,12 @@ export {
   walletId,
   resolveWallet,
   accountClass,
-  WC_ICONS,
-  DISCOVER_MOBILE,
-  DISCOVER_DESKTOP,
+  wcLinks,
+  browseLink,
   isMobile,
   isKnownWallet,
   getDownloadUrl,
   getName,
-  getTooltip,
   detectLegacy,
   eip6963Providers,
   mergeWallets,

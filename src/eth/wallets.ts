@@ -46,17 +46,17 @@ interface Eip6963Detail {
 // Wallet Database (single source of truth)
 // ─────────────────────────────────────────────────────────────
 
-interface WalletDef {
+export interface WalletDef {
   id: string;
   name: string;
   url: string; // download URL
   rdns?: string; // EIP-6963 reverse domain
   path?: string; // window.* path for legacy detection
   flag?: string; // ethereum.isX flag
-  mobile?: boolean; // available on mobile
-  wc?: boolean; // show in WalletConnect grid
-  discoverMobile?: boolean; // show in mobile discover section
-  discoverDesktop?: boolean; // show in desktop discover section
+  android?: string; // Play package id: native install detection + explicit-intent target
+  scheme?: string; // native WalletConnect prefix, `<uri-encoded pairing>` appended: `metamask://wc?uri=`
+  universal?: string; // https universal-link prefix, same shape as `scheme`
+  browse?: string; // no WC pairing: template opening the dapp in the wallet's own browser, `{url}`/`{origin}` (URI-encoded)
 }
 
 export const WALLETS: WalletDef[] = [
@@ -67,10 +67,9 @@ export const WALLETS: WalletDef[] = [
     url: 'https://metamask.io',
     rdns: 'io.metamask',
     flag: 'isMetaMask',
-    mobile: true,
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'io.metamask',
+    scheme: 'metamask://wc?uri=',
+    universal: 'https://metamask.app.link/wc?uri=',
   },
   {
     id: 'rabby',
@@ -79,7 +78,8 @@ export const WALLETS: WalletDef[] = [
     rdns: 'io.rabby',
     path: 'rabby',
     flag: 'isRabby',
-    discoverDesktop: true,
+    android: 'com.debank.rabbymobile',
+    scheme: 'rabby://wc?uri=',
   },
   {
     id: 'rainbow',
@@ -88,10 +88,9 @@ export const WALLETS: WalletDef[] = [
     rdns: 'me.rainbow',
     path: 'rainbow',
     flag: 'isRainbow',
-    mobile: true,
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'me.rainbow',
+    scheme: 'rainbow://wc?uri=',
+    universal: 'https://rnbwapp.com/wc?uri=',
   },
   {
     id: 'phantom',
@@ -100,10 +99,8 @@ export const WALLETS: WalletDef[] = [
     rdns: 'app.phantom',
     path: 'phantom.ethereum',
     flag: 'isPhantom',
-    mobile: true,
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'app.phantom',
+    browse: 'https://phantom.app/ul/browse/{url}?ref={origin}',
   },
   {
     id: 'trust',
@@ -112,10 +109,9 @@ export const WALLETS: WalletDef[] = [
     rdns: 'com.trustwallet.app',
     path: 'trustwallet',
     flag: 'isTrust',
-    mobile: true,
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'com.wallet.crypto.trustapp',
+    scheme: 'trust://wc?uri=',
+    universal: 'https://link.trustwallet.com/wc?uri=',
   },
   {
     id: 'base',
@@ -124,12 +120,16 @@ export const WALLETS: WalletDef[] = [
     rdns: 'com.coinbase.wallet',
     path: 'coinbaseWalletExtension',
     flag: 'isCoinbaseWallet',
-    mobile: true,
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'org.toshi',
+    browse: 'cbwallet://miniapp?url={url}',
   },
-  { id: 'safe', name: 'Safe', url: 'https://safe.global', rdns: 'global.safe.wallet', wc: true },
+  {
+    id: 'safe',
+    name: 'Safe',
+    url: 'https://safe.global',
+    rdns: 'global.safe.wallet',
+    android: 'global.safe.mobileapp',
+  },
   {
     id: 'backpack',
     name: 'Backpack',
@@ -140,14 +140,20 @@ export const WALLETS: WalletDef[] = [
   },
 
   // Hardware wallets
-  { id: 'ledger', name: 'Ledger', url: 'https://ledger.com', wc: true },
-  { id: 'trezor', name: 'Trezor', url: 'https://trezor.io', wc: true },
-  { id: 'tangem', name: 'Tangem', url: 'https://tangem.com', wc: true },
+  {
+    id: 'ledger',
+    name: 'Ledger',
+    url: 'https://ledger.com',
+    android: 'com.ledger.live',
+    scheme: 'ledgerlive://wc?uri=',
+  },
+  { id: 'trezor', name: 'Trezor', url: 'https://trezor.io' },
+  { id: 'tangem', name: 'Tangem', url: 'https://tangem.com' },
 
   // Institutional
-  { id: 'copper', name: 'Copper', url: 'https://copper.co', wc: true },
-  { id: 'bitgo', name: 'BitGo', url: 'https://bitgo.com', wc: true },
-  { id: 'fireblocks', name: 'Fireblocks', url: 'https://fireblocks.com', wc: true },
+  { id: 'copper', name: 'Copper', url: 'https://copper.co' },
+  { id: 'bitgo', name: 'BitGo', url: 'https://bitgo.com' },
+  { id: 'fireblocks', name: 'Fireblocks', url: 'https://fireblocks.com' },
 
   // Exchange wallets
   {
@@ -156,7 +162,7 @@ export const WALLETS: WalletDef[] = [
     url: 'https://www.binance.com',
     path: 'BinanceChain',
     flag: 'isBinance',
-    wc: true,
+    android: 'com.binance.dev',
   },
   {
     id: 'okx',
@@ -165,9 +171,7 @@ export const WALLETS: WalletDef[] = [
     rdns: 'com.okex.wallet',
     path: 'okxwallet',
     flag: 'isOkxWallet',
-    wc: true,
-    discoverMobile: true,
-    discoverDesktop: true,
+    android: 'com.okx.wallet',
   },
   {
     id: 'bitget',
@@ -176,7 +180,7 @@ export const WALLETS: WalletDef[] = [
     rdns: 'com.bitget.wallet',
     path: 'bitkeep.ethereum',
     flag: 'isBitKeep',
-    wc: true,
+    android: 'com.bitkeep.wallet',
   },
   {
     id: 'gate',
@@ -185,10 +189,9 @@ export const WALLETS: WalletDef[] = [
     rdns: 'io.gate.wallet',
     path: 'gatewallet',
     flag: 'isGateWallet',
-    wc: true,
   },
-  { id: 'bybit', name: 'Bybit', url: 'https://www.bybit.com/en/web3', wc: true },
-  { id: 'kucoin', name: 'KuCoin', url: 'https://kucoin.com', wc: true },
+  { id: 'bybit', name: 'Bybit', url: 'https://www.bybit.com/en/web3' },
+  { id: 'kucoin', name: 'KuCoin', url: 'https://kucoin.com' },
 
   // DeFi wallets
   {
@@ -198,6 +201,8 @@ export const WALLETS: WalletDef[] = [
     rdns: 'io.zerion.wallet',
     path: 'zerionWallet',
     flag: 'isZerion',
+    android: 'io.zerion.android',
+    scheme: 'zerion://wc?uri=',
   },
   {
     id: 'tokenpocket',
@@ -206,6 +211,8 @@ export const WALLETS: WalletDef[] = [
     rdns: 'pro.tokenpocket',
     path: 'tokenpocket.ethereum',
     flag: 'isTokenPocket',
+    android: 'vip.mytokenpocket',
+    scheme: 'tpoutside://wc?uri=',
   },
   {
     id: 'coin98',
@@ -223,31 +230,32 @@ export const WALLETS: WalletDef[] = [
     path: '$onekey.ethereum',
     flag: 'isOneKey',
   },
-  {
-    id: 'family',
-    name: 'Family',
-    url: 'https://family.co',
-    rdns: 'co.family.wallet',
-    wc: true,
-    discoverMobile: true,
-  },
+  { id: 'family', name: 'Family', url: 'https://family.co', rdns: 'co.family.wallet' },
   {
     id: '1inch',
     name: '1inch',
     url: 'https://1inch.io/wallet',
     rdns: 'io.1inch.wallet',
-    wc: true,
-    discoverMobile: true,
+    android: 'io.oneinch.android',
+    scheme: 'oneinch://wc?uri=',
   },
   {
     id: 'uniswap',
     name: 'Uniswap',
     url: 'https://wallet.uniswap.org',
     rdns: 'org.uniswap',
-    wc: true,
-    discoverMobile: true,
+    android: 'com.uniswap.mobile',
+    scheme: 'uniswap://wc?uri=',
+    universal: 'https://uniswap.org/app/wc?uri=',
   },
-  { id: 'imtoken', name: 'imToken', url: 'https://token.im', rdns: 'im.token', wc: true },
+  {
+    id: 'imtoken',
+    name: 'imToken',
+    url: 'https://token.im',
+    rdns: 'im.token',
+    android: 'im.token.app',
+    scheme: 'imtokenv2://wc?uri=',
+  },
   {
     id: 'safepal',
     name: 'SafePal',
@@ -255,9 +263,16 @@ export const WALLETS: WalletDef[] = [
     rdns: 'com.safepal',
     path: 'safepalProvider',
     flag: 'isSafePal',
-    wc: true,
+    android: 'io.safepal.wallet',
+    scheme: 'safepalwallet://wc?uri=',
   },
-  { id: 'argent', name: 'Argent', url: 'https://argent.xyz', rdns: 'xyz.argent', wc: true },
+  {
+    id: 'argent',
+    name: 'Argent',
+    url: 'https://argent.xyz',
+    rdns: 'xyz.argent',
+    android: 'com.ready.wallet',
+  },
 
   // Browser & other
   {
@@ -326,11 +341,6 @@ for (const [alias, id] of [
   if (def) ALIASES.set(alias, def);
 }
 
-// Curated lists derived from WALLETS
-export const WC_ICONS = WALLETS.filter((w) => w.wc).map((w) => w.id);
-export const DISCOVER_MOBILE = WALLETS.filter((w) => w.discoverMobile).map((w) => w.id);
-export const DISCOVER_DESKTOP = WALLETS.filter((w) => w.discoverDesktop).map((w) => w.id);
-
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
@@ -370,16 +380,27 @@ function multiProviders(): Eip1193Provider[] {
   }
 }
 
+/** Ordered launch links for a WalletConnect pairing `uri`: native scheme, universal link, then the bare
+ *  `wc:` URI (any registered handler). Entries a wallet lacks are skipped. */
+export const wcLinks = (w: Pick<WalletDef, 'scheme' | 'universal'>, uri: string): string[] => {
+  const enc = encodeURIComponent(uri);
+  return [w.scheme && w.scheme + enc, w.universal && w.universal + enc, uri].filter(
+    (l): l is string => !!l,
+  );
+};
+
+/** Deep link opening `pageUrl` in the wallet's own dapp browser (wallets with no WC pairing). */
+export const browseLink = (w: Pick<WalletDef, 'browse'>, pageUrl: string): string | undefined =>
+  w.browse
+    ?.replace('{url}', encodeURIComponent(pageUrl))
+    .replace('{origin}', encodeURIComponent(new URL(pageUrl).origin));
+
 export const isMobile = () =>
   typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 /** Is this id a row in [`WALLETS`], i.e. do we ship a rasterised icon and a name for it? */
 export const isKnownWallet = (id: string): boolean => byId.has(id);
 export const getDownloadUrl = (id: string) => byId.get(id)?.url || null;
 export const getName = (id: string) => byId.get(id)?.name || id;
-export const getTooltip = (id: string) => {
-  const w = byId.get(id);
-  return w ? `${w.name}${w.mobile ? ' Mobile' : ''}` : id;
-};
 
 // ─────────────────────────────────────────────────────────────
 // Legacy Detection
