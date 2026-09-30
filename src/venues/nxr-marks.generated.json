@@ -140,6 +140,22 @@
       "symbol": "XAUT-USDC"
     }
   },
+  "WMON": {
+    "usd": {
+      "symbol": "MON-USDC"
+    },
+    "usdc": {
+      "symbol": "MON-USDC"
+    }
+  },
+  "XAUT0": {
+    "usd": {
+      "symbol": "XAUT-USDC"
+    },
+    "usdc": {
+      "symbol": "XAUT-USDC"
+    }
+  },
   "WBNB": {
     "usd": {
       "symbol": "BNB-USDC"

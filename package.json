@@ -73,7 +73,7 @@
     "build": "bun run fetch-abis && bun build ./src/index.ts --outdir ./dist --target node",
     "check": "bun run typecheck && bun test",
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
-    "fetch-abis": "bun scripts/gen-constants.ts && bun scripts/gen-venues.ts && bun scripts/fetch-abis.ts",
+    "fetch-abis": "bun scripts/gen-constants.ts && bun scripts/gen-venues.ts && bun scripts/gen-nxr-marks.ts && bun scripts/fetch-abis.ts",
     "format": "bunx biome format --write src",
     "lint": "bunx biome check src",
     "postinstall": "bun run fetch-abis",
