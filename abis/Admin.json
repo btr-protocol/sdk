@@ -123,6 +123,11 @@
         "name": "vegaBps",
         "type": "uint16",
         "internalType": "uint16"
+      },
+      {
+        "name": "lpSym",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],

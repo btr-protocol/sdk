@@ -253,6 +253,11 @@
         "name": "vegaBps",
         "type": "uint16",
         "internalType": "uint16"
+      },
+      {
+        "name": "lpSym",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -1303,6 +1308,11 @@
         "name": "poolAdmin_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "lpTag",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1332,7 +1342,7 @@
     "name": "maxRedeem",
     "inputs": [
       {
-        "name": "owner",
+        "name": "holder",
         "type": "address",
         "internalType": "address"
       },
