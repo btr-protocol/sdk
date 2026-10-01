@@ -271,6 +271,27 @@ describe('quoteFromWire', () => {
     expect(quoteFromWire(priced(false, 9.9, 10, 1), 18, [], 1)).not.toBeNull(); // -90% floor buy
   });
 
+  // 6.4e-7 in at 6 decimals is sent as raw 1 (1e-6): the fill is 1 raw out, r = 1 against what was
+  // sent, not 1.56 against the float.
+  test('dust input is judged against the rounded amount actually sent', () => {
+    const dust = (): QuoteResponseWire => ({
+      ...priced(false, 1e-6, 1),
+      amount_out: '0x1',
+      gross_out: '0x1',
+    });
+    expect(quoteFromWire(dust(), 6, [], 6.4e-7)?.avgPrice).toBeCloseTo(1, 9);
+  });
+
+  // The core caps a flat sell at mark: a sell fill above 1.01·mark is off-scale, though the generic
+  // cap (a floor-offset BUY fills to 10x mark) lets the same quote through.
+  test('flatSell caps the fill at 1.01·mark; the same quote without it passes', () => {
+    const q = priced(false, 0.5, 1, 0.1); // mark = mid/10
+    expect(quoteFromWire(q, 18, [], 1, true)).toBeNull();
+    expect(quoteFromWire(q, 18, [], 1)).not.toBeNull();
+    expect(quoteFromWire(q, 18, [], 1, false)).not.toBeNull();
+    expect(quoteFromWire(priced(false, 0.099, 1, 0.1), 18, [], 1, true)).not.toBeNull();
+  });
+
   test('non-positive mid or mark with a positive fill: refused', () => {
     expect(quoteFromWire(priced(false, 1, 0), 18, [], 1)).toBeNull();
     expect(quoteFromWire(priced(false, 1, 1, 0), 18, [], 1)).toBeNull();

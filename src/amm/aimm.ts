@@ -834,22 +834,31 @@ const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
  * inverted flat BUY (mid base-per-spoke, fill spoke-per-base, r = 1/p²) is refused for p < 1; for
  * p > 1 its mark is too LARGE, which only raises the mark cap (a high minOut reverts, never fills).
  * A non-positive mid/mark with a positive fill is refused.
+ *
+ * Fills are per the amount actually SENT (`amountInTok` rounded to raw at `decimalsIn`, default
+ * `wireDecimals`: right for a flat quote, a path passes its first hop's), so a dust input is not
+ * refused for the rounding. `flatSell` tightens the mark cap to 1.01·mark: the core caps a sell
+ * at mark, so only a buy can fill up to 10x mark.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
   wireDecimals: number,
   route: string[],
   amountInTok: number,
+  flatSell = false,
+  decimalsIn = wireDecimals,
 ): Quote | null {
+  const sent = Math.round(amountInTok * 10 ** decimalsIn) / 10 ** decimalsIn;
   const amountOut = Number(BigInt(w.amount_out)) / 10 ** wireDecimals;
   const grossOut = Number(BigInt(w.gross_out)) / 10 ** wireDecimals;
-  const avgPrice = amountInTok > 0 && amountOut > 0 ? amountOut / amountInTok : 0;
+  const avgPrice = sent > 0 && amountOut > 0 ? amountOut / sent : 0;
   const midPrice = wadToF64(w.mid_price);
   const markPrice = wadToF64(w.mark_price);
-  const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
+  const grossAvg = sent > 0 && grossOut > 0 ? grossOut / sent : 0;
   if (grossAvg > 0) {
     const r = midPrice > 0 ? grossAvg / midPrice : Number.POSITIVE_INFINITY;
-    if (!(r <= 1.01 && grossAvg <= 10.1 * markPrice && (w.saturated || r >= 0.01))) return null;
+    const markCap = (flatSell ? 1.01 : 10.1) * markPrice;
+    if (!(r <= 1.01 && grossAvg <= markCap && (w.saturated || r >= 0.01))) return null;
   }
   const spreadBps = w.spread_pbps / 100;
   const feeBps = (fee: string): number =>

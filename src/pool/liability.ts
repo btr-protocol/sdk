@@ -247,12 +247,14 @@ export function backendConvert(
     dec: number,
     route: string[],
     fairIn: number,
-  ): Quote | null => quoteFromWire(w, dec, route, fairIn);
+    flatSell = false,
+    decimalsIn = dec,
+  ): Quote | null => quoteFromWire(w, dec, route, fairIn, flatSell, decimalsIn);
   return async (fairIn: number): Promise<Quote | null> => {
     if (!inBase && outBase && legIn) {
       const hub = hubFor(legIn, 'sell into the base');
       const w = await quoteLegAsync(legIn, fairIn, true, legIn.decimals, hub, opts.backendBase);
-      return decode(w, legIn.decimals, [tokenIn, tokenOut], fairIn);
+      return decode(w, legIn.decimals, [tokenIn, tokenOut], fairIn, true);
     }
     if (inBase && !outBase && legOut) {
       const hub = hubFor(legOut, 'buy out of the base');
@@ -276,7 +278,7 @@ export function backendConvert(
         },
       ];
       const w = await quotePathAsync(legs, opts.backendBase);
-      return decode(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
+      return decode(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn, false, decIn);
     }
     throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
   };
