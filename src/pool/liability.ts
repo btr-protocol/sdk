@@ -231,19 +231,30 @@ export function backendConvert(
   const decIn = inBase ? opts.baseDecimals : (state.legs[tokenIn]?.decimals ?? opts.baseDecimals);
   const legIn = state.legs[tokenIn];
   const legOut = state.legs[tokenOut];
-  // A leg that touches the hub is settled against the HUB's endpoint (its coverage wall tolls a
-  // sell into it, its vega enters the spread both ways). No hub book ⇒ no honest quote.
-  const hub = state.hub ? hubEndpointWire(state.hub, opts.baseDecimals) : null;
+  // A flat /quote has no decimal boundary: amounts AND the counterparty book are in the SPOKE's
+  // scale (depth.rs shifts the hub the same way), so the hub is built per leg and the response is
+  // decoded at the leg's decimals. A leg that touches the hub is settled against the HUB's
+  // endpoint (its coverage wall tolls a sell into it, its vega enters the spread both ways); no
+  // hub book ⇒ no honest quote. A null decode is a scale/orientation mismatch: fail closed.
+  const hubFor = (leg: PoolLeg, what: string) => {
+    if (!state.hub) throw new Error(`backendConvert: no hub book for a ${what}`);
+    return hubEndpointWire(state.hub, leg.decimals);
+  };
+  const decode = (w: QuoteResponseWire, dec: number, route: string[], fairIn: number): Quote => {
+    const q = quoteFromWire(w, dec, route, fairIn);
+    if (!q) throw new Error(`backendConvert: ${route.join('->')} quote off-scale vs mid`);
+    return q;
+  };
   return async (fairIn: number): Promise<Quote> => {
     if (!inBase && outBase && legIn) {
-      if (!hub) throw new Error('backendConvert: no hub book for a sell into the base');
-      const w = await quoteLegAsync(legIn, fairIn, true, decIn, hub, opts.backendBase);
-      return quoteFromWire(w, opts.baseDecimals, [tokenIn, tokenOut], fairIn);
+      const hub = hubFor(legIn, 'sell into the base');
+      const w = await quoteLegAsync(legIn, fairIn, true, legIn.decimals, hub, opts.backendBase);
+      return decode(w, legIn.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (inBase && !outBase && legOut) {
-      if (!hub) throw new Error('backendConvert: no hub book for a buy out of the base');
-      const w = await quoteLegAsync(legOut, fairIn, false, decIn, hub, opts.backendBase);
-      return quoteFromWire(w, legOut.decimals, [tokenIn, tokenOut], fairIn);
+      const hub = hubFor(legOut, 'buy out of the base');
+      const w = await quoteLegAsync(legOut, fairIn, false, legOut.decimals, hub, opts.backendBase);
+      return decode(w, legOut.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (!inBase && !outBase && legIn && legOut) {
       // The hub is INTERIOR to a cross on both hops: the path delivers on the out-spoke's own
@@ -262,7 +273,7 @@ export function backendConvert(
         },
       ];
       const w = await quotePathAsync(legs, opts.backendBase);
-      return quoteFromWire(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
+      return decode(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
     }
     throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
   };

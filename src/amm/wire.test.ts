@@ -51,6 +51,20 @@ describe('hubEndpointWire', () => {
   });
 });
 
+describe('hubEndpointWire decimals', () => {
+  // A flat /quote has no decimal boundary: the hub book rides in the SPOKE's scale, so the same
+  // human book is 1e12x larger for an 18-decimal spoke than for a 6-decimal one.
+  test('the same human book scales to whichever decimals the surface reads', () => {
+    const e6 = hubEndpointWire(HUB, 6);
+    const e18 = hubEndpointWire(HUB, 18);
+    // f64 products: exact at 6, within an ulp at 18
+    expect(Number(BigInt(e18.reserves)) / Number(BigInt(e6.reserves))).toBeCloseTo(1e12, -3);
+    expect(Number(BigInt(e18.liabilities)) / Number(BigInt(e6.liabilities))).toBeCloseTo(1e12, -3);
+    expect(e18.vega_bps).toBe(e6.vega_bps);
+    expect(e18.kappa_cov_bps).toBe(e6.kappa_cov_bps);
+  });
+});
+
 describe('poolStateToWire', () => {
   test('publishes the WHOLE hub endpoint, not just its balance', () => {
     const w = poolStateToWire('p', undefined, state(HUB), meta, 6);
@@ -182,8 +196,8 @@ describe('legToQuoteBody', () => {
 describe('quoteFromWire', () => {
   const wire = (saturated?: boolean): QuoteResponseWire =>
     ({
-      amount_out: '0x3e8',
-      gross_out: '0x3e8',
+      amount_out: '0xde0b6b3a7640000',
+      gross_out: '0xde0b6b3a7640000',
       avg_price: '0xde0b6b3a7640000',
       mid_price: '0xde0b6b3a7640000',
       mark_price: '0xde0b6b3a7640000',
@@ -197,12 +211,12 @@ describe('quoteFromWire', () => {
   // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
   // flag survives the wire.
   test('carries the saturation flag, so a flat top is never shown as a price', () => {
-    expect(quoteFromWire(wire(true), 18, [], 1).saturated).toBe(true);
-    expect(quoteFromWire(wire(false), 18, [], 1).saturated).toBe(false);
+    expect(quoteFromWire(wire(true), 18, [], 1)?.saturated).toBe(true);
+    expect(quoteFromWire(wire(false), 18, [], 1)?.saturated).toBe(false);
   });
 
   test('a backend that predates the flag reads unsaturated, never undefined', () => {
-    expect(quoteFromWire(wire(undefined), 18, [], 1).saturated).toBe(false);
+    expect(quoteFromWire(wire(undefined), 18, [], 1)?.saturated).toBe(false);
   });
 
   // USDC (6) -> WMON (18): mid/mark are human-per-human, only amounts carry the 1e12 decimals gap.
@@ -221,7 +235,7 @@ describe('quoteFromWire', () => {
       proto_fee: '0x0',
       lp_fee: '0x0',
     } as QuoteResponseWire;
-    const q = quoteFromWire(w, 18, ['USDC', 'WMON'], 0.001);
+    const q = quoteFromWire(w, 18, ['USDC', 'WMON'], 0.001)!;
     expect(1 / q.midPrice).toBeCloseTo(0.0321, 4);
     expect(q.markPrice).toBeCloseTo(mid, 9);
     expect(q.avgPrice).toBeCloseTo(mid, 6);
@@ -250,16 +264,15 @@ describe('quoteFromWire', () => {
     };
 
     test('18 spoke vs 6 base: impact and premium stay sane', () => {
-      const q = quoteFromWire(buy(wad(mid)), 18, ['USDC', 'WMON'], 1_000);
+      const q = quoteFromWire(buy(wad(mid)), 18, ['USDC', 'WMON'], 1_000)!;
       expect(q.midPrice).toBeCloseTo(mid, 9);
       expect(q.avgPrice).toBeCloseTo(mid * 0.999 * 0.999, 4);
       expect(q.priceImpactBps).toBeCloseTo(10, 0);
       expect(Math.abs(q.midPremiumBps)).toBeLessThan(1);
     });
 
-    test('the old base-per-spoke orientation would read as ~1e7 bps impact', () => {
-      const q = quoteFromWire(buy(wad(1 / mid)), 18, ['USDC', 'WMON'], 1_000);
-      expect(q.priceImpactBps).toBeGreaterThan(1e5);
+    test('the old base-per-spoke orientation is refused, not read as ~1e7 bps impact', () => {
+      expect(quoteFromWire(buy(wad(1 / mid)), 18, ['USDC', 'WMON'], 1_000)).toBeNull();
     });
 
     test('same decimals: mid is the plain out-per-in, impact tracks the fill', () => {
@@ -274,9 +287,79 @@ describe('quoteFromWire', () => {
         proto_fee: '0x0',
         lp_fee: '0x0',
       } as QuoteResponseWire;
-      const q = quoteFromWire(w, 18, ['USDC', 'USDT'], 1_000);
+      const q = quoteFromWire(w, 18, ['USDC', 'USDT'], 1_000)!;
       expect(q.midPrice).toBe(1);
       expect(q.priceImpactBps).toBe(0);
     });
+  });
+});
+
+// A flat /quote has no decimal boundary (btr-quote lib.rs `quote_exact_in`): amount_in, amount_out
+// and gross_out are all raw in the SPOKE's decimals, whichever side is the base. Human amounts are
+// equal across the boundary, so a caller decodes at the spoke's decimals and reads base-human.
+describe('quoteFromWire: flat quote in SPOKE scale (mixed decimals)', () => {
+  const wad = (x: number): string => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+  const raw = (human: number, dec: number): string =>
+    `0x${(BigInt(Math.round(human * 1e6)) * 10n ** BigInt(dec - 6)).toString(16)}`;
+  const resp = (gross: number, net: number, dec: number, mid: number): QuoteResponseWire =>
+    ({
+      amount_out: raw(net, dec),
+      gross_out: raw(gross, dec),
+      avg_price: '0x0',
+      mid_price: wad(mid),
+      mark_price: wad(mid),
+      spread_pbps: 0,
+      cov_toll: '0x0',
+      proto_fee: '0x0',
+      lp_fee: '0x0',
+    }) as QuoteResponseWire;
+
+  // Sell 1000 of an 18-decimal spoke into a 6-decimal base at mid 1: out is 999 raw at 18, NOT
+  // 999e6. Decoding it at the base's 6 would read 9.99e14.
+  test('SELL 18-spoke / 6-base: decodes at spoke decimals', () => {
+    const q = quoteFromWire(resp(999.5, 999, 18, 1), 18, ['SPK', 'BASE'], 1_000)!;
+    expect(q.amountOut).toBeCloseTo(999, 9);
+    expect(q.grossOut).toBeCloseTo(999.5, 9);
+    expect(q.avgPrice).toBeCloseTo(0.999, 9);
+    expect(q.priceImpactBps).toBeCloseTo(5, 6);
+    // the base-decimals decode is the 1e12x overshoot the reviewer caught
+    expect(quoteFromWire(resp(999.5, 999, 18, 1), 6, ['SPK', 'BASE'], 1_000)).toBeNull();
+  });
+
+  test('SELL 6-spoke / 18-base: decodes at spoke decimals', () => {
+    const q = quoteFromWire(resp(999.5, 999, 6, 1), 6, ['SPK', 'BASE'], 1_000)!;
+    expect(q.amountOut).toBeCloseTo(999, 9);
+    expect(q.avgPrice).toBeCloseTo(0.999, 9);
+    expect(q.priceImpactBps).toBeCloseTo(5, 6);
+    // decoding at the base's 18 reads 1e-9: also refused
+    expect(quoteFromWire(resp(999.5, 999, 6, 1), 18, ['SPK', 'BASE'], 1_000)).toBeNull();
+  });
+
+  // Buy a 6-decimal spoke with 1000 of an 18-decimal base at out-per-in 2: out is raw at 6.
+  test('BUY 6-spoke / 18-base: out in spoke scale', () => {
+    const q = quoteFromWire(resp(1_998, 1_996, 6, 2), 6, ['BASE', 'SPK'], 1_000)!;
+    expect(q.amountOut).toBeCloseTo(1_996, 9);
+    expect(q.avgPrice).toBeCloseTo(1.996, 9);
+    expect(q.priceImpactBps).toBeCloseTo(10, 6);
+  });
+
+  // Buy an 18-decimal spoke with 1000 of a 6-decimal base at out-per-in 31.15.
+  test('BUY 18-spoke / 6-base: out in spoke scale', () => {
+    const mid = 31.15;
+    const q = quoteFromWire(
+      resp(1_000 * mid * 0.999, 1_000 * mid * 0.998, 18, mid),
+      18,
+      ['BASE', 'SPK'],
+      1_000,
+    )!;
+    expect(q.amountOut).toBeCloseTo(1_000 * mid * 0.998, 6);
+    expect(q.priceImpactBps).toBeCloseTo(10, 4);
+    expect(q.avgPrice).toBeCloseTo(mid * 0.998, 9);
+  });
+
+  test('refuses a fill off the mid by more than 100x either way', () => {
+    expect(quoteFromWire(resp(1_000, 1_000, 18, 1_000), 18, [], 1_000)).toBeNull();
+    expect(quoteFromWire(resp(1_000, 1_000, 18, 0.001), 18, [], 1_000)).toBeNull();
+    expect(quoteFromWire(resp(1_000, 1_000, 18, 1.5), 18, [], 1_000)).not.toBeNull();
   });
 });

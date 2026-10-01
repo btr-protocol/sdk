@@ -729,11 +729,16 @@ export const INTERIOR_ENDPOINT: EndpointWire = {
   kappa_cov_bps: 0,
 };
 
-/** A pool's hub as a path endpoint, in the hub token's native raw scale. */
-export function hubEndpointWire(hub: HubBook, hubDecimals: number): EndpointWire {
+/**
+ * A pool's hub as a path endpoint, raw at `decimals`. Which decimals depends on the surface:
+ * `/route` and `/depth` take the hub in its own (base) scale and shift it themselves
+ * ({@link poolStateToWire}); a flat `/quote` has no decimal boundary, so its hub must already be
+ * in the SPOKE's scale (pass `leg.decimals`, mirroring `depth.rs`' `dec_shift(.., bd, sd)`).
+ */
+export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
   return {
-    reserves: toU128Hex(hub.res * 10 ** hubDecimals),
-    liabilities: toU128Hex(hub.liab * 10 ** hubDecimals),
+    reserves: toU128Hex(hub.res * 10 ** decimals),
+    liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
   };
@@ -742,10 +747,11 @@ export function hubEndpointWire(hub: HubBook, hubDecimals: number): EndpointWire
 /**
  * One leg as a /quote body. `selling` = paying the spoke into the hub.
  *
- * `amountInTok` is HUMAN. A sell is scaled by `decimalsIn` (the spoke's own). A BUY pays the base
- * in, but the server prices it in the SPOKE's scale with no shift of its own (`dec_shift` is a
- * path-walk step, not a flat-quote one), so `decimalsIn` is ignored and the base amount is
- * re-denominated to `leg.decimals`. Scaling by the base's decimals read 1e12x off on 6 vs 18.
+ * `amountInTok` is HUMAN. A flat `/quote` has no decimal boundary: every amount on the wire, in
+ * and out, is in the SPOKE's scale (`leg.decimals`), and the counterparty book must be too (see
+ * {@link hubEndpointWire}). A sell scales by `decimalsIn` (the spoke's own); a BUY pays the base
+ * in but is re-denominated to `leg.decimals`, so `decimalsIn` is ignored there. Scaling a buy by
+ * the base's decimals read 1e12x off on 6 vs 18.
  *
  * `counterparty` is the path's far endpoint and is REQUIRED (no default): a direct leg passes
  * {@link hubEndpointWire}, a cross's interior hop passes {@link INTERIOR_ENDPOINT}. It was
@@ -812,23 +818,37 @@ export function quoteLegAsync(
 const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
 
 /**
- * Wire → f64 Quote. `mid`/`mark` are WAD human-per-human (the decimal boundary is `_legScaleOut`,
- * on AMOUNTS only), so they take no `10^(decIn − decOut)` shift; `avgPrice` is the ratio of the two
- * human amounts. A flat BUY's mid/mark ride out-per-in
- * too (btr-quote f8a9c2a), the same side as `avgPrice`. Shifting mid/mark put MON/USDC at 3.2e10 on a 6 vs 18 decimals pair.
+ * Wire → f64 Quote, or null when the response is not on the scale this codec reads.
+ *
+ * `wireDecimals` is the scale `amount_out`/`gross_out` are raw in: the SPOKE's `leg.decimals` for
+ * a flat `/quote` (both directions; the pricer delivers the hub side shifted into spoke scale),
+ * the last leg's `decimals_out` for `/quote-path`. Amounts decode to HUMAN units, which are equal
+ * across the boundary. `mid`/`mark` are WAD human-per-human and take no decimals shift; a flat
+ * BUY's ride out-per-in too (btr-quote f8a9c2a), the same side as `avgPrice`.
+ *
+ * Guard: a fill/mid ratio outside [0.01, 100] means the amounts and the mid disagree on scale or
+ * orientation (a new sdk against an older back). Such a quote would feed minOut and the mark cap,
+ * so it is refused rather than returned.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
-  decOut: number,
+  wireDecimals: number,
   route: string[],
   amountInTok: number,
-): Quote {
-  const amountOut = Number(BigInt(w.amount_out)) / 10 ** decOut;
-  const grossOut = Number(BigInt(w.gross_out)) / 10 ** decOut;
+): Quote | null {
+  const amountOut = Number(BigInt(w.amount_out)) / 10 ** wireDecimals;
+  const grossOut = Number(BigInt(w.gross_out)) / 10 ** wireDecimals;
   const avgPrice = amountInTok > 0 && amountOut > 0 ? amountOut / amountInTok : 0;
   const midPrice = wadToF64(w.mid_price);
   const markPrice = wadToF64(w.mark_price);
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
+  if (
+    midPrice > 0 &&
+    grossAvg > 0 &&
+    !(grossAvg / midPrice >= 0.01 && grossAvg / midPrice <= 100)
+  ) {
+    return null;
+  }
   const spreadBps = w.spread_pbps / 100;
   const feeBps = (fee: string): number =>
     grossOut > 0 ? (Number(BigInt(fee)) / Number(BigInt(w.gross_out))) * 1e4 : 0;

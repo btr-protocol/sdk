@@ -6,6 +6,7 @@ import { type PoolState, buildLeg } from '../amm/aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
+  backendConvert,
   exitCap,
   exitValue,
   legCoverage,
@@ -291,6 +292,91 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       // @ts-expect-error restore the real fetch
       globalThis.fetch = undefined;
     }
+  });
+});
+
+describe('backendConvert: flat legs in SPOKE scale', () => {
+  const meta = { addressOf: () => null, decimalsOf: () => 6 };
+  const wad = (x: number) => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+  const hex = (n: bigint) => `0x${n.toString(16)}`;
+
+  // 18-decimal spoke, 6-decimal base, hub 2M human. Mid 1.
+  const state = (): PoolState => ({
+    base: 'USDC',
+    legs: {
+      WMON: buildLeg(
+        'WMON',
+        1,
+        sigmaSeed('stable'),
+        1_000_000,
+        1_000_000,
+        2_000_000,
+        18,
+        STABLE_PROFILE,
+        0,
+      ),
+    },
+    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+  });
+
+  const run = async (tokenIn: string, tokenOut: string, outRaw: bigint) => {
+    const calls: Record<string, unknown>[] = [];
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_u: string, init: { body?: string }) => {
+      calls.push(JSON.parse(init.body ?? '{}'));
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: hex(outRaw),
+          gross_out: hex(outRaw),
+          avg_price: wad(1),
+          mid_price: wad(1),
+          mark_price: wad(1),
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+        }),
+      };
+    };
+    try {
+      const q = await backendConvert(state(), tokenIn, tokenOut, {
+        meta,
+        baseDecimals: 6,
+        backendBase: 'https://q.example/v1',
+      })(1_000);
+      return {
+        q,
+        body: calls[0] as {
+          amount_in: string;
+          counterparty: { reserves: string; liabilities: string };
+        },
+      };
+    } finally {
+      // @ts-expect-error restore the real fetch
+      globalThis.fetch = undefined;
+    }
+  };
+
+  test('SELL 18-spoke into a 6-base: hub book + amount_in at 18, out decoded at 18', async () => {
+    const { q, body } = await run('WMON', 'USDC', 999n * 10n ** 18n);
+    expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
+    expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
+    expect(Number(BigInt(body.counterparty.liabilities)) / 1e18).toBeCloseTo(2_000_000, 0);
+    expect(q.amountOut).toBeCloseTo(999, 9);
+    expect(q.avgPrice).toBeCloseTo(0.999, 9);
+  });
+
+  test('BUY the 18-spoke with 6-base: hub book + amount_in at 18, out decoded at 18', async () => {
+    const { q, body } = await run('USDC', 'WMON', 999n * 10n ** 18n);
+    expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
+    expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
+    expect(q.amountOut).toBeCloseTo(999, 9);
+  });
+
+  test('a response at the wrong scale fails closed instead of minting a quote', async () => {
+    // 999 raw at the BASE's 6 decimals while the wire is spoke-scale: 1e-12 of a fill
+    await expect(run('WMON', 'USDC', 999n * 10n ** 6n)).rejects.toThrow('off-scale');
   });
 });
 
