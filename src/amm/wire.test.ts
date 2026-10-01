@@ -210,6 +210,17 @@ describe('quoteFromWire', () => {
 
   // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
   // flag survives the wire.
+  // A saturated huge sell fills far below mid by design: the scale guard must not refuse it.
+  test('a saturated quote passes the fill/mid guard; the same fill unflagged is refused', () => {
+    const w = (saturated: boolean): QuoteResponseWire => ({
+      ...wire(saturated),
+      amount_out: '0x38d7ea4c68000', // 0.001 of 1 in
+      gross_out: '0x38d7ea4c68000',
+    });
+    expect(quoteFromWire(w(true), 18, [], 1)?.saturated).toBe(true);
+    expect(quoteFromWire(w(false), 18, [], 1)).toBeNull();
+  });
+
   test('carries the saturation flag, so a flat top is never shown as a price', () => {
     expect(quoteFromWire(wire(true), 18, [], 1)?.saturated).toBe(true);
     expect(quoteFromWire(wire(false), 18, [], 1)?.saturated).toBe(false);

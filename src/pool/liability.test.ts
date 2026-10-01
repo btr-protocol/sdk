@@ -315,6 +315,17 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
         STABLE_PROFILE,
         0,
       ),
+      AUDF: buildLeg(
+        'AUDF',
+        1,
+        sigmaSeed('stable'),
+        1_000_000,
+        1_000_000,
+        2_000_000,
+        6,
+        STABLE_PROFILE,
+        0,
+      ),
     },
     hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
   });
@@ -350,6 +361,7 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
         body: calls[0] as {
           amount_in: string;
           counterparty: { reserves: string; liabilities: string };
+          legs: { amount_in: string; decimals_in: number; decimals_out: number }[];
         },
       };
     } finally {
@@ -363,20 +375,48 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
     expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
     expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
     expect(Number(BigInt(body.counterparty.liabilities)) / 1e18).toBeCloseTo(2_000_000, 0);
-    expect(q.amountOut).toBeCloseTo(999, 9);
-    expect(q.avgPrice).toBeCloseTo(0.999, 9);
+    expect(q?.amountOut).toBeCloseTo(999, 9);
+    expect(q?.avgPrice).toBeCloseTo(0.999, 9);
   });
 
   test('BUY the 18-spoke with 6-base: hub book + amount_in at 18, out decoded at 18', async () => {
     const { q, body } = await run('USDC', 'WMON', 999n * 10n ** 18n);
     expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
     expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
-    expect(q.amountOut).toBeCloseTo(999, 9);
+    expect(q?.amountOut).toBeCloseTo(999, 9);
   });
 
-  test('a response at the wrong scale fails closed instead of minting a quote', async () => {
+  test('a response at the wrong scale resolves null instead of minting a quote', async () => {
     // 999 raw at the BASE's 6 decimals while the wire is spoke-scale: 1e-12 of a fill
-    await expect(run('WMON', 'USDC', 999n * 10n ** 6n)).rejects.toThrow('off-scale');
+    expect((await run('WMON', 'USDC', 999n * 10n ** 6n)).q).toBeNull();
+  });
+
+  test('/quote-path cross 18-spoke -> 6-spoke: hop decimals and out decoded at the out-spoke', async () => {
+    const { q, body } = await run('WMON', 'AUDF', 999n * 10n ** 6n);
+    expect(body.legs.map((l) => [l.decimals_in, l.decimals_out])).toEqual([
+      [18, 6],
+      [6, 6],
+    ]);
+    expect(Number(BigInt(body.legs[0].amount_in)) / 1e18).toBeCloseTo(1_000, 6);
+    expect(q?.amountOut).toBeCloseTo(999, 9);
+    expect(q?.route).toEqual(['WMON', 'USDC', 'AUDF']);
+  });
+
+  test('/quote-path cross 6-spoke -> 18-spoke: out decoded at 18', async () => {
+    const { q, body } = await run('AUDF', 'WMON', 999n * 10n ** 18n);
+    expect(body.legs.map((l) => [l.decimals_in, l.decimals_out])).toEqual([
+      [6, 6],
+      [6, 18],
+    ]);
+    expect(Number(BigInt(body.legs[0].amount_in)) / 1e6).toBeCloseTo(1_000, 6);
+    expect(q?.amountOut).toBeCloseTo(999, 9);
+  });
+
+  test('a null conversion makes the liability quote null, not a throw', async () => {
+    const inLeg = { symbol: 'WMON', reserves: 1_000_000, liabilities: 1_000_000 };
+    const outLeg = { symbol: 'AUDF', reserves: 1_000_000, liabilities: 1_000_000 };
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 1_000, 1, async () => null);
+    expect(q).toBeNull();
   });
 });
 

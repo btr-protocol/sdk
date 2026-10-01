@@ -164,7 +164,7 @@ export async function quoteSwapLiabilityCoreAsync(
   outLeg: LiabLeg,
   lpAmountIn: number,
   poolC: number,
-  convert: (fairIn: number) => Promise<Quote>,
+  convert: (fairIn: number) => Promise<Quote | null>,
 ): Promise<SwapLiabilityQuote | null> {
   if (!(lpAmountIn > 0) || !(Number.isFinite(poolC) && poolC > 0)) return null;
   const idxIn = idxOf(inLeg);
@@ -176,6 +176,7 @@ export async function quoteSwapLiabilityCoreAsync(
   const haircutIn = liabIn > fairIn ? liabIn - fairIn : 0;
 
   const q = await convert(fairIn);
+  if (!q) return null;
   const markCap = fairIn * q.markPrice;
   const markCapBinding = q.amountOut > markCap;
   const conv = markCapBinding ? markCap : q.amountOut;
@@ -217,14 +218,14 @@ export interface BackendConvertOpts {
  * spoke→spoke cross ONE POST /v1/quote-path over both hops (the chain settles a path once, so
  * summing two leg quotes re-charges the spread and under-quotes it).
  * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint
- * nothing from). Composed in fill order over the backend's own outputs.
+ * nothing from); an off-scale quote resolves null (no honest price for this pair). Composed in fill order over the backend's own outputs.
  */
 export function backendConvert(
   state: PoolState,
   tokenIn: string,
   tokenOut: string,
   opts: BackendConvertOpts,
-): (fairIn: number) => Promise<Quote> {
+): (fairIn: number) => Promise<Quote | null> {
   const base = state.base;
   const inBase = tokenIn === base;
   const outBase = tokenOut === base;
@@ -235,17 +236,18 @@ export function backendConvert(
   // scale (depth.rs shifts the hub the same way), so the hub is built per leg and the response is
   // decoded at the leg's decimals. A leg that touches the hub is settled against the HUB's
   // endpoint (its coverage wall tolls a sell into it, its vega enters the spread both ways); no
-  // hub book ⇒ no honest quote. A null decode is a scale/orientation mismatch: fail closed.
+  // hub book ⇒ no honest quote. A null decode is a scale/orientation mismatch: no quote (null).
   const hubFor = (leg: PoolLeg, what: string) => {
     if (!state.hub) throw new Error(`backendConvert: no hub book for a ${what}`);
     return hubEndpointWire(state.hub, leg.decimals);
   };
-  const decode = (w: QuoteResponseWire, dec: number, route: string[], fairIn: number): Quote => {
-    const q = quoteFromWire(w, dec, route, fairIn);
-    if (!q) throw new Error(`backendConvert: ${route.join('->')} quote off-scale vs mid`);
-    return q;
-  };
-  return async (fairIn: number): Promise<Quote> => {
+  const decode = (
+    w: QuoteResponseWire,
+    dec: number,
+    route: string[],
+    fairIn: number,
+  ): Quote | null => quoteFromWire(w, dec, route, fairIn);
+  return async (fairIn: number): Promise<Quote | null> => {
     if (!inBase && outBase && legIn) {
       const hub = hubFor(legIn, 'sell into the base');
       const w = await quoteLegAsync(legIn, fairIn, true, legIn.decimals, hub, opts.backendBase);

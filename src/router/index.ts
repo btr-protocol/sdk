@@ -22,7 +22,7 @@ import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
 import { defaultDeadline } from '../pool/index.js';
 import { applySlip } from '../utils/maths.js';
-import type { SwapPlan } from './route.js';
+import { type SwapPlan, assertSlip } from './route.js';
 
 /** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
  *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
@@ -224,15 +224,6 @@ const toUnits = (v: number, decimals: number): bigint => {
  *  sequential fallback fills the biggest slice first and residual dust rides on the last part. */
 function orderedParts(plan: SwapPlan): SwapPlan['parts'] {
   return [...plan.parts].sort((a, b) => b.fraction - a.fraction);
-}
-
-/** One slippage gate for every plan→calls mapping. Unvalidated, slip >= 1 drives every minOut to
- *  0: a batch with no slippage floor at all, which is the one failure mode planning exists to
- *  prevent. NaN does the same. */
-function assertSlip(caller: string, slip: number): void {
-  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
-    throw new Error(`${caller}: slippageFrac must be in [0, 1), got ${slip}`);
-  }
 }
 
 /** Single call pipeline: one encoder per EIP-5792 call shape, shared by the direct N-call path,

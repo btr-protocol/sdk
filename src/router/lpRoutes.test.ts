@@ -227,6 +227,64 @@ describe('rankDeposit (routes A / B)', () => {
   });
 });
 
+describe('crossExit degenerate quotes', () => {
+  const wad = (x: number) => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+  const stubQuote = (o: { mid: number; mark: number; out?: string }) => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_u: string, init: { body?: string }) => {
+      const b = JSON.parse(init.body ?? '{}');
+      const amountIn = b.legs ? b.legs[0].amount_in : b.amount_in;
+      const out = o.out ?? amountIn;
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: out,
+          gross_out: out,
+          avg_price: wad(o.mid),
+          mid_price: wad(o.mid),
+          mark_price: wad(o.mark),
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+        }),
+      };
+    };
+  };
+  const cross = async () =>
+    (await rankRedeem([healthyPool()], 'NZDF', 'AUDF', 5_000, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+
+  test('mark cap collapsing the output to 0 is no-route, never a feasible zero', async () => {
+    stubQuote({ mid: 1, mark: 0 });
+    const r = await cross();
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('no-route');
+  });
+
+  test('an off-scale quote (null from backendConvert) is no-route, not backend-error', async () => {
+    stubQuote({ mid: 1000, mark: 1000 }); // fill/mid = 1e-3
+    const r = await cross();
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('no-route');
+  });
+});
+
+describe('slippageFrac validation', () => {
+  for (const bad of [1, -0.1, Number.NaN]) {
+    test(`rejects ${bad}`, async () => {
+      const o = { ...BE, slippageFrac: bad };
+      await expect(rankDeposit([healthyPool()], 'AUDF', 'NZDF', 100, o)).rejects.toThrow(
+        'slippageFrac',
+      );
+      await expect(rankRedeem([healthyPool()], 'NZDF', 'AUDF', 100, o)).rejects.toThrow(
+        'slippageFrac',
+      );
+    });
+  }
+});
+
 describe("rankRedeem (routes A' / B')", () => {
   test('equal economics resolve on the gas tiebreak: one-call cross-exit wins', async () => {
     const pools = [healthyPool()];

@@ -66,3 +66,12 @@ export const poolHas = (s: PoolState, token: string): boolean =>
 export function poolHolding(pools: NamedPool[], a: string, b: string): NamedPool | undefined {
   return pools.find((p) => poolHas(p.state, a) && poolHas(p.state, b));
 }
+
+/** One slippage gate for every plan→calls mapping. Unvalidated, slip >= 1 drives every minOut to
+ *  0: a batch with no slippage floor at all, which is the one failure mode planning exists to
+ *  prevent. NaN does the same. */
+export function assertSlip(caller: string, slip: number): void {
+  if (!Number.isFinite(slip) || slip < 0 || slip >= 1) {
+    throw new Error(`${caller}: slippageFrac must be in [0, 1), got ${slip}`);
+  }
+}

@@ -26,7 +26,7 @@ import {
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
 import type { NamedPool, SwapPlan } from './route.js';
-import { poolHas, poolHolding } from './route.js';
+import { assertSlip, poolHas, poolHolding } from './route.js';
 
 export interface LpRouteOpts {
   /** The caller's effective tolerance, resolved at quote time (spread-based by default in the
@@ -416,6 +416,7 @@ export async function rankDeposit(
   amountIn: number,
   opts: LpRouteOpts,
 ): Promise<RankedLpPlan> {
+  assertSlip('rankDeposit', opts.slippageFrac);
   if (!(amountIn > 0)) return { best: null, routes: [] };
   if (xToken === targetSym) {
     const holder = poolHolding(pools, xToken, xToken);
@@ -474,7 +475,7 @@ async function crossExit(
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   const fair = withdrawValue * c;
   const convert = backendConvert(holder.state, targetSym, outToken, b);
-  let q: Awaited<ReturnType<typeof convert>> | null;
+  let q: Awaited<ReturnType<typeof convert>>;
   try {
     q = await convert(fair);
   } catch {
@@ -486,6 +487,7 @@ async function crossExit(
   // Lemma B mark cap, and NO output-leg haircut: the claim was settled at C on the way in.
   const markCap = fair * q.markPrice;
   const out = q.amountOut > markCap ? markCap : q.amountOut;
+  if (!(out > 0)) return unfeasible(CROSS_DEAD, 'no-route');
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -594,6 +596,7 @@ export async function rankRedeem(
   lpFaceIn: number,
   opts: LpRouteOpts,
 ): Promise<RankedLpPlan> {
+  assertSlip('rankRedeem', opts.slippageFrac);
   if (!(lpFaceIn > 0)) return { best: null, routes: [] };
   if (targetSym === outToken) {
     const holder = poolHolding(pools, targetSym, targetSym);

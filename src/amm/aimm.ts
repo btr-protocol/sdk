@@ -828,7 +828,8 @@ const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
  *
  * Guard: a fill/mid ratio outside [0.01, 100] means the amounts and the mid disagree on scale or
  * orientation (a new sdk against an older back). Such a quote would feed minOut and the mark cap,
- * so it is refused rather than returned.
+ * so it is refused rather than returned. A `saturated` quote is exempt: a huge sell that drains
+ * the book fills far below mid by design and is still a valid, flagged quote.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
@@ -843,6 +844,7 @@ export function quoteFromWire(
   const markPrice = wadToF64(w.mark_price);
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
   if (
+    !w.saturated &&
     midPrice > 0 &&
     grossAvg > 0 &&
     !(grossAvg / midPrice >= 0.01 && grossAvg / midPrice <= 100)
