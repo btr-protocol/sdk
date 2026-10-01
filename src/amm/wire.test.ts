@@ -149,6 +149,30 @@ describe('legToQuoteBody', () => {
     });
   });
 
+  // The server prices a flat buy in the SPOKE scale, so the base amount is re-denominated to
+  // `leg.decimals` whatever scale the caller held it in (`decimalsIn` is a sell-only input).
+  test('a buy scales amount_in to the spoke decimals (6 base -> 18 spoke)', () => {
+    const b = legToQuoteBody(leg, 1_000, false, 6, INTERIOR_ENDPOINT);
+    expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 18n);
+    expect(b.selling).toBe(false);
+  });
+
+  test('a buy scales amount_in to the spoke decimals (18 base -> 6 spoke)', () => {
+    const l6 = buildLeg('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
+    const b = legToQuoteBody(l6, 2.5, false, 18, INTERIOR_ENDPOINT);
+    expect(BigInt(b.amount_in)).toBe(2_500_000n);
+  });
+
+  test('same decimals: a buy is unchanged', () => {
+    const b = legToQuoteBody(leg, 1_000, false, 18, INTERIOR_ENDPOINT);
+    expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 18n);
+  });
+
+  test('a sell still scales by decimalsIn', () => {
+    const b = legToQuoteBody(leg, 1_000, true, 6, INTERIOR_ENDPOINT);
+    expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 6n);
+  });
+
   test('unknown confidence goes out null, never a fail-open zero', () => {
     const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6));
     expect(b.confidence_bps).toBeNull();
@@ -202,5 +226,57 @@ describe('quoteFromWire', () => {
     expect(q.markPrice).toBeCloseTo(mid, 9);
     expect(q.avgPrice).toBeCloseTo(mid, 6);
     expect(q.priceImpactBps).toBeLessThan(1);
+  });
+  // btr-quote f8a9c2a: a flat BUY answers mid/mark out-per-in human (same side as avg/gross_avg),
+  // no longer the anchor-per-spoke reciprocal. 1000 USDC (6) in -> WMON (18) out at 31.15.
+  describe('flat buy, server orientation (out-per-in)', () => {
+    const wad = (x: number): string => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+    const hex = (n: bigint): string => `0x${n.toString(16)}`;
+    const mid = 31.15;
+    const buy = (midW: string): QuoteResponseWire => {
+      const gross = BigInt(Math.round(1_000 * mid * 0.999 * 1e6)) * 10n ** 12n;
+      const out = (gross * 9_990n) / 10_000n;
+      return {
+        amount_out: hex(out),
+        gross_out: hex(gross),
+        avg_price: '0x0',
+        mid_price: midW,
+        mark_price: wad(mid),
+        spread_pbps: 0,
+        cov_toll: '0x0',
+        proto_fee: '0x0',
+        lp_fee: '0x0',
+      } as QuoteResponseWire;
+    };
+
+    test('18 spoke vs 6 base: impact and premium stay sane', () => {
+      const q = quoteFromWire(buy(wad(mid)), 18, ['USDC', 'WMON'], 1_000);
+      expect(q.midPrice).toBeCloseTo(mid, 9);
+      expect(q.avgPrice).toBeCloseTo(mid * 0.999 * 0.999, 4);
+      expect(q.priceImpactBps).toBeCloseTo(10, 0);
+      expect(Math.abs(q.midPremiumBps)).toBeLessThan(1);
+    });
+
+    test('the old base-per-spoke orientation would read as ~1e7 bps impact', () => {
+      const q = quoteFromWire(buy(wad(1 / mid)), 18, ['USDC', 'WMON'], 1_000);
+      expect(q.priceImpactBps).toBeGreaterThan(1e5);
+    });
+
+    test('same decimals: mid is the plain out-per-in, impact tracks the fill', () => {
+      const w = {
+        amount_out: hex(10n ** 21n),
+        gross_out: hex(10n ** 21n),
+        avg_price: '0x0',
+        mid_price: wad(1),
+        mark_price: wad(1),
+        spread_pbps: 0,
+        cov_toll: '0x0',
+        proto_fee: '0x0',
+        lp_fee: '0x0',
+      } as QuoteResponseWire;
+      const q = quoteFromWire(w, 18, ['USDC', 'USDT'], 1_000);
+      expect(q.midPrice).toBe(1);
+      expect(q.priceImpactBps).toBe(0);
+    });
   });
 });

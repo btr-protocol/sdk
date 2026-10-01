@@ -742,6 +742,11 @@ export function hubEndpointWire(hub: HubBook, hubDecimals: number): EndpointWire
 /**
  * One leg as a /quote body. `selling` = paying the spoke into the hub.
  *
+ * `amountInTok` is HUMAN. A sell is scaled by `decimalsIn` (the spoke's own). A BUY pays the base
+ * in, but the server prices it in the SPOKE's scale with no shift of its own (`dec_shift` is a
+ * path-walk step, not a flat-quote one), so `decimalsIn` is ignored and the base amount is
+ * re-denominated to `leg.decimals`. Scaling by the base's decimals read 1e12x off on 6 vs 18.
+ *
  * `counterparty` is the path's far endpoint and is REQUIRED (no default): a direct leg passes
  * {@link hubEndpointWire}, a cross's interior hop passes {@link INTERIOR_ENDPOINT}. It was
  * absent from the first cut of this wire and every spoke→base sell quoted a zero coverage toll
@@ -760,7 +765,7 @@ export function legToQuoteBody(
     vega_bps: leg.profile.vega,
     min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
-    amount_in: toU128Hex(amountInTok * 10 ** decimalsIn),
+    amount_in: toU128Hex(amountInTok * 10 ** (selling ? decimalsIn : leg.decimals)),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
     liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
     mark: toHex(BigInt(Math.round(leg.twap * 1e18))),
@@ -809,7 +814,8 @@ const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
 /**
  * Wire → f64 Quote. `mid`/`mark` are WAD human-per-human (the decimal boundary is `_legScaleOut`,
  * on AMOUNTS only), so they take no `10^(decIn − decOut)` shift; `avgPrice` is the ratio of the two
- * human amounts. Shifting mid/mark put MON/USDC at 3.2e10 on a 6 vs 18 decimals pair.
+ * human amounts. A flat BUY's mid/mark ride out-per-in
+ * too (btr-quote f8a9c2a), the same side as `avgPrice`. Shifting mid/mark put MON/USDC at 3.2e10 on a 6 vs 18 decimals pair.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
