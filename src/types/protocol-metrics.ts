@@ -254,13 +254,58 @@ export interface LegRiskParams {
   hook: {
     target: string;
     preOutflow: boolean;
-    /** `YieldHookLib.Curve`: target liquid share L(R), band L·(1±w); tMin, t0 in token base units. */
-    curve: { tMin: string; t0: string; l0Bps: number; lMinBps: number; wBps: number } | null;
+    /** `YieldHookLib.Curve`: target liquid share L(R), band L·(1±w); tMin, t0, maxInvested in token base units. */
+    curve: {
+      tMin: string;
+      t0: string;
+      l0Bps: number;
+      lMinBps: number;
+      wBps: number;
+      maxInvested: string;
+    } | null;
     /** Seconds the booked yield may age before a keeper `sync`; risk-steward set, on chain. */
     maxCacheAge: number | null;
     /** Unix seconds of the last `sync`. */
     lastSync: number | null;
+    /** Where the hook supplies to; `supplyApr` is a decimal ratio read off the venue. */
+    venue: {
+      kind: 'aaveV3' | 'erc4626';
+      name: string;
+      market: string;
+      position: string;
+      supplyApr: number | null;
+    } | null;
+    /** The leg's book in token units: `liquid` = reserves - invested. `idle` says why nothing is invested. */
+    book: {
+      reserves: number;
+      invested: number;
+      liquid: number;
+      /** Shares of `reserves`; null when it is 0. */
+      investedRatio: number | null;
+      liquidRatio: number | null;
+      /** Venue NAV of the position. */
+      nav: number | null;
+      /** Reserves under this invest nothing: the curve holds the leg fully liquid. */
+      tMin: number | null;
+      /** Invested-book cap; null when uncapped or unread (see `uncapped`). */
+      maxInvested: number | null;
+      /** null = the curve did not read. */
+      uncapped: boolean | null;
+      idle: 'belowTMin' | 'capZero' | null;
+    } | null;
+    /** Merkl rewards accrued to the hook; `null` = Merkl did not answer, `[]` = none. */
+    rewards: HookReward[] | null;
   } | null;
+}
+
+export interface HookReward {
+  token: string;
+  symbol: string | null;
+  decimals: number;
+  /** Not yet claimed, in token units; `claimable` is what a claim can take now, `pending` is still in Merkl's dispute period. */
+  unclaimed: number;
+  claimable: number;
+  pending: number;
 }
 
 /** GET /v1/pools/{tag}/params: one pool read at one block. */
