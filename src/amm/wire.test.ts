@@ -173,11 +173,34 @@ describe('quoteFromWire', () => {
   // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
   // flag survives the wire.
   test('carries the saturation flag, so a flat top is never shown as a price', () => {
-    expect(quoteFromWire(wire(true), 18, 18, [], 1).saturated).toBe(true);
-    expect(quoteFromWire(wire(false), 18, 18, [], 1).saturated).toBe(false);
+    expect(quoteFromWire(wire(true), 18, [], 1).saturated).toBe(true);
+    expect(quoteFromWire(wire(false), 18, [], 1).saturated).toBe(false);
   });
 
   test('a backend that predates the flag reads unsaturated, never undefined', () => {
-    expect(quoteFromWire(wire(undefined), 18, 18, [], 1).saturated).toBe(false);
+    expect(quoteFromWire(wire(undefined), 18, [], 1).saturated).toBe(false);
+  });
+
+  // USDC (6) -> WMON (18): mid/mark are human-per-human, only amounts carry the 1e12 decimals gap.
+  test('mixed 6 <-> 18 decimals read mid/mark as human, impact stays sane', () => {
+    const wad = (x: number): string => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+    const mid = 31.15; // WMON per USDC (~0.0321 USDC per WMON)
+    const out = BigInt(Math.round(0.001 * mid * 1e6)) * 10n ** 12n; // 0.001 USDC in -> WMON raw
+    const w = {
+      amount_out: `0x${out.toString(16)}`,
+      gross_out: `0x${out.toString(16)}`,
+      avg_price: '0x0',
+      mid_price: wad(mid),
+      mark_price: wad(mid),
+      spread_pbps: 0,
+      cov_toll: '0x0',
+      proto_fee: '0x0',
+      lp_fee: '0x0',
+    } as QuoteResponseWire;
+    const q = quoteFromWire(w, 18, ['USDC', 'WMON'], 0.001);
+    expect(1 / q.midPrice).toBeCloseTo(0.0321, 4);
+    expect(q.markPrice).toBeCloseTo(mid, 9);
+    expect(q.avgPrice).toBeCloseTo(mid, 6);
+    expect(q.priceImpactBps).toBeLessThan(1);
   });
 });

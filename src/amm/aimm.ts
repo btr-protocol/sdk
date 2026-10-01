@@ -806,20 +806,22 @@ export function quoteLegAsync(
 
 const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
 
-/** Wire → f64 Quote. WAD prices convert to token space via the leg decimals. */
+/**
+ * Wire → f64 Quote. `mid`/`mark` are WAD human-per-human (the decimal boundary is `_legScaleOut`,
+ * on AMOUNTS only), so they take no `10^(decIn − decOut)` shift; `avgPrice` is the ratio of the two
+ * human amounts. Shifting mid/mark put MON/USDC at 3.2e10 on a 6 vs 18 decimals pair.
+ */
 export function quoteFromWire(
   w: QuoteResponseWire,
-  decIn: number,
   decOut: number,
   route: string[],
   amountInTok: number,
 ): Quote {
   const amountOut = Number(BigInt(w.amount_out)) / 10 ** decOut;
   const grossOut = Number(BigInt(w.gross_out)) / 10 ** decOut;
-  const unit = 10 ** decIn / 10 ** decOut;
-  const avgPrice = wadToF64(w.avg_price) * unit;
-  const midPrice = wadToF64(w.mid_price) * unit;
-  const markPrice = wadToF64(w.mark_price) * unit;
+  const avgPrice = amountInTok > 0 && amountOut > 0 ? amountOut / amountInTok : 0;
+  const midPrice = wadToF64(w.mid_price);
+  const markPrice = wadToF64(w.mark_price);
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
   const spreadBps = w.spread_pbps / 100;
   const feeBps = (fee: string): number =>

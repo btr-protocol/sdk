@@ -238,12 +238,12 @@ export function backendConvert(
     if (!inBase && outBase && legIn) {
       if (!hub) throw new Error('backendConvert: no hub book for a sell into the base');
       const w = await quoteLegAsync(legIn, fairIn, true, decIn, hub, opts.backendBase);
-      return quoteFromWire(w, decIn, opts.baseDecimals, [tokenIn, tokenOut], fairIn);
+      return quoteFromWire(w, opts.baseDecimals, [tokenIn, tokenOut], fairIn);
     }
     if (inBase && !outBase && legOut) {
       if (!hub) throw new Error('backendConvert: no hub book for a buy out of the base');
       const w = await quoteLegAsync(legOut, fairIn, false, decIn, hub, opts.backendBase);
-      return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, tokenOut], fairIn);
+      return quoteFromWire(w, legOut.decimals, [tokenIn, tokenOut], fairIn);
     }
     if (!inBase && !outBase && legIn && legOut) {
       // The hub is INTERIOR to a cross on both hops: the path delivers on the out-spoke's own
@@ -262,7 +262,7 @@ export function backendConvert(
         },
       ];
       const w = await quotePathAsync(legs, opts.backendBase);
-      return quoteFromWire(w, decIn, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
+      return quoteFromWire(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn);
     }
     throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
   };
