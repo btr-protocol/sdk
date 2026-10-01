@@ -254,17 +254,32 @@ describe('quoteFromWire', () => {
     expect(quoteFromWire(priced(true, 1.5, 1), 18, [], 1)).toBeNull();
   });
 
-  test('unsaturated bounds unchanged: [0.01, 100] of mid', () => {
-    expect(quoteFromWire(priced(false, 50, 1), 18, [], 1)).not.toBeNull();
-    expect(quoteFromWire(priced(false, 101, 1), 18, [], 1)).toBeNull();
+  test('unsaturated bounds: [0.01, 1.01] of mid', () => {
+    expect(quoteFromWire(priced(false, 1.02, 1), 18, [], 1)).toBeNull();
     expect(quoteFromWire(priced(false, 0.009, 1), 18, [], 1)).toBeNull();
   });
 
-  // 6 -> 18: saturated huge sell at 1% of mid in mixed decimals still passes.
+  // Old back flat BUY: mid/mark base-per-spoke (p) while fill is spoke-per-base (1/p) ⇒ r = 1/p².
+  test('old-back inverted unsaturated buy, p = 0.2 and p = 0.1: refused', () => {
+    for (const p of [0.2, 0.1])
+      expect(quoteFromWire(priced(false, 0.99 / p, p), 18, [], 1)).toBeNull();
+  });
+
+  test('legit new-back quotes pass: fee/toll below mid, premium, off-peg deep-discount buy', () => {
+    expect(quoteFromWire(priced(false, 0.97, 1), 18, [], 1)).not.toBeNull(); // fee+toll+impact
+    expect(quoteFromWire(priced(false, 1.019, 1.02, 1), 18, [], 1)).not.toBeNull(); // mid premium
+    expect(quoteFromWire(priced(false, 9.9, 10, 1), 18, [], 1)).not.toBeNull(); // -90% floor buy
+  });
+
+  test('non-positive mid or mark with a positive fill: refused', () => {
+    expect(quoteFromWire(priced(false, 1, 0), 18, [], 1)).toBeNull();
+    expect(quoteFromWire(priced(false, 1, 1, 0), 18, [], 1)).toBeNull();
+  });
+
+  // 6 -> 18: saturated huge sell at 1% of mid, raw in the 6-decimal wire scale, still passes.
   test('saturated mixed 6 <-> 18 valid fill passes, inverted mid refused', () => {
     const mid = 31.15;
-    const raw = (x: number): string =>
-      `0x${(BigInt(Math.round(x * 1e6)) * 10n ** 12n).toString(16)}`;
+    const raw = (x: number): string => `0x${BigInt(Math.round(x * 1e6)).toString(16)}`;
     const w = (m: number): QuoteResponseWire => ({
       ...wire(true),
       amount_out: raw(0.01 * mid),
@@ -272,8 +287,8 @@ describe('quoteFromWire', () => {
       mid_price: wad(m),
       mark_price: wad(m),
     });
-    expect(quoteFromWire(w(mid), 18, [], 1)?.saturated).toBe(true);
-    expect(quoteFromWire(w(1 / mid), 18, [], 1)).toBeNull();
+    expect(quoteFromWire(w(mid), 6, [], 1)?.saturated).toBe(true);
+    expect(quoteFromWire(w(1 / mid), 6, [], 1)).toBeNull();
   });
 
   // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the

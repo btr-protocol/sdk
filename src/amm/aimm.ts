@@ -826,13 +826,14 @@ const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
  * across the boundary. `mid`/`mark` are WAD human-per-human and take no decimals shift; a flat
  * BUY's ride out-per-in too (btr-quote f8a9c2a), the same side as `avgPrice`.
  *
- * Guard: a fill/mid ratio outside [0.01, 100] means the amounts and the mid disagree on scale or
- * orientation (a new sdk against an older back). Such a quote would feed minOut and the mark cap,
- * so it is refused rather than returned. A `saturated` quote skips the LOWER bound only (a huge
- * sell drains the book and fills far below mid by design) and instead must hold fill <= 1.01·mid
- * and fill <= 2·mark: saturation never lifts fill above mid, and the mark cap (fairIn·mark) is
- * then never far below the fill. A mid/mark that is too small (inverted p>1, mis-scaled down)
- * is refused; one that is too large only raises the cap, and a high minOut reverts, never fills.
+ * Guard on the GROSS fill (curve output, pre-clamp/fee/toll), r = grossAvg/mid: the curve walk
+ * starts AT mid and moves against the trader (sell avg <= mid, also capped at mark; buy exec >= mid
+ * so out-per-in <= mid), so a legit fill never exceeds mid. Any quote must hold r <= 1.01 and
+ * grossAvg <= 10.1·mark (a buy at the -90% offset floor fills up to 10x mark in out-per-in);
+ * unless `saturated` (a drained book fills far below mid by design) also r >= 0.01. An old back's
+ * inverted flat BUY (mid base-per-spoke, fill spoke-per-base, r = 1/p²) is refused for p < 1; for
+ * p > 1 its mark is too LARGE, which only raises the mark cap (a high minOut reverts, never fills).
+ * A non-positive mid/mark with a positive fill is refused.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
@@ -846,10 +847,9 @@ export function quoteFromWire(
   const midPrice = wadToF64(w.mid_price);
   const markPrice = wadToF64(w.mark_price);
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
-  if (midPrice > 0 && grossAvg > 0) {
-    const r = grossAvg / midPrice;
-    const ok = w.saturated ? r <= 1.01 && grossAvg <= 2 * markPrice : r >= 0.01 && r <= 100;
-    if (!ok) return null;
+  if (grossAvg > 0) {
+    const r = midPrice > 0 ? grossAvg / midPrice : Number.POSITIVE_INFINITY;
+    if (!(r <= 1.01 && grossAvg <= 10.1 * markPrice && (w.saturated || r >= 0.01))) return null;
   }
   const spreadBps = w.spread_pbps / 100;
   const feeBps = (fee: string): number =>
