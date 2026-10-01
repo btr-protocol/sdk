@@ -208,8 +208,6 @@ describe('quoteFromWire', () => {
       saturated,
     }) as QuoteResponseWire;
 
-  // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
-  // flag survives the wire.
   // A saturated huge sell fills far below mid by design: the scale guard must not refuse it.
   test('a saturated quote passes the fill/mid guard; the same fill unflagged is refused', () => {
     const w = (saturated: boolean): QuoteResponseWire => ({
@@ -221,6 +219,65 @@ describe('quoteFromWire', () => {
     expect(quoteFromWire(w(false), 18, [], 1)).toBeNull();
   });
 
+  const wad = (x: number): string => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
+  // fill = price of 1 in; mid/mark as the back sends them.
+  const priced = (
+    saturated: boolean,
+    fill: number,
+    mid: number,
+    mark = mid,
+  ): QuoteResponseWire => ({
+    ...wire(saturated),
+    amount_out: wad(fill),
+    gross_out: wad(fill),
+    mid_price: wad(mid),
+    mark_price: wad(mark),
+  });
+
+  // An old back (saturated, no orientation fix) may invert mid+mark together. Too-small mark ⇒
+  // markCap collapses minOut (sandwichable) ⇒ must be null; too-large mark only raises the cap.
+  test('saturated + inverted mid/mark, p > 1: refused', () => {
+    expect(quoteFromWire(priced(true, 30, 1 / 31.15), 18, [], 1)).toBeNull();
+  });
+
+  test('saturated + inverted mid/mark, p < 1: passes only in the safe direction (cap >= fill)', () => {
+    const q = quoteFromWire(priced(true, 0.02, 1 / 0.0321), 18, [], 1);
+    expect(q).not.toBeNull();
+    expect(q!.markPrice).toBeGreaterThan(q!.avgPrice);
+  });
+
+  test('saturated + mis-scaled small mark (correct mid): refused', () => {
+    expect(quoteFromWire(priced(true, 0.5, 1, 1e-12), 18, [], 1)).toBeNull();
+  });
+
+  test('saturated fill above mid is refused (saturation only lowers fill)', () => {
+    expect(quoteFromWire(priced(true, 1.5, 1), 18, [], 1)).toBeNull();
+  });
+
+  test('unsaturated bounds unchanged: [0.01, 100] of mid', () => {
+    expect(quoteFromWire(priced(false, 50, 1), 18, [], 1)).not.toBeNull();
+    expect(quoteFromWire(priced(false, 101, 1), 18, [], 1)).toBeNull();
+    expect(quoteFromWire(priced(false, 0.009, 1), 18, [], 1)).toBeNull();
+  });
+
+  // 6 -> 18: saturated huge sell at 1% of mid in mixed decimals still passes.
+  test('saturated mixed 6 <-> 18 valid fill passes, inverted mid refused', () => {
+    const mid = 31.15;
+    const raw = (x: number): string =>
+      `0x${(BigInt(Math.round(x * 1e6)) * 10n ** 12n).toString(16)}`;
+    const w = (m: number): QuoteResponseWire => ({
+      ...wire(true),
+      amount_out: raw(0.01 * mid),
+      gross_out: raw(0.01 * mid),
+      mid_price: wad(m),
+      mark_price: wad(m),
+    });
+    expect(quoteFromWire(w(mid), 18, [], 1)?.saturated).toBe(true);
+    expect(quoteFromWire(w(1 / mid), 18, [], 1)).toBeNull();
+  });
+
+  // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
+  // flag survives the wire.
   test('carries the saturation flag, so a flat top is never shown as a price', () => {
     expect(quoteFromWire(wire(true), 18, [], 1)?.saturated).toBe(true);
     expect(quoteFromWire(wire(false), 18, [], 1)?.saturated).toBe(false);

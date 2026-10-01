@@ -828,8 +828,11 @@ const wadToF64 = (h: string): number => Number(BigInt(h)) / 1e18;
  *
  * Guard: a fill/mid ratio outside [0.01, 100] means the amounts and the mid disagree on scale or
  * orientation (a new sdk against an older back). Such a quote would feed minOut and the mark cap,
- * so it is refused rather than returned. A `saturated` quote is exempt: a huge sell that drains
- * the book fills far below mid by design and is still a valid, flagged quote.
+ * so it is refused rather than returned. A `saturated` quote skips the LOWER bound only (a huge
+ * sell drains the book and fills far below mid by design) and instead must hold fill <= 1.01·mid
+ * and fill <= 2·mark: saturation never lifts fill above mid, and the mark cap (fairIn·mark) is
+ * then never far below the fill. A mid/mark that is too small (inverted p>1, mis-scaled down)
+ * is refused; one that is too large only raises the cap, and a high minOut reverts, never fills.
  */
 export function quoteFromWire(
   w: QuoteResponseWire,
@@ -843,13 +846,10 @@ export function quoteFromWire(
   const midPrice = wadToF64(w.mid_price);
   const markPrice = wadToF64(w.mark_price);
   const grossAvg = amountInTok > 0 && grossOut > 0 ? grossOut / amountInTok : 0;
-  if (
-    !w.saturated &&
-    midPrice > 0 &&
-    grossAvg > 0 &&
-    !(grossAvg / midPrice >= 0.01 && grossAvg / midPrice <= 100)
-  ) {
-    return null;
+  if (midPrice > 0 && grossAvg > 0) {
+    const r = grossAvg / midPrice;
+    const ok = w.saturated ? r <= 1.01 && grossAvg <= 2 * markPrice : r >= 0.01 && r <= 100;
+    if (!ok) return null;
   }
   const spreadBps = w.spread_pbps / 100;
   const feeBps = (fee: string): number =>

@@ -217,8 +217,9 @@ export interface BackendConvertOpts {
  * Backend conversion for the liability pipeline: one POST /v1/quote per direct leg, and for a
  * spoke→spoke cross ONE POST /v1/quote-path over both hops (the chain settles a path once, so
  * summing two leg quotes re-charges the spread and under-quotes it).
- * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint
- * nothing from); an off-scale quote resolves null (no honest price for this pair). Composed in fill order over the backend's own outputs.
+ * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint nothing
+ * from); an off-scale quote resolves null (no honest price for this pair). Composed in fill
+ * order over the backend's own outputs.
  */
 export function backendConvert(
   state: PoolState,
