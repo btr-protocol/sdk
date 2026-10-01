@@ -39,11 +39,20 @@ describe('publishMarks verification', () => {
     // Swap the halves: each tier's roster no longer matches its commitment.
     const swapped = (AUTH >> 128n) | ((AUTH & ((1n << 128n) - 1n)) << 128n);
     expect(verifyPushP8(PRIMARY, { ...ctx, auth: swapped })[0].committed).toBe(false);
-    const tampered = `${PRIMARY.slice(0, -4)}${PRIMARY.endsWith('00') ? '11' : '00'}00` as Hex;
-    const t = verifyPushP8(tampered.slice(0, PRIMARY.length) as Hex, ctx)[0];
+    // Flip a nibble inside the last signature's s (v stays valid): it recovers to someone else.
+    const at = PRIMARY.length - 40;
+    const flipped = PRIMARY[at] === '0' ? '1' : '0';
+    const tampered = `${PRIMARY.slice(0, at)}${flipped}${PRIMARY.slice(at + 1)}` as Hex;
+    const t = verifyPushP8(tampered, ctx)[0];
     expect(t.ok).toBe(false);
     // The domain binds the chain: the same bytes recover to other addresses elsewhere.
     expect(verifyPushP8(PRIMARY, { ...ctx, chainId: 1 })[0].quorum).toBe(false);
+  });
+
+  test('a recovery byte the contract would reject throws', () => {
+    // The last signature's v: 27/28 on chain; 0/1 would recover here but revert in ecrecover.
+    const v0 = `${PRIMARY.slice(0, -2)}00` as Hex;
+    expect(() => verifyPushP8(v0, ctx)).toThrow('recovery byte');
   });
 
   test('truncated or foreign calldata throws instead of verifying', () => {

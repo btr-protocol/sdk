@@ -20,6 +20,8 @@ import { pushDigest } from './wire';
 export const PUBLISH_MARKS_SELECTOR = '0x013b6436';
 /** `MarkStoreBase` is constructed with version "2"; the name is the oracle family's. */
 const P8_DOMAIN = { name: 'BTR ExternalOracleV4', version: '2' } as const;
+/** `MarkP8Lib.CONF_MAX`: the highest conf code a lane entry may carry. */
+const P8_CONF_MAX = 61;
 /** The store's raw read of its auth word: byte `0x80 | AUTH (0x40)` (`Pool.fallback`'s raw path). */
 export const P8_AUTH_READ: Hex = '0xc0';
 
@@ -27,7 +29,7 @@ export interface P8Segment {
   tier: 1 | 2;
   /** Source second the segment's marks carry. */
   srcSecs: number;
-  /** Lanes the segment writes. */
+  /** Lanes the segment carries (the store may skip a halted or non-advancing one). */
   lanes: number;
   /** The roster the calldata carries (ascending) and the threshold it commits to. */
   roster: Address[];
@@ -39,7 +41,8 @@ export interface P8Segment {
   committed: boolean;
   /** The k recovered signers are strictly ascending and each on the roster. */
   quorum: boolean;
-  /** `committed && quorum`: the store would take this segment's signatures. */
+  /** `committed && quorum`: the signatures and roster are valid. The store also needs the sender
+   *  on `relayers`, which a landed tx implies; compare `tx.from` to check it. */
   ok: boolean;
 }
 
@@ -75,6 +78,8 @@ export function verifyPushP8(
     for (; mask !== 0n; mask >>= 1n) {
       if ((mask & 1n) === 0n) continue;
       need(p + 5);
+      // `_lane` reverts on a conf code above CONF_MAX.
+      if ((b[p + 4] & 0x7f) > P8_CONF_MAX) throw new Error('lane conf code out of range');
       p += b[p + 4] & 0x80 ? 6 : 5;
       lanes++;
     }
@@ -91,6 +96,11 @@ export function verifyPushP8(
       verifyingContract: tierVerifier(ctx.factory, tier),
     });
     const roster = addrs(p + 1, nSig);
+    // The contract hands `v` to ecrecover as is, which takes 27 or 28 only.
+    for (let i = 0; i < k; i++) {
+      const v = b[sigs + 65 * i + 64];
+      if (v !== 27 && v !== 28) throw new Error(`bad signature recovery byte ${v}`);
+    }
     const recovered = Array.from({ length: k }, (_, i) =>
       recoverDigestSigner(digest, b.slice(sigs + 65 * i, sigs + 65 * (i + 1))),
     );
