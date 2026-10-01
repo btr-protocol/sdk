@@ -330,7 +330,13 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
     hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
   });
 
-  const run = async (tokenIn: string, tokenOut: string, outRaw: bigint) => {
+  const run = async (
+    tokenIn: string,
+    tokenOut: string,
+    outRaw: bigint,
+    mark = 1,
+    amount = 1_000,
+  ) => {
     const calls: Record<string, unknown>[] = [];
     // @ts-expect-error stub fetch
     globalThis.fetch = async (_u: string, init: { body?: string }) => {
@@ -342,7 +348,7 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
           gross_out: hex(outRaw),
           avg_price: wad(1),
           mid_price: wad(1),
-          mark_price: wad(1),
+          mark_price: wad(mark),
           spread_pbps: 0,
           cov_toll: '0x0',
           proto_fee: '0x0',
@@ -355,7 +361,7 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
         meta,
         baseDecimals: 6,
         backendBase: 'https://q.example/v1',
-      })(1_000);
+      })(amount);
       return {
         q,
         body: calls[0] as {
@@ -410,6 +416,18 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
     ]);
     expect(Number(BigInt(body.legs[0].amount_in)) / 1e6).toBeCloseTo(1_000, 6);
     expect(q?.amountOut).toBeCloseTo(999, 9);
+  });
+
+  test('flat spoke->base SELL passes flatSell: a fill at mid with mark = mid/10 is refused', async () => {
+    // 1.01·mark cap = 0.101 < fill 0.999/token; a flat buy (10.1·mark cap) would accept the same.
+    expect((await run('WMON', 'USDC', 999n * 10n ** 18n, 0.1)).q).toBeNull();
+    expect((await run('USDC', 'WMON', 999n * 10n ** 18n, 0.1)).q).not.toBeNull();
+  });
+
+  test('/quote-path decodes the sent amount at the FIRST hop decimals (18), not the out-spoke (6)', async () => {
+    // 1.5e-6 WMON in, 1 raw AUDF (1e-6) out: avg 2/3. Rounding the input at 6 decimals gives 2e-6 -> 0.5.
+    const { q } = await run('WMON', 'AUDF', 1n, 1, 1.5e-6);
+    expect(q?.avgPrice).toBeCloseTo(2 / 3, 9);
   });
 
   test('a null conversion makes the liability quote null, not a throw', async () => {
