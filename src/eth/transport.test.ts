@@ -176,6 +176,21 @@ describe('httpTransport resilience', () => {
   });
 });
 
+describe('httpTransport: a 400 is a verdict on the request', () => {
+  test("is thrown once with the relay's reason, never retried", async () => {
+    let reads = 0;
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
+      reads++;
+      return new Response('{"error":"eth_getLogs spans at most 10000 blocks"}', { status: 400 });
+    });
+    const p = httpTransport('http://rpc', { retries: 3, retryDelay: 1 });
+    await expect(p.request({ method: 'eth_getLogs', params: [] })).rejects.toThrow(/spans at most/);
+    expect(reads).toBe(1);
+  });
+});
+
 describe('httpTransport attests every endpoint before its first use', () => {
   // A public RPC URL has no identity. `res.ok` was the whole test, so an endpoint re-pointed at
   // another network (or a gateway answering 200 with a JSON-RPC error) read as healthy and then

@@ -8,6 +8,7 @@
  * The frontend imports from here - do not duplicate in front/.
  */
 
+import { CHAIN_RPCS } from './rpcs.generated';
 import type { Address } from './types';
 
 export type { Address } from './types';
@@ -17,6 +18,8 @@ export type { Address } from './types';
 // ─────────────────────────────────────────────────────────────
 
 const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
+
+const rpcs = (id: number): readonly string[] => CHAIN_RPCS[id] ?? [];
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -29,6 +32,9 @@ interface ChainConfig {
    *  directory and the extension, so one slug serves `/networks/<slug>.svg`, its `-mono` mask
    *  and the rasterised `<slug>.webp` pair. */
   iconSlug?: string;
+  /** The chain's top RPCs from the one list (`CHAIN_RPCS`): what `wallet_addEthereumChain` hands the
+   *  wallet and what the browser's residual reads hit. Empty when no endpoint passed the last
+   *  refresh (an unlaunched chain): the wallet prompt then has nothing to offer. */
   rpcUrls: readonly string[];
   nativeCurrency: {
     name: string;
@@ -90,22 +96,14 @@ export function getChainMonoIcon(chainId: number): string {
 // Chain Configurations
 // ─────────────────────────────────────────────────────────────
 
+/** The chains BTR serves or will, plus local Anvil. RPC URLs are NOT listed here: `rpcs.generated.ts`
+ *  carries each chain's top rows of dex-evm `deployments/chains.json` (`scripts/gen-rpcs.ts`), the one
+ *  RPC list. Adding a chain = a row here for its metadata and a refresh of that list. */
 export const CHAINS: Record<number, ChainConfig> = {
-  // ═══════════════════════════════════════════════════════════
-  // Layer 1s
-  // ═══════════════════════════════════════════════════════════
-
   1: {
     id: 1,
     name: 'Ethereum',
-    rpcUrls: [
-      'https://eth.llamarpc.com',
-      'https://rpc.ankr.com/eth',
-      'https://eth-mainnet.public.blastapi.io',
-      'https://1rpc.io/eth',
-      'https://cloudflare-eth.com',
-      'https://eth.drpc.org',
-    ],
+    rpcUrls: rpcs(1),
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     blockExplorerUrls: ['https://etherscan.io'],
     wrappedNative: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -115,118 +113,52 @@ export const CHAINS: Record<number, ChainConfig> = {
   56: {
     id: 56,
     name: 'BNB Chain',
-    rpcUrls: [
-      'https://bsc-dataseed.binance.org',
-      'https://rpc.ankr.com/bsc',
-      'https://binance.llamarpc.com',
-      'https://bsc-mainnet.public.blastapi.io',
-    ],
+    rpcUrls: rpcs(56),
     nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
     blockExplorerUrls: ['https://bscscan.com'],
     wrappedNative: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  143: {
-    id: 143,
-    name: 'Monad',
-    rpcUrls: ['https://rpc3.monad.xyz', 'https://rpc-mainnet.monadinfra.com'],
-    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
-    blockExplorerUrls: ['https://monadvision.com', 'https://monadscan.com'],
-    wrappedNative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
   137: {
     id: 137,
     name: 'Polygon',
-    rpcUrls: [
-      'https://polygon-rpc.com',
-      'https://rpc.ankr.com/polygon',
-      'https://polygon-mainnet.public.blastapi.io',
-      'https://1rpc.io/matic',
-    ],
+    rpcUrls: rpcs(137),
     nativeCurrency: { name: 'Polygon', symbol: 'POL', decimals: 18 },
     blockExplorerUrls: ['https://polygonscan.com'],
     wrappedNative: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  43114: {
-    id: 43114,
-    name: 'Avalanche C-Chain',
-    iconSlug: 'avalanche',
-    rpcUrls: [
-      'https://api.avax.network/ext/bc/C/rpc',
-      'https://rpc.ankr.com/avalanche',
-      'https://ava-mainnet.public.blastapi.io/ext/bc/C/rpc',
-      'https://1rpc.io/avax/c',
-    ],
-    nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
-    blockExplorerUrls: ['https://snowtrace.io'],
-    wrappedNative: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
+  143: {
+    id: 143,
+    name: 'Monad',
+    rpcUrls: rpcs(143),
+    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+    blockExplorerUrls: ['https://monadvision.com', 'https://monadscan.com'],
+    wrappedNative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  // ═══════════════════════════════════════════════════════════
-  // Layer 2s / Rollups
-  // ═══════════════════════════════════════════════════════════
-
-  42161: {
-    id: 42161,
-    name: 'Arbitrum One',
-    iconSlug: 'arbitrum',
-    rpcUrls: [
-      'https://arb1.arbitrum.io/rpc',
-      'https://arbitrum.llamarpc.com',
-      'https://rpc.ankr.com/arbitrum',
-      'https://arbitrum-one.public.blastapi.io',
-    ],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://arbiscan.io'],
-    wrappedNative: '0x82aF49447d8a07e3bd95bd0d56f35241523fbab1',
+  196: {
+    id: 196,
+    name: 'X Layer',
+    // OKX's Polygon-CDK zkEVM. Gas is OKB, not ETH: quoting a fee in ETH here is a ~1e3 error.
+    rpcUrls: rpcs(196),
+    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+    blockExplorerUrls: ['https://www.oklink.com/x-layer'],
+    wrappedNative: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
     multicall3: MULTICALL3_ADDRESS,
   },
-
-  8453: {
-    id: 8453,
-    name: 'Base',
-    rpcUrls: [
-      'https://mainnet.base.org',
-      'https://base.llamarpc.com',
-      'https://1rpc.io/base',
-      'https://base-mainnet.public.blastapi.io',
-    ],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://basescan.org'],
-    wrappedNative: '0x4200000000000000000000000000000000000006',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // Alt L1s / Emerging Chains
-  // ═══════════════════════════════════════════════════════════
 
   999: {
     id: 999,
     name: 'HyperEVM',
     iconSlug: 'hyperevm',
-    rpcUrls: ['https://rpc.hyperliquid.xyz/evm'],
+    rpcUrls: rpcs(999),
     nativeCurrency: { name: 'Hyperliquid', symbol: 'HYPE', decimals: 18 },
     blockExplorerUrls: ['https://hyperevmscan.io'],
     wrappedNative: '0x5555555555555555555555555555555555555555',
-    multicall3: MULTICALL3_ADDRESS,
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  196: {
-    id: 196,
-    name: 'X Layer',
-    // OKX's Polygon-CDK zkEVM. Gas is OKB, not ETH: quoting a fee in ETH here is a ~1e3 error.
-    rpcUrls: ['https://xlayerrpc.okx.com', 'https://rpc.xlayer.tech'],
-    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
-    blockExplorerUrls: ['https://www.oklink.com/x-layer'],
-    wrappedNative: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
     multicall3: MULTICALL3_ADDRESS,
   },
 
@@ -235,7 +167,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: 'Robinhood Chain',
     // The slug would be `robinhood-chain`; the asset is `robinhood`.
     iconSlug: 'robinhood',
-    rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
+    rpcUrls: rpcs(4663),
     // Arbitrum Orbit L2, ETH gas. No WETH predeploy at 0x42..06 (verified: no code), and no
     // wrapped native is pinned until one is confirmed on-chain.
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -243,27 +175,13 @@ export const CHAINS: Record<number, ChainConfig> = {
     multicall3: MULTICALL3_ADDRESS,
   },
 
-  // ═══════════════════════════════════════════════════════════
-  // Testnets / Dev
-  // ═══════════════════════════════════════════════════════════
-
-  31337: {
-    id: 31337,
-    name: 'Anvil',
-    iconSlug: 'anvil',
-    rpcUrls: ['http://localhost:8545'],
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    testnet: true,
-  },
-
   5042: {
     id: 5042,
     name: 'Arc',
     iconSlug: 'arc',
-    // ⚠ NOT LIVE UNTIL LAUNCH. The endpoint below is the owner-authoritative mainnet URL, but
-    // Arc mainnet has not launched: it is NOT verified and must not be treated as reachable.
-    // Nothing may route here until launch; a `pending` deployment is never selectable.
-    rpcUrls: ['https://rpc.mainnet.arc.network'],
+    // Chainlist lists mainnet endpoints and several answered eth_chainId 5042 when last probed
+    // (2026-10-02). Reachable is not deployed: a `pending` deployment is never selectable.
+    rpcUrls: rpcs(5042),
     // Native gas is USDC at 18 decimals; the ERC-20 view at 0x3600… reports 6 for the SAME
     // balance (verified on-chain: eth_getBalance/1e18 == balanceOf/1e6). Mixing the two
     // interfaces in one accounting path is a 1e12 error.
@@ -276,16 +194,10 @@ export const CHAINS: Record<number, ChainConfig> = {
   5042002: {
     id: 5042002,
     name: 'Arc Testnet',
-    // All verified live (eth_chainId -> 0x4cef52). Order is a batch/sub-request budget, not
-    // preference: drpc rejects batches over 3 and the arc.network host caps at ~16 sub-requests,
-    // so the two that take a full multicall lead and arc.network is the last resort.
-    // rpc.testnet.arc.io / rpc.drpc.testnet.arc.io were invented by mechanical renaming: never
-    // reintroduce them, and never put arc-testnet.drpc.org back in front.
-    rpcUrls: [
-      'https://rpc.blockdaemon.testnet.arc.network',
-      'https://5042002.rpc.thirdweb.com',
-      'https://rpc.testnet.arc.network',
-    ],
+    // Order lives in chains.json, not here: blockdaemon leads because it takes the 20k-block
+    // eth_getLogs span the admin safety scan sends; rpc.testnet.arc.network caps it near 10k.
+    // Never reintroduce invented hosts (rpc.testnet.arc.io, rpc.drpc.testnet.arc.io).
+    rpcUrls: rpcs(5042002),
     // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     blockExplorerUrls: ['https://testnet.arcscan.app'],
@@ -299,102 +211,45 @@ export const CHAINS: Record<number, ChainConfig> = {
     nativeErc20: '0x3600000000000000000000000000000000000000',
     testnet: true,
   },
-  97: {
-    id: 97,
-    name: 'BNB Chain Testnet',
-    rpcUrls: [
-      'https://bsc-testnet.drpc.org',
-      'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
-      'https://data-seed-prebsc-1-s2.bnbchain.org:8545',
-      'https://data-seed-prebsc-1-s1.binance.org:8545',
-      'https://bsc-testnet-rpc.publicnode.com',
-    ],
-    nativeCurrency: { name: 'Test BNB', symbol: 'tBNB', decimals: 18 },
-    blockExplorerUrls: ['https://testnet.bscscan.com'],
-    wrappedNative: '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd',
-    multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
-  },
 
-  84532: {
-    id: 84532,
-    name: 'Base Sepolia Testnet',
-    rpcUrls: ['https://sepolia.base.org', 'https://base-sepolia.public.blastapi.io'],
-    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://sepolia.basescan.org'],
+  8453: {
+    id: 8453,
+    name: 'Base',
+    rpcUrls: rpcs(8453),
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://basescan.org'],
     wrappedNative: '0x4200000000000000000000000000000000000006',
     multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
   },
 
-  421614: {
-    id: 421614,
-    name: 'Arbitrum Sepolia Testnet',
-    rpcUrls: [
-      'https://sepolia-rollup.arbitrum.io/rpc',
-      'https://arbitrum-sepolia.public.blastapi.io',
-    ],
-    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://sepolia.arbiscan.io'],
-    wrappedNative: '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73',
+  42161: {
+    id: 42161,
+    name: 'Arbitrum One',
+    iconSlug: 'arbitrum',
+    rpcUrls: rpcs(42161),
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    blockExplorerUrls: ['https://arbiscan.io'],
+    wrappedNative: '0x82aF49447d8a07e3bd95bd0d56f35241523fbab1',
     multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
   },
 
-  998: {
-    id: 998,
-    name: 'HyperEVM Testnet',
-    rpcUrls: ['https://rpc.hyperliquid-testnet.xyz/evm'],
-    nativeCurrency: { name: 'Test Hyperliquid', symbol: 'HYPE', decimals: 18 },
-    blockExplorerUrls: ['https://testnet.hyperevmscan.io'],
-    wrappedNative: '0x5555555555555555555555555555555555555555',
+  43114: {
+    id: 43114,
+    name: 'Avalanche C-Chain',
+    iconSlug: 'avalanche',
+    rpcUrls: rpcs(43114),
+    nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+    blockExplorerUrls: ['https://snowtrace.io'],
+    wrappedNative: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
     multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
   },
 
-  80002: {
-    id: 80002,
-    name: 'Polygon Amoy Testnet',
-    rpcUrls: ['https://rpc-amoy.polygon.technology', 'https://polygon-amoy.public.blastapi.io'],
-    nativeCurrency: { name: 'Test POL', symbol: 'POL', decimals: 18 },
-    blockExplorerUrls: ['https://amoy.polygonscan.com'],
-    wrappedNative: '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
-    multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
-  },
-
-  1952: {
-    id: 1952,
-    // NOT 195 and NOT 196: `eth_chainId` on the OKX testrpc answers 0x7a0. 196 is X Layer
-    // MAINNET, and 195 was the retired Sepolia-era testnet.
-    name: 'X Layer Testnet',
-    rpcUrls: ['https://xlayertestrpc.okx.com', 'https://testrpc.xlayer.tech/terigon'],
-    nativeCurrency: { name: 'Test OKB', symbol: 'OKB', decimals: 18 },
-    blockExplorerUrls: ['https://www.oklink.com/x-layer-testnet'],
-    // No WOKB at the mainnet address here (verified: no code).
-    multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
-  },
-
-  46630: {
-    id: 46630,
-    name: 'Robinhood Chain Testnet',
-    iconSlug: 'robinhood',
-    rpcUrls: ['https://rpc.testnet.chain.robinhood.com'],
-    nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
-    blockExplorerUrls: ['https://explorer.testnet.chain.robinhood.com'],
-    multicall3: MULTICALL3_ADDRESS,
-    testnet: true,
-  },
-
-  43113: {
-    id: 43113,
-    name: 'Avalanche Fuji Testnet',
-    rpcUrls: ['https://api.avax-test.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche_fuji'],
-    nativeCurrency: { name: 'Test Avalanche', symbol: 'AVAX', decimals: 18 },
-    blockExplorerUrls: ['https://testnet.snowtrace.io'],
-    wrappedNative: '0xd00ae08403B9bbb9124bB305C09058E32C39A48c',
-    multicall3: MULTICALL3_ADDRESS,
+  31337: {
+    id: 31337,
+    name: 'Anvil',
+    iconSlug: 'anvil',
+    rpcUrls: ['http://localhost:8545'],
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     testnet: true,
   },
 };

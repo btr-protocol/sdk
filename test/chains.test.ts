@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { withChainId } from '../src/api.js';
+import { CHAINS, getAllRpcs } from '../src/eth/chains.js';
+import { CHAIN_RPCS } from '../src/eth/rpcs.generated.js';
 import {
   BTR_CHAINS,
   chainVenue,
@@ -36,6 +38,35 @@ describe('served chains', () => {
   test('withChainId appends the chain', () => {
     expect(withChainId('/v1/pools', 56)).toBe('/v1/pools?chainId=56');
     expect(withChainId('/v1/pools?x=1', 5042002)).toBe('/v1/pools?x=1&chainId=5042002');
+  });
+});
+
+describe('chain registry', () => {
+  // The owner's list: BNB, Monad, X Layer, Base, Avalanche, Arbitrum, Ethereum, Robinhood, Arc
+  // (mainnet + testnet), Polygon, HyperEVM; plus local Anvil. A chain not here is not offered.
+  const LISTED = [1, 56, 137, 143, 196, 999, 4663, 5042, 5042002, 8453, 42161, 43114, 31337];
+
+  test('is the listed chains plus Anvil, and covers every served chain', () => {
+    expect(
+      Object.keys(CHAINS)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual([...LISTED].sort((a, b) => a - b));
+    for (const c of BTR_CHAINS) expect(CHAINS[c.chainId]).toBeDefined();
+  });
+
+  // The list goes to the wallet verbatim and is the browser's read endpoint: the top rows of the
+  // one list (chains.json), so no chain carries a URL of its own here.
+  test('one or two https RPCs per chain, all from the one list (Anvil: localhost)', () => {
+    for (const c of Object.values(CHAINS)) {
+      const urls = getAllRpcs(c.id);
+      expect(urls.length).toBeGreaterThanOrEqual(1);
+      expect(urls.length).toBeLessThanOrEqual(2);
+      for (const u of urls) {
+        expect(u).toMatch(c.id === 31337 ? /^http:\/\/localhost:/ : /^https:\/\//);
+        if (c.id !== 31337) expect(CHAIN_RPCS[c.id]).toContain(u);
+      }
+    }
   });
 });
 
