@@ -140,6 +140,7 @@ describe('outage vs no-liquidity', () => {
       },
     ];
     const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, {
+      slippageFrac: 0.005,
       backend: {
         meta: { addressOf: () => null, decimalsOf: () => 6 },
         baseDecimals: 6,
