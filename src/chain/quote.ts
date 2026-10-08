@@ -61,6 +61,10 @@ export interface QuoteFlags {
   out: number;
   swap_enabled: boolean;
   halted: boolean;
+  /** Either endpoint carries SWAP_GATED: `swap` needs AccessControl perms bit 10. */
+  swap_gated?: boolean;
+  /** Both endpoints admit a perm-less executor (no halt, swaps on, not gated). */
+  open_path?: boolean;
 }
 
 export interface ChainQuoteResponse {
@@ -105,6 +109,13 @@ interface ChainRouteRequest {
   slippage: Slippage;
 }
 
+/** One `getRiskFlags(token)` word read on `pool` (pool tag, token symbol, as in ChainHop). */
+export interface ChainLegFlags {
+  pool: string;
+  token: string;
+  word: number;
+}
+
 interface ChainRouteResponse {
   chain_id: number;
   block: BlockRef;
@@ -112,6 +123,12 @@ interface ChainRouteResponse {
   best: ChainRouteSelection | null;
   singles: ChainPart[];
   refused: Refused[];
+  /** Every fetched (pool, token) word; empty on a head-surface answer. */
+  flags?: ChainLegFlags[];
+  /** A leg of `best` is SWAP_GATED: perm-less executors revert NotAuthorized. */
+  swap_gated?: boolean;
+  /** Every leg of `best` admits a perm-less executor; false with no `best`. */
+  open_path?: boolean;
 }
 
 interface ChainClientOpts {
