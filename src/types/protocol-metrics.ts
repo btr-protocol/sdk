@@ -123,6 +123,14 @@ export interface PoolProtocolMetrics extends AprLegs {
   protoFeesUsd: number | null;
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
   tollUsd?: number | null;
+  /**
+   * `lpFeesUsd + protoFeesUsd`: the gross swap fee. `revenueUsd` is the protocol share of it, and
+   * `protocolSharePct = revenueUsd / feesUsd`. Optional so a back that predates the split still
+   * type-checks; the front derives both from lp/proto when absent.
+   */
+  feesUsd?: number | null;
+  revenueUsd?: number | null;
+  protocolSharePct?: number | null;
   assets: AssetProtocolMetrics[];
 }
 
@@ -134,6 +142,10 @@ export interface ProtocolKpis {
   protoFeesUsd: number | null;
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
   tollUsd?: number | null;
+  /** See `PoolProtocolMetrics.feesUsd`. Absent from a back that predates the split. */
+  feesUsd?: number | null;
+  revenueUsd?: number | null;
+  protocolSharePct?: number | null;
   coverageAvg: number | null;
   feeApr: number | null;
   strategyApr: number | null;
