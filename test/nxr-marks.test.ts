@@ -192,3 +192,9 @@ describe('NXR mark sources', () => {
     expect(closedUntil('BRLA', wed)).toBeNull();
   });
 });
+
+test('custodial BTC wrappers use distinct signed asset identities', () => {
+  expect(nxrPair('WBTC', 'USDC')!.nxrSymbol).toBe('WBTC-USDC');
+  expect(nxrPair('CBBTC', 'USDC')!.nxrSymbol).toBe('CBBTC-USDC');
+  expect(nxrMark('WBTC')!.nxrSymbol).not.toBe(nxrMark('CBBTC')!.nxrSymbol);
+});

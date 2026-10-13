@@ -116,10 +116,9 @@ export const NXR_MARKS: Record<string, NxrMark> = {
 
   // ── volatiles: native USDC CEX tape.
   WETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
-  WBTC: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
-  // CBBTC and WBTC share BTC-USDC: NXR serves neither `WBTC-USD` nor `CBBTC-USD` (both 404,
-  // probed 2026-08-14), and a wrapper's own tape would be thinner than BTC's in any case.
-  CBBTC: { nxrSymbol: 'BTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
+  WBTC: { nxrSymbol: 'WBTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
+  // Separate signed marks include the independently corroborated wrapper premium.
+  CBBTC: { nxrSymbol: 'CBBTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   BNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   XAUT: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
   // Monad legs. MITCH ids per monad.manifest.json (probed 2026-09-29): WMON 457965716382941184 =

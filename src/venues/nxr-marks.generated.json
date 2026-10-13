@@ -110,18 +110,18 @@
   },
   "WBTC": {
     "usd": {
-      "symbol": "BTC-USDC"
+      "symbol": "WBTC-USDC"
     },
     "usdc": {
-      "symbol": "BTC-USDC"
+      "symbol": "WBTC-USDC"
     }
   },
   "CBBTC": {
     "usd": {
-      "symbol": "BTC-USDC"
+      "symbol": "CBBTC-USDC"
     },
     "usdc": {
-      "symbol": "BTC-USDC"
+      "symbol": "CBBTC-USDC"
     }
   },
   "BNB": {
