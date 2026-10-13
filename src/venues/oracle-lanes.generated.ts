@@ -126,7 +126,7 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
     chainId: 143,
     wire: 'v8',
     role: 'primary',
-    oracle: '0xbBBbBBBb323D7f7E51976b8A8DF2Bb4B4608d9B3',
+    oracle: '0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF',
     lanesPerSlot: 4,
     domainName: 'BTR ExternalOracleV4',
     feeds: {
@@ -142,7 +142,7 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
     chainId: 143,
     wire: 'v8',
     role: 'reference',
-    oracle: '0x27cf4711937B0154ba70D020eD238D941b586966',
+    oracle: '0xBccAE41A5df0f9241454198d4565426Abf41cA83',
     lanesPerSlot: 4,
     domainName: 'BTR ExternalOracleV4',
     feeds: {
