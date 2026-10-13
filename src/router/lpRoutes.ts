@@ -403,9 +403,11 @@ async function transferMint(
     return unfeasible(shell, 'backend-error');
   }
   if (!q) return unfeasible(shell, 'no-route');
+  // step[1] is in SHARES (the chain's swapLiability arg); `out` is FACE like every other route.
   shell.steps[1].amountOut = q.lpAmountOut;
   shell.steps[1].minOut = q.lpAmountOut * (1 - slip);
-  return { ...shell, out: q.lpAmountOut, feasible: true };
+  const faceOut = (q.lpAmountOut * (outLeg.indexWad ?? WAD)) / WAD;
+  return { ...shell, out: faceOut, feasible: true };
 }
 
 /** Mint amountIn of xToken, ending in targetSym LP. Single-pool scope (spec §2.1). */

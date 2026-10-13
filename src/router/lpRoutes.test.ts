@@ -149,6 +149,19 @@ describe('rankDeposit (routes A / B)', () => {
     expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
   });
 
+  test('deposit-first out is FACE like market-first: ranks on one unit at leg index != 1', async () => {
+    const idx = { NZDF: 2.027e18 };
+    const o = { ...BE, liquidityIndexWad: (s: string) => idx[s as keyof typeof idx] ?? 1e18 };
+    const { routes } = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, o);
+    const m = routes.find((r) => r.id === 'market-first');
+    const t = routes.find((r) => r.id === 'deposit-first');
+    expect(t?.out).toBeCloseTo(5_000, 4);
+    expect(Math.abs((t?.out ?? 0) - (m?.out ?? 0)) / 5_000).toBeLessThan(1e-6);
+    // shares stay in the liability step only: face / 2.027, floored by slippage
+    expect(t?.steps[1].amountOut).toBeCloseTo(5_000 / 2.027, 4);
+    expect(t?.steps[1].minOut).toBeCloseTo((5_000 / 2.027) * 0.995, 4);
+  });
+
   test('unplannable input never reaches POST /route (the backend 400s it)', async () => {
     const stub = globalThis.fetch;
     const routed: string[] = [];
