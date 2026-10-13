@@ -160,6 +160,19 @@ describe('rankDeposit (routes A / B)', () => {
     // shares stay in the liability step only: face / 2.027, floored by slippage
     expect(t?.steps[1].amountOut).toBeCloseTo(5_000 / 2.027, 4);
     expect(t?.steps[1].minOut).toBeCloseTo((5_000 / 2.027) * 0.995, 4);
+    // route floor is FACE too: shares floor re-scaled by the index
+    expect(t?.minOut).toBeCloseTo(5_000 * 0.995, 4);
+  });
+
+  test('route minOut is the encoded floor in out units (market-first deposits Σ final minOut at C)', async () => {
+    const p = [pool('core', { hubRes: 2_400_000 })]; // C = 1.1
+    const { routes } = await rankDeposit(p, 'AUDF', 'NZDF', 5_500, BE);
+    const m = routes.find((r) => r.id === 'market-first');
+    const swapFloor = m?.steps.filter((s) => s.kind === 'swap').reduce((a, s) => a + s.minOut, 0);
+    expect(m?.minOut).toBeCloseTo((swapFloor ?? 0) / 1.1, 6);
+    expect(m?.minOut).toBeGreaterThan(0);
+    const direct = await rankDeposit(p, 'AUDF', 'AUDF', 5_500, BE);
+    expect(direct.best?.minOut).toBeCloseTo(5_000, 6);
   });
 
   test('unplannable input never reaches POST /route (the backend 400s it)', async () => {

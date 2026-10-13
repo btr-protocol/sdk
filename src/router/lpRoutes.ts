@@ -83,6 +83,8 @@ export interface RankedLpRoute {
   feasible: boolean;
   reason?: string;
   out: number;
+  /** The floor the batch ENCODES, in `out` units (face for mints, tokens for exits). */
+  minOut: number;
   hops: number;
   steps: LpRouteStep[];
 }
@@ -106,6 +108,7 @@ const MARKET_DEAD: RouteShell = {
   id: 'market-first',
   label: 'market swap, then deposit',
   out: 0,
+  minOut: 0,
   hops: 1,
   steps: [],
 };
@@ -114,6 +117,7 @@ const CROSS_DEAD: RouteShell = {
   id: 'cross-exit',
   label: 'cross withdraw (one call)',
   out: 0,
+  minOut: 0,
   hops: 1,
   steps: [],
 };
@@ -304,6 +308,7 @@ async function marketMint(
         id: 'market-first',
         label: 'market swap, then deposit',
         out: plan.amountOut,
+        minOut: 0,
         hops: steps.length + 1,
         steps,
       },
@@ -331,6 +336,8 @@ async function marketMint(
     id: 'market-first',
     label: 'market swap, then deposit',
     out: plan.amountOut / c,
+    // The deposit takes Σ final-leg floors and mints at C: that is the face the batch guarantees.
+    minOut: depositFloor / c,
     hops: steps.length,
     steps,
     feasible: true,
@@ -356,6 +363,7 @@ async function transferMint(
     id: 'deposit-first',
     label: 'deposit, then transfer liability',
     out: 0,
+    minOut: 0,
     hops: 2,
     steps: [
       {
@@ -407,7 +415,12 @@ async function transferMint(
   shell.steps[1].amountOut = q.lpAmountOut;
   shell.steps[1].minOut = q.lpAmountOut * (1 - slip);
   const faceOut = (q.lpAmountOut * (outLeg.indexWad ?? WAD)) / WAD;
-  return { ...shell, out: faceOut, feasible: true };
+  return {
+    ...shell,
+    out: faceOut,
+    minOut: (shell.steps[1].minOut * (outLeg.indexWad ?? WAD)) / WAD,
+    feasible: true,
+  };
 }
 
 /** Mint amountIn of xToken, ending in targetSym LP. Single-pool scope (spec §2.1). */
@@ -431,6 +444,7 @@ export async function rankDeposit(
       feasible: c !== null,
       ...(c === null ? { reason: 'feed-unavailable' } : {}),
       out: c === null ? 0 : amountIn / c,
+      minOut: c === null ? 0 : amountIn / c,
       hops: 1,
       steps: [
         {
@@ -495,6 +509,7 @@ async function crossExit(
     id: 'cross-exit',
     label: 'cross withdraw (one call)',
     out,
+    minOut: out * (1 - slip),
     hops: 1,
     steps: [
       {
@@ -531,6 +546,7 @@ async function transferExit(
     id: 'transfer-exit',
     label: 'transfer liability, then same-asset exit',
     out: 0,
+    minOut: 0,
     hops: 2,
     steps: [
       {
@@ -587,7 +603,7 @@ async function transferExit(
   shell.steps[1].amountIn = q.lpAmountOut;
   shell.steps[1].amountOut = exitOut;
   shell.steps[1].minOut = exitOut * (1 - slip);
-  return { ...shell, out: exitOut, feasible: true };
+  return { ...shell, out: exitOut, minOut: shell.steps[1].minOut, feasible: true };
 }
 
 /** Redeem lpFaceIn (FACE units) of targetSym LP, ending in outToken tokens. */
@@ -608,6 +624,7 @@ export async function rankRedeem(
       id: 'cross-exit',
       label: 'same-asset withdraw',
       out: 0,
+      minOut: 0,
       hops: 1,
       steps: [
         {
@@ -632,6 +649,7 @@ export async function rankRedeem(
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;
+    gated.minOut = gated.steps[0].minOut;
     return { best: gated, routes: [gated] };
   }
   needBackend(opts);
