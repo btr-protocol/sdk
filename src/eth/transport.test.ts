@@ -191,6 +191,78 @@ describe('httpTransport: a 400 is a verdict on the request', () => {
   });
 });
 
+describe('httpTransport rotates steady-state reads across endpoints', () => {
+  test('consecutive reads walk the ring instead of pinning the first', async () => {
+    const { reads } = ((): { reads: string[] } => {
+      const reads: string[] = [];
+      useFetch(async (url, init) => {
+        const body = jsonBody(init) as MockRequest;
+        if (body.method === 'eth_chainId') return ok(body);
+        reads.push(String(url));
+        return ok(body);
+      });
+      return { reads };
+    })();
+    const p = httpTransport(['http://a', 'http://b', 'http://c'], {
+      chainId: 1,
+      retryDelay: 1,
+      batch: false,
+    });
+    for (let i = 0; i < 4; i++) await p.request({ method: 'eth_call', params: [`0x${i}`] });
+    // distinct params defeat inflight dedupe; each post starts at the next endpoint
+    expect(reads).toEqual(['http://a', 'http://b', 'http://c', 'http://a']);
+  });
+
+  test('rotation survives an eviction mid-ring', async () => {
+    const reads: string[] = [];
+    useFetch(async (url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      const u = String(url);
+      if (body.method === 'eth_chainId')
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id,
+            result: u === 'http://evil' ? '0x64' : '0x1',
+          }),
+          { status: 200 },
+        );
+      reads.push(u);
+      return ok(body);
+    });
+    const p = httpTransport(['http://a', 'http://evil', 'http://b'], {
+      chainId: 1,
+      retryDelay: 1,
+      batch: false,
+    });
+    for (let i = 0; i < 3; i++) await p.request({ method: 'eth_call', params: [`0x${i}`] });
+    expect(reads).toEqual(['http://a', 'http://b', 'http://a']); // evil attested, evicted, never read
+    expect(reads).not.toContain('http://evil');
+  });
+});
+
+describe('httpTransport never rotates a send or the nonce read', () => {
+  test('sends and eth_getTransactionCount start at the primary', async () => {
+    const seen: [string, string][] = [];
+    useFetch(async (url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method !== 'eth_chainId') seen.push([String(body.method), String(url)]);
+      return ok(body);
+    });
+    const p = httpTransport(['http://a', 'http://b'], { chainId: 1, retryDelay: 1, batch: false });
+    await p.request({ method: 'eth_call', params: ['0x1'] });
+    await p.request({ method: 'eth_getTransactionCount', params: ['0xabc', 'pending'] });
+    await p.request({ method: 'eth_sendRawTransaction', params: ['0xdead'] });
+    await p.request({ method: 'eth_call', params: ['0x2'] });
+    expect(seen).toEqual([
+      ['eth_call', 'http://a'],
+      ['eth_getTransactionCount', 'http://a'],
+      ['eth_sendRawTransaction', 'http://a'],
+      ['eth_call', 'http://b'],
+    ]);
+  });
+});
+
 describe('httpTransport attests every endpoint before its first use', () => {
   // A public RPC URL has no identity. `res.ok` was the whole test, so an endpoint re-pointed at
   // another network (or a gateway answering 200 with a JSON-RPC error) read as healthy and then

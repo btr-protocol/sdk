@@ -162,12 +162,27 @@ export function httpTransport(
     return p;
   };
 
-  // Failover across endpoints + capped exponential backoff.
+  // Failover across endpoints + capped exponential backoff. The ring ROTATES: each
+  // top-level post starts at the next endpoint, so steady-state reads spread across the
+  // endpoints (and their per-IP rate budgets) instead of pinning the first until it fails.
+  // A send and the pending-nonce read never rotate: they start at the primary, so the nonce
+  // comes from the node that takes the send (same rule as btr-rpc).
+  let start = 0;
+  const at = (i: number, n: number): number => ((i % n) + n) % n;
+  const pinned = (body: unknown): boolean =>
+    (Array.isArray(body) ? body : [body]).some((r) => {
+      const m = (r as { method?: unknown } | undefined)?.method;
+      return (
+        typeof m === 'string' &&
+        (m.startsWith('eth_send') || m.startsWith('mev_') || m === 'eth_getTransactionCount')
+      );
+    });
   async function post(body: unknown): Promise<RpcResponse> {
     let last: unknown;
+    const first = !endpoints.length || pinned(body) ? 0 : start++ % endpoints.length;
     for (let attempt = 0; attempt <= retries; attempt++) {
       if (!endpoints.length) throw new RpcNetworkError(`no endpoint attests chain ${chain}`);
-      const url = endpoints[attempt % endpoints.length];
+      const url = endpoints[at(first + attempt, endpoints.length)];
       try {
         if (!(await attest(url))) {
           // Concurrent posts share one cached verdict; only the first still finds the url
