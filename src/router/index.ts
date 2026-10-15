@@ -183,6 +183,23 @@ export interface PlanLegOpts {
    *  with the server's own `amount_out`, and the widest tolerance the service will author (99.9%)
    *  satisfies that check while floring nothing. Supply the user's own maximum. */
   maxTolPbps?: number;
+  /** The pair the USER asked for, as token addresses (the WRAPPED address on a gas-token side,
+   *  as the plan is expressed). Supply both for every swap: every part must enter on `expectedIn`
+   *  and deliver `expectedOut`, else NO plan. The plan's legs come off the quote wire, and a part
+   *  entering on another token spends the user's raw `amountInUnits` in it (the approval and
+   *  `transferFrom` follow the plan, not the form). `tokenOf` resolves only what the plan names. */
+  expectedIn?: Address;
+  expectedOut?: Address;
+}
+
+const sameAddr = (a: Address, b: Address): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** A part's first input and last output against the caller's pair: true when unbound or matching. */
+function boundEnds(tin: Address, tout: Address, opts: PlanLegOpts): boolean {
+  return (
+    (opts.expectedIn === undefined || sameAddr(tin, opts.expectedIn)) &&
+    (opts.expectedOut === undefined || sameAddr(tout, opts.expectedOut))
+  );
 }
 
 /** The caller's tolerance ceiling for a server-authored floor. A plan carrying `serverFloors` and
@@ -308,7 +325,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   const partIn: bigint[] = [];
   for (const [i, part] of ordered.entries()) {
     const tin = part.route.legs[0] && opts.tokenOf(part.route.legs[0].tokenIn);
-    if (!tin) return null;
+    const last = part.route.legs.at(-1);
+    const tout = last && opts.tokenOf(last.tokenOut);
+    if (!tin || !tout || !boundEnds(tin.address, tout.address, opts)) return null;
     const amountIn = carve(part.fraction, i, tin.decimals);
     if (amountIn <= 0n) continue;
     parts.push(part);
@@ -331,6 +350,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     const last = part.route.legs.at(-1);
     const out = last && opts.tokenOf(last.tokenOut);
     const server = out && opts.serverFloors?.[out.address.toLowerCase()];
+    // Floors supplied but none for what this part delivers: it lands a token the server never
+    // floored, and the client slippage below would stand in for a promise nobody made.
+    if (!server && opts.serverFloors) return null;
     if (!server) continue;
     byFloor.set(server, [
       ...(byFloor.get(server) ?? []),
@@ -384,6 +406,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tmid = opts.tokenOf(rl[0].tokenOut);
       const t2out = opts.tokenOf(rl[1].tokenOut);
       if (!rl[0].poolAddr || !rl[1].poolAddr || !t1in || !tmid || !t2out) return null;
+      // Hop 2 is encoded as `tmid -> t2out`: a part whose legs do not join would be re-chained into
+      // a pair its pool was never quoted on (`planToRouterPlan` refuses the same).
+      if (rl[1].tokenIn !== rl[0].tokenOut) return null;
       if (
         !opts.isOfficialPool(rl[0].poolAddr as Address) ||
         !opts.isOfficialPool(rl[1].poolAddr as Address)
@@ -843,7 +868,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
       hops.push({ pool: leg.poolAddr as Address, tokenOut: tout.address });
       terminal = tout;
     }
-    if (!terminal) return null;
+    if (!terminal || !boundEnds(tin.address, terminal.address, opts)) return null;
 
     const amountIn = carve(part.fraction, i, tin.decimals);
     // A part can be carved down to nothing — `inputCarver` floors every non-last slice, so a tiny
@@ -863,7 +888,8 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
   }
   if (parts.length === 0) return null;
 
-  const floors: RouterFloor[] = [...quoted.values()].map(({ token, amount }) => {
+  const floors: RouterFloor[] = [];
+  for (const { token, amount } of quoted.values()) {
     const server = opts.serverFloors?.[token.toLowerCase()];
     if (server) {
       assertServerFloor(
@@ -872,10 +898,15 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
         server.minOut,
         serverTolCeiling('planToRouterPlan', opts),
       );
-      return { token, minOut: server.minOut };
+      floors.push({ token, minOut: server.minOut });
+    } else if (opts.serverFloors) {
+      // Floors supplied but none for this output: the plan delivers a token the server never
+      // floored. A client-slippage floor here would be a promise nobody made. No plan.
+      return null;
+    } else {
+      floors.push({ token, minOut: applySlip(amount, slip) });
     }
-    return { token, minOut: applySlip(amount, slip) };
-  });
+  }
 
   // A gas-token swap is single-asset on that side by definition — the user pays or is paid in the
   // one native token. More than one input (or output) with the flag set means the plan and the

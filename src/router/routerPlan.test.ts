@@ -892,3 +892,78 @@ describe('server floors — checked against the server amount_out, not the plan 
     );
   });
 });
+
+// SA-C10-01. The plan's legs come off the quote wire. A USDC->USDT request answered with a
+// DAI->USDT route used to be encoded as is: the typed raw USDC amount spent in DAI, approved and
+// pulled from the wallet. Both builders now take the user's pair and refuse any part that does
+// not enter on it and deliver it; floors supplied with none for the delivered token fail closed.
+describe('plans bind to the requested pair', () => {
+  const e18 = 10n ** 18n;
+  const floor = {
+    amountOut: 99n * e18,
+    minOut: (99n * e18 * 990_000n) / 1_000_000n,
+    tolPbps: 10_000,
+  };
+  const bound = {
+    slippageFrac: 0.01,
+    ...O,
+    amountInUnits: 100_000_000n,
+    serverFloors: { [USDT.toLowerCase()]: floor },
+    maxTolPbps: 10_000,
+    expectedIn: USDC,
+    expectedOut: USDT,
+  };
+  const via = (toks: string[]) =>
+    plan(100, 99, [
+      part(
+        route(
+          toks.slice(1).map(() => P1),
+          toks,
+        ),
+        1,
+        100,
+        99,
+        [100, 99],
+      ),
+    ]);
+  const direct = (toks: string[]) => plan(100, 99, [part(route([P1], toks), 1, 100, 99)]);
+
+  test('the requested pair encodes on both builders', () => {
+    expect(must(planToRouterPlan(via(['USDC', 'DAI', 'USDT']), bound)).parts[0].tokenIn).toBe(USDC);
+    expect(planToLegs(via(['USDC', 'DAI', 'USDT']), bound)?.[0].tokenIn).toBe(USDC);
+    expect(planToLegs(direct(['USDC', 'USDT']), bound)?.[0].tokenIn).toBe(USDC);
+  });
+
+  test.each([
+    ['a substituted input (C->B for A->B)', via(['DAI', 'USDC', 'USDT'])],
+    ['a substituted direct input', direct(['DAI', 'USDT'])],
+    ['a substituted output', via(['USDC', 'USDT', 'DAI'])],
+    ['a substituted direct output', direct(['USDC', 'DAI'])],
+  ] as const)('refuses %s on both builders', (_, p) => {
+    expect(planToRouterPlan(p, bound)).toBeNull();
+    expect(planToLegs(p, bound)).toBeNull();
+  });
+
+  test('one substituted part of a split refuses the whole plan', () => {
+    const p = plan(100, 99, [
+      part(route([P1], ['USDC', 'USDT']), 0.6, 60, 59),
+      part(route([P2], ['DAI', 'USDT']), 0.4, 40, 40),
+    ]);
+    expect(planToRouterPlan(p, bound)).toBeNull();
+    expect(planToLegs(p, bound)).toBeNull();
+  });
+
+  // Unbound callers: the server floor map is the only identity they carry. A delivered token it
+  // does not floor used to fall back to the client's slippage; now it is no plan.
+  test('floors supplied but none for the delivered token fail closed', () => {
+    const { expectedIn: _i, expectedOut: _o, ...unbound } = bound;
+    expect(planToRouterPlan(direct(['USDC', 'DAI']), unbound)).toBeNull();
+    expect(planToLegs(direct(['USDC', 'DAI']), unbound)).toBeNull();
+  });
+
+  test('a two-leg part whose legs do not join is refused on the leg path too', () => {
+    const r = route([P1, P2], ['USDC', 'DAI', 'USDT']);
+    r.legs[1].tokenIn = 'BNB';
+    expect(planToLegs(plan(100, 99, [part(r, 1, 100, 99, [100, 99])]), bound)).toBeNull();
+  });
+});

@@ -200,7 +200,7 @@ describe('chain quote client', () => {
                 pool: 'btr-stable',
                 token_in: 'a',
                 token_out: 'b',
-                amount_in: '0x1',
+                amount_in: '0xde0b6b3a7640000',
                 amount_out: '0x2',
               },
             ],
@@ -227,5 +227,79 @@ describe('chain quote client', () => {
       slippage: { mode: 'relative', pbps: 5_000 },
     });
     expect(res.best?.floors[0].tol_pbps).toBe(5_000);
+  });
+});
+
+// SA-C10-01: the route wire names its own hops. A part entering on a token the user did not pick,
+// or spending another size, would carry the typed raw amount into a pair nobody asked for.
+describe('chain route shape', () => {
+  const TIN = '0x0000000000000000000000000000000000000001';
+  const TOUT = '0x0000000000000000000000000000000000000002';
+  const IN = 10n ** 18n;
+  const hop = (pool: string, tin: string, tout: string, amountIn = IN) => ({
+    pool,
+    token_in: tin,
+    token_out: tout,
+    amount_in: hex(amountIn),
+    amount_out: hex(1_000_000n),
+  });
+  const body = (
+    parts: ReturnType<typeof hop>[][],
+    singles: ReturnType<typeof hop>[][] = parts,
+    floorToken = TOUT,
+  ) => ({
+    chain_id: 1,
+    block: { number: 9, timestamp: 1 },
+    source: 'chain',
+    best: {
+      parts: parts.map((hops) => ({ hops })),
+      floors: [
+        { token: floorToken, amount_out: hex(1_000_000n), tol_pbps: 5_000, min_out: hex(995_000n) },
+      ],
+    },
+    singles: singles.map((hops) => ({ hops })),
+    refused: [],
+  });
+  const route = () =>
+    chainRoute({
+      chain_id: 1,
+      token_in: TIN,
+      token_out: TOUT,
+      amount_in: hex(IN),
+      slippage: { mode: 'relative', pbps: 5_000 },
+    });
+  const kindOf = async (): Promise<string | undefined> => {
+    try {
+      await route();
+    } catch (e) {
+      return e instanceof ChainError ? e.kind : 'untyped';
+    }
+    return undefined;
+  };
+  const AB = [hop('btr-stable', 'A', 'H'), hop('btr-crypto', 'H', 'B')];
+
+  test('a joined A->H->B part spending exactly amount_in passes', async () => {
+    stub(body([AB]));
+    expect((await route()).best?.parts[0].hops).toHaveLength(2);
+  });
+
+  test.each([
+    ['a single entering on another token', body([AB], [AB, [hop('btr-crypto', 'C', 'B')]])],
+    ['a single exiting on another token', body([AB], [AB, [hop('btr-stable', 'A', 'C')]])],
+    ['a disjoint part', body([[hop('btr-stable', 'A', 'H'), hop('btr-crypto', 'C', 'B')]], [])],
+    ['an empty part', body([[]], [])],
+    ['a best spending less than amount_in', body([[hop('btr-stable', 'A', 'B', IN - 1n)]], [])],
+    ['a single at another size', body([AB], [[hop('btr-stable', 'A', 'B', IN * 2n)]])],
+    ['a floor on another token', body([AB], [AB], TIN)],
+    [
+      'a non-integer amount',
+      body(
+        [[hop('btr-stable', 'A', 'B')]].map((p) => p.map((h) => ({ ...h, amount_in: 'x' }))),
+        [],
+      ),
+    ],
+  ] as const)('refuses %s', async (_, b) => {
+    stub(b);
+    expect(await kindOf()).toBe('transport');
   });
 });

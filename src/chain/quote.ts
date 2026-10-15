@@ -273,8 +273,57 @@ export async function chainRoute(
   }
   const key = `r:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}:${req.amount_in.toLowerCase()}`;
   acceptBlock(key, raw.block.number);
+  checkRouteShape(req, raw);
   for (const f of raw.best?.floors ?? []) {
     checkFloor(f.amount_out, f.tol_pbps, f.min_out, req.slippage);
   }
   return raw;
+}
+
+/** The served itineraries answer THE REQUEST, not a pair the server picked.
+ *
+ *  Hops name registry symbols while the request names addresses, so endpoint identity is bound by
+ *  the caller that owns the roster (front `pricePlan`) and again at the calldata builder
+ *  (`PlanLegOpts.expectedIn/Out`). What the wire alone can prove is checked here: every part is a
+ *  joined chain, every part (best and singles) enters on one token and exits on one token, the best
+ *  spends EXACTLY `amount_in` and each single all of it, and every floor names `token_out`. A route
+ *  entering on a token the user did not pick would otherwise spend the typed raw amount in it. */
+function checkRouteShape(req: ChainRouteRequest, raw: ChainRouteResponse): void {
+  const bad = (why: string): never => {
+    throw new ChainError('transport', `chain/route response ${why}`);
+  };
+  const big = (v: string): bigint => {
+    try {
+      return BigInt(v);
+    } catch {
+      return bad(`carries a non-integer amount ${v}`);
+    }
+  };
+  const want = BigInt(req.amount_in);
+  const parts = raw.best?.parts ?? [];
+  const all = [...parts, ...(raw.singles ?? [])];
+  let entry: string | undefined;
+  let exit: string | undefined;
+  for (const p of all) {
+    const hops = p?.hops ?? [];
+    if (hops.length === 0) bad('carries an empty part');
+    for (let h = 1; h < hops.length; h++) {
+      if (hops[h].token_in !== hops[h - 1].token_out) bad('carries a disjoint part');
+    }
+    const tin = hops[0].token_in;
+    const tout = hops[hops.length - 1].token_out;
+    if (tin === tout) bad('carries a part that exits on its own input');
+    if ((entry ??= tin) !== tin) bad('parts enter on different tokens');
+    if ((exit ??= tout) !== tout) bad('parts exit on different tokens');
+  }
+  if (raw.best) {
+    const spent = parts.reduce((s, p) => s + big(p.hops[0].amount_in), 0n);
+    if (parts.length > 0 && spent !== want) bad(`spends ${spent}, not the requested ${want}`);
+    for (const f of raw.best.floors ?? []) {
+      if (f.token.toLowerCase() !== req.token_out.toLowerCase()) bad('floors another token');
+    }
+  }
+  for (const s of raw.singles ?? []) {
+    if (big(s.hops[0].amount_in) !== want) bad('prices a single at another size');
+  }
 }
