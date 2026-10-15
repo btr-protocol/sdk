@@ -236,6 +236,48 @@ describe('planToRouterPlan', () => {
     expect(rp.unwrapAmount).toBe(rp.floors[0].minOut);
   });
 
+  // SA-C10-08. The native flag alone does not name the token: without the binding a plan
+  // entering on (or delivering) some other asset would still wrap (unwrap) the user's native.
+  test('a native flag bound to the wrong wrapped-native identity is refused', () => {
+    const weth = route([P1], ['BNB', 'USDT']);
+    // The single input is WNATIVE, not DAI: wrapping would fund the wrong contract.
+    expect(
+      planToRouterPlan(plan(3, 99, [part(weth, 1, 3, 99)]), {
+        ...O0,
+        nativeIn: true,
+        wrappedNative: DAI,
+        amountInUnits: 3_000_000_000_000_000_000n,
+      }),
+    ).toBeNull();
+    // ...while the right identity plans.
+    expect(
+      planToRouterPlan(plan(3, 99, [part(weth, 1, 3, 99)]), {
+        ...O0,
+        nativeIn: true,
+        wrappedNative: WNATIVE,
+        amountInUnits: 3_000_000_000_000_000_000n,
+      }),
+    ).not.toBeNull();
+    const out = route([P1], ['USDC', 'BNB']);
+    // The single floor is WNATIVE, not DAI: unwrapping would burn from the wrong contract.
+    expect(
+      planToRouterPlan(plan(100, 2, [part(out, 1, 100, 2)]), {
+        slippageFrac: 0.5,
+        ...O,
+        nativeOut: true,
+        wrappedNative: DAI,
+      }),
+    ).toBeNull();
+    expect(
+      planToRouterPlan(plan(100, 2, [part(out, 1, 100, 2)]), {
+        slippageFrac: 0.5,
+        ...O,
+        nativeOut: true,
+        wrappedNative: WNATIVE,
+      }),
+    ).not.toBeNull();
+  });
+
   test('a native flag that disagrees with the plan is refused, not guessed at', () => {
     const a = route([P1], ['BNB', 'USDT']);
     const b = route([P2], ['USDC', 'USDT']);
@@ -684,6 +726,22 @@ describe('planToLegs', () => {
   // extractable, authored by the SDK. The SDK never authors a floor (L-43): null instead.
   test('a chained part with no server floor is refused, not floored by the SDK', () => {
     expect(planToLegs(crossPlan, { slippageFrac: 0.01, ...O, nativeIn: true })).toBeNull();
+  });
+
+  // SA-C10-02. Hop 2 is encoded as `tmid -> t2out`, so a disjoint part (USDC->DAI, then
+  // USDT->BNB) would be re-chained into USDC->DAI then DAI->BNB — a pair the second pool never
+  // quoted. The router path already refused this; the direct path re-chained it silently.
+  test('a chained part whose legs do not join is refused, not re-chained', () => {
+    const broken = {
+      legs: [
+        { poolTag: 'p0', poolAddr: POOL_S, tokenIn: 'USDC', tokenOut: 'DAI' },
+        { poolTag: 'p1', poolAddr: POOL_V, tokenIn: 'USDT', tokenOut: 'BNB' }, // USDT, not DAI
+      ],
+      tokens: ['USDC', 'DAI', 'BNB'],
+      hops: 2,
+    };
+    const p = plan(100, 99, [part(broken, 1, 100, 99, [98, 99])]);
+    expect(planToLegs(p, { ...O0, ...floorOn(WNATIVE, 99n, 99n, 0) })).toBeNull();
   });
 
   // Refusals, each fail-closed:

@@ -10,6 +10,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
+import { ACCESS_CONTROL_ABI } from '../src/abis/AccessControl';
 import { abiHash } from '../src/abis/hash';
 
 const repo = join(import.meta.dir, '..');
@@ -83,6 +84,10 @@ describe('PoolFactory parity is pinned across repos', () => {
     expect(lock.PoolFactory).toBe(abiHash(POOL_FACTORY_ABI));
   });
 
+  test('the lock pins the committed AccessControl snapshot', () => {
+    expect(lock.AccessControl).toBe(abiHash(ACCESS_CONTROL_ABI));
+  });
+
   test('the official-grant surface is present and setProtocolDeployer is gone', () => {
     const names = new Set(
       (POOL_FACTORY_ABI as { type?: string; name?: string }[])
@@ -104,6 +109,28 @@ describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
       expect(abiHash(readAbi(join(backAbis, `${name}.json`)))).toBe(lock[name]);
     });
   }
+});
+
+// SA-C10-03: the guardian/safety ABIs come from the bundle, hash-verified, never the wire. A
+// backend-served PoolFactory/AccessControl could suppress a pending upgrade from view, so
+// `fetchAbi` must answer these names without a request. Failing `fetch` proves no request.
+describe('fetchAbi serves the pinned guardian ABIs from the bundle', () => {
+  test('PoolFactory and AccessControl resolve to the bundled, lock-pinned copies', async () => {
+    const failFetch = () => {
+      throw new Error('fetchAbi went to the wire for a pinned ABI');
+    };
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = failFetch as unknown as typeof fetch;
+    try {
+      const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
+      resetFetchAbiCacheForTest();
+      expect(await fetchAbi('PoolFactory')).toBe(POOL_FACTORY_ABI);
+      expect(await fetchAbi('accesscontrol')).toBe(ACCESS_CONTROL_ABI);
+      expect(await fetchAbi('pool')).toBe((await import('../src/abis/Pool')).POOL_ABI);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
 
 // ── the script ───────────────────────────────────────────────────────────────

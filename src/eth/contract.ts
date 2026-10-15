@@ -5,7 +5,7 @@
 
 import type { Abi, AbiFunction } from './abi';
 import { decodeErrorResult, decodeFn, encodeFn } from './abi';
-import { estimateGas, ethCall, sendTransaction } from './rpc';
+import { estimateGas, ethCall, getChainId, sendTransaction } from './rpc';
 import { RpcRevertError } from './transport';
 import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
@@ -24,12 +24,16 @@ interface ReadOptions {
   blockTag?: 'latest' | 'pending' | 'earliest' | Hex;
 }
 
-interface WriteOptions {
+export interface WriteOptions {
   value?: bigint;
   gas?: bigint;
   gasPrice?: bigint;
   maxFeePerGas?: bigint;
   maxPriorityFeePerGas?: bigint;
+  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16): a wallet switched to
+   *  another network after the quote would otherwise sign the same calldata on the wrong chain.
+   *  Same check as `signTransaction`'s `expectedChainId`, at the send instead of the preimage. */
+  expectedChainId?: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -124,6 +128,14 @@ export class Contract {
     options: WriteOptions = {},
   ): Promise<Hex> {
     if (!this.account) throw new Error('No account connected');
+    if (options.expectedChainId !== undefined) {
+      const chainId = await getChainId(this.provider);
+      if (chainId !== options.expectedChainId) {
+        throw new Error(
+          `chain mismatch: endpoint reports ${chainId}, expected ${options.expectedChainId}`,
+        );
+      }
+    }
 
     const data = encodeFn({ abi: this.abi, functionName, args });
     const tx: TransactionRequest = { from: this.account, to: this.address, data };

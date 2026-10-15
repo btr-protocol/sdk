@@ -64,7 +64,7 @@ describe('chain quote client', () => {
     const urls: string[] = [];
     globalThis.fetch = (async (u: string) => {
       urls.push(u);
-      return new Response(JSON.stringify(quoteBody(100)), { status: 200 });
+      return new Response(JSON.stringify({ ...quoteBody(100), chain_id: 56 }), { status: 200 });
     }) as unknown as typeof fetch;
     await chainQuote({ ...REQ, chain_id: 56 });
     expect(urls[0]).toEndWith('/v1/chain/quote?chainId=56');
@@ -227,6 +227,33 @@ describe('chain quote client', () => {
       slippage: { mode: 'relative', pbps: 5_000 },
     });
     expect(res.best?.floors[0].tol_pbps).toBe(5_000);
+  });
+
+  // SA-C10-09. A response for another chain prices (and floors) the wrong assets: rejected as
+  // transport, never priced.
+  test('rejects a quote answered for another chain', async () => {
+    stub({ ...quoteBody(100), chain_id: 56 });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'transport' });
+  });
+
+  test('rejects a route answered for another chain', async () => {
+    stub({
+      chain_id: 56,
+      block: { number: 5, timestamp: 1 },
+      source: 'chain',
+      best: null,
+      singles: [],
+      refused: [],
+    });
+    await expect(
+      chainRoute({
+        chain_id: 1,
+        token_in: '0x0000000000000000000000000000000000000001',
+        token_out: '0x0000000000000000000000000000000000000002',
+        amount_in: '0xde0b6b3a7640000',
+        slippage: { mode: 'relative', pbps: 5_000 },
+      }),
+    ).rejects.toMatchObject({ kind: 'transport' });
   });
 });
 

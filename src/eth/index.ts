@@ -142,6 +142,7 @@ export {
 export { verifySignature } from './signature';
 
 // Contract
+export type { WriteOptions } from './contract';
 export {
   Contract,
   ContractRevertError,

@@ -20,7 +20,7 @@
  */
 
 import type { Address } from './types';
-import { zeroAddress } from './types';
+import { isZeroAddress, zeroAddress } from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Contract Addresses by Chain
@@ -125,6 +125,13 @@ for (const [chain, registry] of Object.entries(CONTRACTS)) {
 export type SupportedChainId = keyof typeof CONTRACTS;
 type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
 
+/** A placeholder is not an address: zeroAddress is truthy, so returning it lets a future caller
+ *  treat "not deployed" as a target and burn a call (or funds) into `0x0`. Undeployed reads as
+ *  `undefined`, the same answer an unknown chain already gets (SA-C10-19). */
+function live(addr: Address | undefined): Address | undefined {
+  return addr === undefined || isZeroAddress(addr) ? undefined : addr;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────
@@ -134,7 +141,7 @@ export function getContractAddress(
   contractName: ContractName,
 ): Address | undefined {
   const chain = chainId as SupportedChainId;
-  return CONTRACTS[chain]?.[contractName];
+  return live(CONTRACTS[chain]?.[contractName]);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -143,15 +150,15 @@ export function getContractAddress(
 
 export function getBtrPoolFactory(chainId: number): Address | undefined {
   const chain = chainId as SupportedChainId;
-  return CONTRACTS[chain]?.POOL_FACTORY;
+  return live(CONTRACTS[chain]?.POOL_FACTORY);
 }
 
 export function getBtrAdmin(chainId: number): Address | undefined {
   const chain = chainId as SupportedChainId;
-  return CONTRACTS[chain]?.ADMIN;
+  return live(CONTRACTS[chain]?.ADMIN);
 }
 
 export function getBtrAccessControl(chainId: number): Address | undefined {
   const chain = chainId as SupportedChainId;
-  return CONTRACTS[chain]?.ACCESS_CONTROL;
+  return live(CONTRACTS[chain]?.ACCESS_CONTROL);
 }

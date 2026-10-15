@@ -6,6 +6,7 @@ import {
   formatPrice,
   formatUnits,
   formatYield,
+  parseUnits,
   subscriptZeros,
   toInputValue,
 } from './format';
@@ -186,4 +187,24 @@ describe('formatUnits', () => {
   ])('formatUnits(%p, %p) === %p', (value, decimals, expected) => {
     expect(formatUnits(value, decimals)).toBe(expected);
   });
+});
+
+// SA-C10-17. `parseUnits('')` used to return 0n, turning a missing amount into a zero-amount
+// send. Plain decimals still parse; everything else throws.
+describe('parseUnits', () => {
+  test.each([
+    ['0', 18, 0n],
+    ['1', 18, 10n ** 18n],
+    ['1.5', 6, 1_500_000n],
+    ['  2.25  ', 2, 225n],
+  ])('parseUnits(%p, %p) === %p', (value, decimals, expected) => {
+    expect(parseUnits(value, decimals)).toBe(expected);
+  });
+
+  test.each([[''], ['   '], ['abc'], ['1e5'], ['-1'], ['+1'], ['1,000'], ['1.2.3'], ['0x10']])(
+    'parseUnits(%p) throws instead of inventing 0n',
+    (value) => {
+      expect(() => parseUnits(value, 18)).toThrow(/not a decimal/);
+    },
+  );
 });

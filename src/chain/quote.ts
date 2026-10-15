@@ -233,6 +233,15 @@ function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Sl
   }
 }
 
+/** The response answers THIS request's chain: a replica/LB mixup serving another chain's quote
+ *  would otherwise price (and floor) the wrong assets. A wire-sourced mismatch is the client's
+ *  to classify: `transport`, retryable. */
+function checkChainId(what: string, want: number, got: unknown): void {
+  if (got !== want) {
+    throw new ChainError('transport', `${what} response is for chain ${String(got)}, not ${want}`);
+  }
+}
+
 /** `POST /v1/chain/quote`. */
 export async function chainQuote(
   req: ChainQuoteRequest,
@@ -247,6 +256,7 @@ export async function chainQuote(
   if (!raw || typeof raw.block?.number !== 'number') {
     throw new ChainError('transport', 'chain/quote response is missing its block');
   }
+  checkChainId('chain/quote', req.chain_id, raw.chain_id);
   const key = `q:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}`;
   acceptBlock(key, raw.block.number);
   for (const a of raw.amounts) {
@@ -271,6 +281,7 @@ export async function chainRoute(
   if (!raw || typeof raw.block?.number !== 'number') {
     throw new ChainError('transport', 'chain/route response is missing its block');
   }
+  checkChainId('chain/route', req.chain_id, raw.chain_id);
   const key = `r:${req.chain_id}:${req.token_in.toLowerCase()}:${req.token_out.toLowerCase()}:${req.amount_in.toLowerCase()}`;
   acceptBlock(key, raw.block.number);
   checkRouteShape(req, raw);

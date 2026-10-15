@@ -67,6 +67,11 @@ export interface TransportOpts {
   // first endpoint that answers sets it: the ring is one chain either way, and a public URL
   // re-pointed at another network is evicted instead of answering reads as truth.
   chainId?: number;
+  // Re-probe an attested endpoint every this many ms (default 5 min; 0 disables). Attestation
+  // was once-per-endpoint, so a public URL re-pointed at another network AFTER its probe
+  // answered reads as truth until restart (SA-C10-18). A mismatch on re-probe evicts the
+  // endpoint, exactly like the first probe.
+  attestIntervalMs?: number;
   // batch:false disables coalescing; otherwise the prepared batch flushes on whichever fires
   // first: {wait} ms since the first enqueue (default 0 = same tick / microtask), {max}
   // requests per round-trip (default 100), or {maxBytes} approx serialized request bytes
@@ -141,12 +146,20 @@ export function httpTransport(
   }
 
   // Endpoint attestation. A public RPC URL has no identity; the one checkable fact is that it
-  // ANSWERS AS the expected chain. Attested once per endpoint and cached; a transport failure
-  // during the probe is retried later, a mismatch evicts the endpoint from the ring for good.
+  // ANSWERS AS the expected chain. Attested before first use and re-probed every
+  // `attestIntervalMs`; a transport failure during the probe is retried later, a mismatch evicts
+  // the endpoint from the ring for good.
   let chain = opts.chainId;
+  const attestIntervalMs = opts.attestIntervalMs ?? 5 * 60_000;
   const attested = new Map<string, Promise<boolean>>();
+  const attestedAt = new Map<string, number>();
   const attest = (url: string): Promise<boolean> => {
     let p = attested.get(url);
+    if (p && attestIntervalMs > 0 && Date.now() - (attestedAt.get(url) ?? 0) >= attestIntervalMs) {
+      attested.delete(url);
+      attestedAt.delete(url);
+      p = undefined;
+    }
     if (!p) {
       p = fetchRpc(url, { jsonrpc: '2.0', id: ++id, method: 'eth_chainId', params: [] }).then(
         (r) => {
@@ -156,7 +169,11 @@ export function httpTransport(
           return got === chain;
         },
       );
-      p.catch(() => attested.delete(url));
+      attestedAt.set(url, Date.now());
+      p.catch(() => {
+        attested.delete(url);
+        attestedAt.delete(url);
+      });
       attested.set(url, p);
     }
     return p;

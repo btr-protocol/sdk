@@ -298,4 +298,33 @@ describe('httpTransport attests every endpoint before its first use', () => {
       RpcNetworkError,
     );
   });
+
+  // SA-C10-18. Attestation was once-per-endpoint: a public URL re-pointed at another network
+  // after its probe answered reads as truth until restart. Past the interval the probe runs
+  // again, and a mismatch evicts like the first probe.
+  test('an endpoint re-pointed at another chain is evicted on re-probe', async () => {
+    let chain = '0x1';
+    let probes = 0;
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') {
+        probes++;
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: chain }), {
+          status: 200,
+        });
+      }
+      return ok(body);
+    });
+    const p = httpTransport('http://rpc', { chainId: 1, retryDelay: 1, attestIntervalMs: 5 });
+    expect(await p.request({ method: 'eth_call', params: [] })).toBe('0xok');
+    expect(probes).toBe(1);
+    expect(await p.request({ method: 'eth_call', params: ['same-interval'] })).toBe('0xok');
+    expect(probes).toBe(1); // cached within the interval
+    await new Promise((r) => setTimeout(r, 10));
+    chain = '0x64'; // re-pointed after attestation
+    await expect(p.request({ method: 'eth_call', params: ['after-repoint'] })).rejects.toThrow(
+      /no endpoint attests chain/,
+    );
+    expect(probes).toBe(2); // re-probed, mismatched, evicted
+  });
 });

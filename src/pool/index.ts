@@ -12,6 +12,7 @@ import type {
 } from '../abis/structs.generated.js';
 import { decodeFn, encodeFn } from '../eth/abi';
 import { multicallStrict } from '../eth/multicall';
+import { getChainId } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { toAsset } from './asset.js';
 
@@ -314,11 +315,15 @@ interface SwapParams {
   recipient: Address;
   /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
+  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  expectedChainId?: number;
 }
 
 interface DepositParams {
   token: Address;
   amount: bigint;
+  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  expectedChainId?: number;
 }
 
 interface WithdrawParams {
@@ -327,6 +332,22 @@ interface WithdrawParams {
   minAmountOut: bigint;
   /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
+  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  expectedChainId?: number;
+}
+
+/** Pre-send chain guard: a wallet that switched networks after the quote would otherwise send
+ *  the same calldata on the wrong chain. The front checks this too; the SDK refuses here so a
+ *  direct caller is bound as well. Same wording as `signTransaction`'s `expectedChainId`. */
+async function checkExpectedChain(
+  provider: Eip1193Provider,
+  expectedChainId: number | undefined,
+): Promise<void> {
+  if (expectedChainId === undefined) return;
+  const chainId = await getChainId(provider);
+  if (chainId !== expectedChainId) {
+    throw new Error(`chain mismatch: endpoint reports ${chainId}, expected ${expectedChainId}`);
+  }
 }
 
 /**
@@ -338,6 +359,7 @@ export async function swap(
   poolAddress: Address,
   params: SwapParams,
 ): Promise<Hex> {
+  await checkExpectedChain(provider, params.expectedChainId);
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'swap_qe',
@@ -373,6 +395,7 @@ export async function deposit(
   poolAddress: Address,
   params: DepositParams,
 ): Promise<Hex> {
+  await checkExpectedChain(provider, params.expectedChainId);
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'deposit',
@@ -399,6 +422,7 @@ export async function withdraw(
   poolAddress: Address,
   params: WithdrawParams,
 ): Promise<Hex> {
+  await checkExpectedChain(provider, params.expectedChainId);
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'withdraw',

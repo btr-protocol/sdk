@@ -153,6 +153,11 @@ export interface PlanLegOpts {
   nativeIn?: boolean;
   /** User wants the gas token back: the last leg of every part unwraps after it swaps. */
   nativeOut?: boolean;
+  /** Chain's wrapped-native address, binding the native flags to a token identity. When supplied,
+   *  a `nativeIn` plan must enter on this ONE token and a `nativeOut` plan must deliver it;
+   *  anything else is no plan. Without it only singularity is checked (the direct path still
+   *  binds each leg at build time in `validateLegs`), so callers that know the chain pass it. */
+  wrappedNative?: Address;
   /** EXACT input size in base units - the same bigint the caller's balance guard compared against
    *  `balanceOf`, and the amount the wallet is actually asked to part with. Supply it whenever it
    *  is known.
@@ -910,9 +915,23 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
 
   // A gas-token swap is single-asset on that side by definition — the user pays or is paid in the
   // one native token. More than one input (or output) with the flag set means the plan and the
-  // flag disagree, and guessing which to believe is how you wrap the wrong amount.
+  // flag disagree, and guessing which to believe is how you wrap the wrong amount. And the flag
+  // alone does not name the token: when the caller supplies `wrappedNative`, the single input
+  // (output) must BE it, or the wrap would fund — the unwrap would burn from — an unrelated
+  // contract (the direct path enforces the same per leg in `validateLegs`).
   if (opts.nativeIn && inputs.size !== 1) return null;
   if (opts.nativeOut && floors.length !== 1) return null;
+  const wnative = opts.wrappedNative?.toLowerCase();
+  if (wnative) {
+    if (opts.nativeIn) {
+      const [only] = inputs;
+      if (only !== wnative) return null;
+    }
+    if (opts.nativeOut) {
+      const [only] = floors;
+      if (only?.token.toLowerCase() !== wnative) return null;
+    }
+  }
 
   return {
     parts,
