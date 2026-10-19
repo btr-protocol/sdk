@@ -41,6 +41,24 @@ export interface QuotedAmount {
   min_out: string;
 }
 
+/**
+ * Why a quote amount has no price. `inflow_capped`: `ThresholdViolation(reservesAfter, cap)`, the
+ * pool's always-on inflow cap (`R + amountIn <= k·L`, k 1.5 PEGGED / 2.0 otherwise). A quote
+ * carries no `minOut`, so the selector's slippage meaning cannot occur here; the A-188 overshoot
+ * and route-maxDev reverts share it and are rare next to the cap. The input leg cannot be told
+ * from the output leg by args, so `cap` is the bound the revert reported, not necessarily the input's.
+ */
+export type RefusalReason = 'inflow_capped' | 'other';
+
+export function refusalReason(r: Refused): RefusalReason {
+  return r.name === 'ThresholdViolation' ? 'inflow_capped' : 'other';
+}
+
+/** The `cap` word of a `ThresholdViolation(reached, cap)` refusal; null for any other revert. */
+export function refusedCap(r: Refused): bigint | null {
+  return r.name === 'ThresholdViolation' && r.args.length >= 2 ? BigInt(r.args[1]!) : null;
+}
+
 type QuoteAmountResult = QuotedAmount | { refused: Refused };
 
 export function isRefused(a: QuoteAmountResult): a is { refused: Refused } {

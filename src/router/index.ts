@@ -178,7 +178,8 @@ export interface PlanLegOpts {
    *  across the parts landing the same token (`planToLegs`), and a two-leg part scales its
    *  intermediate hop; only the delivered token's floor is server-authored. A chained hop 2 is
    *  then funded at `leg1Quoted·(1−tol)` and floored at ≈ `leg2Quoted·(1−tol)`: ZERO margin, so
-   *  adverse drift after hop 1 mines reverts `ThresholdViolation`. Route cross parts through
+   *  adverse drift after hop 1 mines reverts `ThresholdViolation` (as does an input past the pool's
+   *  inflow cap, same selector: size parts under `k·L − R`, never read it as slippage). Route cross parts through
    *  `planToRouterPlan` where the aggregate floor is enforced once. REQUIRED for a chained part:
    *  `planToLegs` returns null rather than author a hop-2 floor of its own (`slippageFrac` floors
    *  direct legs only). */

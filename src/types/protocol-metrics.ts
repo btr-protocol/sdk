@@ -273,6 +273,8 @@ interface LegFlags {
   flash: boolean;
   exotic: boolean;
   depositGated: boolean;
+  /** `PEGGED_BIT` (bit 3): inflow cap 1.5·L (else 2.0·L) and the lower κ floor. */
+  pegged: boolean;
 }
 
 /** One leg's live risk parameters, in display units (bps, whole tokens). Null = not read. */
@@ -402,6 +404,7 @@ export interface PoolRiskParams {
     swapsOff: number;
     flashOn: number;
     depositGated: number;
+    pegged: number;
     feedGated: number;
   };
   /** Null = the leg's getAsset did not read. */

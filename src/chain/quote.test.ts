@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { ChainError } from './errors.js';
-import { type ChainQuoteResponse, chainQuote, chainRoute, resetChainClientState } from './quote.js';
+import {
+  type ChainQuoteResponse,
+  chainQuote,
+  chainRoute,
+  refusalReason,
+  refusedCap,
+  resetChainClientState,
+} from './quote.js';
 
 const realFetch = globalThis.fetch;
 
@@ -328,5 +335,19 @@ describe('chain route shape', () => {
   ] as const)('refuses %s', async (_, b) => {
     stub(b);
     expect(await kindOf()).toBe('transport');
+  });
+});
+
+describe('refusal reason', () => {
+  const w = (n: number) => `0x${n.toString(16).padStart(64, '0')}`;
+  test('ThresholdViolation reads as the inflow cap and exposes its bound', () => {
+    const r = { name: 'ThresholdViolation', selector: '0x00000000', args: [w(300), w(200)] };
+    expect(refusalReason(r)).toBe('inflow_capped');
+    expect(refusedCap(r)).toBe(200n);
+  });
+  test('any other revert is not a cap', () => {
+    const r = { name: 'StaleData', selector: '0x00000000', args: [] };
+    expect(refusalReason(r)).toBe('other');
+    expect(refusedCap(r)).toBeNull();
   });
 });
