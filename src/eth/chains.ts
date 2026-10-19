@@ -195,8 +195,8 @@ export const CHAINS: Record<number, ChainConfig> = {
     id: 5042002,
     name: 'Arc Testnet',
     // Order lives in chains.json, not here: blockdaemon leads because it takes the 20k-block
-    // eth_getLogs span the admin safety scan sends; rpc.testnet.arc.network caps it near 10k.
-    // Never reintroduce invented hosts (rpc.testnet.arc.io, rpc.drpc.testnet.arc.io).
+    // eth_getLogs span the admin safety scan sends; rpc.testnet.arc.io caps it near 10k.
+    // *.testnet.arc.network is retired (NXDOMAIN since 2026-10-18): Arc serves these from arc.io.
     rpcUrls: rpcs(5042002),
     // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },

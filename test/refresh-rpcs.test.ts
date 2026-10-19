@@ -174,7 +174,8 @@ test("trusted: a chain's own hosts and publicnode, nothing that merely contains 
   expect(trusted(1, 'https://ethereum-rpc.publicnode.com')).toBe(true);
   expect(trusted(143, 'https://monad.xyz.evil.example')).toBe(false);
   expect(trusted(1, 'https://eth.drpc.org')).toBe(false);
-  expect(trusted(5042, 'https://rpc.mainnet.arc.io')).toBe(false); // arc.io is not a listed owner
+  expect(trusted(5042, 'https://rpc.mainnet.arc.io')).toBe(true); // Arc moved its RPCs to arc.io (2026-10)
+  expect(trusted(5042, 'https://arc.io.evil.example')).toBe(false);
 });
 
 // A refresh must diff only its rows: render() has to reproduce the file's own layout. Runs on the

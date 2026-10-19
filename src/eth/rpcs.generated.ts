@@ -13,5 +13,5 @@ export const CHAIN_RPCS: Readonly<Record<number, readonly string[]>> = {
   8453: ['https://base-rpc.publicnode.com', 'https://developer-access-mainnet.base.org'],
   42161: ['https://arbitrum-one-rpc.publicnode.com', 'https://arb1.arbitrum.io/rpc'],
   43114: ['https://avalanche-c-chain-rpc.publicnode.com', 'https://rpc-avalanche.blockmachine.io'],
-  5042002: ['https://rpc.blockdaemon.testnet.arc.network', 'https://rpc.testnet.arc.network'],
+  5042002: ['https://rpc.blockdaemon.testnet.arc.io', 'https://rpc.testnet.arc.io'],
 };
