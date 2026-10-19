@@ -47,6 +47,7 @@ describe('hubEndpointWire', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      flags: 0,
     });
   });
 });
@@ -81,6 +82,15 @@ describe('poolStateToWire', () => {
     expect(w.base_kappa_cov_bps).toBeNull();
     // The per-leg balance copy still fills reserves: it is a capacity number, not an endpoint.
     expect(w.base_reserves).toBe('0x2e90edd000');
+  });
+
+  test('Asset.flags reach the wire for spokes and hub (PEGGED => 1.5x cap in back)', () => {
+    const st = state({ ...HUB, flags: 8 });
+    for (const l of Object.values(st.legs)) l.flags = 8;
+    const w = poolStateToWire('p', undefined, st, meta, 6);
+    expect(w.base_flags).toBe(8);
+    expect(w.spokes[0].flags).toBe(8);
+    expect(poolStateToWire('p', undefined, state(HUB), meta, 6).spokes[0].flags).toBe(0);
   });
 
   test('unknown confidence goes out null, never a fail-open zero', () => {
@@ -150,6 +160,7 @@ describe('legToQuoteBody', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      flags: 0,
     });
   });
 
@@ -160,6 +171,7 @@ describe('legToQuoteBody', () => {
       liabilities: '0x0',
       vega_bps: 0,
       kappa_cov_bps: 0,
+      flags: 0,
     });
   });
 

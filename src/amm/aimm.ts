@@ -244,6 +244,8 @@ export interface PoolLeg {
   uoa?: boolean;
   baseMark?: number;
   baseRefBandBps?: number;
+  /** The leg's `Asset.flags` word (PEGGED bit 3 => back applies the 1.5x inflow cap, else 2.0x; bit 0 halts). Absent = 0. */
+  flags?: number;
 }
 
 /** The hub's own book. It is an ENDPOINT, not a spoke: it carries liabilities, a coverage wall
@@ -253,6 +255,8 @@ interface HubBook {
   liab: number;
   vegaBps: number;
   kappaCovBps: number;
+  /** The hub's `Asset.flags` word; absent = 0. */
+  flags?: number;
 }
 
 export interface PoolState {
@@ -399,6 +403,8 @@ interface SpokeWire {
   internal: boolean;
   peg_mark: string | null;
   decimals?: number;
+  /** `Asset.flags`: back reads PEGGED (bit 3) off it for the inflow cap. */
+  flags: number;
 }
 /**
  * One ENDPOINT of a swap path: the wire form of the chain's `PricingLib.EndpointCache`.
@@ -415,6 +421,8 @@ interface EndpointWire {
   liabilities: string;
   vega_bps: number;
   kappa_cov_bps: number;
+  /** `Asset.flags` of the endpoint (PEGGED => 1.5x inflow cap on its input); absent = 0. */
+  flags?: number;
 }
 export interface NamedPoolWire {
   tag: string;
@@ -427,6 +435,8 @@ export interface NamedPoolWire {
   base_liabilities?: string | null;
   base_vega_bps?: number | null;
   base_kappa_cov_bps?: number | null;
+  /** The hub's `Asset.flags` (PEGGED => 1.5x cap on a buy's input). */
+  base_flags?: number;
   /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
    *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
   base_decimals?: number | null;
@@ -694,6 +704,8 @@ interface QuoteRequestWire {
   peg_mark: string | null;
   base_mark: string | null;
   base_ref_band_bps: number;
+  /** The leg's `Asset.flags` (see {@link SpokeWire}). */
+  flags: number;
 }
 
 /** One hop of a {@link quotePathAsync} request: a `/quote` body plus the hop's own scales. */
@@ -727,6 +739,7 @@ export const INTERIOR_ENDPOINT: EndpointWire = {
   liabilities: '0x0',
   vega_bps: 0,
   kappa_cov_bps: 0,
+  flags: 0,
 };
 
 /**
@@ -741,6 +754,7 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
     liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
+    flags: hub.flags ?? 0,
   };
 }
 
@@ -781,6 +795,7 @@ export function legToQuoteBody(
     confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
+    flags: leg.flags ?? 0,
     ...depegWire(leg),
   };
 }
@@ -908,6 +923,7 @@ export function poolStateToWire(
     base_liabilities: hub?.liabilities ?? null,
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
+    base_flags: hub?.flags ?? 0,
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
     spokes: Object.values(state.legs).map((leg) => ({
@@ -931,6 +947,7 @@ export function poolStateToWire(
       internal: leg.internal ?? false,
       peg_mark: pegMarkWire(leg),
       decimals: leg.decimals,
+      flags: leg.flags ?? 0,
     })),
   };
 }
