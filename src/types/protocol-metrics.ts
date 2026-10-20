@@ -88,6 +88,8 @@ export interface YieldRates {
   apy: number | null;
   /** Average LP-claim USD base the rates are over: the weight when blending rates. */
   liabilitiesUsd: number | null;
+  /** Any leg under this scope is hooked. false ⇒ "No hook" whatever `strategyApr` reads. */
+  hooked: boolean;
 }
 
 /** Minimum shape required to display yield without fabricating totals. */
@@ -97,7 +99,6 @@ export interface AprLegs extends YieldRates {
 
 /** Asset-scope yield extras. */
 export interface AssetYield {
-  hooked: boolean;
   /** The hook's non-diluted venue supply rate; null if unhooked or unmeasured. */
   venueApr: number | null;
   /** Window the fee rate covers; shorter than requested for a young pool. */
