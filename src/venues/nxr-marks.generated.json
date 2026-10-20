@@ -8,6 +8,14 @@
       "symbol": "USDT-USDC"
     }
   },
+  "USDT0": {
+    "usd": {
+      "symbol": "USDT-USD"
+    },
+    "usdc": {
+      "symbol": "USDT-USDC"
+    }
+  },
   "USDE": {
     "usd": {
       "symbol": "USDE-USD"

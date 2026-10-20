@@ -63,6 +63,9 @@ interface NxrMark extends NxrPair {
   usdc?: NxrPair;
   /** Weekly open windows; absent = 24/7. */
   session?: MarketSession;
+  /** Market-data base when the display tape is the underlying, not `nxrSymbol`'s base (cbBTC charts
+   *  on BTC: NXR has no CBBTC ticker). Never feeds the oracle mark. */
+  mdBase?: string;
   /** Plausibility window for a seed mid, in units of `nxrSymbol`. A SCALE guard, deliberately wide:
    *  it catches a 1e3 fat-finger or an inverted pair, not a market move. Absent ⇒ the caller applies
    *  its peg band, so a non-peg asset MUST carry one or it fails at 0.98. */
@@ -86,6 +89,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // pool that consumes the mark as attested, and only the five Arc lists carry one. USDT and
   // RLUSD are quoted in USDC outright; NXR composes any other `-USDC` cross from its USD tickers.
   USDT: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
+  /** Monad's USDT0 is USDT: one tape. */
+  USDT0: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
   USDE: PEG_STABLE('USDE-USD'),
   USDS: PEG_STABLE('USDS-USD', { nxrSymbol: 'USDS-USDC' }),
   DAI: PEG_STABLE('DAI-USD'),
@@ -119,7 +124,7 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   WETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
   WBTC: { nxrSymbol: 'WBTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
   // Separate signed marks include the independently corroborated wrapper premium.
-  CBBTC: { nxrSymbol: 'CBBTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
+  CBBTC: { nxrSymbol: 'CBBTC-USDC', mdBase: 'BTC', band: [20_000, 500_000], refUsd: 63_800 },
   BNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   XAUT: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
   // Monad legs. MITCH ids per monad.manifest.json (probed 2026-09-29): WMON 457965716382941184 =
@@ -227,6 +232,12 @@ export const NXR_MARKS: Record<string, NxrMark> = {
  */
 export function nxrMark(symbol: string): NxrMark | null {
   return NXR_MARKS[symbol.replace(/\.b$/i, '').toUpperCase()] ?? null;
+}
+
+/** NXR base symbol for charts/tickers/stream of a roster leg (`WETH`→`ETH`, `cbBTC`→`BTC`, `WMON`→`MON`); the leg's own symbol when unlisted. */
+export function mdBase(symbol: string): string {
+  const m = nxrMark(symbol);
+  return m ? (m.mdBase ?? m.nxrSymbol.split('-')[0]) : symbol;
 }
 
 /** The unit a chain's pools consume a mark in: its `quoteUnit` column, not a preference. */

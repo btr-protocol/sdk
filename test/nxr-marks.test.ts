@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { NXR_MARKS, closedUntil, nxrMark, nxrPair } from '../src/venues/nxr';
+import { NXR_MARKS, closedUntil, mdBase, nxrMark, nxrPair } from '../src/venues/nxr';
 import { chainVenue } from '../src/venues/registry';
 
 /**
@@ -197,4 +197,23 @@ test('custodial BTC wrappers use distinct signed asset identities', () => {
   expect(nxrPair('WBTC', 'USDC')!.nxrSymbol).toBe('WBTC-USDC');
   expect(nxrPair('CBBTC', 'USDC')!.nxrSymbol).toBe('CBBTC-USDC');
   expect(nxrMark('WBTC')!.nxrSymbol).not.toBe(nxrMark('CBBTC')!.nxrSymbol);
+});
+
+test('mdBase: charts/tickers key on the NXR ticker, not the roster leg', () => {
+  const want: Record<string, string> = {
+    USDC: 'USDC',
+    USDT0: 'USDT',
+    WETH: 'ETH',
+    WMON: 'MON',
+    CBBTC: 'BTC',
+    cbBTC: 'BTC',
+    WBTC: 'WBTC',
+    XAUT0: 'XAUT',
+    MUSD: 'MUSD',
+    AUSD: 'AUSD',
+    GHO: 'GHO',
+    USDE: 'USDE',
+  };
+  for (const [leg, base] of Object.entries(want)) expect(mdBase(leg)).toBe(base);
+  expect(mdBase('NOPE')).toBe('NOPE');
 });
