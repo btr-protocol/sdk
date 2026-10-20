@@ -107,6 +107,20 @@ export interface AssetYield {
   hookWindowMs: number | null;
 }
 
+/** A yield-hook leg's on-chain buffer curve. Amounts in token units, rates in bps. */
+export interface HookCurve {
+  /** Reserves at or below which the whole leg stays liquid (target 100%). */
+  tMin: number;
+  /** Reserves where the liquid-share target equals `l0Bps`. */
+  t0: number;
+  l0Bps: number;
+  lMinBps: number;
+  /** Band half-width: invest while liquid > L(1+w), pull while liquid < L(1-w). */
+  wBps: number;
+  /** Invested-book cap; null when uncapped. */
+  maxInvested: number | null;
+}
+
 export interface AssetProtocolMetrics extends AprLegs, AssetYield {
   symbol: string;
   token: string | null;
@@ -124,6 +138,8 @@ export interface AssetProtocolMetrics extends AprLegs, AssetYield {
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
   tollUsd?: number | null;
   oracleAgeSec: number | null;
+  /** Hook buffer curve; null when unhooked or unread. Absent from a back that predates it. */
+  hookCurve?: HookCurve | null;
 }
 
 export interface PoolProtocolMetrics extends AprLegs {
