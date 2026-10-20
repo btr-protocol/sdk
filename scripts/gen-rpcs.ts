@@ -7,7 +7,7 @@
  * residual reads, where a long list is a long list of third parties seeing a user's address. The
  * file's order is the back's (capacity), so the pick is NOT just the first two: not `paid`, and
  * ranked, among `browser` rows (any row when a chain has none), trusted host (see `lib/rpcUrl.ts`) with a real batch (`batch_max` >= 16, or unmeasured)
- * first, trusted next, wide-batch next, then the rest, ties in file order. The browser's multicall
+ * first, wide-batch next, then trusted narrow, then the rest, ties in file order. The browser's multicall
  * coalescer sends wide batches, so `test/refresh-rpcs.test.ts` fails when a SERVED chain's picks
  * cannot take one. Every pick must pass `unusable`: a hand-edited key or http URL fails the run
  * rather than reaching a public file, a CSP header and a wallet prompt. The output is committed (a
@@ -31,7 +31,7 @@ export function rpcsFromChains(file: { rpc: Record<string, Row[]> }): Record<num
     const rank = (r: Row) => {
       const url = norm(typeof r === 'string' ? r : r.url);
       const wide = typeof r === 'string' || !r.batch_max || r.batch_max >= MIN_BATCH;
-      return (trusted(Number(id), url) ? 0 : 2) + (wide ? 0 : 1);
+      return (wide ? 0 : 2) + (trusted(Number(id), url) ? 0 : 1);
     };
     // Browser-callable rows only (`"browser": true`: a page on btr.markets passed CORS against
     // them). A chain with none falls back to any row: its list is a wallet prompt, and an
