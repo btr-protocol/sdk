@@ -84,7 +84,10 @@ export interface YieldRates {
   tollApr: number | null;
   /** `feeApr + strategyApr`; null when a hooked leg's hook part is unmeasured, even if `feeApr` exists. */
   apr: number | null;
-  /** Compounded `apr` over the effective window: the headline. */
+  /**
+   * Compounded `apr` over the effective window. null when `apr` is above 100% (compounding is
+   * meaningless) or the window is under 24h, even though `apr` is set: read `apr` then.
+   */
   apy: number | null;
   /** Average LP-claim USD base the rates are over: the weight when blending rates. */
   liabilitiesUsd: number | null;
@@ -187,7 +190,10 @@ export interface ProtocolKpis extends YieldRates {
 
 export interface ProtocolMetricsSummary {
   chainId: number;
-  window: MetricsWindow;
+  /** The preset label of `windowMs`; null for a free-form window. */
+  window: MetricsWindow | null;
+  /** The window every rate and flow in this response covers (default 7d, same as `/pools/metrics`). */
+  windowMs?: number;
   asOf: number;
   source: MetricsSource;
   stale: boolean;
