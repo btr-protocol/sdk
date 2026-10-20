@@ -82,8 +82,9 @@ export const HALT_MASK = 5;
 export const HALT_SETTABLE_MASK = 1;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 65397;
+export const KNOWN_FLAGS_MASK = 65405;
 export const LIABILITY_SWAP_ENABLED_BIT = 32;
+export const PEGGED_BIT = 8;
 export const SWAP_ENABLED_BIT = 16;
 export const SWAP_GATED_BIT = 1024;
 export const TOKEN_EXOTIC_BIT = 256;
@@ -95,10 +96,14 @@ export const INDEX_REASON_WRITEDOWN = 3;
 export const INDEX_REASON_YIELD = 1;
 export const MAX_CONFIDENCE_HALT_BPS = 1000;
 export const MAX_DISPERSION_PBPS = 900000;
+export const MIN_KAPPA_COV_BPS = 50;
+export const MIN_KAPPA_COV_BPS_PEGGED = 10;
 export const ORACLE_MODE_EXTERNAL = 0;
 export const ORACLE_MODE_INTERNAL = 1;
+export const PEG_CAP_BPS = 15000;
 export const QUOTE_UNIT_ANCHOR = 0;
 export const QUOTE_UNIT_UOA = 1;
+export const VOL_CAP_BPS = 20000;
 
 // Staleness (PricingLib).
 export const MAX_STALE_GRACE_SECS = 30;
