@@ -8,6 +8,14 @@ import {
 } from './tokens';
 
 describe('resolveTokenAlias', () => {
+  test('Monad stable identities retain their six-decimal scale and display symbols', () => {
+    for (const s of ['AUSD', 'mUSD', 'USDT']) {
+      expect(getTokenAddress(s, 143)).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(TOKENS[canonicalTokenSymbol(s)].decimals).toBe(6);
+    }
+    expect(TOKENS.MUSD.symbol).toBe('mUSD');
+    expect(TOKENS.USDT.symbol).toBe('USDT');
+  });
   test.each([
     ['WETH', 'ETH'],
     ['weth', 'ETH'],

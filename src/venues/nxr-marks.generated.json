@@ -90,6 +90,14 @@
       "symbol": "AUSD-USD"
     }
   },
+  "MUSD": {
+    "usd": {
+      "symbol": "MUSD-USD"
+    },
+    "usdc": {
+      "symbol": "MUSD-USDC"
+    }
+  },
   "USDC": {
     "usd": {
       "symbol": "USDC-USD"

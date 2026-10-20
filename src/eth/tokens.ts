@@ -132,6 +132,7 @@ export const TOKENS: Record<string, TokenMetadata> = {
     decimals: 6,
     addresses: {
       '1': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      '143': '0xe7cd86e13AC4309349F30B3435a9d337750fC82D',
       '56': '0x55d398326f99059fF775485246999027B3197955',
       '999': '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb',
       '8453': '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
@@ -275,10 +276,19 @@ export const TOKENS: Record<string, TokenMetadata> = {
   AUSD: {
     symbol: 'AUSD',
     name: 'Agora Dollar',
-    decimals: 18,
+    decimals: 6,
     addresses: {
       '1': '0x00000000efe302beaa2b3e6e1b18d08d69a9012a',
       '56': '0x00000000efe302beaa2b3e6e1b18d08d69a9012a',
+      '143': '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a',
+    },
+  },
+  MUSD: {
+    symbol: 'mUSD',
+    name: 'MetaMask USD',
+    decimals: 6,
+    addresses: {
+      '143': '0xacA92E438df0B2401fF60dA7E4337B687a2435DA',
     },
   },
 

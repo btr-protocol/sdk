@@ -100,6 +100,7 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   USDTB: PEG_STABLE('USDTB-USD'),
   FDUSD: PEG_STABLE('FDUSD-USD'),
   AUSD: PEG_STABLE('AUSD-USD'),
+  MUSD: PEG_STABLE('MUSD-USD', { nxrSymbol: 'MUSD-USDC' }),
   /** The base's own depeg reference. There is no USDC/USDC identity feed. */
   USDC: PEG_STABLE('USDC-USD'),
   // ── Arc faucet twins. Pool legs that own NO FEED: each borrows an existing one on chain
