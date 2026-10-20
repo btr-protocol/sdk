@@ -193,7 +193,7 @@ export interface ProtocolMetricsSummary {
   /** The preset label of `windowMs`; null for a free-form window. */
   window: MetricsWindow | null;
   /** The window every rate and flow in this response covers (default 7d, same as `/pools/metrics`). */
-  windowMs?: number;
+  windowMs: number;
   asOf: number;
   source: MetricsSource;
   stale: boolean;
