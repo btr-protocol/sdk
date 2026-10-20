@@ -71,24 +71,42 @@ export type ProtocolTimeseriesMetric =
  *  listing stays on GET /v1/liquidity. */
 export type ProtocolLiquidityMetric = 'liq.dep.usd' | 'liq.wd.usd' | 'liq.net.usd' | 'liq.events';
 
-/** Minimum shape required to display APR legs without fabricating totals. */
-export interface AprLegs {
+/**
+ * Server-computed yield at every scope (protocol, pool, asset). Display only: nothing here is
+ * summed, diluted or compounded client-side. `null` = unknown, never 0; a measured 0 is 0.
+ */
+export interface YieldRates {
+  /** Swap-fee APR, simple, annualized over the trailing window. */
   feeApr: number | null;
+  /** Hook APR, already diluted by the invested share. null = unhooked OR hooked and still measuring. */
   strategyApr: number | null;
+  /** Coverage-toll APR. MEMO: restores coverage, not in `apr`. */
+  tollApr: number | null;
+  /** `feeApr + strategyApr`; null when a hooked leg's hook part is unmeasured, even if `feeApr` exists. */
+  apr: number | null;
+  /** Compounded `apr` over the effective window: the headline. */
+  apy: number | null;
+  /** Average LP-claim USD base the rates are over: the weight when blending rates. */
+  liabilitiesUsd: number | null;
+}
+
+/** Minimum shape required to display yield without fabricating totals. */
+export interface AprLegs extends YieldRates {
   stale: boolean;
 }
 
-interface ApyBreakdown {
-  apy: number | null;
-  swapFeeApr: number | null;
-  rehypoApr: number | null;
-  swapFeePct: number | null;
-  rehypoPct: number | null;
-  hookAddress: string | null;
+/** Asset-scope yield extras. */
+export interface AssetYield {
   hooked: boolean;
+  /** The hook's non-diluted venue supply rate; null if unhooked or unmeasured. */
+  venueApr: number | null;
+  /** Window the fee rate covers; shorter than requested for a young pool. */
+  windowMs: number | null;
+  /** Span the hook rate was measured over; can be far shorter than `windowMs` after a rollout. */
+  hookWindowMs: number | null;
 }
 
-export interface AssetProtocolMetrics extends AprLegs {
+export interface AssetProtocolMetrics extends AprLegs, AssetYield {
   symbol: string;
   token: string | null;
   strategyId: string;
@@ -105,7 +123,6 @@ export interface AssetProtocolMetrics extends AprLegs {
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
   tollUsd?: number | null;
   oracleAgeSec: number | null;
-  apy: ApyBreakdown;
 }
 
 export interface PoolProtocolMetrics extends AprLegs {
@@ -134,7 +151,7 @@ export interface PoolProtocolMetrics extends AprLegs {
   assets: AssetProtocolMetrics[];
 }
 
-export interface ProtocolKpis {
+export interface ProtocolKpis extends YieldRates {
   tvlUsd: number | null;
   volumeUsd: number | null;
   swapCount: number | null;
@@ -147,8 +164,6 @@ export interface ProtocolKpis {
   revenueUsd?: number | null;
   protocolSharePct?: number | null;
   coverageAvg: number | null;
-  feeApr: number | null;
-  strategyApr: number | null;
   utilization: number | null;
   investedRatio: number | null;
 }
