@@ -86,5 +86,6 @@ export const POOL_STRUCTS = {
     target: [0, 0],
     flags: [0, 20],
     lastCreditAt: [0, 24],
+    creditBookCode: [0, 28],
   },
 } as const satisfies Record<string, Record<string, readonly [number, number]>>;

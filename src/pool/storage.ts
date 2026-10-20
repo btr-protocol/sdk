@@ -110,6 +110,8 @@ export interface HookSlot {
   flags: number;
   /** Unix seconds of the last `hookCreditYield` rate bucket; 0 until the leg is seeded. */
   lastCreditAt: number;
+  /** `liabilities` after the last credit, float-coded (dex `PoolHooksLib.bookCode`); 0 = primes on the next credit. */
+  creditBookCode: number;
 }
 
 /** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but

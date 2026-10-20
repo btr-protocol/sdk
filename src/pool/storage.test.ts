@@ -120,6 +120,7 @@ test('packed field offsets match the Solidity struct packing', () => {
       target: [0, 0],
       flags: [0, 20],
       lastCreditAt: [0, 24],
+      creditBookCode: [0, 28],
     },
   });
 });

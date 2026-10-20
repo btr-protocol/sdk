@@ -35,7 +35,7 @@ export type FeedDataFields =
 
 export type FeeParamsFields = 'protoSharePct' | 'flashFeePbps' | 'flowCooldownSecs';
 
-export type HookSlotFields = 'target' | 'flags' | 'lastCreditAt';
+export type HookSlotFields = 'target' | 'flags' | 'lastCreditAt' | 'creditBookCode';
 
 export type OracleConfigFields = 'lane' | 'mode' | 'quoteUnit' | 'refBandBps';
 

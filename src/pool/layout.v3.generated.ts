@@ -70,6 +70,7 @@ export const POOL_STRUCTS_V3 = {
     target: [0, 0],
     flags: [0, 20],
     lastCreditAt: [0, 24],
+    creditBookCode: [0, 28],
   },
   Custody: {
     protocolFees: [0, 0],
