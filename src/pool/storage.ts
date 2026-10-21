@@ -369,18 +369,19 @@ const U128 = (1n << 128n) - 1n;
 const field = (w: bigint, shift: number, width: number) =>
   Number((w >> BigInt(shift)) & ((1n << BigInt(width)) - 1n));
 
-/** Decoded `IPool.Custody` (layout v3): one word per leg at `custody` (slot 7). */
+/** Decoded `IPool.Custody`: one word per leg at `custody` (slot 7). Storage version >= 6 meaning;
+ *  on v3-v5 pools the low half is the escrowed `protocolFees` (token units) instead. */
 export interface Custody {
-  /** Escrowed protocol slice of the leg's balance, token units. Includes a permanent 1-wei seed
-   *  once the leg has taken a deposit: claimable = max(protocolFees - 1, 0). */
-  protocolFees: bigint;
+  /** Pending treasury LP shares, priced by `liquidityIndexWad`, not yet minted. Includes a
+   *  permanent seed share once the leg has taken a deposit: claimable = max(treasuryShares - 1, 0). */
+  treasuryShares: bigint;
   /** Tranche out on the leg's hook; `Asset.reserves = R_liq + invested`. */
   invested: bigint;
 }
 
 export function decodeCustody(word: Hex): Custody {
   const w = BigInt(word);
-  return { protocolFees: w & U128, invested: w >> 128n };
+  return { treasuryShares: w & U128, invested: w >> 128n };
 }
 
 /** A `marks` word (layout v3): a feed exactly as the pool prices it, plus, on word 0 only, the

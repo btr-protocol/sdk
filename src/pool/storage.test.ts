@@ -331,9 +331,9 @@ describe('marks words (MarkWordLib)', () => {
     });
   });
 
-  test('custody splits into protocolFees (low) and invested (high)', () => {
+  test('custody splits into treasuryShares (low) and invested (high)', () => {
     const w = `0x${((5_000_000n << 128n) | 123_000_000n).toString(16).padStart(64, '0')}` as const;
-    expect(decodeCustody(w)).toEqual({ protocolFees: 123_000_000n, invested: 5_000_000n });
+    expect(decodeCustody(w)).toEqual({ treasuryShares: 123_000_000n, invested: 5_000_000n });
   });
 });
 
