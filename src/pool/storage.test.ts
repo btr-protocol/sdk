@@ -3,6 +3,7 @@
  * LSB-aligned fields within a 32-byte word.
  */
 import { describe, expect, test } from 'bun:test';
+import { existsSync, readFileSync } from 'node:fs';
 import { buildCurve } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
 import {
@@ -555,6 +556,21 @@ describe('versioned readers', () => {
 });
 
 describe('layout v5', () => {
+  test('slots match the solc layout of dex-evm Pool (skipped without a forge build)', () => {
+    const art = new URL('../../../dex-evm/out/Pool.sol/Pool.json', import.meta.url);
+    if (!existsSync(art)) return;
+    const { storageLayout } = JSON.parse(readFileSync(art, 'utf8'));
+    const ps = Object.values<{ members?: { label: string; slot: string }[] }>(
+      storageLayout.types,
+    ).find((t) => t.members?.some((m) => m.label === 'lpSyms'));
+    for (const m of ps?.members ?? []) {
+      if (m.label.startsWith('__') || m.label in POOL_STORAGE_V5 === false) continue;
+      expect<bigint>(POOL_STORAGE_V5[m.label as keyof typeof POOL_STORAGE_V5]).toBe(BigInt(m.slot));
+    }
+    expect(POOL_STORAGE_V5.lpTag).toBe(14n);
+    expect(POOL_STORAGE_V5.lpSyms).toBe(15n);
+  });
+
   test('store base is keccak256("btr.markstore") - 1', () => {
     expect<bigint>(MARK_STORE.MS).toBe(
       BigInt('0x8fb4340288f7429bd33c13abd02aa3c2145e859f37a071b10e8e034e391167ea') - 1n,

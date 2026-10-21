@@ -3,7 +3,9 @@
 // sits in `Asset` slot 2 and the marks live once, in the Pool impl's `MarkStore`
 // (`MARK_STORE`, one word per lane at `MS + lane`). Slot 6 is reserved too: each curve is an
 // immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `coop` (slot 13) = a leg's
-// `swapCoop` terms, `discBps | rebateBps << 16`. `storage.test.ts` restates it by hand.
+// `swapCoop` terms, `discBps | rebateBps << 16`. `lpTag` (14, receipt branding) and `lpSyms`
+// (15, listed receipt SYMs) are appended at `storageVersion() >= 7`; on a v5/v6 pool both slots read
+// 0. `storage.test.ts` restates it by hand.
 
 /** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
 export const POOL_STORAGE_V5 = {
@@ -24,10 +26,19 @@ export const POOL_STORAGE_V5 = {
   poolAdmin: 10n,
   legs: 12n,
   coop: 13n,
+  lpTag: 14n,
+  lpSyms: 15n,
 } as const;
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
-export const POOL_MAPPINGS_V5 = ['assets', 'custody', 'assetHooks', 'lpTokens', 'coop'] as const;
+export const POOL_MAPPINGS_V5 = [
+  'assets',
+  'custody',
+  'assetHooks',
+  'lpTokens',
+  'coop',
+  'lpSyms',
+] as const;
 
 /**
  * `MarkStore` in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
