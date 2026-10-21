@@ -1,6 +1,5 @@
 /**
- * Push digest + quorum recovery over the V5 golden blob. The blob codec itself is pinned in
- * test/oracle-v5-wire.test.ts.
+ * Push digest + quorum recovery over the V5 golden blob.
  */
 
 import { describe, expect, it } from 'bun:test';

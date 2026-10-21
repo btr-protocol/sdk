@@ -102,7 +102,6 @@ export {
 
 // Token Standards
 export { ERC20_ABI } from './erc20';
-export { ERC4626_ABI } from './erc4626';
 
 // RPC
 export {

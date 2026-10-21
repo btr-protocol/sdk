@@ -2,12 +2,12 @@
  * ExternalOracleV4 - the deployed READ surface.
  *
  * The fleet runs V4 (cyclic clock, no EPOCH). Push paths and events differ per generation and are
- * decoded from raw calldata (`oracle/wire.ts`), never through this ABI.
+ * decoded from raw calldata, never through this ABI.
  * Bundled statically: the transparency page must read the chain with zero server trust, so it
  * cannot depend on the backend ABI service.
  *
  * ! V4 dates a push with a CYCLIC clock (`tsDs` = deciseconds since midnight UTC, no epoch).
- * Reconstruct a v5 source time with `reconSecsFromDs` against the pushing block's timestamp.
+ * Reconstruct a v5 source time against the pushing block's timestamp.
  *
  * Source: dex-evm src/oracles/ExternalOracleV4.sol + NxrSignerSet.sol.
  */

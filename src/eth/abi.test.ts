@@ -83,7 +83,6 @@ describe('no hand-maintained mirrors of on-chain signatures', () => {
       'eth/erc721.ts',
       'eth/erc777.ts',
       'eth/erc1155.ts',
-      'eth/erc4626.ts',
       'eth/erc7540.ts',
       'eth/layerzero-oft.ts',
       'eth/abi.ts', // type declarations, not fragments
