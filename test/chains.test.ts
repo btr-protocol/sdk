@@ -12,10 +12,10 @@ import {
 } from '../src/venues/index.js';
 
 describe('served chains', () => {
-  test('lists BNB, Arc, Monad, live iff a record exists', () => {
+  test('lists the default chain first, live iff a record exists', () => {
     expect(BTR_CHAINS).toEqual([
-      { chainId: 56, slug: 'bnb', status: 'pending' },
       { chainId: 5042002, slug: 'arc', status: 'live' },
+      { chainId: 56, slug: 'bnb', status: 'pending' },
       { chainId: 143, slug: 'monad', status: 'live' },
     ]);
     expect(deployedChainIds()).toEqual([143, 5042002]);

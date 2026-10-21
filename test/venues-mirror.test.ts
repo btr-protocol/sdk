@@ -3,8 +3,8 @@
 import { expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { poolTag, venuesFromRecords } from '../scripts/gen-venues';
-import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
+import { poolTag, servedChains, venuesFromRecords } from '../scripts/gen-venues';
+import { DEPLOYED_VENUES, SERVED_CHAINS } from '../src/venues/deployments.generated';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 if (!existsSync(join(DEX, 'deployments', 'chains.json')))
@@ -12,6 +12,10 @@ if (!existsSync(join(DEX, 'deployments', 'chains.json')))
 
 test('committed table = records', () => {
   expect(DEPLOYED_VENUES).toEqual(venuesFromRecords(DEX));
+});
+
+test('served chains = records, default first', () => {
+  expect(SERVED_CHAINS).toEqual(servedChains(DEX));
 });
 
 test('tags follow the back registry', () => {

@@ -304,3 +304,19 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
     ],
   },
 };
+
+/** Chains the deployment serves, default first (`chains.json`); live iff `DEPLOYED_VENUES` has a record. */
+export const SERVED_CHAINS: ReadonlyArray<{ chainId: number; slug: string }> = [
+  {
+    chainId: 5042002,
+    slug: 'arc',
+  },
+  {
+    chainId: 56,
+    slug: 'bnb',
+  },
+  {
+    chainId: 143,
+    slug: 'monad',
+  },
+];

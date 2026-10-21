@@ -25,9 +25,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Tracking, norm, trusted, unusable } from './lib/rpcUrl';
 
-/** The chains BTR serves or will: BNB, Monad, X Layer, Base, Avalanche, Arbitrum, Ethereum,
- *  Robinhood, Arc (mainnet + testnet), Polygon, HyperEVM. */
-export const CHAIN_IDS = [1, 56, 137, 143, 196, 999, 4663, 5042, 5042002, 8453, 42161, 43114];
 const CHAINLIST = 'https://chainlist.org/rpcs.json';
 const ORIGIN = 'https://btr.markets';
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
@@ -415,8 +412,6 @@ async function main() {
   const target =
     process.env.CHAINS_JSON ?? join(root, '..', 'dex-evm', 'deployments', 'chains.json');
   if (!existsSync(target)) throw new Error(`${target} absent`);
-  const ids = opt('--chains')?.split(',').map(Number) ?? CHAIN_IDS;
-
   const listFile = opt('--chainlist');
   const raw = listFile ? readFileSync(listFile, 'utf8') : await (await fetch(CHAINLIST)).text();
   const all = JSON.parse(raw) as { chainId: number; rpc: { url: string; tracking?: Tracking }[] }[];
@@ -424,6 +419,8 @@ async function main() {
     throw new Error('chainlist: implausible payload, nothing written');
 
   const file = JSON.parse(readFileSync(target, 'utf8')) as Chains;
+  // The chains are the list's own keys; seed a new chain's first rows with `--chains <id>`.
+  const ids = opt('--chains')?.split(',').map(Number) ?? Object.keys(file.rpc).map(Number);
   const extra = Object.keys(file).filter(
     (k) => !['note', 'slugs', 'default', 'rpc', 'rps'].includes(k),
   );

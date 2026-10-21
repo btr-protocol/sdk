@@ -14,7 +14,7 @@
 import type { Address, Hex } from '../eth/index.js';
 import { normalizeAddress } from '../eth/types.js';
 import { mitchFeedId } from '../oracle/mitch.js';
-import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
+import { type ChainVenue, DEPLOYED_VENUES, SERVED_CHAINS } from './deployments.generated.js';
 import { nxrMark } from './nxr.js';
 
 export type VenueKind = 'btr';
@@ -47,20 +47,14 @@ interface BtrChain {
   status: 'live' | 'pending';
 }
 
-/** Every chain the one BTR deployment serves, in default order: BNB first once live, then Arc, then Monad. */
-export const BTR_CHAINS: readonly BtrChain[] = (
-  [
-    [56, 'bnb'],
-    [5042002, 'arc'],
-    [143, 'monad'],
-  ] as const
-).map(([chainId, slug]) => ({
+/** Every chain the one BTR deployment serves, default first (`SERVED_CHAINS`, from `chains.json`). */
+export const BTR_CHAINS: readonly BtrChain[] = SERVED_CHAINS.map(({ chainId, slug }) => ({
   chainId,
   slug,
   status: DEPLOYED_VENUES[chainId] ? 'live' : 'pending',
 }));
 
-/** The first live served chain: Arc until BNB's record lands, then BNB. */
+/** The first live served chain: `chains.json` `.default` when it has a record. */
 export function defaultChainId(): number {
   const c = BTR_CHAINS.find((c) => c.status === 'live');
   if (!c) throw new Error('no served BTR chain has a deployment record');
