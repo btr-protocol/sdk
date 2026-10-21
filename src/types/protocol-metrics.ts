@@ -205,6 +205,15 @@ export interface ProtocolMetricsSummary {
   stale: boolean;
   protocol: ProtocolKpis;
   pools: PoolProtocolMetrics[];
+  /** The same figures over the equal window that ended one window ago (`asOf` = its end), for
+   *  deltas. Null when the store could not answer it. No `hookCurve`, no `oracleAgeSec`. */
+  previous?: {
+    windowMs: number;
+    asOf: number;
+    source: MetricsSource;
+    protocol: ProtocolKpis;
+    pools: PoolProtocolMetrics[];
+  } | null;
 }
 
 export interface TimeseriesPoint {
