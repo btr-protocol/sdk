@@ -206,7 +206,7 @@ async function post(path: string, body: unknown, opts: ChainClientOpts): Promise
 const MAX_TOL_PBPS = 999_000;
 /** `SwapQuote.spreadPbps` is a uint16 BY CONSTRUCTION — `PricingLib.sol` solves its interior swing cap
  *  so a composed fence always fits the field — so this is the widest spread any quote can carry. */
-const MAX_SPREAD_PBPS = 0xffff;
+export const MAX_SPREAD_PBPS = 0xffff;
 
 /** The widest `tol_pbps` the request's own policy can yield server-side (`slippage::floor`):
  *  relative is its clamped pbps, spread is `pct`% of a chain spread that cannot exceed its field.
