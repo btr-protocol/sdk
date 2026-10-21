@@ -922,6 +922,11 @@
             "name": "lastCreditAt",
             "type": "uint32",
             "internalType": "uint32"
+          },
+          {
+            "name": "creditBookCode",
+            "type": "uint32",
+            "internalType": "uint32"
           }
         ]
       }
@@ -1211,7 +1216,13 @@
         "internalType": "uint256"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {

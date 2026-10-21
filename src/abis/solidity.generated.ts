@@ -106,7 +106,7 @@ export const QUOTE_UNIT_UOA = 1;
 export const VOL_CAP_BPS = 20000;
 
 // Staleness (PricingLib).
-export const MAX_STALE_GRACE_SECS = 30;
+export const MAX_STALE_GRACE_SECS = 3;
 export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.
