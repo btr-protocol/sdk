@@ -427,10 +427,10 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       if (leg1Quoted <= 0n) return null;
       const server = opts.serverFloors?.[t2out.address.toLowerCase()];
       const leg2MinOut = serverFloorByPart.get(i);
-      // A chained part is floored by the SERVER or not at all. The old no-server fallback floored
+      // A chained part is floored by the SERVER or not at all. A no-server fallback would floor
       // hop 2 at `q2·(1−s)²` (hop 1's floor funds hop 2, then `s` again on top) while the UI
       // promised `q2·(1−s)`: ~2× the tolerance extractable, authored here. The SDK never authors a
-      // floor (L-43); fail closed and let the caller fetch `/v1/chain/route`.
+      // floor; fail closed and let the caller fetch `/v1/chain/route`.
       if (!server || leg2MinOut === undefined) return null;
       const leg1MinOut = applyTolPbps(leg1Quoted, server.tolPbps);
       const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);

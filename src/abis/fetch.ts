@@ -15,7 +15,7 @@ import lock from '../../abis.lock.json';
  *  integrity available at runtime; a name outside the pinned set still goes to the backend, is
  *  cached for the session only, and is exactly as trusted as the backend is.
  *
- *  PoolFactory and AccessControl are pinned the same way (SA-C10-03): the guardian/safety
+ *  PoolFactory and AccessControl are pinned the same way: the guardian/safety
  *  surfaces read through them, and a backend-served ABI there could suppress a pending upgrade
  *  from view. Every bundled copy is hash-checked against `abis.lock.json` at module load, so a
  *  tampered bundle fails loudly instead of encoding money a different way. */

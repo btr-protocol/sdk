@@ -562,7 +562,7 @@ describe('capacity clamp boundary', () => {
   });
 });
 
-describe('audit regressions', () => {
+describe('market-mint sizing and liability-index conversion', () => {
   test('market-mint deposit is sized at the terminal FLOOR, never the quote or summed hops', async () => {
     const pools = [
       mkPool('a', { AUDF: leg('AUDF') }),
@@ -610,8 +610,8 @@ describe('audit regressions', () => {
   });
 });
 
-/** LEDA-7. The chain settles LP entry and exit at POOL-LEVEL C (LED-A); the per-leg haircut these
- *  routes used to price is gone from the contracts. Hub 2M/2M + AUDF/NZDF at mark 1. */
+/** The chain settles LP entry and exit at POOL-LEVEL C (LED-A); the per-leg haircut these
+ *  routes would price does not exist in the contracts. Hub 2M/2M + AUDF/NZDF at mark 1. */
 describe('LP routes settle at pool C, not at a per-leg haircut', () => {
   test('same-asset exit pays min(c_leg, C): a covered leg in a short pool is capped at C', async () => {
     // hub 1.6M/2M, legs 1M/1M: C = 3.6M / 4M = 0.9. AUDF itself is fully covered.

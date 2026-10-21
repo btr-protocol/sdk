@@ -229,7 +229,7 @@ describe('chain quote client', () => {
     expect(res.best?.floors[0].tol_pbps).toBe(5_000);
   });
 
-  // SA-C10-09. A response for another chain prices (and floors) the wrong assets: rejected as
+  // A response for another chain prices (and floors) the wrong assets: rejected as
   // transport, never priced.
   test('rejects a quote answered for another chain', async () => {
     stub({ ...quoteBody(100), chain_id: 56 });
@@ -257,7 +257,7 @@ describe('chain quote client', () => {
   });
 });
 
-// SA-C10-01: the route wire names its own hops. A part entering on a token the user did not pick,
+// The route wire names its own hops. A part entering on a token the user did not pick,
 // or spending another size, would carry the typed raw amount into a pair nobody asked for.
 describe('chain route shape', () => {
   const TIN = '0x0000000000000000000000000000000000000001';

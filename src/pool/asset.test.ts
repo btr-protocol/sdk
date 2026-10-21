@@ -29,7 +29,7 @@ const row = {
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 
-describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says (A-104)', () => {
+describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says', () => {
   test('the decoder really does hand the uint16 fields back as bigint', () => {
     const raw = decodeFn<Record<string, unknown>>({
       abi: POOL_ABI,

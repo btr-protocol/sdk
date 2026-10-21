@@ -20,7 +20,7 @@ type RlpItem = RlpScalar | readonly RlpItem[];
 function encodeItem(input: RlpItem): Uint8Array {
   // A nested list is a list, not a string: an empty accessList MUST encode as 0xc0. Encoding it
   // as the empty string 0x80 is a different preimage, so the signature is over a payload no node
-  // reconstructs and the transaction is rejected (A-636).
+  // reconstructs and the transaction is rejected.
   if (Array.isArray(input)) return encodeList(input as readonly RlpItem[]);
 
   // Convert to bytes

@@ -299,7 +299,7 @@ describe('httpTransport attests every endpoint before its first use', () => {
     );
   });
 
-  // SA-C10-18. Attestation was once-per-endpoint: a public URL re-pointed at another network
+  // Attestation must repeat: a public URL re-pointed at another network
   // after its probe answered reads as truth until restart. Past the interval the probe runs
   // again, and a mismatch evicts like the first probe.
   test('an endpoint re-pointed at another chain is evicted on re-probe', async () => {

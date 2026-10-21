@@ -111,7 +111,7 @@ describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
   }
 });
 
-// SA-C10-03: the guardian/safety ABIs come from the bundle, hash-verified, never the wire. A
+// The guardian/safety ABIs come from the bundle, hash-verified, never the wire. A
 // backend-served PoolFactory/AccessControl could suppress a pending upgrade from view, so
 // `fetchAbi` must answer these names without a request. Failing `fetch` proves no request.
 describe('fetchAbi serves the pinned guardian ABIs from the bundle', () => {

@@ -4,7 +4,7 @@
  * V5 (`ExternalOracleV4.pushV4` / `pushSignedV4`): 8 x 29-bit lanes, wire v5 DIFF blobs, 11-byte
  * header, 5-byte price entries, `tsDs` = deciseconds since midnight UTC (cyclic, no epoch).
  *
- * V6 (`MarkStore.publishMarks`): 12-byte header (`srcSecs` = ABSOLUTE source second u32, A-262),
+ * V6 (`MarkStore.publishMarks`): 12-byte header (`srcSecs` = ABSOLUTE source second u32),
  * same 5/5/3-byte sections, but the price lane is a self-describing u32 (`exp7:u7 | mant:u25`,
  * `mark = mant << (exp7 - 16)`, no per-feed bias) and `nC == nP` is mandatory: price and conf are
  * walked in lockstep on the same `gi` sequence.

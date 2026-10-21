@@ -30,7 +30,7 @@ export interface WriteOptions {
   gasPrice?: bigint;
   maxFeePerGas?: bigint;
   maxPriorityFeePerGas?: bigint;
-  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16): a wallet switched to
+  /** Refuse to send unless the endpoint reports THIS chain: a wallet switched to
    *  another network after the quote would otherwise sign the same calldata on the wrong chain.
    *  Same check as `signTransaction`'s `expectedChainId`, at the send instead of the preimage. */
   expectedChainId?: number;

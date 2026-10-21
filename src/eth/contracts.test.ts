@@ -1,4 +1,4 @@
-/** SA-C10-19: the placeholder registry never hands out zeroAddress as a target.
+/** The placeholder registry never hands out zeroAddress as a target.
  *
  *  zeroAddress is truthy, so returning it for an undeployed contract lets a future caller treat
  *  "not deployed" as a destination. Undeployed reads as `undefined` — the same answer an unknown

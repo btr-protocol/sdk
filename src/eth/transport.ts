@@ -69,7 +69,7 @@ export interface TransportOpts {
   chainId?: number;
   // Re-probe an attested endpoint every this many ms (default 5 min; 0 disables). Attestation
   // was once-per-endpoint, so a public URL re-pointed at another network AFTER its probe
-  // answered reads as truth until restart (SA-C10-18). A mismatch on re-probe evicts the
+  // answered reads as truth until restart. A mismatch on re-probe evicts the
   // endpoint, exactly like the first probe.
   attestIntervalMs?: number;
   // batch:false disables coalescing; otherwise the prepared batch flushes on whichever fires

@@ -251,7 +251,7 @@ describe('planToLegs routes only through pools the caller vouches for', () => {
   });
 });
 
-// A-926 (no server floor → refused) is pinned in src/router/routerPlan.test.ts.
+// The no-server-floor refusal is pinned in src/router/routerPlan.test.ts.
 test('a chained hop 2 is funded by hop 1 floor and floored on the server number', () => {
   const c = meta.C;
   const amountOut = 98n * 10n ** BigInt(c.decimals);

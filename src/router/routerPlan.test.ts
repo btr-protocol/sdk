@@ -236,7 +236,7 @@ describe('planToRouterPlan', () => {
     expect(rp.unwrapAmount).toBe(rp.floors[0].minOut);
   });
 
-  // SA-C10-08. The native flag alone does not name the token: without the binding a plan
+  // The native flag alone does not name the token: without the binding a plan
   // entering on (or delivering) some other asset would still wrap (unwrap) the user's native.
   test('a native flag bound to the wrong wrapped-native identity is refused', () => {
     const weth = route([P1], ['BNB', 'USDT']);
@@ -721,14 +721,14 @@ describe('planToLegs', () => {
     expect(legs[1].wrapIn).toBeUndefined();
   });
 
-  // A-926. Without a server floor the builder used to floor hop 2 at `q2·(1−s)²` — hop 1's floor
+  // A builder without a server floor would floor hop 2 at `q2·(1−s)²` — hop 1's floor
   // funds hop 2, then `s` again on top — while the UI promised `q2·(1−s)`: ~2× the tolerance
-  // extractable, authored by the SDK. The SDK never authors a floor (L-43): null instead.
+  // extractable, authored by the SDK. The SDK never authors a floor: null instead.
   test('a chained part with no server floor is refused, not floored by the SDK', () => {
     expect(planToLegs(crossPlan, { slippageFrac: 0.01, ...O, nativeIn: true })).toBeNull();
   });
 
-  // SA-C10-02. Hop 2 is encoded as `tmid -> t2out`, so a disjoint part (USDC->DAI, then
+  // Hop 2 is encoded as `tmid -> t2out`, so a disjoint part (USDC->DAI, then
   // USDT->BNB) would be re-chained into USDC->DAI then DAI->BNB — a pair the second pool never
   // quoted. The router path already refused this; the direct path re-chained it silently.
   test('a chained part whose legs do not join is refused, not re-chained', () => {
@@ -951,7 +951,7 @@ describe('server floors — checked against the server amount_out, not the plan 
   });
 });
 
-// SA-C10-01. The plan's legs come off the quote wire. A USDC->USDT request answered with a
+// The plan's legs come off the quote wire. A USDC->USDT request answered with a
 // DAI->USDT route used to be encoded as is: the typed raw USDC amount spent in DAI, approved and
 // pulled from the wallet. Both builders now take the user's pair and refuse any part that does
 // not enter on it and deliver it; floors supplied with none for the delivered token fail closed.

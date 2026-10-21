@@ -189,7 +189,7 @@ describe('formatUnits', () => {
   });
 });
 
-// SA-C10-17. `parseUnits('')` used to return 0n, turning a missing amount into a zero-amount
+// `parseUnits('')` must not return 0n, which would turn a missing amount into a zero-amount
 // send. Plain decimals still parse; everything else throws.
 describe('parseUnits', () => {
   test.each([

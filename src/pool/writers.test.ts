@@ -1,4 +1,4 @@
-/** SA-C10-16: the wallet-path writers refuse a chain the caller did not ask for.
+/** The wallet-path writers refuse a chain the caller did not ask for.
  *
  *  The front checks the wallet chain too, but a direct SDK caller had no guard: a wallet switched
  *  to another network after the quote would send the same calldata on the wrong chain. The check

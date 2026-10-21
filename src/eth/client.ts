@@ -115,7 +115,7 @@ const EMPTY_ACCESS_LIST: readonly never[] = [];
  *  A nonce whose transaction never reached a mempool (estimate or raw-tx send failed) is RELEASED,
  *  and the lowest released nonce at or above the chain count is issued before the tip advances.
  *  The tip is monotone, so without that the hole was permanent and every later transaction from
- *  the sender queued behind it (A-925, a regression of the A-637 lock). */
+ *  the sender queued behind it. */
 type NonceLane = { tip: Promise<bigint | undefined>; free: Set<bigint> };
 const NONCE_LANES = new WeakMap<object, Map<string, NonceLane>>();
 
@@ -161,7 +161,7 @@ function nextNonce(provider: Eip1193Provider, from: Address): Promise<bigint> {
 
 /** Return a nonce to its lane after the transaction signed for it never reached a mempool. The tip
  *  does not move; the next allocation reissues the lowest free nonce at or above the chain count,
- *  so a failed estimate or send heals the lane instead of stranding every later send (A-925). */
+ *  so a failed estimate or send heals the lane instead of stranding every later send. */
 export function releaseNonce(provider: Eip1193Provider, from: Address, nonce: bigint): void {
   laneOf(provider, from).free.add(nonce);
 }
@@ -312,7 +312,7 @@ export function createPrivateKeyClient(
     sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
       // Allocate here, not inside signTransaction, so a failure at ANY step between allocation and
       // broadcast (estimateGas, signing, the raw-tx send) returns the nonce to the lane. Left at
-      // the tip, one such failure stranded every later send behind a hole that never healed (A-925).
+      // the tip, one such failure stranded every later send behind a hole that never healed.
       const explicit = tx.nonce !== undefined;
       const nonce = tx.nonce !== undefined ? BigInt(tx.nonce) : await nextNonce(provider, account);
       try {

@@ -38,7 +38,7 @@ function balancedState(): PoolState {
   };
 }
 
-describe('LEDA-7: the ONE off-chain replica of pool-level settlement', () => {
+describe('the one off-chain replica of pool-level settlement', () => {
   // A USDC hub (mark 1) and a spoke at mark 2: C = (R_hub + R_x·2) / (L_hub + L_x·2).
   const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
     base: 'USDC',

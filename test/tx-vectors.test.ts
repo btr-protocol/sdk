@@ -220,7 +220,7 @@ describe('concurrent signing does not reuse a nonce', () => {
   });
 });
 
-describe('a released nonce heals the lane instead of stranding it (A-925)', () => {
+describe('a released nonce heals the lane instead of stranding it', () => {
   test('the tip did not advance while the nonce was allocated: release reissues it', async () => {
     const p = stub(8453, 12);
     const from = privateKeyToAddress(KEY_01);

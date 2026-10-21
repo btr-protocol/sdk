@@ -312,7 +312,7 @@ describe('quoteFromWire', () => {
     expect(quoteFromWire(w(1 / mid), 6, [], 1)).toBeNull();
   });
 
-  // A-188: a clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
+  // A clamped size is the flat top of the coverage wall, and a UI can only refuse it if the
   // flag survives the wire.
   test('carries the saturation flag, so a flat top is never shown as a price', () => {
     expect(quoteFromWire(wire(true), 18, [], 1)?.saturated).toBe(true);

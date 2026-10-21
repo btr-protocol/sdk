@@ -127,7 +127,7 @@ type ContractName = keyof (typeof CONTRACTS)[SupportedChainId];
 
 /** A placeholder is not an address: zeroAddress is truthy, so returning it lets a future caller
  *  treat "not deployed" as a target and burn a call (or funds) into `0x0`. Undeployed reads as
- *  `undefined`, the same answer an unknown chain already gets (SA-C10-19). */
+ *  `undefined`, the same answer an unknown chain already gets. */
 function live(addr: Address | undefined): Address | undefined {
   return addr === undefined || isZeroAddress(addr) ? undefined : addr;
 }

@@ -213,7 +213,7 @@ export function sanitizeDispersion(minDispersion: number, cap: number): number {
 
 export interface AimmProfile {
   /** BPS. Spread term = σ_path·vega/PBPS (`PricingLib._pathSpread`): 10_000 prices 1 % of σ, the
-   *  uint16 max 6.5 %. Kept on this scale for phase-1 stables (A-005, owner call); dispersion is
+   *  uint16 max 6.5 %. Kept on this scale for phase-1 stables; dispersion is
    *  σ·vega/BPS, so the SAME vega tracks σ 1:1 there. */
   vega: number;
   minFeePbps: number;
@@ -274,7 +274,7 @@ export interface Quote {
   lpFeeBps: number;
   protoFeeBps: number;
   covTollBps: number;
-  /** The delivering leg's gross was clamped at the coverage-wall argmax (A-188): `amountOut` is the
+  /** The delivering leg's gross was clamped at the coverage-wall argmax: `amountOut` is the
    *  flat top of the wall, not a price, so refuse the size rather than display it. */
   saturated?: boolean;
   route: string[];
@@ -449,7 +449,7 @@ interface LegWire {
   token_out: string;
   amount_in: string;
   amount_out: string;
-  /** A-188: clamped at the delivering book's coverage argmax; `amount_out` is not a price. */
+  /** Clamped at the delivering book's coverage argmax; `amount_out` is not a price. */
   saturated: boolean;
 }
 interface SplitPartWire {
@@ -712,7 +712,7 @@ export interface QuoteResponseWire {
   cov_toll: string;
   proto_fee: string;
   lp_fee: string;
-  /** Gross clamped at the coverage argmax (A-188); a size past the overshoot band is an error. */
+  /** Gross clamped at the coverage argmax; a size past the overshoot band is an error. */
   saturated: boolean;
 }
 

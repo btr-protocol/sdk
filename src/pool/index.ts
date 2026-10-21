@@ -315,14 +315,14 @@ interface SwapParams {
   recipient: Address;
   /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
-  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
 }
 
 interface DepositParams {
   token: Address;
   amount: bigint;
-  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
 }
 
@@ -332,7 +332,7 @@ interface WithdrawParams {
   minAmountOut: bigint;
   /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
   deadline?: bigint;
-  /** Refuse to send unless the endpoint reports THIS chain (SA-C10-16). Optional: absent, no check. */
+  /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
 }
 
