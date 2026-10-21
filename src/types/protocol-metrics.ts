@@ -51,6 +51,7 @@ export type ProtocolTimeseriesMetric =
   | 'fee.toll.usd'
   | 'apr.fee'
   | 'apr.strategy'
+  | 'hook.yield.usd'
   | 'tvl.usd'
   | 'depth.usd'
   | 'reserves.usd'
@@ -108,6 +109,11 @@ export interface AssetYield {
   windowMs: number | null;
   /** Span the hook rate was measured over; can be far shorter than `windowMs` after a rollout. */
   hookWindowMs: number | null;
+  /** Realized hook yield in USD over the window (interval-start marks, gross of venue). 0 for an
+   *  unhooked leg, null when a hooked leg has no usable interval. Absent on an older back. */
+  hookYieldUsd?: number | null;
+  /** Some interval was skipped (gap, no mark): `hookYieldUsd` understates. */
+  hookYieldPartial?: boolean;
 }
 
 /** A yield-hook leg's on-chain buffer curve. Amounts in token units, rates in bps. */
@@ -204,6 +210,9 @@ export interface ProtocolMetricsSummary {
 export interface TimeseriesPoint {
   t: number;
   v: number | null;
+  /** `hook.yield.usd` only: a hooked leg in the bucket had a skipped or unmeasured interval, so
+   *  `v` understates (or is a gap). Never a 0. */
+  partial?: boolean;
 }
 
 export interface ProtocolMetricsTimeseries {
