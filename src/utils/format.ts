@@ -97,14 +97,15 @@ export function formatUnits(value: bigint, decimals: number): string {
 }
 
 /** Parse decimal string to token amount (wei). Throws on anything that is not a plain decimal:
- *  empty, whitespace, signs, exponents and garbage used to parse as 0n (`''` split into
+ *  empty, whitespace, signs, exponents and garbage (a trailing or leading dot, `1.` / `.5`, is a
+ *  half-typed amount and parses) used to parse as 0n (`''` split into
  *  `['','']`, `BigInt('')` == 0n), silently turning a missing amount into a zero-amount send. */
 export function parseUnits(value: string, decimals: number): bigint {
   const v = value.trim();
-  if (!/^\d+(\.\d+)?$/.test(v)) throw new Error(`parseUnits: not a decimal '${value}'`);
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(v)) throw new Error(`parseUnits: not a decimal '${value}'`);
   const [intPart, decPart = ''] = v.split('.');
   const padded = decPart.padEnd(decimals, '0').slice(0, decimals);
-  return BigInt(intPart + padded);
+  return BigInt((intPart || '0') + padded);
 }
 
 // ─────────────────────────────────────────────────────────────

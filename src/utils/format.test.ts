@@ -197,14 +197,25 @@ describe('parseUnits', () => {
     ['1', 18, 10n ** 18n],
     ['1.5', 6, 1_500_000n],
     ['  2.25  ', 2, 225n],
+    ['1.', 6, 1_000_000n],
+    ['.5', 6, 500_000n],
+    ['.5', 0, 0n],
   ])('parseUnits(%p, %p) === %p', (value, decimals, expected) => {
     expect(parseUnits(value, decimals)).toBe(expected);
   });
 
-  test.each([[''], ['   '], ['abc'], ['1e5'], ['-1'], ['+1'], ['1,000'], ['1.2.3'], ['0x10']])(
-    'parseUnits(%p) throws instead of inventing 0n',
-    (value) => {
-      expect(() => parseUnits(value, 18)).toThrow(/not a decimal/);
-    },
-  );
+  test.each([
+    [''],
+    ['   '],
+    ['abc'],
+    ['1e5'],
+    ['-1'],
+    ['+1'],
+    ['1,000'],
+    ['1.2.3'],
+    ['0x10'],
+    ['.'],
+  ])('parseUnits(%p) throws instead of inventing 0n', (value) => {
+    expect(() => parseUnits(value, 18)).toThrow(/not a decimal/);
+  });
 });
