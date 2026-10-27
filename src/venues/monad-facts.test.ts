@@ -21,7 +21,11 @@ describe('monad aggregator facts', () => {
   });
 
   test('btr-core roster covers the six aggregator tokens', () => {
-    expect(monad.rosters['btr-core']).toEqual(['USDC', 'WMON', 'CBBTC', 'WBTC', 'WETH', 'XAUT0']);
+    // pool-v2 lists 11 legs: the six live ones plus five stables queued through ADD_ASSET.
+    expect(monad.rosters['btr-core']).toEqual(
+      expect.arrayContaining(['USDC', 'WMON', 'CBBTC', 'WBTC', 'WETH', 'XAUT0']),
+    );
+    expect(monad.rosters['btr-core']).toHaveLength(11);
     expect(monad.tokens).toMatchObject({
       USDC: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603',
       WMON: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
