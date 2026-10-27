@@ -569,6 +569,7 @@ describe('layout v5', () => {
     }
     expect(POOL_STORAGE_V5.lpTag).toBe(14n);
     expect(POOL_STORAGE_V5.lpSyms).toBe(15n);
+    expect([POOL_STORAGE_V5.classHead, POOL_STORAGE_V5.classRisk]).toEqual([16n, 17n]);
   });
 
   test('store base is keccak256("btr.markstore") - 1', () => {

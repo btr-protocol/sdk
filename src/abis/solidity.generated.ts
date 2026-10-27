@@ -32,6 +32,7 @@ export const OpType = {
   SWEEP: 11,
   BACKFILL_LEGS: 12,
   UPDATE_POOL_ADMIN: 13,
+  UPDATE_CLASS_RISK: 14,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 
@@ -82,7 +83,7 @@ export const HALT_MASK = 5;
 export const HALT_SETTABLE_MASK = 1;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 65405;
+export const KNOWN_FLAGS_MASK = 65533;
 export const LIABILITY_SWAP_ENABLED_BIT = 32;
 export const PEGGED_BIT = 8;
 export const SWAP_ENABLED_BIT = 16;
@@ -106,7 +107,7 @@ export const QUOTE_UNIT_UOA = 1;
 export const VOL_CAP_BPS = 20000;
 
 // Staleness (PricingLib).
-export const MAX_STALE_GRACE_SECS = 30;
+export const MAX_STALE_GRACE_SECS = 3;
 export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.

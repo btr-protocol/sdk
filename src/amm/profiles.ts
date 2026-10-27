@@ -1,4 +1,4 @@
-import { type AimmProfile, type QuarticCurve, buildCurve, dispersionCap } from './aimm.js';
+import { type AimmProfile, type QuarticCurve, buildCurve } from './aimm.js';
 
 const BOOTSTRAP_INTERIOR = [2000, 4000, 6000, 8000];
 const rampWQ = (step: bigint): bigint[] =>
@@ -27,14 +27,12 @@ export const STABLE_PROFILE: AimmProfile = {
   curve: BOOTSTRAP_STABLE_CURVE,
 };
 
-// Volatile floor DERIVED from the curve, never picked: `sanitizeDispersion` CHECKS
-// `minDispersion` against `dispersionCap` (10_862 here); a floor above the cap is a
-// pool configuration that cannot exist on chain.
-const VOL_CAP = dispersionCap(BOOTSTRAP_VOLATILE_CURVE);
+// Volatile floor: 2_172 PBPS. It was floor(dispersionCap/5) of the retired interior swing cap; the
+// chain now bounds a floor only by `MAX_DISPERSION_PBPS`, so the value stays as a plain number.
 export const VOLATILE_PROFILE: AimmProfile = {
   ...RISK,
   minFeePbps: 1_000,
-  minDisp: Math.floor(VOL_CAP / 5),
+  minDisp: 2_172,
   curve: BOOTSTRAP_VOLATILE_CURVE,
 };
 

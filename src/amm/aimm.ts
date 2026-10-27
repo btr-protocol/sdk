@@ -191,18 +191,6 @@ export function buildCurve(
   return { m, boundaries, dispRef, flags, segs };
 }
 
-/** `PricingLib.MAX_INTERIOR_SWING_PBPS`: 2·B·P/(2P + B), B = uint16.max / 6 interior legs = 10_922. */
-export const MAX_INTERIOR_SWING_PBPS = 10_862;
-
-const curveSpanQ = (c: QuarticCurve): bigint => evalQ(c, BPS) - evalQ(c, 0);
-
-export function dispersionCap(c: QuarticCurve): number {
-  const span = curveSpanQ(c);
-  if (span <= 0n) throw new Error('flat curve has no dispersion cap');
-  const cap = (BigInt(MAX_INTERIOR_SWING_PBPS) * BigInt(c.dispRef) * QI) / span;
-  return Number(cap > 4294967295n ? 4294967295n : cap);
-}
-
 export function sanitizeDispersion(minDispersion: number, cap: number): number {
   const mn = minDispersion === 0 ? 1000 : minDispersion;
   if (mn > cap || mn > MAX_DISPERSION_PBPS) throw new Error('InvalidConfig: dispersion floor');

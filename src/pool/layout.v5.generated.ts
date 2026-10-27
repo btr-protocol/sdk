@@ -5,7 +5,9 @@
 // immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `coop` (slot 13) = a leg's
 // `swapCoop` terms, `discBps | rebateBps << 16`. `lpTag` (14, receipt branding) and `lpSyms`
 // (15, listed receipt SYMs) are appended at `storageVersion() >= 7`; on a v5/v6 pool both slots read
-// 0. `storage.test.ts` restates it by hand.
+// 0. `classHead` (16, a leg's peg family + default risk row, `ClassHead {uint8 family; uint64 row}`)
+// and `classRisk` (17, `leg => family => row`) are appended at `storageVersion() >= 9`; below 9 both
+// read 0. `storage.test.ts` restates it by hand.
 
 /** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
 export const POOL_STORAGE_V5 = {
@@ -28,6 +30,8 @@ export const POOL_STORAGE_V5 = {
   coop: 13n,
   lpTag: 14n,
   lpSyms: 15n,
+  classHead: 16n,
+  classRisk: 17n,
 } as const;
 
 /** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
@@ -38,6 +42,8 @@ export const POOL_MAPPINGS_V5 = [
   'lpTokens',
   'coop',
   'lpSyms',
+  'classHead',
+  'classRisk',
 ] as const;
 
 /**

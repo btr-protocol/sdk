@@ -112,6 +112,32 @@ export interface HookSlot {
   lastCreditAt: number;
 }
 
+/** `PoolConstantsLib.CLASS_ROWS_BIT`: the leg has a peg family or a risk row (store-owned flag). */
+export const CLASS_ROWS_BIT = 1 << 7;
+/** `PoolConstantsLib.MAX_FAMILY`: highest peg-family id and row key (0 = the leg's default row). */
+export const MAX_FAMILY = 4;
+
+/** A `classRisk` / `classHead.row` word (`ClassRiskLib.pack`): kappaCovBps 0..13 | refBandBps
+ *  14..22 | minFeePbps 23..36, bits 37..63 zero. */
+export interface ClassRisk {
+  kappaCovBps: number;
+  refBandBps: number;
+  minFeePbps: number;
+}
+
+export function decodeClassRisk(pack: bigint): ClassRisk {
+  return {
+    kappaCovBps: Number(pack & 0x3fffn),
+    refBandBps: Number((pack >> 14n) & 0x1ffn),
+    minFeePbps: Number((pack >> 23n) & 0x3fffn),
+  };
+}
+
+/** `IPool.ClassHead` slot (`classHead[leg]`): family = low byte, default row = next 64 bits. */
+export function decodeClassHead(word: bigint): { family: number; row: bigint } {
+  return { family: Number(word & 0xffn), row: (word >> 8n) & 0xffff_ffff_ffff_ffffn };
+}
+
 /** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
  *  no longer a storage struct of its own: both fields live in `Asset` slot 2. */
 export interface RiskConfig {

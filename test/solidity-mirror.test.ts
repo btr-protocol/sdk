@@ -16,7 +16,7 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
-import { MAX_INTERIOR_SWING_PBPS } from '../src/amm/aimm';
+import { CLASS_ROWS_BIT, MAX_FAMILY, decodeClassRisk } from '../src/pool/storage';
 import { MARK_WORD_V4 } from '../src/pool/layout.v4.generated';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
@@ -185,6 +185,21 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     }
   });
 
+  test('class-row constants and pack layout match PoolConstantsLib.sol', () => {
+    const c = poolConsts();
+    expect(c.get('CLASS_ROWS_BIT')).toBe(CLASS_ROWS_BIT);
+    expect(c.get('MAX_FAMILY')).toBe(MAX_FAMILY);
+    // ClassRiskLib.pack: kappa | band << BAND_SHIFT | fee << FEE_SHIFT, widths from the masks.
+    expect([c.get('CLASS_BAND_SHIFT'), c.get('CLASS_FEE_SHIFT')]).toEqual([14, 23]);
+    const row = 10_000n | (500n << 14n) | (10_000n << 23n);
+    expect(decodeClassRisk(row)).toEqual({
+      kappaCovBps: 10_000,
+      refBandBps: 500,
+      minFeePbps: 10_000,
+    });
+    expect(M.KNOWN_FLAGS_MASK & CLASS_ROWS_BIT).toBe(CLASS_ROWS_BIT);
+  });
+
   test('perms lanes match shared ConstantsLib.sol', () => {
     const c = constants(src(join(SHARED, 'evm', 'src', 'ConstantsLib.sol')));
     for (const k of ['PERM_KEEPER', 'PERM_GUARDIAN', 'PERM_RISK_STEWARD'] as const) {
@@ -198,18 +213,6 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     expect(c.get('MAX_STALE_GRACE_SECS')).toBe(M.MAX_STALE_GRACE_SECS);
   });
 
-  test('MAX_INTERIOR_SWING_PBPS is the PricingLib.sol derivation at AnchorTreeLib.MAX_DEPTH', () => {
-    const pricing = src(join(DEX, 'src', 'libraries', 'PricingLib.sol'));
-    expect(pricing).toContain(
-      'MAX_INTERIOR_SWING_PBPS =\n    (2 * FENCE_BUDGET_PBPS * SC.PBPS) / (2 * SC.PBPS + FENCE_BUDGET_PBPS);',
-    );
-    const tree = src(join(DEX, 'src', 'libraries', 'AnchorTreeLib.sol'));
-    const depth = Number(/MAX_DEPTH = (\d+);/.exec(tree)?.[1]);
-    const budget = Math.floor(65_535 / (2 * depth + 1 - 3)); // uint16.max / MAX_INTERIOR_LEGS
-    const P = 1_000_000;
-    expect(MAX_INTERIOR_SWING_PBPS).toBe(Math.floor((2 * budget * P) / (2 * P + budget)));
-  });
-
   // The source holds the v4 codec; v3's `MARK_WORD` is frozen.
   test('MARK_WORD_V4 offsets match MarkWordLib.sol', () => {
     const c = constants(src(join(DEX, 'src', 'libraries', 'MarkWordLib.sol')));
@@ -221,7 +224,10 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     // cancelled with `subject = 0` computes a key nothing was queued under.
     const admin = src(join(DEX, 'src', 'Admin.sol'));
     const body = /_keyOf\([^)]*\)[^{]*\{([\s\S]*?)\n {2}\}/.exec(admin)?.[1] ?? '';
-    const named = [...body.matchAll(/OpType\.(\w+)/g)].map((m) => m[1]);
+    // UPDATE_CLASS_RISK is keyed per (token, family) off its subject: not pool-scoped.
+    const named = [...body.matchAll(/OpType\.(\w+)/g)]
+      .map((m) => m[1])
+      .filter((n) => n !== 'UPDATE_CLASS_RISK');
     expect(new Set(named)).toEqual(
       new Set(
         M.POOL_SCOPED_OPS.map(
