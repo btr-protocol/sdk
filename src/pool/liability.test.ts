@@ -217,7 +217,7 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
   });
 });
 
-describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
+describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
   const meta = {
     addressOf: () => null,
     decimalsOf: () => 6,
@@ -258,17 +258,13 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
       expect(q?.haircutIn).toBe(0);
 
       // A cross is ONE settlement, not two leg quotes summed: exactly one POST, to /quote-path,
-      // carrying both hops. The spread comes back whole rather than re-charged per hop.
+      // carrying the pool and the pair; the backend walks the path. The spread comes back whole.
       expect(calls).toHaveLength(1);
       expect(calls[0].url.endsWith('/quote-path')).toBe(true);
-      const legs = calls[0].body.legs as Record<string, unknown>[];
-      expect(legs).toHaveLength(2);
-      expect(legs[0].selling).toBe(true);
-      expect(legs[1].selling).toBe(false);
-      expect(legs[0].decimals_out).toBe(backendOpts.baseDecimals);
-      expect(legs[1].decimals_in).toBe(backendOpts.baseDecimals);
-      // The hub is interior to the path on both hops.
-      for (const l of legs) expect((l.counterparty as { reserves: string }).reserves).toBe('0x0');
+      expect([calls[0].body.token_in, calls[0].body.token_out]).toEqual(['AUDF', 'NZDF']);
+      const pool = calls[0].body.pool as { base: string; base_decimals: number };
+      expect(pool.base).toBe(state.base);
+      expect(pool.base_decimals).toBe(backendOpts.baseDecimals);
       // Half of ONE 40 pbps path spread. Two summed leg quotes would have landed at 0.4.
       expect(q?.convSpreadBps).toBeCloseTo(40 / 100 / 2, 9);
     } finally {
@@ -295,7 +291,7 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote legs)', () => {
   });
 });
 
-describe('backendConvert: flat legs in SPOKE scale', () => {
+describe('backendConvert: one pool-shaped /quote-path per pair', () => {
   const meta = { addressOf: () => null, decimalsOf: () => 6 };
   const wad = (x: number) => `0x${BigInt(Math.round(x * 1e18)).toString(16)}`;
   const hex = (n: bigint) => `0x${n.toString(16)}`;
@@ -365,9 +361,10 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
       return {
         q,
         body: calls[0] as {
+          token_in: string;
+          token_out: string;
           amount_in: string;
-          counterparty: { reserves: string; liabilities: string };
-          legs: { amount_in: string; decimals_in: number; decimals_out: number }[];
+          pool: { base_reserves: string; base_decimals: number; spokes: { token: string }[] };
         },
       };
     } finally {
@@ -376,55 +373,42 @@ describe('backendConvert: flat legs in SPOKE scale', () => {
     }
   };
 
-  test('SELL 18-spoke into a 6-base: hub book + amount_in at 18, out decoded at 18', async () => {
-    const { q, body } = await run('WMON', 'USDC', 999n * 10n ** 18n);
+  test('SELL 18-spoke into a 6-base: the pool wire + amount_in at 18, out decoded at 6', async () => {
+    const { q, body } = await run('WMON', 'USDC', 999n * 10n ** 6n);
+    expect([body.token_in, body.token_out]).toEqual(['WMON', 'USDC']);
     expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
-    expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
-    expect(Number(BigInt(body.counterparty.liabilities)) / 1e18).toBeCloseTo(2_000_000, 0);
+    expect(Number(BigInt(body.pool.base_reserves)) / 1e6).toBeCloseTo(2_000_000, 0);
+    expect(body.pool.spokes.map((s) => s.token)).toEqual(['WMON', 'AUDF']);
     expect(q?.amountOut).toBeCloseTo(999, 9);
     expect(q?.avgPrice).toBeCloseTo(0.999, 9);
   });
 
-  test('BUY the 18-spoke with 6-base: hub book + amount_in at 18, out decoded at 18', async () => {
+  test('BUY the 18-spoke with 6-base: amount_in at 6, out decoded at 18', async () => {
     const { q, body } = await run('USDC', 'WMON', 999n * 10n ** 18n);
-    expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
-    expect(Number(BigInt(body.counterparty.reserves)) / 1e18).toBeCloseTo(2_000_000, 0);
+    expect(Number(BigInt(body.amount_in)) / 1e6).toBeCloseTo(1_000, 6);
     expect(q?.amountOut).toBeCloseTo(999, 9);
   });
 
   test('a response at the wrong scale resolves null instead of minting a quote', async () => {
-    // 999 raw at the BASE's 6 decimals while the wire is spoke-scale: 1e-12 of a fill
-    expect((await run('WMON', 'USDC', 999n * 10n ** 6n)).q).toBeNull();
+    // 999 raw at 18 decimals while USDC is 6: 1e-15 of a fill
+    expect((await run('WMON', 'USDC', 999n)).q).toBeNull();
   });
 
-  test('/quote-path cross 18-spoke -> 6-spoke: hop decimals and out decoded at the out-spoke', async () => {
+  test('a cross 18-spoke -> 6-spoke is one path request, out decoded at the out-spoke', async () => {
     const { q, body } = await run('WMON', 'AUDF', 999n * 10n ** 6n);
-    expect(body.legs.map((l) => [l.decimals_in, l.decimals_out])).toEqual([
-      [18, 6],
-      [6, 6],
-    ]);
-    expect(Number(BigInt(body.legs[0].amount_in)) / 1e18).toBeCloseTo(1_000, 6);
+    expect([body.token_in, body.token_out]).toEqual(['WMON', 'AUDF']);
+    expect(Number(BigInt(body.amount_in)) / 1e18).toBeCloseTo(1_000, 6);
     expect(q?.amountOut).toBeCloseTo(999, 9);
-    expect(q?.route).toEqual(['WMON', 'USDC', 'AUDF']);
+    expect(q?.route).toEqual(['WMON', 'AUDF']);
   });
 
-  test('/quote-path cross 6-spoke -> 18-spoke: out decoded at 18', async () => {
+  test('a cross 6-spoke -> 18-spoke: out decoded at 18', async () => {
     const { q, body } = await run('AUDF', 'WMON', 999n * 10n ** 18n);
-    expect(body.legs.map((l) => [l.decimals_in, l.decimals_out])).toEqual([
-      [6, 6],
-      [6, 18],
-    ]);
-    expect(Number(BigInt(body.legs[0].amount_in)) / 1e6).toBeCloseTo(1_000, 6);
+    expect(Number(BigInt(body.amount_in)) / 1e6).toBeCloseTo(1_000, 6);
     expect(q?.amountOut).toBeCloseTo(999, 9);
   });
 
-  test('flat spoke->base SELL passes flatSell: a fill at mid with mark = mid/10 is refused', async () => {
-    // 1.01·mark cap = 0.101 < fill 0.999/token; a flat buy (10.1·mark cap) would accept the same.
-    expect((await run('WMON', 'USDC', 999n * 10n ** 18n, 0.1)).q).toBeNull();
-    expect((await run('USDC', 'WMON', 999n * 10n ** 18n, 0.1)).q).not.toBeNull();
-  });
-
-  test('/quote-path decodes the sent amount at the FIRST hop decimals (18), not the out-spoke (6)', async () => {
+  test('the sent amount decodes at the INPUT decimals (18), not the output (6)', async () => {
     // 1.5e-6 WMON in, 1 raw AUDF (1e-6) out: avg 2/3. Rounding the input at 6 decimals gives 2e-6 -> 0.5.
     const { q } = await run('WMON', 'AUDF', 1n, 1, 1.5e-6);
     expect(q?.avgPrice).toBeCloseTo(2 / 3, 9);

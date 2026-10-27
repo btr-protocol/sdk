@@ -232,6 +232,25 @@ export interface PoolLeg {
   uoa?: boolean;
   baseMark?: number;
   baseRefBandBps?: number;
+  /** `Asset.anchor` symbol (the parent in the pool's anchor tree); absent = the base. */
+  anchor?: string;
+  /** Stored class words (`classHead` + `classRisk`); absent = no `CLASS_ROWS_BIT`. */
+  class?: ClassWire;
+  /** The lane's R-tier mark, base per token; absent = a reference agreeing with `twap`. */
+  refMark?: number;
+  lane?: number;
+  maxDevBps?: number;
+}
+
+/**
+ * A leg's stored peg-family words: `classHead` (family, default row) and `classRisk[leg][1..4]`,
+ * each row the packed `ClassRiskLib` uint64 (< 2^37, exact as a number). The backend picks the
+ * pair family and applies the rows; a caller never resolves a fee or a wall from them.
+ */
+export interface ClassWire {
+  family: number;
+  head_row: number;
+  family_rows: [number, number, number, number];
 }
 
 /** The hub's own book. It is an ENDPOINT, not a spoke: it carries liabilities, a coverage wall
@@ -247,6 +266,8 @@ export interface PoolState {
   base: string;
   legs: Record<string, PoolLeg>;
   hub?: HubBook;
+  /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
+  baseClass?: ClassWire;
 }
 
 export interface Quote {
@@ -387,6 +408,11 @@ interface SpokeWire {
   internal: boolean;
   peg_mark: string | null;
   decimals?: number;
+  anchor?: string | null;
+  class?: ClassWire | null;
+  ref_mark?: string | null;
+  lane?: number | null;
+  max_dev_bps?: number;
 }
 /**
  * One ENDPOINT of a swap path: the wire form of the chain's `PricingLib.EndpointCache`.
@@ -420,6 +446,7 @@ export interface NamedPoolWire {
   base_decimals?: number | null;
   base_mark: string | null;
   base_ref_band_bps: number;
+  base_class?: ClassWire | null;
   spokes: SpokeWire[];
 }
 export interface RouteRequestWire {
@@ -556,18 +583,12 @@ export const isNoCapacityError = (e: unknown): boolean =>
   e instanceof Error && /^btr-quote HTTP 422 \S+ capacity$/.test(e.message);
 
 /**
- * A whole path, settled ONCE over POST /v1/quote-path.
- *
- * A cross is NOT the sum of its legs: the chain walks every hop gross and charges one spread,
- * one coverage toll and one fee at the tail. Summing per-leg {@link quoteLegAsync} calls
- * re-charges the spread on each hop and lands under the chain. At most two legs.
- *
- * A hop whose far token is interior to the path passes {@link INTERIOR_ENDPOINT}. Only a
- * buy-FIRST path needs a real counterparty on its head: that is its input endpoint, whose
- * vega the path spread is taken at, and the backend refuses an interior one there.
+ * One swap inside one pool over POST /v1/quote-path: the backend walks the pool's anchor tree
+ * (any depth), applies the pair's class rows and settles one spread, toll and fee at the tail,
+ * exactly as `Pool.swap`. A cross is never the sum of {@link quoteLegAsync} legs.
  */
-export function quotePathAsync(legs: PathLegWire[], base?: string): Promise<QuoteResponseWire> {
-  return post<QuoteResponseWire>(backendBase(base), '/quote-path', { legs });
+export function quotePathAsync(req: PathRequestWire, base?: string): Promise<QuoteResponseWire> {
+  return post<QuoteResponseWire>(backendBase(base), '/quote-path', req);
 }
 
 /** Optimal routing across pools over POST /v1/route. */
@@ -682,12 +703,19 @@ interface QuoteRequestWire {
   peg_mark: string | null;
   base_mark: string | null;
   base_ref_band_bps: number;
+  /** This leg's and the counterparty's stored class words: the backend applies the pair's rows
+   *  over the `min_fee_pbps` / `kappa_cov_bps` RECORD above. */
+  class: ClassWire | null;
+  counterparty_class: ClassWire | null;
 }
 
-/** One hop of a {@link quotePathAsync} request: a `/quote` body plus the hop's own scales. */
-export interface PathLegWire extends QuoteRequestWire {
-  decimals_in: number;
-  decimals_out: number;
+/** A {@link quotePathAsync} request: one uploaded pool and a pair inside it. */
+export interface PathRequestWire {
+  pool: NamedPoolWire;
+  token_in: string;
+  token_out: string;
+  /** 0x hex, raw at `token_in`'s decimals. */
+  amount_in: string;
 }
 
 export interface QuoteResponseWire {
@@ -752,6 +780,7 @@ export function legToQuoteBody(
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
+  counterpartyClass?: ClassWire,
 ): QuoteRequestWire {
   return {
     curve: curveToWire(leg.profile.curve),
@@ -770,6 +799,8 @@ export function legToQuoteBody(
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
     ...depegWire(leg),
+    class: leg.class ?? null,
+    counterparty_class: counterpartyClass ?? null,
   };
 }
 
@@ -898,6 +929,7 @@ export function poolStateToWire(
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
+    base_class: state.baseClass ?? null,
     spokes: Object.values(state.legs).map((leg) => ({
       token: leg.token,
       address: meta.addressOf(leg.token),
@@ -919,6 +951,11 @@ export function poolStateToWire(
       internal: leg.internal ?? false,
       peg_mark: pegMarkWire(leg),
       decimals: leg.decimals,
+      anchor: leg.anchor ?? null,
+      class: leg.class ?? null,
+      ref_mark: leg.refMark != null ? wadHex(leg.refMark) : null,
+      lane: leg.lane ?? null,
+      max_dev_bps: leg.maxDevBps ?? 0,
     })),
   };
 }

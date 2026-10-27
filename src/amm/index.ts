@@ -21,7 +21,8 @@ export type {
   DepthBookWire,
   DepthRequestWire,
   WireMeta,
-  PathLegWire,
+  PathRequestWire,
+  ClassWire,
   QuoteResponseWire,
 } from './aimm.js';
 export {

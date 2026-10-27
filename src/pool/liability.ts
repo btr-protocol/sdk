@@ -1,6 +1,6 @@
 // Liability-swap pipeline over the backend quoter (POST /v1/quote|route).
 // Same style as front/src/lib/lpMath.ts: f64 in, f64 out, no chain reads. State inputs come from
-// getAsset (sdk/pool/index.ts); conversion is backend SSOT (quoteLegAsync / POST /v1/route), never
+// getAsset (sdk/pool/index.ts); conversion is backend SSOT (POST /v1/quote-path), never
 // the deleted TS curve replica.
 //
 // LP settlement is POOL-LEVEL (LED-A, PoolSolvencyLib.sol): `C = Σ R_k·m_k / Σ L_k·m_k`. There is no
@@ -20,17 +20,13 @@
 
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import {
-  INTERIOR_ENDPOINT,
-  type PathLegWire,
   type PoolLeg,
   type PoolState,
   type Quote,
   type QuoteResponseWire,
   type WireMeta,
-  hubEndpointWire,
-  legToQuoteBody,
+  poolStateToWire,
   quoteFromWire,
-  quoteLegAsync,
   quotePathAsync,
 } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
@@ -214,12 +210,11 @@ export interface BackendConvertOpts {
 }
 
 /**
- * Backend conversion for the liability pipeline: one POST /v1/quote per direct leg, and for a
- * spoke→spoke cross ONE POST /v1/quote-path over both hops (the chain settles a path once, so
- * summing two leg quotes re-charges the spread and under-quotes it).
+ * Backend conversion for the liability pipeline: ONE POST /v1/quote-path over the pool's books.
+ * The backend walks the anchor-tree path between the two tokens, applies the pair's class rows and
+ * settles once, as the chain does, so no leg dispatch or hub selection happens here.
  * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint nothing
- * from); an off-scale quote resolves null (no honest price for this pair). Composed in fill
- * order over the backend's own outputs.
+ * from); an off-scale quote resolves null (no honest price for this pair).
  */
 export function backendConvert(
   state: PoolState,
@@ -227,60 +222,24 @@ export function backendConvert(
   tokenOut: string,
   opts: BackendConvertOpts,
 ): (fairIn: number) => Promise<Quote | null> {
-  const base = state.base;
-  const inBase = tokenIn === base;
-  const outBase = tokenOut === base;
-  const decIn = inBase ? opts.baseDecimals : (state.legs[tokenIn]?.decimals ?? opts.baseDecimals);
-  const legIn = state.legs[tokenIn];
-  const legOut = state.legs[tokenOut];
-  // A flat /quote has no decimal boundary: amounts AND the counterparty book are in the SPOKE's
-  // scale (depth.rs shifts the hub the same way), so the hub is built per leg and the response is
-  // decoded at the leg's decimals. A leg that touches the hub is settled against the HUB's
-  // endpoint (its coverage wall tolls a sell into it, its vega enters the spread both ways); no
-  // hub book ⇒ no honest quote. A null decode is a scale/orientation mismatch: no quote (null).
-  const hubFor = (leg: PoolLeg, what: string) => {
-    if (!state.hub) throw new Error(`backendConvert: no hub book for a ${what}`);
-    return hubEndpointWire(state.hub, leg.decimals);
-  };
-  const decode = (
-    w: QuoteResponseWire,
-    dec: number,
-    route: string[],
-    fairIn: number,
-    flatSell = false,
-    decimalsIn = dec,
-  ): Quote | null => quoteFromWire(w, dec, route, fairIn, flatSell, decimalsIn);
+  const dec = (t: string): number | undefined =>
+    t === state.base ? opts.baseDecimals : state.legs[t]?.decimals;
+  const decIn = dec(tokenIn);
+  const decOut = dec(tokenOut);
   return async (fairIn: number): Promise<Quote | null> => {
-    if (!inBase && outBase && legIn) {
-      const hub = hubFor(legIn, 'sell into the base');
-      const w = await quoteLegAsync(legIn, fairIn, true, legIn.decimals, hub, opts.backendBase);
-      return decode(w, legIn.decimals, [tokenIn, tokenOut], fairIn, true);
+    if (decIn === undefined || decOut === undefined || tokenIn === tokenOut) {
+      throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${state.base}`);
     }
-    if (inBase && !outBase && legOut) {
-      const hub = hubFor(legOut, 'buy out of the base');
-      const w = await quoteLegAsync(legOut, fairIn, false, legOut.decimals, hub, opts.backendBase);
-      return decode(w, legOut.decimals, [tokenIn, tokenOut], fairIn);
-    }
-    if (!inBase && !outBase && legIn && legOut) {
-      // The hub is INTERIOR to a cross on both hops: the path delivers on the out-spoke's own
-      // book and takes its vega from the in-spoke's, so neither hop's counterparty is read.
-      const legs: PathLegWire[] = [
-        {
-          ...legToQuoteBody(legIn, fairIn, true, decIn, INTERIOR_ENDPOINT),
-          decimals_in: decIn,
-          decimals_out: opts.baseDecimals,
-        },
-        {
-          // The walk overwrites this hop's input with the first hop's gross output.
-          ...legToQuoteBody(legOut, 0, false, opts.baseDecimals, INTERIOR_ENDPOINT),
-          decimals_in: opts.baseDecimals,
-          decimals_out: legOut.decimals,
-        },
-      ];
-      const w = await quotePathAsync(legs, opts.backendBase);
-      return decode(w, legOut.decimals, [tokenIn, base, tokenOut], fairIn, false, decIn);
-    }
-    throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${base}`);
+    const w = await quotePathAsync(
+      {
+        pool: poolStateToWire('pool', undefined, state, opts.meta, opts.baseDecimals),
+        token_in: tokenIn,
+        token_out: tokenOut,
+        amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
+      },
+      opts.backendBase,
+    );
+    return quoteFromWire(w, decOut, [tokenIn, tokenOut], fairIn, false, decIn);
   };
 }
 
