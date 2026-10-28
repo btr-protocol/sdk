@@ -11,15 +11,19 @@ import {
   MARK_WORD,
   MARK_WORD_V4,
   P8_CONF_TABLE,
+  POOL_AREA_V10,
   POOL_STORAGE,
   POOL_STORAGE_V3,
   POOL_STORAGE_V4,
   POOL_STORAGE_V5,
+  POOL_STORAGE_V10,
   POOL_STRUCTS,
   POOL_STRUCTS_V3,
   POOL_STRUCTS_V4,
   addressAt,
   curvePointer,
+  curveSlot,
+  decodeClassHead,
   decodeCustody,
   decodeLegOracle,
   decodeMark,
@@ -28,6 +32,7 @@ import {
   decodeStoreWord,
   i8At,
   laneFloat,
+  layoutOf,
   mappingBase,
   mappingBaseU16,
   p8ClassOf,
@@ -35,10 +40,14 @@ import {
   p8Sigma,
   p8StoreWord,
   p8TierSlot,
+  poolStorageOf,
+  readClassHead,
   readCurve,
+  readCustody,
   readMarks,
   readOracleConfig,
   readSolvencyState,
+  recordSlot,
   u8At,
   u16At,
   u32At,
@@ -729,5 +738,172 @@ describe('P8 mark store', () => {
         TOKEN,
       ),
     ).rejects.toBe(reverted);
+  });
+});
+
+/**
+ * Layout v10 against dex-evm release/pool-v2-rc2 83773c0: the words of core
+ * `tests/fixtures/tree_vectors_v10.txt` phase A (`CoreTreeVectorsV10` probe, the 450-swap scene),
+ * where the chain's own `recordOf` / `curveAt` (`script/lib/AssetLib.sol`) put the 7 legs at
+ * 139..169 and curve 1 at 128. The curve is the same `DEFAULT_CURVE` the v5 recording carried as
+ * SSTORE2 code, so the v10 words must decode to that blob exactly.
+ */
+describe('layout v10', () => {
+  const POOL = '0xF983b09E07bF24f78107b1D71d4bC9B0d8B5699d' as const;
+  const LEGS = [
+    ['0xA4AD4f68d0b91CFD19687c881e50f3A00242828c', 139n],
+    ['0x03A6a84cD762D9707A21605b548aaaB891562aAb', 144n],
+    ['0xD6BbDE9174b1CdAa358d2Cf4D57D1a9F7178FBfF', 149n],
+    ['0x15cF58144EF33af1e14b5208015d11F9143E27b9', 154n],
+    ['0x212224D2F2d262cd093eE13240ca4873fcCBbA3C', 159n],
+    ['0x2a07706473244BC757E10F2a9E86fB532828afe3', 164n],
+    ['0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7', 169n],
+  ] as const;
+  const SLOTS = new Map<bigint, string>([
+    [86n, '0x0000000000000000000000a42a07706473244bc757e10f2a9e86fb532828afe3'],
+    [94n, '0x00000000000000000000009003a6a84cd762d9707a21605b548aaab891562aab'],
+    [95n, '0x00000000000000000000008ba4ad4f68d0b91cfd19687c881e50f3a00242828c'],
+    [106n, '0x0000000000000000000000a93d7ebc40af7092e3f1c81f2e996cba5cae2090d7'],
+    [108n, '0x00000000000000000000009a15cf58144ef33af1e14b5208015d11f9143e27b9'],
+    [111n, '0x00000000000000000000009f212224d2f2d262cd093ee13240ca4873fccbba3c'],
+    [114n, '0x000000000000000000000095d6bbde9174b1cdaa358d2cf4d57d1a9f7178fbff'],
+    [115n, '0x0000000000000000000000000000000000000000000000000080000100000000'],
+    [128n, '0x0003e813880000000000000000000000000000000000001f4017700fa007d005'],
+    [129n, '0x0000003081a26359ffffffa8b0421a00000000746a528800ffffff8b95ad7800'],
+    [130n, '0x000000000000000000000000000000000000000000000000fffffff4ae8d4f36'],
+    [131n, '0x000000033bd7a037fffffff64c791f560000002a09f322e3ffffffcde071cc8f'],
+    [132n, '0x0000000000000000fffffffffffffffffffda2eef260ee34ffffffff98850bfa'],
+    [133n, '0x000000019debd01cfffffffd931e47d60000001eb880721cfffffff10b3abaf9'],
+    [134n, '0x0000000000000000fffffffffffffffffffcabfaf5a339730000000000000000'],
+    [135n, '0x000000019debd01d000000026ce1b82a0000001eb880721c0000000ef4c54507'],
+    [136n, '0x0000000000000000fffffffffffffffffffcabfaf5a3397300000000677af407'],
+    [137n, '0x000000033bd7a03f00000009b386e0aa0000002a09f322e3000000321f8e3371'],
+    [138n, '0x0000000000000000fffffffffffffffffffda2eef260ee770000000b5172b0c3'],
+    // USDT0's record: Asset 0..2, Custody (+3), ClassHead (+4: USD, famRow pack(20, 20, 500))
+    [144n, '0x000000000000000000000274a48a7800000000000000000000000246139ca800'],
+    [145n, '0x000000000000000000000000a4ad4f68d0b91cfd19687c881e50f3a00242828c'],
+    [146n, '0x0096010000006400b00006ffff02bd03e80001000003e8000de0b6b3a7640000'],
+    [147n, '0x0000000000000000000000000000000000000000000000000000000000000001'],
+    [148n, '0x00000000000000000000000000000000000000fa050014000000000000000001'],
+  ]);
+  const V5_BLOB =
+    '0x000003e813880000000000000000000000000000000000001f4017700fa007d0050000003081a26359ffffffa8b0421a00000000746a528800ffffff8b95ad7800000000000000000000000000000000000000000000000000fffffff4ae8d4f36000000033bd7a037fffffff64c791f560000002a09f322e3ffffffcde071cc8f0000000000000000fffffffffffffffffffda2eef260ee34ffffffff98850bfa000000019debd01cfffffffd931e47d60000001eb880721cfffffff10b3abaf90000000000000000fffffffffffffffffffcabfaf5a339730000000000000000000000019debd01d000000026ce1b82a0000001eb880721c0000000ef4c545070000000000000000fffffffffffffffffffcabfaf5a3397300000000677af407000000033bd7a03f00000009b386e0aa0000002a09f322e3000000321f8e33710000000000000000fffffffffffffffffffda2eef260ee770000000b5172b0c3';
+  const ZERO = `0x${'0'.repeat(64)}`;
+  const at = (version: number, slots = SLOTS): Eip1193Provider =>
+    ({
+      request: async ({ method, params }: { method: string; params: unknown[] }) => {
+        if (method === 'eth_call') return `0x${version.toString(16).padStart(64, '0')}`;
+        if (method === 'eth_getCode') return V5_BLOB;
+        return slots.get(BigInt(params[1] as string)) ?? ZERO;
+      },
+    }) as unknown as Eip1193Provider;
+  const words = (from: bigint, n: number) =>
+    Array.from({ length: n }, (_, i) => BigInt(SLOTS.get(from + BigInt(i)) ?? ZERO));
+
+  test('dispatch is exact: 5..9 = v5, 10 = v10, anything else throws', async () => {
+    for (const v of [5, 6, 7, 8, 9]) expect(layoutOf(v)).toBe(5);
+    expect(layoutOf(10)).toBe(10);
+    expect(poolStorageOf(10)).toBe(POOL_STORAGE_V10);
+    for (const v of [0, 1, 11, 12]) expect(() => layoutOf(v)).toThrow('no storage layout');
+    const pool = `0x${'cc'.repeat(20)}` as `0x${string}`;
+    await expect(readCurve(at(11), pool, 1)).rejects.toThrow('no storage layout');
+    await expect(readMarks(at(11), pool, LEGS[0][0])).rejects.toThrow('no storage layout');
+  });
+
+  test('slots match dex-evm Pool storageLayout and PoolConstantsLib (pinned by hand)', () => {
+    expect([POOL_STORAGE_V10.unlisted, POOL_STORAGE_V10.classRisk]).toEqual([4n, 17n]);
+    expect([POOL_STORAGE_V10.swapGate, POOL_STORAGE_V10.areaTop]).toEqual([18n, 82n]);
+    expect([POOL_STORAGE_V10.legIndex, POOL_STORAGE_V10.curveIndex]).toEqual([83n, 115n]);
+    expect(POOL_AREA_V10.AREA_BASE).toBe(128n);
+    expect(POOL_AREA_V10.IMPL_COPY).toBe(127n);
+    expect([POOL_AREA_V10.RECORD_CUSTODY, POOL_AREA_V10.RECORD_CLASS_HEAD]).toEqual([3n, 4n]);
+    expect([POOL_AREA_V10.LEG_MAX, POOL_AREA_V10.CURVE_MAX]).toEqual([24, 48]);
+    expect(POOL_STORAGE_V10.legIndex + BigInt(POOL_AREA_V10.LEG_INDEX_SLOTS)).toBe(
+      POOL_STORAGE_V10.curveIndex,
+    );
+    expect(POOL_STORAGE_V10.swapGate + BigInt(POOL_AREA_V10.SWAP_GATE_SLOTS)).toBe(82n);
+    expect('assets' in POOL_STORAGE_V10 || 'custody' in POOL_STORAGE_V10).toBe(false);
+  });
+
+  test('slots match the solc layout of a sibling dex-evm v10 build (skipped without one)', () => {
+    const art = new URL('../../../dex-evm/out/Pool.sol/Pool.json', import.meta.url);
+    if (!existsSync(art)) return;
+    const { storageLayout } = JSON.parse(readFileSync(art, 'utf8'));
+    const ps = Object.values<{ members?: { label: string; slot: string; offset: number }[] }>(
+      storageLayout.types,
+    ).find((t) => t.members?.some((m) => m.label === 'lpSyms'));
+    if (!ps?.members?.some((m) => m.label === 'legIndex')) return; // a pre-v10 build
+    const live = ps.members.filter((m) => !m.label.startsWith('__'));
+    expect(Object.fromEntries(live.map((m) => [m.label, BigInt(m.slot)]))).toEqual({
+      ...POOL_STORAGE_V10,
+    });
+    const meta = Object.fromEntries(
+      live.filter((m) => m.slot === '82').map((m) => [m.label, m.offset]),
+    );
+    expect(meta).toEqual(POOL_AREA_V10.META_OFFSETS);
+  });
+
+  test('recordSlot / curveSlot resolve the chain fixture as recordOf / curveAt did', () => {
+    const legIndex = words(83n, 32);
+    for (const [t, r] of LEGS) expect(recordSlot(legIndex, t)).toBe(r);
+    expect(recordSlot(legIndex, `0x${'11'.repeat(20)}`)).toBeNull();
+    const curveIndex = words(115n, 8);
+    expect(curveSlot(curveIndex, 1)).toBe(128n);
+    expect(curveSlot(curveIndex, 2)).toBeNull();
+    expect(curveSlot(curveIndex, 65)).toBeNull(); // lane 1 holds curve 1, lane 2 empty
+  });
+
+  test('probes wrap and stop at an empty entry', () => {
+    const e = (low: number, k: number, r: bigint) =>
+      (r << 160n) | (BigInt(k) << 152n) | BigInt(low);
+    const ix = Array<bigint>(32).fill(0n);
+    ix[31] = e(31, 1, 128n);
+    ix[0] = e(31, 2, 133n);
+    const tok = (k: number) => `0x${k.toString(16).padStart(2, '0')}${'00'.repeat(18)}1f` as const;
+    expect(recordSlot(ix, tok(1))).toBe(128n);
+    expect(recordSlot(ix, tok(2))).toBe(133n);
+    expect(recordSlot(ix, tok(3))).toBeNull();
+    const lanes = Array<bigint>(8).fill(0n);
+    lanes[7] |= (63n | (200n << 16n)) << 224n; // lane 63: curve 63
+    lanes[0] |= 127n | (300n << 16n); // curve 127 = 63 mod 64: wraps to lane 0
+    expect(curveSlot(lanes, 63)).toBe(200n);
+    expect(curveSlot(lanes, 127)).toBe(300n);
+    expect(curveSlot(lanes, 191)).toBeNull();
+  });
+
+  test('readCurve: the area words decode to the v5 blob of the same curve, no eth_getCode', async () => {
+    const v10 = await readCurve(
+      {
+        request: async ({ method, params }: { method: string; params: unknown[] }) => {
+          if (method === 'eth_getCode') throw new Error('v10 reads no code');
+          return at(10).request({ method, params } as never);
+        },
+      } as unknown as Eip1193Provider,
+      POOL,
+      1,
+    );
+    expect(v10).not.toBeNull();
+    expect(v10).toEqual(await readCurve(at(5), `0x${'dd'.repeat(20)}`, 1));
+    expect(await readCurve(at(10), POOL, 2)).toBeNull();
+  });
+
+  test('records: Asset slot 2, Custody +3, ClassHead +4 with famRow', async () => {
+    const usdt = LEGS[1][0];
+    expect(await readOracleConfig(at(10), POOL, usdt)).toEqual({
+      lane: 1,
+      mode: 0,
+      quoteUnit: 0,
+      refBandBps: 150,
+    });
+    expect(await readCustody(at(10), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    const head = await readClassHead(at(10), POOL, usdt);
+    expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });
+    expect(decodeClassHead(BigInt(SLOTS.get(148n)!))).toEqual(head);
+    // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +4
+    const t = `0x${'11'.repeat(20)}` as const;
+    const u = mappingBase(t, 4n);
+    const slots = new Map(SLOTS);
+    slots.set(u + 4n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
+    expect(await readClassHead(at(10, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
   });
 });

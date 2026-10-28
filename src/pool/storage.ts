@@ -8,7 +8,9 @@
  * `Pool.storageVersion()` (`readStorageVersion`): v2 (`layout.generated.ts`), v3
  * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved), v4
  * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0) and v5
- * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`). An ABI diff cannot see packing, so
+ * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`; storage versions 5..9) and
+ * v10 (`layout.v10.generated.ts`: leg records and curves in the area behind `legIndex` /
+ * `curveIndex`). Dispatch is exact: a version without tables throws. An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
@@ -42,6 +44,7 @@ import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
 import { MARK_STORE, POOL_STORAGE_V5 } from './layout.v5.generated.js';
+import { POOL_AREA_V10, POOL_STORAGE_V10 } from './layout.v10.generated.js';
 
 export { POOL_MAPPINGS, POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 export {
@@ -61,6 +64,11 @@ export {
   POOL_MAPPINGS_V5,
   POOL_STORAGE_V5,
 } from './layout.v5.generated.js';
+export {
+  POOL_AREA_V10,
+  POOL_MAPPINGS_V10,
+  POOL_STORAGE_V10,
+} from './layout.v10.generated.js';
 
 /** `Pool.storageVersion()`. */
 const STORAGE_VERSION_SELECTOR = '0x403ebd03';
@@ -68,8 +76,9 @@ const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
 
 /**
  * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), 3 = layout v3 (`POOL_STORAGE_V3`),
- * 4 = layout v4 (`POOL_STORAGE_V4`), >= 5 = layout v5 (`POOL_STORAGE_V5`). Memoised per provider and pool: a pool's layout moves only with an impl
- * upgrade.
+ * 4 = layout v4 (`POOL_STORAGE_V4`), 5..9 = layout v5 (`POOL_STORAGE_V5`), 10 = layout v10
+ * (`POOL_STORAGE_V10`); any other version throws (`poolStorageOf`). Memoised per provider and pool:
+ * a pool's layout moves only with an impl upgrade.
  */
 function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
   const byPool = versions.get(provider) ?? new Map<string, Promise<number>>();
@@ -88,13 +97,31 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
   return v;
 }
 
-/** The absolute slot table a layout version selects. */
-function poolStorageOf(
+/** The layout family of a storage version; throws on a version this SDK has no tables for, so a
+ *  newer pool is refused instead of read through an older layout's slots. */
+export function layoutOf(storageVersion: number): 2 | 3 | 4 | 5 | 10 {
+  if (storageVersion === 2 || storageVersion === 3 || storageVersion === 4) return storageVersion;
+  if (storageVersion >= 5 && storageVersion <= 9) return 5;
+  if (storageVersion === 10) return 10;
+  throw new Error(`Pool.storageVersion() ${storageVersion}: no storage layout for it`);
+}
+
+/** The absolute slot table a layout version selects (exact match, `layoutOf`). */
+export function poolStorageOf(
   storageVersion: number,
-): typeof POOL_STORAGE | typeof POOL_STORAGE_V3 | typeof POOL_STORAGE_V4 | typeof POOL_STORAGE_V5 {
-  if (storageVersion >= 5) return POOL_STORAGE_V5;
-  if (storageVersion >= 4) return POOL_STORAGE_V4;
-  return storageVersion === 3 ? POOL_STORAGE_V3 : POOL_STORAGE;
+):
+  | typeof POOL_STORAGE
+  | typeof POOL_STORAGE_V3
+  | typeof POOL_STORAGE_V4
+  | typeof POOL_STORAGE_V5
+  | typeof POOL_STORAGE_V10 {
+  return {
+    2: POOL_STORAGE,
+    3: POOL_STORAGE_V3,
+    4: POOL_STORAGE_V4,
+    5: POOL_STORAGE_V5,
+    10: POOL_STORAGE_V10,
+  }[layoutOf(storageVersion)];
 }
 
 /**
@@ -133,9 +160,12 @@ export function decodeClassRisk(pack: bigint): ClassRisk {
   };
 }
 
-/** `IPool.ClassHead` slot (`classHead[leg]`): family = low byte, default row = next 64 bits. */
-export function decodeClassHead(word: bigint): { family: number; row: bigint } {
-  return { family: Number(word & 0xffn), row: (word >> 8n) & 0xffff_ffff_ffff_ffffn };
+/** `IPool.ClassHead` word: family = low byte, default row = next 64 bits, then (v10) `famRow`, the
+ *  leg's row in its own family (0 below v10). `ClassRiskLib.rowAt` reads `famRow` for the leg's own
+ *  family and `classRisk[leg][f]` for any other. */
+export function decodeClassHead(word: bigint): { family: number; row: bigint; famRow: bigint } {
+  const U64 = 0xffff_ffff_ffff_ffffn;
+  return { family: Number(word & 0xffn), row: (word >> 8n) & U64, famRow: (word >> 72n) & U64 };
 }
 
 /** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
@@ -270,9 +300,105 @@ export function curvePointer(pool: Address, curveId: number): Address {
   return `0x${keccak256(`0xd694${proxy}01`).slice(26)}` as Address;
 }
 
+/** `recordOf`: `token`'s record slot off the 32 `legIndex` words (slots 83..114), `null` when
+ *  unlisted. Linear probe from `uint160(token) % 32`, stopping at an empty entry. */
+export function recordSlot(legIndex: readonly bigint[], token: Address): bigint | null {
+  const t = BigInt(token);
+  let h = Number(t & 31n);
+  for (let n = 0; n < POOL_AREA_V10.LEG_INDEX_SLOTS; n++) {
+    const e = legIndex[h] ?? 0n;
+    if (e === 0n) return null;
+    if ((e & ((1n << 160n) - 1n)) === t) return e >> 160n;
+    h = (h + 1) & 31;
+  }
+  return null;
+}
+
+/** `curveAt`: curve `id`'s blob slot off the 8 `curveIndex` words (slots 115..122), `null` when not
+ *  installed. Linear probe over the 64 u32 lanes from `id % 64`, stopping at an empty lane. */
+export function curveSlot(curveIndex: readonly bigint[], id: number): bigint | null {
+  let j = id & 63;
+  for (let n = 0; n < POOL_AREA_V10.CURVE_INDEX_LANES; n++) {
+    const e = ((curveIndex[j >> 3] ?? 0n) >> BigInt(32 * (j & 7))) & 0xffff_ffffn;
+    if (e === 0n) return null;
+    if ((e & 0xffffn) === BigInt(id)) return e >> 16n;
+    j = (j + 1) & 63;
+  }
+  return null;
+}
+
+/** `n` consecutive pool words from `slot`, one transport round-trip (the tick batch coalesces). */
+async function readWords(
+  provider: Eip1193Provider,
+  pool: Address,
+  slot: bigint,
+  n: number,
+): Promise<bigint[]> {
+  const w = await Promise.all(
+    Array.from({ length: n }, (_, i) => getStorageAt(provider, pool, slot + BigInt(i))),
+  );
+  return w.map((x) => BigInt(x));
+}
+
 /**
- * Read + decode a shared curve: on v5 the SSTORE2 blob at `curvePointer` (one `eth_getCode`: a STOP
- * byte, then header + 2 words per segment), on v2–v4 `NUQuarticLib.Curve` @ curves[curveId],
+ * The base slot of `token`'s `Asset` (its record): v10 through `legIndex`, falling back to the
+ * `unlisted` mapping entry (slot 4) as `assetOf` does; v5..9 the `assets` mapping entry (slot 4).
+ * `Custody` sits at +3 and `ClassHead` at +4 on v10. `key` = the resolved storage key.
+ */
+export async function assetSlot(
+  provider: Eip1193Provider,
+  pool: Address,
+  key: Address,
+): Promise<bigint> {
+  const layout = layoutOf(await readStorageVersion(provider, pool));
+  if (layout === 10) {
+    const ix = await readWords(provider, pool, POOL_STORAGE_V10.legIndex, 32);
+    return recordSlot(ix, key) ?? mappingBase(key, POOL_STORAGE_V10.unlisted);
+  }
+  if (layout === 5) return mappingBase(key, POOL_STORAGE_V5.assets);
+  return mappingBase(key, POOL_STORAGE.assets);
+}
+
+/** A leg's `ClassHead` (v10 record +4, v9 `classHead` mapping 16; zero below 9). */
+export async function readClassHead(
+  provider: Eip1193Provider,
+  pool: Address,
+  token: Address,
+): Promise<{ family: number; row: bigint; famRow: bigint }> {
+  const [layout, key] = await Promise.all([
+    readStorageVersion(provider, pool).then(layoutOf),
+    resolveTokenStorageKey(provider, pool, token),
+  ]);
+  if (layout < 5) return decodeClassHead(0n);
+  const at =
+    layout === 10
+      ? (await assetSlot(provider, pool, key)) + POOL_AREA_V10.RECORD_CLASS_HEAD
+      : mappingBase(key, POOL_STORAGE_V5.classHead);
+  return decodeClassHead(BigInt(await getStorageAt(provider, pool, at)));
+}
+
+/** A leg's `Custody` word: v10 record +3, v3..9 the `custody` mapping (slot 7). */
+export async function readCustody(
+  provider: Eip1193Provider,
+  pool: Address,
+  token: Address,
+): Promise<Custody> {
+  const [layout, key] = await Promise.all([
+    readStorageVersion(provider, pool).then(layoutOf),
+    resolveTokenStorageKey(provider, pool, token),
+  ]);
+  if (layout === 2) throw new Error('layout v2 has no Custody word');
+  const at =
+    layout === 10
+      ? (await assetSlot(provider, pool, key)) + POOL_AREA_V10.RECORD_CUSTODY
+      : mappingBase(key, POOL_STORAGE_V5.custody);
+  return decodeCustody(await getStorageAt(provider, pool, at));
+}
+
+/**
+ * Read + decode a shared curve: on v10 the pool's own words at `curveSlot` (the 8 `curveIndex` words,
+ * then header + up to 2·14 segment words in one round-trip), on v5..9 the SSTORE2 blob at
+ * `curvePointer` (one `eth_getCode`: a STOP byte, then header + 2 words per segment), on v2–v4 `NUQuarticLib.Curve` @ curves[curveId],
  * slot 6 (header slot + the 2m live words of the fixed uint256[28] block). Returns null when the
  * curve is not installed (header 0 / no code).
  * Curve type/eval: `QuarticCurve` + `evalQ`/`areaQ` in `@sdk/amm`.
@@ -282,7 +408,15 @@ export async function readCurve(
   pool: Address,
   curveId: number,
 ): Promise<QuarticCurve | null> {
-  if ((await readStorageVersion(provider, pool)) >= 5) {
+  const layout = layoutOf(await readStorageVersion(provider, pool));
+  if (layout === 10) {
+    const ix = await readWords(provider, pool, POOL_STORAGE_V10.curveIndex, 8);
+    const at = curveSlot(ix, curveId);
+    return at === null
+      ? null
+      : decodeCurve(await readWords(provider, pool, at, 1 + CURVE_SEG_SLOTS));
+  }
+  if (layout === 5) {
     const code = (await getCode(provider, curvePointer(pool, curveId))).slice(4); // 0x + STOP
     const words = Array.from({ length: code.length >> 6 }, (_, i) =>
       BigInt(`0x${code.slice(64 * i, 64 * i + 64)}`),
@@ -341,13 +475,13 @@ export async function readOracleConfig(
   pool: Address,
   token: Address,
 ): Promise<OracleConfig | LegacyOracleConfig> {
-  const [version, key] = await Promise.all([
-    readStorageVersion(provider, pool),
+  const [layout, key] = await Promise.all([
+    readStorageVersion(provider, pool).then(layoutOf),
     resolveTokenStorageKey(provider, pool, token),
   ]);
-  if (version >= 5) {
+  if (layout >= 5) {
     const leg = decodeLegOracle(
-      await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V5.assets) + 2n),
+      await getStorageAt(provider, pool, (await assetSlot(provider, pool, key)) + 2n),
     );
     return {
       lane: leg.lane,
@@ -611,12 +745,12 @@ export async function readMarks(
   pool: Address,
   token: Address,
 ): Promise<{ primary: MarkWord; ref: MarkWord } | null> {
-  const version = await readStorageVersion(provider, pool);
+  const version = layoutOf(await readStorageVersion(provider, pool));
   if (version < 3) return null;
   const key = await resolveTokenStorageKey(provider, pool, token);
   if (version >= 5) {
     const [slot2, implWord] = await Promise.all([
-      getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V5.assets) + 2n),
+      assetSlot(provider, pool, key).then((a) => getStorageAt(provider, pool, a + 2n)),
       getStorageAt(provider, pool, IMPL_SLOT),
     ]);
     const leg = decodeLegOracle(slot2);

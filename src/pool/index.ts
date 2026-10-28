@@ -198,6 +198,14 @@ export {
   readCurve,
   readOracleConfig,
   getStorageAt,
+  POOL_AREA_V10,
+  POOL_STORAGE_V10,
+  assetSlot,
+  curveSlot,
+  layoutOf,
+  readClassHead,
+  readCustody,
+  recordSlot,
 } from './storage.js';
 
 /**
