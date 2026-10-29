@@ -92,6 +92,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   /** Monad's USDT0 is USDT: one tape. */
   USDT0: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
   USDE: PEG_STABLE('USDE-USD'),
+  /** M0 USDat: one Ethereum Curve pool is its market; NXR composes USDAT-USDC from USDAT-USD. */
+  USDAT: PEG_STABLE('USDAT-USD', { nxrSymbol: 'USDAT-USDC' }),
   USDS: PEG_STABLE('USDS-USD', { nxrSymbol: 'USDS-USDC' }),
   DAI: PEG_STABLE('DAI-USD'),
   USD1: PEG_STABLE('USD1-USD', { nxrSymbol: 'USD1-USDC' }),
@@ -131,6 +133,9 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // MON-USDC, XAUT0 454557230336835584 = XAUT-USDC.
   WMON: { nxrSymbol: 'MON-USDC', band: [0.001, 1], refUsd: 0.028 },
   XAUT0: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
+  // Maple syrupUSDC: a USDC vault share (NAV ~1.19, accrues), never 1:1, so it carries a scale band.
+  // MITCH 458075667545718784 = SYRUPUSDC-USDC (rate-anchored onchain composite).
+  SYRUPUSDC: { nxrSymbol: 'SYRUPUSDC-USDC', band: [1, 2], refUsd: 1.19 },
   // BSC wrapped/bridged legs mark their underlying. Each pair is the one bnb.manifest.json's MITCH
   // ticker id names (NXR /v1/price echoes the id): WBNB 434436167548534784 = BNB-USDC, BTCB
   // 435315776850755584 = BTC-USDC, ETH 438724262896861184 = ETH-USDC (probed 2026-09-22).
