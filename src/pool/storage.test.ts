@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { buildCurve } from '../amm/aimm';
+import { keccak256 } from '../eth/index';
 import type { Eip1193Provider } from '../eth/types';
 import {
   MARK_STORE,
@@ -581,10 +582,11 @@ describe('layout v5', () => {
     expect([POOL_STORAGE_V5.classHead, POOL_STORAGE_V5.classRisk]).toEqual([16n, 17n]);
   });
 
-  test('store base is keccak256("btr.markstore") - 1', () => {
-    expect<bigint>(MARK_STORE.MS).toBe(
-      BigInt('0x8fb4340288f7429bd33c13abd02aa3c2145e859f37a071b10e8e034e391167ea') - 1n,
-    );
+  test('store base is the page-aligned keccak256("btr.markstore.p8.v3") - 1', () => {
+    const id = BigInt(keccak256(new TextEncoder().encode('btr.markstore.p8.v3')));
+    expect<bigint>(MARK_STORE.MS).toBe((id - 1n) & ~127n);
+    expect<bigint>(MARK_STORE.MS & 127n).toBe(0n);
+    expect([MARK_STORE.AUTH, MARK_STORE.META]).toEqual([0x20n, 0x21n]);
   });
 
   test('store word vectors match dex-evm MarkWordLib.t.sol and core', () => {
@@ -608,36 +610,37 @@ describe('layout v5', () => {
   });
 });
 
-/** P8 words dumped from dex-evm `MarkStoreP8Migrate.t.sol` (`_populate` + `_migrate`) at
- *  1_790_005_070; `W` = `Pool.fallback`'s answer per lane. Same fixture as core `p8_fixture`. */
+/** P8 words dumped from dex-evm `MarkStoreP8Migrate.t.sol` (`_populate`) at NOW; `W` =
+ *  `Pool.fallback`'s answer per lane. Same fixture as core `p8_fixture`. */
 describe('P8 mark store', () => {
+  const NOW = 1_790_609_870;
   const CLASSES = `0x${[
     '000000000000000000000000000000000000000000000000000000000a692249',
-    '00000000050032e100000a0065c200002581909600007d03212c000050032e10',
-    '0000000000000000000000000000000000000000000028019708000050032e10',
-    'd2902ddffc7ba527eb1ed63e8bf88f092300c656f2f2fbbec7791fea29ab5061',
+    '000000000500323fc0000a00647f80002581909600007d03212c0000500323fc',
+    '00000000000000000000000000000000000000000000280191fe0000500323fc',
+    '9f565915885d2711090cff7ae34213da4080440ed72d78f99086ab658acbc947',
   ].join('')}` as `0x${string}`;
   const P = [
-    '0x6ab14f4e1cf411a3bc223484f407a3bc2d931cf411a3bc22340cf7ffe3bc16d6',
-    '0x6ab14f4e1cf411acffcb6afcf411afb1b967fcf411ad043c0af8f411b474bb55',
-    '0x6ab14f4e0000000000000000000000000000fc03ffc00000001cf411af9131e6',
+    '0xaaea26c01c002823bc223484000023bc2d931c002823bc22340c03ffe3bc16d6',
+    '0xaaea26c01c00282cffcb6afc00282fb1b967fc00282d043c0af800283474bb55',
+    '0xaaea26200003ffc00000000003ffc0000000fc03ffc00000001c00002f9131e6',
   ] as const;
   const R = [
-    '0x6ab14f4e14f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d6',
-    '0x6ab14f4e08f411acffcb6afcf411afb1b96708f411ad043c0a08f411b474bb55',
-    '0x6ab14f4e0000000000000000000000000000fc03ffc000000014f7ffef9127a1',
+    '0xaae9d80014000023bc16d614000023bc16d614000023bc16d614000023bc16d6',
+    '0xaaea26200800002cffcb6afc00002fb1b9670800002d043c0a0800003474bb55',
+    '0xaae9d8000000000000000000000000000000fc03ffc00000001400002f9127a1',
   ] as const;
   const W = [
-    '00000007080002b5589fa7b3de0b6b0190708000180003a06ab13f4f67bc16d6',
-    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
-    '00000007080002b5589fa7b3de0b6b0190708001400003a06ab14f3067bc2d93',
-    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
-    '000000012c00013558a78444ba5daac32012c000000003a06ab14f0800000000',
-    '000000012c00013558a7843d821e05032012c000000003a06ab14f0800000000',
-    '000000012c00003558a78400000000032012c000000003a06ab14f0800000000',
-    '000000012c00013558a7843cffe5b5032012c000380003a06ab14f0879ffcb6a',
-    '000000012c0002b5589fa7bfc893d0832012c000380003a06ab14f087f9131e6',
-    '0000000708000035589fa7800000000190708000000000a06ab13f4f00000000',
+    '00000001fe0002b55d3b0033de0b6b01901fe000180000a06aba85b067bc16d6',
+    '00000001fe0002b55d3b0033de0b6b01901fe000380000a06aba898867bc2234',
+    '00000001fe0002b55d3b0033de0b6b01901fe001400000a06aba89b067bc2d93',
+    '00000001fe0002b55d3b0033de0b6b01901fe000380000a06aba898867bc2234',
+    '000000012c0001355d44c444ba5daac32012c000000001f46aba898800000000',
+    '000000012c0001355d44c43d821e05032012c000000001f46aba898800000000',
+    '000000012c0000355d44c400000000032012c000000001f46aba898800000000',
+    '000000012c0001355d44c43cffe5b5032012c0003800012c6aba898879ffcb6a',
+    '000000012c0002b55d3b003fc893d0832012c000380001f46aba89887f9131e6',
+    '00000001fe0000355d39000000000001901fe000000000a06aba858800000000',
   ];
   const cls = decodeP8Classes(CLASSES)!;
 
@@ -645,7 +648,7 @@ describe('P8 mark store', () => {
     for (let l = 0; l < 10; l++) {
       const floor = p8ClassOf(cls, l)[2];
       const want = `0x${floor.toString(16).padStart(6, '0')}${W[l]!.slice(6)}`;
-      expect<string>(p8StoreWord(P[l >> 2]!, R[l >> 2]!, l, cls)).toBe(want);
+      expect<string>(p8StoreWord(P[l >> 2]!, R[l >> 2]!, l, cls, NOW)).toBe(want);
     }
   });
 
@@ -660,7 +663,7 @@ describe('P8 mark store', () => {
     expect(hi).toBe(0xfa352b4280n);
     expect([p8Conf(31), p8Conf(32), p8Conf(60), p8Conf(61)]).toEqual([31, 36, 1000, 0xffff]);
     expect([p8Sigma(0x20, 160), p8Sigma(0x20, 5000)]).toEqual([256, 5000]);
-    expect(p8ClassOf(cls, 0)).toEqual([3600, 50, 160]);
+    expect(p8ClassOf(cls, 0)).toEqual([1020, 50, 160]);
     expect(p8ClassOf(cls, 7)).toEqual([600, 100, 300]);
     expect(p8ClassOf(cls, 10)).toEqual([0, 0, 0]);
     expect(p8TierSlot(2, 5)).toBe(MARK_STORE.MS + 17n);
@@ -686,8 +689,8 @@ describe('P8 mark store', () => {
         return slots.get(BigInt(params[1] as string)) ?? pad('0');
       },
     } as unknown as Eip1193Provider;
-    const m = await readMarks(provider, POOL, TOKEN);
-    const want = decodeStoreWord(p8StoreWord(P[1], R[1], 7, cls), {
+    const m = await readMarks(provider, POOL, TOKEN, NOW);
+    const want = decodeStoreWord(p8StoreWord(P[1], R[1], 7, cls, NOW), {
       internal: false,
       uoa: false,
       refBandBps: 0,

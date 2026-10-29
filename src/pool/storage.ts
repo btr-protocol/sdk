@@ -665,7 +665,7 @@ export const P8_CONF_TABLE = [
 export type P8Classes = { laneCls: bigint; clsA: bigint; clsB: bigint };
 
 const CLASSES_SELECTOR = '0x31e77853';
-const P8_STORE_ID = keccak256(new TextEncoder().encode('btr.markstore.p8'));
+const P8_STORE_ID = keccak256(new TextEncoder().encode('btr.markstore.p8.v3'));
 
 /** The P8 class table off a `classes()` return; `null` for any other store id. */
 export function decodeP8Classes(ret: Hex): P8Classes | null {
@@ -699,17 +699,23 @@ export function p8TierSlot(tier: 1 | 2, lane: number): bigint {
 /** `lane`'s store word from its P8 tier words: `Pool.fallback`'s decode plus the class minSigma at
  *  `MIN_SIGMA_SHIFT` (the D2b field), so `decodeStoreWord` reads it unchanged. Byte-identical to
  *  core `p8::store_word`. Lane at 56j: mant u24 | e6 24 | age u12 30 | σ8 42 | st u6 50 (62 halted,
- *  63 dark); clock u32 at 224. */
-export function p8StoreWord(pw: Hex, rw: Hex, lane: number, c: P8Classes): Hex {
+ *  63 dark); clock u32 at 224. Clock and age count 250 ms ticks mod 2^32, so the decode needs
+ *  `nowSecs` (the chain's `block.timestamp`). */
+export function p8StoreWord(pw: Hex, rw: Hex, lane: number, c: P8Classes, nowSecs: number): Hex {
   const sh = BigInt(56 * (lane & 3));
   const [P, R] = [BigInt(pw), BigInt(rw)];
   const [p, r] = [(P >> sh) & ((1n << 56n) - 1n), (R >> sh) & ((1n << 56n) - 1n)];
   const M30 = 0x3fffffffn;
+  const nt = BigInt(nowSecs) * 4n;
   if ((p & M30) === 0n && p >> 50n < 62n) return `0x${'0'.repeat(64)}`;
   const [ttl, maxDev, floor] = p8ClassOf(c, lane);
   const tier = (v: bigint, tw: bigint, cs: bigint): bigint => {
     const st = v >> 50n;
-    const obs = ((tw >> 224n) - ((v >> 30n) & 0xfffn)) & 0xffffffffn;
+    // The lane's tick (clock - age, mod 2^32) unwrapped to within +-2^31 ticks of now, floored to
+    // its second; 0 before genesis.
+    const d = (((tw >> 224n) - ((v >> 30n) & 0xfffn) - nt) & 0xffffffffn) ^ 0x80000000n;
+    const o = nt + d - 0x80000000n;
+    const obs = o > 0n ? o >> 2n : 0n;
     const live = st < 62n && (v & M30) !== 0n;
     const f = ((v & 0xffffffn) | ((v & 0x3f000000n) << 1n)) + 0x21000000n;
     return (obs << 32n) | (live ? f | (BigInt(p8Conf(Number(st))) << cs) : 0n);
@@ -739,11 +745,13 @@ async function readP8Classes(provider: Eip1193Provider, impl: Address): Promise<
   return c;
 }
 
-/** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live. */
+/** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live.
+ *  `nowSecs` is the chain time the P8 tick words are unwrapped against. */
 export async function readMarks(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
+  nowSecs = Math.floor(Date.now() / 1000),
 ): Promise<{ primary: MarkWord; ref: MarkWord } | null> {
   const version = layoutOf(await readStorageVersion(provider, pool));
   if (version < 3) return null;
@@ -760,7 +768,7 @@ export async function readMarks(
       getStorageAt(provider, impl, p8TierSlot(1, leg.lane)),
       getStorageAt(provider, impl, p8TierSlot(2, leg.lane)),
     ]);
-    return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls), leg);
+    return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls, nowSecs), leg);
   }
   if (version >= 4) {
     return decodeMarkWord(

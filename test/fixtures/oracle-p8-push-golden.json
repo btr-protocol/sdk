@@ -1,0 +1,134 @@
+{
+  "note": "publishMarks() calldata of wire 3 (store \"btr.markstore.p8.v3\", EIP-712 domain \"BTR ExternalOracleV4\" version \"3\", verifyingContract = factory for t=1, keccak(factory ++ uint8(2)) for t=2): per tier one segment t u8 | srcMs u48 (unix ms) | lane mask u64 | per set lane ascending markF u32 | code u8 (conf code, | 0x80 = sigma8 u8 follows) [| sigma8], then the quorum tail signer bitmap u16 (bit i = i-th signer of the address-ascending roster) | k x r,s,v in bit order. Lanes are the pool-v2 Monad order (0..3 volatile WMON WETH cbBTC XAUT0 in word 0, 4..9 stables, 10 WBTC, 11 USDC-USD); marks in 1e18 USD, sigma8 = sigmaCode(sigmaPbps) with no floor, conf code = confCode(confBps). segmentHex[t-1], digest[t-1] and calldataHex are derived by test/unit/MarkStoreP8Golden.t.sol (GOLDEN_WRITE=1) and landed there on a live store. Test keys only.",
+  "chainId": 31337,
+  "factory": "0x00000000000000000000000000000000000fAc70",
+  "relayer": "0x00000000000000000000000000000000007e1a7e",
+  "k": 2,
+  "srcMs": 1790000000250,
+  "segments": [
+    {
+      "tier": 1,
+      "pks": [
+        "0xa11ce",
+        "0xa11cf",
+        "0xa11d0"
+      ],
+      "signerBitmap": 3,
+      "lanes": [
+        {
+          "lane": 0,
+          "mark1e18": "21550000000000000",
+          "confBps": 3,
+          "sigmaPbps": 900
+        },
+        {
+          "lane": 1,
+          "mark1e18": "2512340000000000000000",
+          "confBps": 2,
+          "sigmaPbps": 600
+        },
+        {
+          "lane": 2,
+          "mark1e18": "110234500000000000000000",
+          "confBps": 2
+        },
+        {
+          "lane": 3,
+          "mark1e18": "3712400000000000000000",
+          "confBps": 4,
+          "sigmaPbps": 3000
+        },
+        {
+          "lane": 4,
+          "mark1e18": "1000300000000000000",
+          "confBps": 1
+        },
+        {
+          "lane": 5,
+          "mark1e18": "999800000000000000",
+          "confBps": 2,
+          "sigmaPbps": 250
+        },
+        {
+          "lane": 6,
+          "mark1e18": "1000100000000000000",
+          "confBps": 3
+        },
+        {
+          "lane": 7,
+          "mark1e18": "999500000000000000",
+          "confBps": 1
+        },
+        {
+          "lane": 8,
+          "mark1e18": "1000000000000000000",
+          "confBps": 2,
+          "sigmaPbps": 180
+        },
+        {
+          "lane": 9,
+          "mark1e18": "1000200000000000000",
+          "confBps": 1
+        },
+        {
+          "lane": 10,
+          "mark1e18": "110198000000000000000000",
+          "confBps": 3,
+          "sigmaPbps": 800
+        },
+        {
+          "lane": 11,
+          "mark1e18": "999900000000000000",
+          "confBps": 1
+        }
+      ]
+    },
+    {
+      "tier": 2,
+      "pks": [
+        "0xd00d",
+        "0xd00e",
+        "0xd00f"
+      ],
+      "signerBitmap": 5,
+      "lanes": [
+        {
+          "lane": 0,
+          "mark1e18": "21540000000000000",
+          "confBps": 5,
+          "sigmaPbps": 1200
+        },
+        {
+          "lane": 2,
+          "mark1e18": "110250000000000000000000",
+          "confBps": 3
+        },
+        {
+          "lane": 4,
+          "mark1e18": "1000200000000000000",
+          "confBps": 2
+        },
+        {
+          "lane": 10,
+          "mark1e18": "110201000000000000000000",
+          "confBps": 4,
+          "sigmaPbps": 700
+        },
+        {
+          "lane": 11,
+          "mark1e18": "1000000000000000000",
+          "confBps": 1001
+        }
+      ]
+    }
+  ],
+  "segmentHex": [
+    "0x0101a0c4506cfa0000000000000fff5d323e71833d7f106371823389757d30027f927fcc845867bc38f10167bc0019822067bc22340367bbddfe0167bc16d6821767bc2d930189755d87833967bc0b7801",
+    "0x0201a0c4506cfa0000000000000c155d321a10854389758aa10367bc2d930289756021843667bc16d63d"
+  ],
+  "digest": [
+    "0x327caab6edcd6ae57e11e9ca8b0ebeabec51abd0b9a584c31536d3e379332758",
+    "0x4767ce98324bc608f6ec2ed80679a4b750577ab7f2bb5e0b57f77bc011eb0673"
+  ],
+  "calldataHex": "0x013b64360101a0c4506cfa0000000000000fff5d323e71833d7f106371823389757d30027f927fcc845867bc38f10167bc0019822067bc22340367bbddfe0167bc16d6821767bc2d930189755d87833967bc0b78010003a318aabe66e816b6d789438fe822d46cf1fc97d72d5981c0871e87242fd8637605abeefe9225840f97a4782a7e205dc8316d708b4a3c1fde653e13022019509b1b27e183e0ab9f18dc11f7422ffc13b186b8dd1687d1ada28d1a71c6f4304931a16708eb3d7ff77a8ab146a17dc0a6148f83730c6a77e18664e5509fcae167a9331c0201a0c4506cfa0000000000000c155d321a10854389758aa10367bc2d930289756021843667bc16d63d0005241aaa7ec48d962673f9464e46c9ecf812fde0e31d6edab7baed63a71c4728f97a0167b822103bd1b3b07022c7570405da3a2e14b57c453d869b5a806a8d125f1b9c360c03facd1fa70ebba147ad8c9f2d96a580d42f3f6db01bb57a70a1799e644ea224ebbe1a0929e4ef5dada85e6fdb989990cd04cd05054c709a281626303b1b"
+}

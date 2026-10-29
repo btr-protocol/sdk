@@ -1,62 +1,71 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { privateKeyToAddress } from '../eth/client';
 import type { Hex } from '../eth/types';
 import { verifyPushP8 } from './p8';
 
-// Real Monad (143) `publishMarks` inputs as the keepers landed them, and the store's auth word
-// (`P8_AUTH_READ`) at the time: tier 1 in the high half, tier 2 in the low.
-const FACTORY = '0xbBBbBBBb323D7f7E51976b8A8DF2Bb4B4608d9B3' as const;
-const AUTH = 0xff46fcd2685aea76cbd1fc3788d4f942e67c3b9759a605d2d087570be44106e5n;
-const ctx = { factory: FACTORY, chainId: 143, auth: AUTH };
-const PRIMARY =
-  '0x013b6436016abe148000000000000000107f220280845b03310751cb9a7465a4c39f97a942b8ba09c467e21382072f290cf83f354015e0214b11a86ce004a737c570421d6755cb4099d21c84afbfbd17410f121c0202b1ea5d344fc5f4ce77a9f931a8eda0f5803c5e7c47e1c98589a5981fc907567816c598944dfe074a2102248a7d1e439cacd2cdbc3f8aa7aedd0eb470d5fa419da638e026787d7cf73759528a77aa9b8d6a1dfb8bdb1b03bf7096b12d4aa74ed1a8f6f4f7e4536a4a1cccb06907eb8efc91f341b732b4979180d34abdf53ce840ec374822f5896ace204e8e84bd71ccfb326de4ca925a799a1ccef0ccb95d1d24f1128d2587724639a31c' as Hex;
-const REFERENCE =
-  '0x013b6436026abe14b4000000000000000c891a8da0845a891a8da0845a032531c59b43e61dc1a2ee49838ad28ebd120d0c7337e9d77cc15bfe851fd3e8558130a6b2e2bb59107c4deff1dc8352f3f9d0a417404b25571941bef80202b1ea5d344fc5f4ce77a9f931a8eda0f5803c5e7c47e1c98589a5981fc907567816c598944dfe074a924fac0e8594f3a5156099962e650953df58bded64c18a53604df01cb6fc3d316d5c8415a857b4185e4c773dc5de44a7c430faa8507d84a55fbb0e2e3a59a3641cff5b57dc3390e2eb3f40ff66ff8768d8775add3fef9817fa4418487aa9c771221168c46394d5ff7a7e57c7722ab69ab291a2201d9757ddf4113d3bfe126f8c231c' as Hex;
+// dex-evm's wire 3 golden push (two segments, k = 2 of 3 per tier, test keys only), landed on a
+// live store by `MarkStoreP8Golden.t.sol`. Vendored as test/fixtures so a fresh clone runs it.
+const G = JSON.parse(
+  readFileSync(new URL('../../test/fixtures/oracle-p8-push-golden.json', import.meta.url), 'utf8'),
+) as {
+  chainId: number;
+  factory: `0x${string}`;
+  calldataHex: Hex;
+  segments: { signerBitmap: number; pks: string[] }[];
+};
+const word = (a: string): Hex => `0x${a.slice(2).padStart(64, '0')}`;
+/** The store's roster for a tier: signer addresses ascending, as `setAuth` seats them. */
+const rosterOf = (pks: string[]): Hex[] =>
+  pks
+    .map((pk) => privateKeyToAddress(`0x${pk.slice(2).padStart(64, '0')}` as Hex).toLowerCase())
+    .sort()
+    .map(word);
+const signers = { 1: rosterOf(G.segments[0].pks), 2: rosterOf(G.segments[1].pks) };
+// AUTH: tier t at bit 32 (t - 1): n = 3 | k = 2 << 8 | 1 relayer << 16.
+const tierCfg = 3n | (2n << 8n) | (1n << 16n);
+const AUTH = tierCfg | (tierCfg << 32n);
+const ctx = { factory: G.factory, chainId: G.chainId, auth: AUTH, signers };
 
-describe('publishMarks verification', () => {
-  test('a primary push: 2 signers on a roster the store committed to', () => {
-    const [s, ...rest] = verifyPushP8(PRIMARY, ctx);
-    expect(rest).toEqual([]);
-    expect({ tier: s.tier, lanes: s.lanes, k: s.k, committed: s.committed, ok: s.ok }).toEqual({
-      tier: 1,
-      lanes: 1,
-      k: 2,
-      committed: true,
-      ok: true,
-    });
-    expect(s.recovered.map((a) => a.toLowerCase())).toEqual([
-      '0x310751cb9a7465a4c39f97a942b8ba09c467e213',
-      '0x82072f290cf83f354015e0214b11a86ce004a737',
+describe('publishMarks verification (wire 3)', () => {
+  test('both segments verify against the stored roster', () => {
+    const segs = verifyPushP8(G.calldataHex, ctx);
+    expect(
+      segs.map((s) => ({ tier: s.tier, bitmap: s.bitmap, k: s.k, lanes: s.lanes, ok: s.ok })),
+    ).toEqual([
+      { tier: 1, bitmap: 0b011, k: 2, lanes: 12, ok: true },
+      { tier: 2, bitmap: 0b101, k: 2, lanes: 5, ok: true },
     ]);
-    expect(s.roster).toHaveLength(3);
+    expect(segs[0].srcMs).toBe(1790000000250);
   });
 
-  test('a reference push verifies under its own tier domain and auth half', () => {
-    const [s] = verifyPushP8(REFERENCE, ctx);
-    expect({ tier: s.tier, ok: s.ok }).toEqual({ tier: 2, ok: true });
+  test('a disabled signer, another chain or a tampered signature fails the quorum', () => {
+    const dis = { ...signers, 1: [...signers[1]] };
+    dis[1][0] = word(`0x${(BigInt(dis[1][0]) | (1n << 160n)).toString(16)}`);
+    expect(verifyPushP8(G.calldataHex, { ...ctx, signers: dis })[0].quorum).toBe(false);
+    expect(verifyPushP8(G.calldataHex, { ...ctx, chainId: 1 })[0].quorum).toBe(false);
+    // Flip a nibble inside the first segment's first signature's s: v stays valid.
+    const at = 2 + 2 * (4 + 15 + 12 * 5 + 2) + 80;
+    const f = G.calldataHex[at] === '0' ? '1' : '0';
+    const bad = `${G.calldataHex.slice(0, at)}${f}${G.calldataHex.slice(at + 1)}` as Hex;
+    expect(verifyPushP8(bad, ctx)[0].ok).toBe(false);
   });
 
-  test('the wrong tier half, a flipped signature byte, or another chain fail', () => {
-    // Swap the halves: each tier's roster no longer matches its commitment.
-    const swapped = (AUTH >> 128n) | ((AUTH & ((1n << 128n) - 1n)) << 128n);
-    expect(verifyPushP8(PRIMARY, { ...ctx, auth: swapped })[0].committed).toBe(false);
-    // Flip a nibble inside the last signature's s (v stays valid): it recovers to someone else.
-    const at = PRIMARY.length - 40;
-    const flipped = PRIMARY[at] === '0' ? '1' : '0';
-    const tampered = `${PRIMARY.slice(0, at)}${flipped}${PRIMARY.slice(at + 1)}` as Hex;
-    const t = verifyPushP8(tampered, ctx)[0];
-    expect(t.ok).toBe(false);
-    // The domain binds the chain: the same bytes recover to other addresses elsewhere.
-    expect(verifyPushP8(PRIMARY, { ...ctx, chainId: 1 })[0].quorum).toBe(false);
+  test('a bitmap bit at or above the stored n fails', () => {
+    const n2 = 2n | (2n << 8n) | (1n << 16n);
+    const segs = verifyPushP8(G.calldataHex, { ...ctx, auth: tierCfg | (n2 << 32n) });
+    expect(segs.map((s) => s.ok)).toEqual([true, false]);
   });
 
   test('a recovery byte the contract would reject throws', () => {
-    // The last signature's v: 27/28 on chain; 0/1 would recover here but revert in ecrecover.
-    const v0 = `${PRIMARY.slice(0, -2)}00` as Hex;
+    const cd = G.calldataHex;
+    const idx = cd.indexOf('0201a0c4506cfa'); // tier 2 header
+    const v0 = `${cd.slice(0, idx - 2)}00${cd.slice(idx)}` as Hex;
     expect(() => verifyPushP8(v0, ctx)).toThrow('recovery byte');
   });
 
   test('truncated or foreign calldata throws instead of verifying', () => {
-    expect(() => verifyPushP8(PRIMARY.slice(0, 120) as Hex, ctx)).toThrow();
+    expect(() => verifyPushP8(G.calldataHex.slice(0, 120) as Hex, ctx)).toThrow();
     expect(() => verifyPushP8('0xdeadbeef', ctx)).toThrow('not a publishMarks call');
   });
 });

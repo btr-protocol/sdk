@@ -91,6 +91,19 @@ export const MARK_STORE_ABI: Abi = [
   {
     inputs: [
       {
+        internalType: 'address',
+        name: 'signer',
+        type: 'address',
+      },
+    ],
+    name: 'disableSigner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'uint256',
         name: 't',
         type: 'uint256',
@@ -183,6 +196,25 @@ export const MARK_STORE_ABI: Abi = [
         name: 't',
         type: 'uint8',
       },
+    ],
+    name: 'rosterHash',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint8',
+        name: 't',
+        type: 'uint8',
+      },
       {
         internalType: 'address[]',
         name: 'signers',
@@ -202,6 +234,25 @@ export const MARK_STORE_ABI: Abi = [
     name: 'setAuth',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'signer',
+        type: 'address',
+      },
+    ],
+    name: 'signerDisabled',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: 'd',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
     type: 'function',
   },
   {
@@ -362,6 +413,19 @@ export const MARK_STORE_ABI: Abi = [
     type: 'event',
   },
   {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'signer',
+        type: 'address',
+      },
+    ],
+    name: 'SignerDisabled',
+    type: 'event',
+  },
+  {
     inputs: [],
     name: 'FutureTimestamp',
     type: 'error',
@@ -415,6 +479,22 @@ export const MARK_STORE_ABI: Abi = [
       },
     ],
     name: 'StaleData',
+    type: 'error',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: 'value',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'threshold',
+        type: 'uint256',
+      },
+    ],
+    name: 'ThresholdViolation',
     type: 'error',
   },
   {
