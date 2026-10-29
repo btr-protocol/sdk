@@ -11,7 +11,9 @@
 
 import { hexToBytes } from '@noble/hashes/utils.js';
 import type { Address, Hex } from '../eth/types';
+import { wireOf } from '../pool/storage';
 import { recoverDigestSigner, tierVerifier } from './eip712';
+import { type P8SegmentV2, verifyPushP8V2 } from './p8.v2';
 import { pushDigest } from './wire';
 
 /** `publishMarks()`. */
@@ -120,4 +122,21 @@ export function verifyPushP8(
     off = sigs + 65 * k;
   }
   return out;
+}
+
+export type P8Verified = { wire: 2; segments: P8SegmentV2[] } | { wire: 3; segments: P8Segment[] };
+
+/** Verify one `publishMarks` tx input against the wire the pool's `storageVersion` runs: 5..9 =
+ *  wire 2 (`p8.v2.ts`, `auth` = word `P8_AUTH_READ_V2`), 10 = wire 3 (`signers` required). Exact
+ *  match like `layoutOf`; any other version throws. */
+export function verifyPushP8At(
+  storageVersion: number,
+  calldata: Hex,
+  ctx: { factory: Address; chainId: number; auth: bigint; signers?: Record<1 | 2, Hex[]> },
+): P8Verified {
+  if (wireOf(storageVersion) === 2) {
+    return { wire: 2, segments: verifyPushP8V2(calldata, ctx) };
+  }
+  if (!ctx.signers) throw new Error('wire 3 verification needs the stored signer words');
+  return { wire: 3, segments: verifyPushP8(calldata, { ...ctx, signers: ctx.signers }) };
 }

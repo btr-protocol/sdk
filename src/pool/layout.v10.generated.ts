@@ -69,3 +69,22 @@ export const POOL_AREA_V10 = {
   /** `ClassHead` byte offsets in its record word. */
   CLASS_HEAD_OFFSETS: { family: 0, row: 1, famRow: 9 },
 } as const;
+
+/**
+ * Wire 3 `MarkStore` (`storageVersion() == 10`) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
+ * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds both tiers in the
+ * `MARK_WORD_V4` layout with the lane's σ floor at `MIN_SIGMA_SHIFT` in place of the mirror bits.
+ * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` (0x20) holds each tier's
+ * counts, tier `t` at bit `32 (t - 1)`: `n u8 | k u8 | nRelayers u8`; `META` (0x21) = `nLanes u8 |
+ * registered bitmap << 64`; signers at `0x30 + 16 (t - 1) + i`, relayers at `0x50 + 16 (t - 1) + i`.
+ * `MS` is page-aligned: `keccak256("btr.markstore.p8.v3") - 1`, low 7 bits cleared.
+ */
+export const MARK_STORE_V10 = {
+  MS: 0x9f565915885d2711090cff7ae34213da4080440ed72d78f99086ab658acbc900n,
+  AUTH: 0x20n,
+  META: 0x21n,
+  MIN_SIGMA_SHIFT: 232,
+  LANE_MASK: 63,
+  INTERNAL_BIT: 64,
+  UOA_BIT: 128,
+} as const;

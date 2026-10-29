@@ -1,7 +1,7 @@
 // `PoolStorage` layout v5 (`Pool.storageVersion() >= 5`, BNB): solc `storageLayout` of dex-evm
 // `out/Pool.sol/Pool.json`. No mark lives in the pool: slot 5 is reserved, the leg's oracle wiring
 // sits in `Asset` slot 2 and the marks live once, in the Pool impl's `MarkStore`
-// (`MARK_STORE`, one word per lane at `MS + lane`). Slot 6 is reserved too: each curve is an
+// (`MARK_STORE_V5`, one word per lane at `MS + lane`). Slot 6 is reserved too: each curve is an
 // immutable SSTORE2 blob at `curvePointer(pool, curveId)`. `coop` (slot 13) = a leg's
 // `swapCoop` terms, `discBps | rebateBps << 16`. `lpTag` (14, receipt branding) and `lpSyms`
 // (15, listed receipt SYMs) are appended at `storageVersion() >= 7`; on a v5/v6 pool both slots read
@@ -47,18 +47,17 @@ export const POOL_MAPPINGS_V5 = [
 ] as const;
 
 /**
- * `MarkStore` in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
+ * Wire 2 `MarkStore` (`storageVersion() 5..9`: Arc, Monad v1) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
  * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds both tiers in the
  * `MARK_WORD_V4` layout with the lane's σ floor at `MIN_SIGMA_SHIFT` in place of the mirror bits.
- * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` (0x20) holds each tier's
- * counts, tier `t` at bit `32 (t - 1)`: `n u8 | k u8 | nRelayers u8`; `META` (0x21) = `nLanes u8 |
- * registered bitmap << 64`; signers at `0x30 + 16 (t - 1) + i`, relayers at `0x50 + 16 (t - 1) + i`.
- * `MS` is page-aligned: `keccak256("btr.markstore.p8.v3") - 1`, low 7 bits cleared.
+ * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` holds both tiers' roster
+ * commitments: tier `t` in the u128 at bit `(2 - t) * 128`, the high 16 bytes of `keccak(roster)`.
  */
-export const MARK_STORE = {
-  MS: 0x9f565915885d2711090cff7ae34213da4080440ed72d78f99086ab658acbc900n,
-  AUTH: 0x20n,
-  META: 0x21n,
+export const MARK_STORE_V5 = {
+  MS: 0x8fb4340288f7429bd33c13abd02aa3c2145e859f37a071b10e8e034e391167e9n,
+  AUTH: 0x40n,
+  META: 0x44n,
+  ANCHOR: 0x80n,
   MIN_SIGMA_SHIFT: 232,
   LANE_MASK: 63,
   INTERNAL_BIT: 64,
