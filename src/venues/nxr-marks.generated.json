@@ -21,6 +21,14 @@
       "symbol": "USDE-USD"
     }
   },
+  "USDAT": {
+    "usd": {
+      "symbol": "USDAT-USD"
+    },
+    "usdc": {
+      "symbol": "USDAT-USDC"
+    }
+  },
   "USDS": {
     "usd": {
       "symbol": "USDS-USD"
@@ -170,6 +178,14 @@
     },
     "usdc": {
       "symbol": "XAUT-USDC"
+    }
+  },
+  "SYRUPUSDC": {
+    "usd": {
+      "symbol": "SYRUPUSDC-USDC"
+    },
+    "usdc": {
+      "symbol": "SYRUPUSDC-USDC"
     }
   },
   "WBNB": {

@@ -92,7 +92,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   /** Monad's USDT0 is USDT: one tape. */
   USDT0: PEG_STABLE('USDT-USD', { nxrSymbol: 'USDT-USDC' }),
   USDE: PEG_STABLE('USDE-USD'),
-  /** M0 USDat: one Ethereum Curve pool is its market; NXR composes USDAT-USDC from USDAT-USD. */
+  /** M0 USDat: one Ethereum Curve pool is its market; NXR composes USDAT-USDC from USDAT-USD.
+   *  Ticker 459285130336272384 (MITCH asset 24501), Monad pool v2 lane gi 11 = signer idx 38. */
   USDAT: PEG_STABLE('USDAT-USD', { nxrSymbol: 'USDAT-USDC' }),
   USDS: PEG_STABLE('USDS-USD', { nxrSymbol: 'USDS-USDC' }),
   DAI: PEG_STABLE('DAI-USD'),
@@ -134,7 +135,8 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   WMON: { nxrSymbol: 'MON-USDC', band: [0.001, 1], refUsd: 0.028 },
   XAUT0: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
   // Maple syrupUSDC: a USDC vault share (NAV ~1.19, accrues), never 1:1, so it carries a scale band.
-  // MITCH 458075667545718784 = SYRUPUSDC-USDC (rate-anchored onchain composite).
+  // Ticker 458075667545718784 (MITCH asset 23401) = SYRUPUSDC-USDC (rate-anchored onchain
+  // composite), Monad pool v2 lane gi 12 = signer idx 37.
   SYRUPUSDC: { nxrSymbol: 'SYRUPUSDC-USDC', band: [1, 2], refUsd: 1.19 },
   // BSC wrapped/bridged legs mark their underlying. Each pair is the one bnb.manifest.json's MITCH
   // ticker id names (NXR /v1/price echoes the id): WBNB 434436167548534784 = BNB-USDC, BTCB
