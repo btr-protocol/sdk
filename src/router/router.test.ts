@@ -235,3 +235,27 @@ describe('buildSwapCalls', () => {
     expect(calls.filter((c) => c.data.startsWith(SWAP_SEL)).length).toBe(2);
   });
 });
+
+describe('approve reset (USDT-style tokens)', () => {
+  const leg: ExecLeg = {
+    pool: POOL_S,
+    tokenIn: USDC,
+    tokenOut: USDT,
+    amountIn: 1000n,
+    quotedOut: 995n,
+    minOut: 995n,
+  };
+  const approves = (allowance?: bigint) =>
+    buildSwapCalls([leg], { recipient: USER, allowance: () => allowance })
+      .filter((c) => c.data.startsWith(APPROVE_SEL))
+      .map((c) => approveAmount(c.data));
+
+  test('0 < allowance < need resets to 0 first', () => {
+    expect(approves(400n)).toEqual([0n, 1000n]);
+  });
+  test('zero, covering or unread allowance keeps one approve', () => {
+    expect(approves(0n)).toEqual([1000n]);
+    expect(approves(1000n)).toEqual([1000n]);
+    expect(approves(undefined)).toEqual([1000n]);
+  });
+});

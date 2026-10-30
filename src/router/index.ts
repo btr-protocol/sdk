@@ -70,6 +70,9 @@ export interface BuildOpts {
   /** Return false to SKIP a token→pool approval (e.g. cached allowance already covers it). Called once
    *  per unique (tokenIn, pool). Default: emit an approval for every non-native leg that needs one. */
   needsApproval?: (tokenIn: Address, pool: Address, amountIn: bigint) => boolean;
+  /** The spender's current allowance when the caller read it. A nonzero allowance below the new
+   *  amount gets `approve(spender, 0)` first: USDT-style tokens revert nonzero -> nonzero. */
+  allowance?: (token: Address, spender: Address) => bigint | undefined;
   /** When true, approve max uint256 (reuse forever). When false/omitted (default), approve only the
    *  exact Σ amountIn for that (token, pool): standard exact-amount approve + swap. */
   approveMax?: boolean;
@@ -250,6 +253,20 @@ function orderedParts(plan: SwapPlan): SwapPlan['parts'] {
 
 /** Single call pipeline: one encoder per EIP-5792 call shape, shared by the direct N-call path,
  *  the on-chain router path, and the LP batches — identical bytes, one owner. */
+/** [approve(0)?, approve(amount)]: the reset only when a read allowance sits strictly between 0
+ *  and the amount (USDT-style tokens refuse nonzero -> nonzero). */
+function approveCalls(
+  token: Address,
+  spender: Address,
+  amount: bigint,
+  opts: Pick<BuildOpts, 'allowance'>,
+): ExecCall[] {
+  const cur = opts.allowance?.(token, spender);
+  const reset =
+    cur !== undefined && cur > 0n && cur < amount ? [approveCall(token, spender, 0n)] : [];
+  return [...reset, approveCall(token, spender, amount)];
+}
+
 function approveCall(token: Address, spender: Address, amount: bigint): ExecCall {
   return {
     to: token,
@@ -550,7 +567,7 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
       leg.wrapIn || !opts.needsApproval ? true : opts.needsApproval(leg.tokenIn, leg.pool, amount);
     if (need && !seen.has(key)) {
       seen.add(key);
-      approvals.push(approveCall(leg.tokenIn, leg.pool, amount));
+      approvals.push(...approveCalls(leg.tokenIn, leg.pool, amount, opts));
     }
   }
   const wrap: ExecCall[] =
@@ -655,7 +672,7 @@ export function buildDepositCalls(
   }
   const amount = opts.approveMax ? MAX_UINT256 : args.amount;
   const need = !opts.needsApproval ? true : opts.needsApproval(args.token, pool, amount);
-  const approval: ExecCall[] = need ? [approveCall(args.token, pool, amount)] : [];
+  const approval: ExecCall[] = need ? approveCalls(args.token, pool, amount, opts) : [];
   return [
     ...approval,
     {
@@ -958,7 +975,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
 export function buildRouterApprovalCalls(
   router: Address,
   rp: RouterPlan,
-  opts: Pick<BuildOpts, 'needsApproval' | 'approveMax' | 'wrappedNative'>,
+  opts: Pick<BuildOpts, 'needsApproval' | 'approveMax' | 'wrappedNative' | 'allowance'>,
 ): ExecCall[] {
   const totals = new Map<string, { token: Address; amount: bigint }>();
   for (const part of rp.parts) {
@@ -979,7 +996,7 @@ export function buildRouterApprovalCalls(
     // caller's cached-allowance probe read a pre-batch state that cannot cover it.
     const wrapped = rp.wrapValue > 0n && token.toLowerCase() === opts.wrappedNative?.toLowerCase();
     if (!wrapped && opts.needsApproval && !opts.needsApproval(token, router, amount)) continue;
-    calls.push(approveCall(token, router, opts.approveMax ? MAX_UINT256 : amount));
+    calls.push(...approveCalls(token, router, opts.approveMax ? MAX_UINT256 : amount, opts));
   }
   return calls;
 }
