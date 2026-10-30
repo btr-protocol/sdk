@@ -15,7 +15,7 @@ import type { Address, Hex } from '../eth/index.js';
 import { normalizeAddress } from '../eth/types.js';
 import { mitchFeedId } from '../oracle/mitch.js';
 import { type ChainVenue, DEPLOYED_VENUES, SERVED_CHAINS } from './deployments.generated.js';
-import { nxrMark } from './nxr.js';
+import { staticRefUsd } from './nxr.js';
 
 export type VenueKind = 'btr';
 
@@ -105,7 +105,7 @@ export function activeOracle(chainId: number): Address {
 export function activeRefMarksUsd(chainId: number): Record<string, number> {
   const out: Record<string, number> = {};
   for (const sym of Object.keys(chainVenue(chainId).tokens)) {
-    const m = nxrMark(sym)?.refUsd;
+    const m = staticRefUsd(sym);
     if (m !== undefined) out[sym] = m;
   }
   return out;

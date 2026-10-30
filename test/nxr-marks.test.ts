@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { NXR_MARKS, closedUntil, mdBase, nxrMark, nxrPair } from '../src/venues/nxr';
-import { chainVenue } from '../src/venues/registry';
+import { NXR_MARKS, closedUntil, mdBase, nxrMark, nxrPair, staticRefUsd } from '../src/venues/nxr';
+import { activeRefMarksUsd, chainVenue } from '../src/venues/registry';
 
 /**
  * `NXR_MARKS` is the only statement of where an asset's mark comes from, and the deploy ceremony
@@ -216,4 +216,11 @@ test('mdBase: charts/tickers key on the NXR ticker, not the roster leg', () => {
   };
   for (const [leg, base] of Object.entries(want)) expect(mdBase(leg)).toBe(base);
   expect(mdBase('NOPE')).toBe('NOPE');
+});
+
+test('an accruing vault share has no static USD ref (sizing falls back)', () => {
+  expect(nxrMark('SYRUPUSDC')?.refUsd).toBeGreaterThan(0); // still the band anchor
+  expect(staticRefUsd('SYRUPUSDC')).toBeUndefined();
+  expect(staticRefUsd('WETH')).toBeGreaterThan(0);
+  for (const id of [143]) expect(activeRefMarksUsd(id).SYRUPUSDC).toBeUndefined();
 });

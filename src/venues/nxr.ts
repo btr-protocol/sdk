@@ -70,9 +70,19 @@ interface NxrMark extends NxrPair {
    *  it catches a 1e3 fat-finger or an inverted pair, not a market move. Absent ⇒ the caller applies
    *  its peg band, so a non-peg asset MUST carry one or it fails at 0.98. */
   band?: readonly [number, number];
-  /** Sizing fallback in USD while the live oracle is stale. Never a price source. */
+  /** Sizing fallback in USD while the live oracle is stale. Never a price source. For an
+   *  `accrues` asset it only anchors `band` (scale guard) and is read through `staticRefUsd`. */
   refUsd?: number;
+  /** NAV accrues (vault share): `refUsd` goes stale, so `staticRefUsd` refuses it. */
+  accrues?: true;
 }
+
+/** The static USD ref for sizing/display fallback; `undefined` for an `accrues` asset (a frozen
+ *  NAV would mis-size seeds and any fallback valuation) and for an unlisted symbol. */
+export const staticRefUsd = (symbol: string): number | undefined => {
+  const m = nxrMark(symbol);
+  return m?.accrues ? undefined : m?.refUsd;
+};
 
 const PEG_STABLE = (nxrSymbol: string, usdc?: NxrPair): NxrMark => ({ nxrSymbol, usdc, refUsd: 1 });
 
@@ -137,7 +147,7 @@ export const NXR_MARKS: Record<string, NxrMark> = {
   // Maple syrupUSDC: a USDC vault share (NAV ~1.19, accrues), never 1:1, so it carries a scale band.
   // Ticker 458075667545718784 (MITCH asset 23401) = SYRUPUSDC-USDC (rate-anchored onchain
   // composite), Monad pool v2 lane gi 12 = signer idx 37.
-  SYRUPUSDC: { nxrSymbol: 'SYRUPUSDC-USDC', band: [1, 2], refUsd: 1.19 },
+  SYRUPUSDC: { nxrSymbol: 'SYRUPUSDC-USDC', band: [1, 2], refUsd: 1.19, accrues: true },
   // BSC wrapped/bridged legs mark their underlying. Each pair is the one bnb.manifest.json's MITCH
   // ticker id names (NXR /v1/price echoes the id): WBNB 434436167548534784 = BNB-USDC, BTCB
   // 435315776850755584 = BTC-USDC, ETH 438724262896861184 = ETH-USDC (probed 2026-09-22).
