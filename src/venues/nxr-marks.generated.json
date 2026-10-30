@@ -326,8 +326,8 @@
   },
   "QCAD": {
     "usd": {
-      "symbol": "USD-CAD",
-      "invert": true
+      "symbol": "CAD-USD",
+      "served": "USD-CAD"
     },
     "usdc": {
       "symbol": "CAD-USDC"
@@ -343,14 +343,14 @@
   },
   "BRLA": {
     "usd": {
-      "symbol": "USD-BRL",
-      "invert": true
+      "symbol": "BRL-USD",
+      "served": "USD-BRL"
     }
   },
   "JPYC": {
     "usd": {
-      "symbol": "USD-JPY",
-      "invert": true
+      "symbol": "JPY-USD",
+      "served": "USD-JPY"
     },
     "usdc": {
       "symbol": "JPY-USDC"
@@ -358,8 +358,8 @@
   },
   "KRW1": {
     "usd": {
-      "symbol": "USD-KRW",
-      "invert": true
+      "symbol": "KRW-USD",
+      "served": "USD-KRW"
     },
     "usdc": {
       "symbol": "KRW-USDC"

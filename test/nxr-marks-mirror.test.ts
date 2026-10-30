@@ -17,3 +17,16 @@ test('every feed of every deployed chain has a mark source', () => {
       expect(nxrMark(sym) ?? nxrMark(`${sym}B`), `${v.chainId} ${name}`).not.toBeNull();
     }
 });
+
+test('an inverted row carries the denominated pair AND the served reciprocal', () => {
+  const rows = Object.entries(marks).filter(
+    ([k, v]) => !k.startsWith('_') && 'served' in (v as { usd: object }).usd,
+  );
+  expect(rows.length).toBeGreaterThan(0);
+  for (const [sym, v] of rows) {
+    const { symbol, served } = (v as { usd: { symbol: string; served: string } }).usd;
+    const [b, q] = symbol.split('-');
+    expect([sym, served]).toEqual([sym, `${q}-${b}`]);
+    expect([sym, symbol]).toEqual([sym, `${b}-USD`]);
+  }
+});

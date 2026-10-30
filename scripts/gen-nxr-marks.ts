@@ -11,16 +11,17 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NXR_MARKS, nxrPair } from '../src/venues/nxr';
 
-type Basis = { symbol: string; invert?: true };
+/** `symbol` is the pair the mark is DENOMINATED in (what the record carries); `served` is the pair
+ *  NXR actually serves when it only carries the reciprocal (the mid is inverted back). */
+type Basis = { symbol: string; served?: string };
 
-/** `usd` is the denominated row (the reciprocal served pair, inverted back, when NXR only carries
- *  that); `usdc` is the declared USDC basis, absent when the asset has none. */
+/** `usd` is the denominated row (with `served` when NXR only carries the reciprocal); `usdc` is the declared USDC basis, absent when the asset has none. */
 export function marksJson(): Record<string, unknown> {
   const out: Record<string, { usd: Basis; usdc?: Basis }> = {};
   for (const [sym, m] of Object.entries(NXR_MARKS)) {
     const usdc = nxrPair(sym, 'USDC');
     out[sym] = {
-      usd: m.nxrQuote ? { symbol: m.nxrQuote, invert: true } : { symbol: m.nxrSymbol },
+      usd: m.nxrQuote ? { symbol: m.nxrSymbol, served: m.nxrQuote } : { symbol: m.nxrSymbol },
       ...(usdc && { usdc: { symbol: usdc.nxrSymbol } }),
     };
   }
