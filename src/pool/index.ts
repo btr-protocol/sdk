@@ -145,6 +145,18 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
+export {
+  bandRefusesEntry,
+  cToll,
+  depositShares,
+  entryGapPbps,
+  exposureTollPbps,
+  hopSpreadPbps,
+  legSpreadPbps,
+  minLpOut,
+  staleExcess,
+} from './lpToll.js';
+export type { TollHop, TollLeg } from './lpToll.js';
 export type {
   LiabLeg,
   SwapLiabilityQuote,
@@ -334,6 +346,8 @@ interface SwapParams {
 interface DepositParams {
   token: Address;
   amount: bigint;
+  /** `Pool.depositMin` share floor; absent sends plain `deposit` (no floor). */
+  minLpOut?: bigint;
   /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
 }
@@ -408,11 +422,14 @@ export async function deposit(
   params: DepositParams,
 ): Promise<Hex> {
   await checkExpectedChain(provider, params.expectedChainId);
-  const calldata = encodeFn({
-    abi: POOL_ABI,
-    functionName: 'deposit',
-    args: [params.token, params.amount],
-  });
+  const calldata =
+    params.minLpOut === undefined
+      ? encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [params.token, params.amount] })
+      : encodeFn({
+          abi: POOL_ABI,
+          functionName: 'depositMin',
+          args: [params.token, params.amount, params.minLpOut],
+        });
 
   return (await provider.request({
     method: 'eth_sendTransaction',

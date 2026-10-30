@@ -37,7 +37,14 @@ export interface LpRouteOpts {
   liquidityIndexWad?: (symbol: string) => number;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: BackendConvertOpts & { meta: WireMeta };
+  /** The pool's C-exposure half-spread (PBPS, `exposureTollPbps`) an ENTRY pays: deposits mint
+   *  `(amt - toll)/C`. Absent reads 0 (a balanced pool); a caller that can read the marks sets it. */
+  entryTollPbps?: number;
+  /** Same, for an EXIT (2·maxDev basis): the payout is `out·(1 - toll)`. */
+  exitTollPbps?: number;
 }
+
+const tollKeep = (pbps: number | undefined): number => 1 - (pbps ?? 0) / 1e6;
 
 const needBackend = (opts: LpRouteOpts): BackendConvertOpts & { meta: WireMeta } => {
   if (!opts.backend) throw new Error('lpRoutes: backend SSOT required (no TS pricer)');
@@ -335,9 +342,9 @@ async function marketMint(
   return {
     id: 'market-first',
     label: 'market swap, then deposit',
-    out: plan.amountOut / c,
+    out: (plan.amountOut * tollKeep(opts.entryTollPbps)) / c,
     // The deposit takes Σ final-leg floors and mints at C: that is the face the batch guarantees.
-    minOut: depositFloor / c,
+    minOut: (depositFloor * tollKeep(opts.entryTollPbps)) / c,
     hops: steps.length,
     steps,
     feasible: true,
@@ -395,7 +402,7 @@ async function transferMint(
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
   // The deposit mints face `amountIn / C`; that face is what the liability swap then burns.
-  const faceIn = amountIn / c;
+  const faceIn = (amountIn * tollKeep(opts.entryTollPbps)) / c;
   shell.steps[1].amountIn = faceIn;
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
@@ -443,8 +450,8 @@ export async function rankDeposit(
       label: 'direct deposit',
       feasible: c !== null,
       ...(c === null ? { reason: 'feed-unavailable' } : {}),
-      out: c === null ? 0 : amountIn / c,
-      minOut: c === null ? 0 : amountIn / c,
+      out: c === null ? 0 : (amountIn * tollKeep(opts.entryTollPbps)) / c,
+      minOut: c === null ? 0 : (amountIn * tollKeep(opts.entryTollPbps)) / c,
       hops: 1,
       steps: [
         {
@@ -489,7 +496,7 @@ async function crossExit(
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
-  const fair = withdrawValue * c;
+  const fair = withdrawValue * c * tollKeep(opts.exitTollPbps);
   const convert = backendConvert(holder.state, targetSym, outToken, b);
   let q: Awaited<ReturnType<typeof convert>>;
   try {
@@ -643,9 +650,11 @@ export async function rankRedeem(
     if (!gated.feasible) return { best: null, routes: [gated] };
     const slip = opts.slippageFrac;
     // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
-    // the hatch stays open. The exit toll is not modelled: the caller's slippage must cover it.
+    // the hatch stays open. `exitTollPbps` is the C-exposure toll taken off the payout.
     const cap = poolExitCap(holder.state);
-    const actual = exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap);
+    const actual =
+      exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap) *
+      tollKeep(opts.exitTollPbps);
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;

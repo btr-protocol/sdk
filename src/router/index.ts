@@ -605,6 +605,8 @@ interface MarketMintArgs {
   /** Deposit size: pass Σ per-part minOut (the guaranteed floor); anything above it stays with
    *  the user as target tokens. Deposits mint at index by design; no price guard exists. */
   depositAmount: bigint;
+  /** `Pool.depositMin` floor on the shares minted (see `minLpOut`); absent sends plain `deposit`. */
+  minLpOut?: bigint;
 }
 interface TransferMintArgs {
   /** 'transfer': Route B, [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
@@ -616,6 +618,16 @@ interface TransferMintArgs {
   /** Shares the deposit mints for THIS sender (post-dead-seed estimate: amt·WAD/idx − dead). */
   lpAmountIn: bigint;
   minLpAmountOut: bigint;
+  /** `Pool.depositMin` floor on the shares minted; absent sends plain `deposit`. */
+  minLpOut?: bigint;
+}
+
+/** `deposit(token, amount)`, or `depositMin(token, amount, minLpOut)` when a floor is given. A
+ *  separate name, not an overload: the ABI keeps one `deposit`. */
+export function depositCallData(token: Address, amount: bigint, minLpOut?: bigint): Hex {
+  return minLpOut === undefined
+    ? encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [token, amount] })
+    : encodeFn({ abi: POOL_ABI, functionName: 'depositMin', args: [token, amount, minLpOut] });
 }
 
 export function buildDepositCalls(
@@ -630,11 +642,7 @@ export function buildDepositCalls(
       ...swaps,
       {
         to: pool,
-        data: encodeFn({
-          abi: POOL_ABI,
-          functionName: 'deposit',
-          args: [args.depositToken, args.depositAmount],
-        }),
+        data: depositCallData(args.depositToken, args.depositAmount, args.minLpOut),
         value: 0n,
       },
     ];
@@ -652,7 +660,7 @@ export function buildDepositCalls(
     ...approval,
     {
       to: pool,
-      data: encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [args.token, args.amount] }),
+      data: depositCallData(args.token, args.amount, args.minLpOut),
       value: 0n,
     },
     {
