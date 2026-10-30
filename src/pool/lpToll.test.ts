@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import vectors from '../../test/fixtures/lp-toll-vectors.json';
 import { buildDepositCalls } from '../router/index';
 import { rankDeposit } from '../router/lpRoutes';
-import { deposit } from './index';
+import { deposit, simulateDeposit } from './index';
 import {
   bandRefusesEntry,
   cToll,
@@ -102,6 +102,25 @@ describe('depositMin plumbing', () => {
     await deposit(provider as never, POOL, { token: TOK, amount: 5n, minLpOut: 4n });
     await deposit(provider as never, POOL, { token: TOK, amount: 5n });
     expect(sent[0].length).toBeGreaterThan(sent[1].length);
+  });
+});
+
+describe('simulateDeposit reads the minted shares off the real entrypoint', () => {
+  test('the first word of DepositResult, from the caller', async () => {
+    const calls: { from?: string; to?: string }[] = [];
+    const word = (v: bigint) => v.toString(16).padStart(64, '0');
+    const provider = {
+      request: async ({ params }: { params?: unknown[] }) => {
+        calls.push(params?.[0] as { from?: string });
+        return `0x${word(999n)}${word(1000n)}${word(7n)}`;
+      },
+    };
+    const USER = `0x${'44'.repeat(20)}` as `0x${string}`;
+    const POOL = `0x${'11'.repeat(20)}` as `0x${string}`;
+    const TOK = `0x${'22'.repeat(20)}` as `0x${string}`;
+    expect(await simulateDeposit(provider as never, POOL, USER, TOK, 1000n)).toBe(999n);
+    expect(calls[0].from).toBe(USER);
+    expect(calls[0].to).toBe(POOL);
   });
 });
 

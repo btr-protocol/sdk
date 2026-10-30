@@ -447,6 +447,28 @@ export async function deposit(
 }
 
 /**
+ * The shares `deposit(token, amount)` would mint for `from` right now: an `eth_call` of the real
+ * entrypoint, so every toll, rate and dead-share seed the chain applies is in the number and no
+ * replica can drift. Needs `from`'s balance and allowance to the pool (the pull runs first): call
+ * it after the approval has mined. Feed `minLpOut(shares, slippageBps)` to `depositMin`.
+ */
+export async function simulateDeposit(
+  provider: Eip1193Provider,
+  poolAddress: Address,
+  from: Address,
+  token: Address,
+  amount: bigint,
+): Promise<bigint> {
+  const data = encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [token, amount] });
+  const result = (await provider.request({
+    method: 'eth_call',
+    params: [{ from, to: poolAddress, data, value: txValue(token, amount) }, 'latest'],
+  })) as Hex;
+  return decodeFn<{ lpAmount: bigint }>({ abi: POOL_ABI, functionName: 'deposit', data: result })
+    .lpAmount;
+}
+
+/**
  * Execute a withdraw transaction
  */
 export async function withdraw(
