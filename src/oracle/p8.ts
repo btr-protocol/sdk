@@ -13,7 +13,7 @@ import { hexToBytes } from '@noble/hashes/utils.js';
 import type { Address, Hex } from '../eth/types';
 import { wireOf } from '../pool/storage';
 import { recoverDigestSigner, tierVerifier } from './eip712';
-import { type P8SegmentV2, verifyPushP8V2 } from './p8.v2';
+import { type P8Entry, type P8SegmentV2, readLaneEntry, verifyPushP8V2 } from './p8.v2';
 import { pushDigest } from './wire';
 
 /** `publishMarks()`. */
@@ -39,6 +39,8 @@ export interface P8Segment {
   srcMs: number;
   /** Lanes the segment carries (the store may skip a halted or non-advancing one). */
   lanes: number;
+  /** The carried lanes' signed entries, in lane order. */
+  entries: P8Entry[];
   /** Signer bitmap: bit i = signer i of the tier's stored roster. */
   bitmap: number;
   /** The stored threshold; the bitmap must set exactly k bits. */
@@ -77,12 +79,16 @@ export function verifyPushP8(
     if (mask === 0n) throw new Error('empty lane mask');
     let p = off + 15;
     let lanes = 0;
-    for (; mask !== 0n; mask >>= 1n) {
+    const entries: P8Entry[] = [];
+    for (let lane = 0; mask !== 0n; mask >>= 1n, lane++) {
       if ((mask & 1n) === 0n) continue;
       need(p + 5);
       // `_lane` reverts on a conf code above CONF_MAX.
       if ((b[p + 4] & 0x7f) > P8_CONF_MAX) throw new Error('lane conf code out of range');
-      p += b[p + 4] & 0x80 ? 6 : 5;
+      need(p + (b[p + 4] & 0x80 ? 6 : 5));
+      const r = readLaneEntry(b, p, lane);
+      entries.push(r.e);
+      p += r.n;
       lanes++;
     }
     const cfg = ctx.auth >> BigInt(32 * (tier - 1));
@@ -118,7 +124,7 @@ export function verifyPushP8(
         const w = ctx.signers[tier][bit];
         return w !== undefined && BigInt(w) === BigInt(recovered[j].toLowerCase());
       });
-    out.push({ tier, srcMs, lanes, bitmap, k, recovered, quorum, ok: quorum });
+    out.push({ tier, srcMs, lanes, entries, bitmap, k, recovered, quorum, ok: quorum });
     off = sigs + 65 * k;
   }
   return out;

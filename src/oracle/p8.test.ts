@@ -114,3 +114,20 @@ describe('version dispatch', () => {
     for (const v of [4, 11]) expect(() => verifyPushP8At(v, W2, w2ctx)).toThrow();
   });
 });
+
+describe('signed lane entries (bind a displayed price to the signature)', () => {
+  test('entries carry the lane index and the signed mark of the golden push', () => {
+    const segs = verifyPushP8(G.calldataHex, ctx);
+    for (const [i, s] of segs.entries()) {
+      const want = (G.segments[i] as unknown as { lanes: { lane: number; mark1e18: string }[] })
+        .lanes;
+      expect(s.entries).toHaveLength(s.lanes);
+      expect(s.entries.map((e) => e.lane)).toEqual(want.map((l) => l.lane));
+      for (const [j, e] of s.entries.entries()) {
+        const w = BigInt(want[j].mark1e18);
+        const rel = Number(e.mark1e18 > w ? e.mark1e18 - w : w - e.mark1e18) / Number(w);
+        expect(rel).toBeLessThan(1e-6); // 25-bit mantissa
+      }
+    }
+  });
+});

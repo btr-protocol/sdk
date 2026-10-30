@@ -24,12 +24,49 @@ const P8_CONF_MAX = 61;
 /** The store's raw read of its auth word: byte `0x80 | AUTH (0x40)` (`Pool.fallback`'s raw path). */
 export const P8_AUTH_READ_V2: Hex = '0xc0';
 
+/** One lane entry as the store reads it: `markF u32 | code u8 [| σ8 u8]`. The signatures cover
+ *  these bytes, so this is the signed price a UI can bind a displayed number to. */
+export interface P8Entry {
+  /** Lane index = bit position in the segment's lane mask. */
+  lane: number;
+  /** The signed mark, 1e18 per unit in the pool's catalog unit (25-bit mantissa, so ~3e-8 exact). */
+  mark1e18: bigint;
+  /** Conf code (7 bits). */
+  confCode: number;
+  /** σ8 code when the entry carries one. */
+  sigma8?: number;
+}
+
+/** `markF` float (`mant u25 | exp7 << 25`) as 1e18: `mant << (exp - 16)`, right shift below 16. */
+const markF = (f: number): bigint => {
+  const mant = BigInt(f & 0x1ffffff);
+  const e = BigInt((f >>> 25) & 0x7f);
+  return e >= 16n ? mant << (e - 16n) : mant >> (16n - e);
+};
+
+/** The entry at `p` for `lane`, and its byte length (5, or 6 with σ8). Caller has bounds-checked. */
+export function readLaneEntry(b: Uint8Array, p: number, lane: number): { e: P8Entry; n: number } {
+  const f = new DataView(b.buffer, b.byteOffset + p, 4).getUint32(0);
+  const withSigma = (b[p + 4] & 0x80) !== 0;
+  return {
+    e: {
+      lane,
+      mark1e18: markF(f),
+      confCode: b[p + 4] & 0x7f,
+      ...(withSigma && { sigma8: b[p + 5] }),
+    },
+    n: withSigma ? 6 : 5,
+  };
+}
+
 export interface P8SegmentV2 {
   tier: 1 | 2;
   /** Source second the segment's marks carry. */
   srcSecs: number;
   /** Lanes the segment carries (the store may skip a halted or non-advancing one). */
   lanes: number;
+  /** The carried lanes' signed entries, in lane order. */
+  entries: P8Entry[];
   /** The roster the calldata carries (ascending) and the threshold it commits to. */
   roster: Address[];
   k: number;
@@ -74,12 +111,16 @@ export function verifyPushP8V2(
     if (mask === 0n) throw new Error('empty lane mask');
     let p = off + 13;
     let lanes = 0;
-    for (; mask !== 0n; mask >>= 1n) {
+    const entries: P8Entry[] = [];
+    for (let lane = 0; mask !== 0n; mask >>= 1n, lane++) {
       if ((mask & 1n) === 0n) continue;
       need(p + 5);
       // `_lane` reverts on a conf code above CONF_MAX.
       if ((b[p + 4] & 0x7f) > P8_CONF_MAX) throw new Error('lane conf code out of range');
-      p += b[p + 4] & 0x80 ? 6 : 5;
+      need(p + (b[p + 4] & 0x80 ? 6 : 5));
+      const r = readLaneEntry(b, p, lane);
+      entries.push(r.e);
+      p += r.n;
       lanes++;
     }
     need(p + 1);
@@ -117,6 +158,7 @@ export function verifyPushP8V2(
       tier,
       srcSecs,
       lanes,
+      entries,
       roster,
       k,
       relayers: addrs(kAt + 2, b[kAt + 1]),
