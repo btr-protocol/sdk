@@ -51,6 +51,7 @@ import {
   readOracleConfig,
   readSolvencyState,
   recordSlot,
+  swapGateAdmits,
   u8At,
   u16At,
   u32At,
@@ -1086,5 +1087,23 @@ describe('layout v10', () => {
     const slots = new Map(SLOTS);
     slots.set(u + 4n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
     expect(await readClassHead(at(10, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
+  });
+});
+
+describe('swapGate membership (v10 Pool.swapGate, not AccessControl perms)', () => {
+  const A = `0x${'00'.repeat(19)}05` as `0x${string}`; // home index 5
+  const B = `0x${'00'.repeat(19)}45` as `0x${string}`; // 0x45 % 64 = 5: collides with A
+  const ZERO = `0x${'00'.repeat(20)}` as `0x${string}`;
+  const table = (m: Record<number, `0x${string}`>) => async (i: number) => m[i] ?? ZERO;
+  test('home hit, collision probe, miss at the first empty slot', async () => {
+    expect(await swapGateAdmits(table({ 5: A, 6: B }), A)).toBe(true);
+    expect(await swapGateAdmits(table({ 5: A, 6: B }), B)).toBe(true);
+    expect(await swapGateAdmits(table({ 5: A }), B)).toBe(false);
+    expect(await swapGateAdmits(table({}), A)).toBe(false);
+  });
+  test('probe wraps past the last slot', async () => {
+    const C = `0x${'00'.repeat(19)}3f` as `0x${string}`; // 63
+    const D = `0x${'00'.repeat(19)}7f` as `0x${string}`; // 127 % 64 = 63
+    expect(await swapGateAdmits(table({ 63: C, 0: D }), D)).toBe(true);
   });
 });

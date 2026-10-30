@@ -532,6 +532,45 @@ export async function readOracleConfig(
   };
 }
 
+/** `PoolConstantsLib.SWAP_GATE_SLOTS`: the open-addressed `swapGate` table (v10), pinned by
+ *  test/solidity-mirror.test.ts. */
+export const SWAP_GATE_SLOTS = 64;
+
+/** `PoolIOLib.requireSwapGate`: probe up from `uint160(caller) % 64` until the caller or the
+ *  first empty slot. `readSlot(i)` returns table entry `i` (zero address = empty). A full table
+ *  without the caller is a miss, as on chain (the loop there is bounded by the empty slot the
+ *  table always keeps). */
+export async function swapGateAdmits(
+  readSlot: (i: number) => Promise<Address>,
+  caller: Address,
+): Promise<boolean> {
+  const want = caller.toLowerCase();
+  const start = Number(BigInt(caller) % BigInt(SWAP_GATE_SLOTS));
+  for (let n = 0; n < SWAP_GATE_SLOTS; n++) {
+    const a = (await readSlot((start + n) % SWAP_GATE_SLOTS)).toLowerCase();
+    if (a === want) return true;
+    if (BigInt(a) === 0n) return false;
+  }
+  return false;
+}
+
+/** Is `caller` in the pool's swap allowlist? v10+ pools gate swaps on `Pool.swapGate`, never on
+ *  `AccessControl.perms` (that lane is DEPOSIT_GATED's only); older pools keep the AC lane, so
+ *  they return `null` and the caller reads `perms` as before. */
+export async function readSwapGateMember(
+  provider: Eip1193Provider,
+  pool: Address,
+  caller: Address,
+): Promise<boolean | null> {
+  const v = await readStorageVersion(provider, pool);
+  if (layoutOf(v) !== 10) return null;
+  const base = POOL_STORAGE_V10.swapGate;
+  return swapGateAdmits(
+    async (i) => addressAt(await getStorageAt(provider, pool, base + BigInt(i)), 0),
+    caller,
+  );
+}
+
 /** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3; on v4 the uint40 `lastGoodCWad9` in slot
  *  0's tail, 1e-9 WAD): the degraded same-asset exit cap (`exitCap`), WAD; 0 until an LP
  *  entrypoint has observed a rate. */

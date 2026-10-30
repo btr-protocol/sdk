@@ -16,8 +16,8 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
-import { CLASS_ROWS_BIT, MAX_FAMILY, decodeClassRisk } from '../src/pool/storage';
 import { MARK_WORD_V4 } from '../src/pool/layout.v4.generated';
+import { CLASS_ROWS_BIT, MAX_FAMILY, SWAP_GATE_SLOTS, decodeClassRisk } from '../src/pool/storage';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
@@ -235,5 +235,10 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
         ),
       ),
     );
+  });
+
+  test('SWAP_GATE_SLOTS matches PoolConstantsLib.sol', () => {
+    const c = constants(src(join(DEX, 'src', 'libraries', 'PoolConstantsLib.sol')));
+    expect(c.get('SWAP_GATE_SLOTS')).toBe(SWAP_GATE_SLOTS);
   });
 });
