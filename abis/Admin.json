@@ -286,29 +286,6 @@
   },
   {
     "type": "function",
-    "name": "collapseAnchor",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "newAnchor",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "executeAddAsset",
     "inputs": [
       {
@@ -336,24 +313,6 @@
       },
       {
         "name": "legs",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeMigrateBaseToken",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "spokes",
         "type": "address[]",
         "internalType": "address[]"
       }
@@ -1232,31 +1191,6 @@
         "type": "uint16",
         "indexed": true,
         "internalType": "uint16"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BaseTokenMigrated",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "oldBase",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newBase",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       }
     ],
     "anonymous": false

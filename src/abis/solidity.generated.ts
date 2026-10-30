@@ -136,7 +136,6 @@ export const GOV_DELAYS = {
  * nothing was queued under and reverts `NoPending` instead of vetoing.
  */
 export const POOL_SCOPED_OPS: readonly OpType[] = [
-  OpType.MIGRATE_BASE_TOKEN,
   OpType.UPDATE_TREASURY,
   OpType.UPDATE_FEES,
   OpType.UPDATE_POOL_ADMIN,

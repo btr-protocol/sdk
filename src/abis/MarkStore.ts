@@ -123,6 +123,19 @@ export const MARK_STORE_ABI: Abi = [
   {
     inputs: [
       {
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'enableRelayer',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
         internalType: 'uint8',
         name: 'lane',
         type: 'uint8',
@@ -250,6 +263,19 @@ export const MARK_STORE_ABI: Abi = [
         internalType: 'bool',
         name: 'd',
         type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'storeAC',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
       },
     ],
     stateMutability: 'view',
@@ -410,6 +436,19 @@ export const MARK_STORE_ABI: Abi = [
       },
     ],
     name: 'OpQueued',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'relayer',
+        type: 'address',
+      },
+    ],
+    name: 'RelayerEnabled',
     type: 'event',
   },
   {

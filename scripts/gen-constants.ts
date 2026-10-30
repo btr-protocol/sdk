@@ -123,7 +123,7 @@ lines.push(
 lines.push(' * nothing was queued under and reverts `NoPending` instead of vetoing.');
 lines.push(' */');
 lines.push('export const POOL_SCOPED_OPS: readonly OpType[] = [');
-for (const op of ['MIGRATE_BASE_TOKEN', 'UPDATE_TREASURY', 'UPDATE_FEES', 'UPDATE_POOL_ADMIN']) {
+for (const op of ['UPDATE_TREASURY', 'UPDATE_FEES', 'UPDATE_POOL_ADMIN']) {
   if (!(op in c.enums.OpType)) throw new Error(`gen-constants: OpType.${op} is gone`);
   lines.push(`  OpType.${op},`);
 }

@@ -674,19 +674,6 @@ export const POOL_FACTORY_ABI = [
     inputs: [
       {
         internalType: 'address',
-        name: 'newBase',
-        type: 'address',
-      },
-    ],
-    name: 'setPoolBaseToken',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
         name: 'pool',
         type: 'address',
       },
@@ -726,25 +713,6 @@ export const POOL_FACTORY_ABI = [
       },
     ],
     name: 'FeedLaneUpdated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'pool',
-        type: 'address',
-      },
-      {
-        indexed: true,
-        internalType: 'address',
-        name: 'newBase',
-        type: 'address',
-      },
-    ],
-    name: 'PoolBaseTokenUpdated',
     type: 'event',
   },
   {
