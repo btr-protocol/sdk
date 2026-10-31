@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { buildDepositCalls } from '../router/index';
-import { deposit, minLpOut, simulateDeposit } from './index';
+import { buildDepositCalls, buildRedeemCalls } from '../router/index';
+import {
+  defaultDeadline,
+  deposit,
+  minLpOut,
+  simulateDeposit,
+  simulatePoolCall,
+  syncChainClock,
+} from './index';
 
 describe('minLpOut', () => {
   test('floors the shares less the slippage in bps', () => {
@@ -61,5 +68,68 @@ describe('simulateDeposit reads the minted shares off the real entrypoint', () =
     expect(await simulateDeposit(provider as never, POOL, USER, TOK, 1000n)).toBe(999n);
     expect(calls[0].from).toBe(USER);
     expect(calls[0].to).toBe(POOL);
+  });
+});
+
+const P = `0x${'11'.repeat(20)}` as `0x${string}`;
+const T = `0x${'22'.repeat(20)}` as `0x${string}`;
+const U = `0x${'44'.repeat(20)}` as `0x${string}`;
+
+describe('simulatePoolCall answers for any pool entrypoint', () => {
+  test('swapLiability decodes the minted shares from the eth_call', async () => {
+    const calls: { params: [{ from: string }] }[] = [];
+    const provider = {
+      request: async (r: { params: [{ from: string }] }) => {
+        calls.push(r);
+        return `0x${4242n.toString(16).padStart(64, '0')}`;
+      },
+    };
+    const args = [T, T, 10n, 1n, 1n];
+    expect(await simulatePoolCall<bigint>(provider as never, P, U, 'swapLiability', args)).toBe(
+      4242n,
+    );
+    expect(calls[0].params[0].from).toBe(U);
+  });
+});
+
+// r2 C-F-3: a bad back value parsed to 0 became an unfloored burn/liability swap.
+describe('LP builders refuse a zero floor', () => {
+  const opts = { recipient: U };
+  test('deposit-first, cross exit and transfer exit', () => {
+    const mint = {
+      mode: 'transfer' as const,
+      token: T,
+      amount: 1n,
+      targetToken: T,
+      lpAmountIn: 1n,
+    };
+    expect(() => buildDepositCalls(P, { ...mint, minLpAmountOut: 0n }, opts)).toThrow(/positive/);
+    const cross = { mode: 'cross' as const, tokenFrom: T, tokenTo: T, lpAmount: 1n };
+    expect(() => buildRedeemCalls(P, { ...cross, minAmountOut: 0n }, opts)).toThrow(/positive/);
+    const tr = { mode: 'transfer' as const, tokenFrom: T, tokenTo: T, lpAmountIn: 1n };
+    for (const bad of [
+      { minLpAmountOut: 0n, lpWithdraw: 1n, minAmountOut: 1n },
+      { minLpAmountOut: 1n, lpWithdraw: 0n, minAmountOut: 1n },
+      { minLpAmountOut: 1n, lpWithdraw: 1n, minAmountOut: 0n },
+    ])
+      expect(() => buildRedeemCalls(P, { ...tr, ...bad }, opts)).toThrow(/positive/);
+    expect(buildRedeemCalls(P, { ...cross, minAmountOut: 1n }, opts)).toHaveLength(1);
+  });
+});
+
+// r2 C-F-7: deadlines came off the device clock; a skewed device widened the window.
+describe('syncChainClock', () => {
+  const at = (timestamp: unknown) => ({ request: async () => ({ timestamp }) });
+  test('deadlines follow chain time, not the device clock', async () => {
+    const chainNow = Math.floor(Date.now() / 1000) - 3_600; // device one hour ahead
+    await syncChainClock(at(`0x${chainNow.toString(16)}`) as never);
+    const d = Number(defaultDeadline());
+    expect(d - chainNow).toBeGreaterThanOrEqual(600);
+    expect(d - chainNow).toBeLessThan(605);
+    await syncChainClock(at(`0x${Math.floor(Date.now() / 1000).toString(16)}`) as never);
+  });
+  test('no timestamp refuses', async () => {
+    await expect(syncChainClock(at(undefined) as never)).rejects.toThrow(/timestamp/);
+    await expect(syncChainClock({ request: async () => null } as never)).rejects.toThrow();
   });
 });

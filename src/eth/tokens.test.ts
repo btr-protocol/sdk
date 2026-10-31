@@ -8,10 +8,11 @@ import {
 } from './tokens';
 
 describe('resolveTokenAlias', () => {
-  test('Monad stable identities retain their six-decimal scale and display symbols', () => {
+  test('Monad stable identities keep their addresses and display symbols', () => {
     for (const s of ['AUSD', 'mUSD', 'USDT']) {
       expect(getTokenAddress(s, 143)).toMatch(/^0x[0-9a-fA-F]{40}$/);
-      expect(TOKENS[canonicalTokenSymbol(s)].decimals).toBe(6);
+      // r2 C-M-9: no per-symbol decimals here; they are per chain (venue pin).
+      expect('decimals' in TOKENS[canonicalTokenSymbol(s)]).toBe(false);
     }
     expect(TOKENS.MUSD.symbol).toBe('mUSD');
     expect(TOKENS.USDT.symbol).toBe('USDT');

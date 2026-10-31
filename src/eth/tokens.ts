@@ -8,7 +8,8 @@
 export interface TokenMetadata {
   symbol: string;
   name: string;
-  decimals: number;
+  // No `decimals`: one per symbol is wrong across chains (USDC is 6 on Base, 18 on BSC). Per-chain
+  // decimals are the venue pin (`@sdk/venues` `DEPLOYED_VENUES[chain].decimals`) or the ERC-20.
   addresses: Record<string, string>; // chainId -> address mapping
   wrapperOf?: string; // For wrapped tokens: WETH -> 'ETH', WBTC -> 'BTC'
   icon?: string; // Optional override. Default: /tokens/{symbol.toLowerCase()}.svg
@@ -23,19 +24,16 @@ export const TOKENS: Record<string, TokenMetadata> = {
   BTC: {
     symbol: 'BTC',
     name: 'Bitcoin',
-    decimals: 8,
     addresses: {},
   },
   ETH: {
     symbol: 'ETH',
     name: 'Ethereum',
-    decimals: 18,
     addresses: {},
   },
   BNB: {
     symbol: 'BNB',
     name: 'BNB',
-    decimals: 18,
     // Native on 56 has no address (NATIVE_TOKEN sentinel); 0xbb4C..095c there is WBNB.
     addresses: {
       '1': '0xB8c77482e45F1F44dE1745F52C74426C631bDD52',
@@ -44,7 +42,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   SOL: {
     symbol: 'SOL',
     name: 'Solana',
-    decimals: 9,
     addresses: {
       '56': '0x570a5d26f7765ecb712c0924e4de545b89fd43df',
     },
@@ -52,7 +49,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   ARB: {
     symbol: 'ARB',
     name: 'Arbitrum',
-    decimals: 18,
     addresses: {
       '1': '0xB50721BCf8d664c30412Cfbc6cf7a15145234ad1',
       '42161': '0x912CE59144191C1204E64559FE8253a0e49E6548',
@@ -61,7 +57,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   HYPE: {
     symbol: 'HYPE',
     name: 'Hyperliquid',
-    decimals: 18,
     addresses: {
       '999': '0x5555555555555555555555555555555555555555',
     },
@@ -71,7 +66,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   WETH: {
     symbol: 'WETH',
     name: 'Wrapped Ether',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -83,7 +77,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   WBNB: {
     symbol: 'WBNB',
     name: 'Wrapped BNB',
-    decimals: 18,
     wrapperOf: 'BNB',
     addresses: {
       '56': '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
@@ -92,7 +85,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   WBTC: {
     symbol: 'WBTC',
     name: 'Wrapped Bitcoin',
-    decimals: 8,
     wrapperOf: 'BTC',
     addresses: {
       '1': '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
@@ -105,7 +97,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   CBBTC: {
     symbol: 'CBBTC',
     name: 'Coinbase Wrapped BTC',
-    decimals: 8,
     wrapperOf: 'BTC',
     addresses: {
       '1': '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
@@ -116,7 +107,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   TBTC: {
     symbol: 'TBTC',
     name: 'Threshold BTC',
-    decimals: 18,
     wrapperOf: 'BTC',
     addresses: {
       '1': '0x18084fbA666a33d37592fA2633fD49a74DD93a88',
@@ -129,7 +119,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USDT: {
     symbol: 'USDT',
     name: 'Tether USD',
-    decimals: 6,
     addresses: {
       '1': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
       '143': '0xe7cd86e13AC4309349F30B3435a9d337750fC82D',
@@ -142,7 +131,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USDC: {
     symbol: 'USDC',
     name: 'USD Coin',
-    decimals: 6,
     addresses: {
       '1': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       '56': '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
@@ -154,7 +142,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USDE: {
     symbol: 'USDE',
     name: 'USDe',
-    decimals: 18,
     addresses: {
       '1': '0x4c9EDD5852cd905f086C759E8383e09bff1E68B3',
       '56': '0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34',
@@ -166,7 +153,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   TUSD: {
     symbol: 'TUSD',
     name: 'TrueUSD',
-    decimals: 18,
     addresses: {
       '1': '0x0000000000085d4780B73119b644AE5ecd22b376',
       '56': '0x40af3827f39d0eacbf4a168f8d4ee67c121d11c9',
@@ -175,7 +161,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   FDUSD: {
     symbol: 'FDUSD',
     name: 'First Digital USD',
-    decimals: 18,
     addresses: {
       '1': '0xc5f0f7b66764f6ec8c8dff7ba683102295e16409',
       '56': '0xc5f0f7b66764f6ec8c8dff7ba683102295e16409',
@@ -184,7 +169,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USDD: {
     symbol: 'USDD',
     name: 'Decentralized USD',
-    decimals: 18,
     addresses: {
       '56': '0xd17479997f34dd9156deef8f95a52d81d265be9c',
     },
@@ -192,7 +176,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USD1: {
     symbol: 'USD1',
     name: 'World Liberty Financial USD',
-    decimals: 18,
     addresses: {
       '1': '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
       '56': '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
@@ -201,7 +184,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   PYUSD: {
     symbol: 'PYUSD',
     name: 'PayPal USD',
-    decimals: 6,
     addresses: {
       '1': '0x6c3ea9036406852006290770BEdFcAbA0e23A0e8',
     },
@@ -209,7 +191,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   RLUSD: {
     symbol: 'RLUSD',
     name: 'Ripple USD',
-    decimals: 18,
     addresses: {
       '1': '0x8292Bb45bf1Ee4d140127049757C2E0fF06317eD',
     },
@@ -217,7 +198,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USDS: {
     symbol: 'USDS',
     name: 'Sky USDS',
-    decimals: 18,
     addresses: {
       '1': '0xdC035D45d973E3EC169d2276DDab16f1e407384F',
     },
@@ -225,7 +205,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   DAI: {
     symbol: 'DAI',
     name: 'Dai',
-    decimals: 18,
     addresses: {
       '1': '0x6B175474E89094C44Da98b954EedeAC495271d0F',
       '56': '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3',
@@ -234,7 +213,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   EURC: {
     symbol: 'EURC',
     name: 'Circle Euro Coin',
-    decimals: 6,
     addresses: {
       '1': '0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c',
       '8453': '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42',
@@ -244,13 +222,11 @@ export const TOKENS: Record<string, TokenMetadata> = {
   USD: {
     symbol: 'USD',
     name: 'US Dollar',
-    decimals: 8,
     addresses: {},
   },
   USDP: {
     symbol: 'USDP',
     name: 'Pax Dollar',
-    decimals: 18,
     addresses: {
       '1': '0x8e870d67f660d95d5be530380d0ec0bd388289e1',
       '56': '0xb3c11196a4f3b1da7c23d9fb0a3dde9c6340934f',
@@ -259,7 +235,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   crvUSD: {
     symbol: 'crvUSD',
     name: 'Curve USD',
-    decimals: 18,
     addresses: {
       '1': '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E',
       '56': '0xe2fb3F127f5450DeE44afe054385d74C392BdeF4',
@@ -268,7 +243,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   lisUSD: {
     symbol: 'lisUSD',
     name: 'Lista USD',
-    decimals: 18,
     addresses: {
       '56': '0x0782b6d8c4551b9760e74c0545a9bcd90bdc41e5',
     },
@@ -276,7 +250,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   AUSD: {
     symbol: 'AUSD',
     name: 'Agora Dollar',
-    decimals: 6,
     addresses: {
       '1': '0x00000000efe302beaa2b3e6e1b18d08d69a9012a',
       '56': '0x00000000efe302beaa2b3e6e1b18d08d69a9012a',
@@ -286,7 +259,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   MUSD: {
     symbol: 'mUSD',
     name: 'MetaMask USD',
-    decimals: 6,
     addresses: {
       '143': '0xacA92E438df0B2401fF60dA7E4337B687a2435DA',
     },
@@ -296,7 +268,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   stETH: {
     symbol: 'stETH',
     name: 'Lido Staked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
@@ -305,7 +276,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   wstETH: {
     symbol: 'wstETH',
     name: 'Wrapped stETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
@@ -316,7 +286,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   rETH: {
     symbol: 'rETH',
     name: 'Rocket Pool ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xae78736Cd615f374D3085123A210448E74Fc6393',
@@ -327,7 +296,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   eETH: {
     symbol: 'eETH',
     name: 'ether.fi Staked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0x35fA164735182de50811E8e2E824cfb9B6118ac2',
@@ -336,7 +304,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   weETH: {
     symbol: 'weETH',
     name: 'Wrapped eETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee',
@@ -348,7 +315,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   wBETH: {
     symbol: 'wBETH',
     name: 'Wrapped Beacon ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xa2E3356610840701BDf5611a53974510Ae27E2e1',
@@ -358,7 +324,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   rsETH: {
     symbol: 'rsETH',
     name: 'Kelp DAO Restaked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7',
@@ -368,7 +333,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   lsETH: {
     symbol: 'lsETH',
     name: 'Liquid Staked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0x8c1BEd5b9a0928467c9B1341Da1D7BD5e10b6549',
@@ -377,7 +341,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   ezETH: {
     symbol: 'ezETH',
     name: 'Renzo Restaked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xbf5495Efe5DB9ce00f80364C8B423567e58d2110',
@@ -389,7 +352,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   osETH: {
     symbol: 'osETH',
     name: 'StakeWise OsTokenized ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
@@ -398,7 +360,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   ETHx: {
     symbol: 'ETHx',
     name: 'Stader ETHx',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xA35b1B31Ce002FBF2058D22F30f95D405200A15b',
@@ -407,7 +368,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   swETH: {
     symbol: 'swETH',
     name: 'Swell ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xf951E335afb289353dc249e82926178EaC7DEd78',
@@ -416,7 +376,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   cbETH: {
     symbol: 'cbETH',
     name: 'Coinbase Wrapped Staked ETH',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xbe9895146f7af43049ca1c1ae358b0541ea49704',
@@ -426,7 +385,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   frxETH: {
     symbol: 'frxETH',
     name: 'Frax Ether',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0x5E8422345238F34275888049021821E8E08CAa1f',
@@ -438,7 +396,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   frxUSD: {
     symbol: 'frxUSD',
     name: 'Frax USD',
-    decimals: 18,
     addresses: {
       '56': '0x80Eede496655FB9047dd39d9f418d5483ED600df',
     },
@@ -446,7 +403,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   sfrxETH: {
     symbol: 'sfrxETH',
     name: 'Staked Frax Ether',
-    decimals: 18,
     wrapperOf: 'ETH',
     addresses: {
       '1': '0xac3E018457B222d93114458476f3E3416Abbe38F',
@@ -459,7 +415,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   PAXG: {
     symbol: 'PAXG',
     name: 'Pax Gold',
-    decimals: 18,
     addresses: {
       '1': '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
       '56': '0x7950865a9140cB519342433146Ed5b40c6F210f7',
@@ -469,7 +424,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   XAUT: {
     symbol: 'XAUT',
     name: 'Tether Gold',
-    decimals: 6,
     addresses: {
       '1': '0x68749665FF8D2d112Fa859AA293F07A622782F38',
       '999': '0xf4D9235269A96aadaFc9aDAE454a0618EBe37949',
@@ -481,7 +435,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   AAVE: {
     symbol: 'AAVE',
     name: 'Aave',
-    decimals: 18,
     addresses: {
       '1': '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9',
       '56': '0xfb6115445Bff7b52FeB98650C87f44907E58f802',
@@ -492,7 +445,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   PENDLE: {
     symbol: 'PENDLE',
     name: 'Pendle',
-    decimals: 18,
     addresses: {
       '1': '0x808507121B80c02388fAd14726482e061B8da827',
       '56': '0xb3Ed0A426155B79B898849803E3B36552f7ED507',
@@ -504,7 +456,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   ENA: {
     symbol: 'ENA',
     name: 'Ethena',
-    decimals: 18,
     addresses: {
       '1': '0x57e114B691Db790C35207b2e685D4A43181e6061',
       '56': '0x58538e6A46E07434d7E7375Bc268D3cb839C0133',
@@ -515,7 +466,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   UNI: {
     symbol: 'UNI',
     name: 'Uniswap',
-    decimals: 18,
     addresses: {
       '1': '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
       '56': '0xBf5140A22578168FD562DCcF235E5D43A02ce9B1',
@@ -526,7 +476,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   CAKE: {
     symbol: 'CAKE',
     name: 'PancakeSwap',
-    decimals: 18,
     addresses: {
       '1': '0x152649eA73beAb28c5b49B26eb48f7EAD6d4c898',
       '56': '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82',
@@ -537,7 +486,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   CRV: {
     symbol: 'CRV',
     name: 'Curve',
-    decimals: 18,
     addresses: {
       '1': '0xD533a949740bb3306d119CC777fa900bA034cd52',
       '56': '0x9996D0276612d23b35f90C51EE935520B3d7355B',
@@ -548,7 +496,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   LINK: {
     symbol: 'LINK',
     name: 'Chainlink',
-    decimals: 18,
     addresses: {
       '1': '0x514910771AF9Ca656af840dff83E8264EcF986CA',
       '56': '0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD',
@@ -559,7 +506,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   ZRO: {
     symbol: 'ZRO',
     name: 'LayerZero',
-    decimals: 18,
     addresses: {
       '1': '0x6985884C4392D348587B19cb9eAAf157F13271cd',
       '56': '0x6985884C4392D348587B19cb9eAAf157F13271cd',
@@ -570,7 +516,6 @@ export const TOKENS: Record<string, TokenMetadata> = {
   AXL: {
     symbol: 'AXL',
     name: 'Axelar',
-    decimals: 18,
     addresses: {
       '1': '0x467719aD09025FcC6cF6F8311755809d45a5E5f3',
       '56': '0x8b1f4432F943c465A973FeDC6d7aa50Fc96f1f65',
@@ -581,19 +526,16 @@ export const TOKENS: Record<string, TokenMetadata> = {
   MORPHO: {
     symbol: 'MORPHO',
     name: 'Morpho',
-    decimals: 18,
     addresses: {},
   },
   SUI: {
     symbol: 'SUI',
     name: 'Sui',
-    decimals: 9,
     addresses: {},
   },
   ZEC: {
     symbol: 'ZEC',
     name: 'Zcash',
-    decimals: 8,
     addresses: {
       '56': '0x1ba42e5193dfa8b03d15dd1b86a3113bbbef8eeb',
     },

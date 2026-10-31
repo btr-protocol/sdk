@@ -36,3 +36,23 @@ describe('monad aggregator facts', () => {
     });
   });
 });
+
+describe('venue decimals pin', () => {
+  // The front refuses a `decimals()` read that disagrees with this table (r2 C-F-2: a relay
+  // answering 8 for 6-dp USDC inflated a 100 USDC approval 100x).
+  test('monad decimals match the eth_call facts above', () => {
+    expect(DEPLOYED_VENUES[143].decimals).toMatchObject({
+      USDC: 6,
+      XAUT0: 6,
+      CBBTC: 8,
+      WBTC: 8,
+      WMON: 18,
+      WETH: 18,
+    });
+  });
+
+  test('every venue token has an integer decimals pin', () => {
+    for (const v of Object.values(DEPLOYED_VENUES))
+      for (const s of Object.keys(v.tokens)) expect(Number.isInteger(v.decimals[s])).toBe(true);
+  });
+});

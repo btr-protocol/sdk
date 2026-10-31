@@ -24,6 +24,9 @@ export interface ChainVenue {
   tokens: Record<string, Address>;
   /** Token key ⇒ manifest `tokens.<key>.symbol`, the listed SYM in the LP receipt (`USDCB` ⇒ `USDC`). */
   symbols: Record<string, string>;
+  /** Token key ⇒ manifest `tokens.<key>.decimals`, asserted against the ERC-20 at deploy. The
+   *  pin: a `decimals()` read that disagrees is refused, never applied. */
+  decimals: Record<string, number>;
   /** On-chain feed name (`USDT-USDC`, `USDC-USD`) ⇒ feedId, in globalIndex order. */
   feedIds: Record<string, Hex>;
   /** Same keys ⇒ MITCH tickerId (decimal string; feedId = bytes32(ticker)). */
@@ -84,6 +87,19 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       GHO: 'GHO',
       USDT0: 'USDT',
       USDE: 'USDe',
+    },
+    decimals: {
+      USDC: 6,
+      WMON: 18,
+      CBBTC: 8,
+      WBTC: 8,
+      WETH: 18,
+      XAUT0: 6,
+      MUSD: 6,
+      AUSD: 6,
+      GHO: 18,
+      USDT0: 6,
+      USDE: 18,
     },
     feedIds: {
       'USDC-USD': '0x0000000000000000000000000000000000000000000000000648453138900000',
@@ -217,6 +233,34 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       MSFT: 'MSFT',
       ORCL: 'ORCL',
       META: 'META',
+    },
+    decimals: {
+      USDCB: 18,
+      EURC: 6,
+      USDT: 18,
+      USDS: 18,
+      USD1: 18,
+      PYUSD: 18,
+      QCAD: 18,
+      AUDF: 18,
+      JPYC: 18,
+      KRW1: 18,
+      WETH: 18,
+      WBTC: 18,
+      CBBTC: 18,
+      BNB: 18,
+      XAUT: 18,
+      PAXG: 18,
+      INTC: 18,
+      AMD: 18,
+      NVDA: 18,
+      ASML: 18,
+      SPCX: 18,
+      AVGO: 18,
+      TSLA: 18,
+      MSFT: 18,
+      ORCL: 18,
+      META: 18,
     },
     feedIds: {
       'USDC-USD': '0x0000000000000000000000000000000000000000000000000648453138900000',

@@ -18,6 +18,7 @@ type Venue = {
   contracts: Record<string, string>;
   tokens: Record<string, string>;
   symbols: Record<string, string>;
+  decimals: Record<string, number>;
   feedIds: Record<string, string>;
   tickerIds: Record<string, string>;
   rosters: Record<string, string[]>;
@@ -65,12 +66,23 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
     const coreKeys = Object.keys(man.pools).filter((k) => poolTag(k));
     const tokens: Record<string, string> = {};
     const symbols: Record<string, string> = {};
-    for (const [s, t] of Object.entries<{ addr: string; symbol: string }>(man.tokens)) {
+    const decimals: Record<string, number> = {};
+    for (const [s, t] of Object.entries<{ addr: string; symbol: string; decimals: unknown }>(
+      man.tokens,
+    )) {
       if (s === '_doc') continue;
       if (typeof t.symbol !== 'string' || !t.symbol)
         throw new Error(`gen-venues: ${slug} manifest tokens.${s} lacks symbol`);
+      // The deploy asserts these against the live ERC-20; clients pin them instead of trusting a read.
+      if (
+        !Number.isInteger(t.decimals) ||
+        (t.decimals as number) < 0 ||
+        (t.decimals as number) > 36
+      )
+        throw new Error(`gen-venues: ${slug} manifest tokens.${s} decimals ${t.decimals}`);
       tokens[s] = t.addr;
       symbols[s] = t.symbol;
+      decimals[s] = t.decimals as number;
     }
 
     const contracts: Record<string, string> = {};
@@ -122,6 +134,7 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
       contracts: sortedContracts,
       tokens,
       symbols,
+      decimals,
       feedIds,
       tickerIds,
       rosters,
@@ -172,6 +185,9 @@ export interface ChainVenue {
   tokens: Record<string, Address>;
   /** Token key ⇒ manifest \`tokens.<key>.symbol\`, the listed SYM in the LP receipt (\`USDCB\` ⇒ \`USDC\`). */
   symbols: Record<string, string>;
+  /** Token key ⇒ manifest \`tokens.<key>.decimals\`, asserted against the ERC-20 at deploy. The
+   *  pin: a \`decimals()\` read that disagrees is refused, never applied. */
+  decimals: Record<string, number>;
   /** On-chain feed name (\`USDT-USDC\`, \`USDC-USD\`) ⇒ feedId, in globalIndex order. */
   feedIds: Record<string, Hex>;
   /** Same keys ⇒ MITCH tickerId (decimal string; feedId = bytes32(ticker)). */

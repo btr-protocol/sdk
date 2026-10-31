@@ -318,9 +318,29 @@ const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
 /** Default tx validity window (seconds) when no deadline is supplied. */
 const DEFAULT_DEADLINE_S = 600;
-/** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now. */
+/** Chain time minus this device's clock, seconds, from the last {@link syncChainClock}. */
+let chainSkewS = 0;
+
+/**
+ * Anchor every default deadline to CHAIN time: reads the latest block's timestamp through
+ * `provider` (pass the wallet's) and keeps its offset from this device's clock. A device clock
+ * hours ahead would otherwise hand out a window hours wide, a pending swap a searcher can hold;
+ * one behind pre-expires it. Throws when the read fails or answers no timestamp, so a send never
+ * goes out on an unknown clock. Unsynced (a server on NTP) the device clock stands.
+ */
+export async function syncChainClock(provider: Eip1193Provider): Promise<void> {
+  const block = (await provider.request({
+    method: 'eth_getBlockByNumber',
+    params: ['latest', false],
+  })) as { timestamp?: unknown } | null;
+  const ts = typeof block?.timestamp === 'string' ? Number(BigInt(block.timestamp)) : Number.NaN;
+  if (!(Number.isSafeInteger(ts) && ts > 0)) throw new Error('chain clock: no block timestamp');
+  chainSkewS = ts - Math.floor(Date.now() / 1000);
+}
+
+/** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now, on chain time once synced. */
 export const defaultDeadline = (): bigint =>
-  BigInt(Math.floor(Date.now() / 1000) + DEFAULT_DEADLINE_S);
+  BigInt(Math.floor(Date.now() / 1000) + chainSkewS + DEFAULT_DEADLINE_S);
 
 interface SwapParams {
   tokenIn: Address;
@@ -439,10 +459,31 @@ export const minLpOut = (shares: bigint, slippageBps: bigint): bigint =>
   (shares * (10_000n - slippageBps)) / 10_000n;
 
 /**
- * The shares `deposit(token, amount)` would mint for `from` right now: an `eth_call` of the real
- * entrypoint, so every toll, rate and dead-share seed the chain applies is in the number and no
- * replica can drift. Needs `from`'s balance and allowance to the pool (the pull runs first): call
- * it after the approval has mined. Feed `minLpOut(shares, slippageBps)` to `depositMin`.
+ * `functionName(args)` on the pool as `from` would run it right now: an `eth_call` of the real
+ * entrypoint, decoded. The chain's own answer for a send, every toll, rate and dead-share seed
+ * included, so a floor checked against it cannot drift from a replica. Pass the WALLET's provider:
+ * the point is an answer the quote service did not author.
+ */
+export async function simulatePoolCall<T>(
+  provider: Eip1193Provider,
+  poolAddress: Address,
+  from: Address,
+  functionName: string,
+  args: readonly unknown[],
+  value: Hex = '0x0',
+): Promise<T> {
+  const data = encodeFn({ abi: POOL_ABI, functionName, args });
+  const result = (await provider.request({
+    method: 'eth_call',
+    params: [{ from, to: poolAddress, data, value }, 'latest'],
+  })) as Hex;
+  return decodeFn<T>({ abi: POOL_ABI, functionName, data: result });
+}
+
+/**
+ * The shares `deposit(token, amount)` would mint for `from` right now ({@link simulatePoolCall}).
+ * Needs `from`'s balance and allowance to the pool (the pull runs first): call it after the
+ * approval has mined. Feed `minLpOut(shares, slippageBps)` to `depositMin`.
  */
 export async function simulateDeposit(
   provider: Eip1193Provider,
@@ -451,13 +492,15 @@ export async function simulateDeposit(
   token: Address,
   amount: bigint,
 ): Promise<bigint> {
-  const data = encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [token, amount] });
-  const result = (await provider.request({
-    method: 'eth_call',
-    params: [{ from, to: poolAddress, data, value: txValue(token, amount) }, 'latest'],
-  })) as Hex;
-  return decodeFn<{ lpAmount: bigint }>({ abi: POOL_ABI, functionName: 'deposit', data: result })
-    .lpAmount;
+  const r = await simulatePoolCall<{ lpAmount: bigint }>(
+    provider,
+    poolAddress,
+    from,
+    'deposit',
+    [token, amount],
+    txValue(token, amount),
+  );
+  return r.lpAmount;
 }
 
 /**

@@ -72,6 +72,9 @@ interface LpRouteStep {
   tokenOut: string;
   amountIn: number;
   amountOut: number;
+  /** `amountOut·(1−slip)` off the BACK END's conversion: indicative. A caller encodes it only
+   *  after lifting it against the chain's own answer for the same call (`simulatePoolCall` /
+   *  `previewWithdraw` through the wallet); `buildDepositCalls`/`buildRedeemCalls` refuse 0. */
   minOut: number;
 }
 
@@ -81,7 +84,8 @@ export interface RankedLpRoute {
   feasible: boolean;
   reason?: string;
   out: number;
-  /** The floor the batch ENCODES, in `out` units (face for mints, tokens for exits). */
+  /** The route's floor in `out` units (face for mints, tokens for exits); same caveat as the
+   *  steps' `minOut`: back-derived until the caller lifts it against the chain. */
   minOut: number;
   hops: number;
   steps: LpRouteStep[];

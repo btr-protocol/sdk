@@ -634,12 +634,20 @@ export function depositCallData(token: Address, amount: bigint, minLpOut?: bigin
     : encodeFn({ abi: POOL_ABI, functionName: 'depositMin', args: [token, amount, minLpOut] });
 }
 
+/** An LP floor of zero (or less) guards nothing: a bad quote value parsed to 0 would send the
+ *  burn or the liability swap unfloored. Refuse it at the encoder, the one place every route passes. */
+const floored = (what: string, v: bigint): bigint => {
+  if (!(v > 0n)) throw new Error(`${what} must be a positive floor, got ${v}`);
+  return v;
+};
+
 export function buildDepositCalls(
   pool: Address,
   args: TransferMintArgs,
   opts: BuildOpts,
 ): ExecCall[] {
   const deadline = swapDeadline(opts);
+  floored('minLpAmountOut', args.minLpAmountOut);
   // ONE approval total: the LP burn needs no allowance. Built directly — the old path faked an
   // ExecLeg (minOut 0, never encoded as a swap) just to borrow buildApprovalCalls.
   if (isSentinel(args.token) || isSentinel(args.targetToken)) {
@@ -697,6 +705,7 @@ export function buildRedeemCalls(
   opts: BuildOpts,
 ): ExecCall[] {
   const deadline = swapDeadline(opts);
+  floored('minAmountOut', args.minAmountOut);
   if (args.mode === 'cross') {
     return [
       {
@@ -710,6 +719,8 @@ export function buildRedeemCalls(
       },
     ];
   }
+  floored('minLpAmountOut', args.minLpAmountOut);
+  floored('lpWithdraw', args.lpWithdraw);
   return [
     {
       to: pool,
