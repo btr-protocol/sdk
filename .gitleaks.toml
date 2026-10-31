@@ -1,5 +1,6 @@
-# Allowlist: BTR books/configs are full of PUBLIC contract addresses (0x…40-hex),
-# which trip generic-api-key. Real secrets are never 40-hex addresses.
+# BTR books and deploy records are full of PUBLIC contract addresses (0x + 40 hex), which trip
+# generic-api-key. Real secrets are never 40-hex addresses. Rule set mirrors dex-evm .gitleaks.toml.
+# Allowlists are value-scoped (never path-only): a path-only exemption hides a seeded private key.
 [extend]
 useDefault = true
 
@@ -8,29 +9,28 @@ id = "generic-api-key"
 [rules.allowlist]
 regexTarget = "match"
 regexes = [
-  '''0x[a-fA-F0-9]{40}''',
+  # A public address: EXACTLY 40 hex after 0x, not part of a longer hex run (a 64-hex key is not).
+  '''\b0x[a-fA-F0-9]{40}\b''',
 ]
 
-[[allowlists]]
-description = "Public contract addresses & deployment records"
-paths = [
-  '''(^|/)deployments/''',
-  '''\.env\.example$''',
-  '''(risk|liquidity|oracle|fleet)\.[a-z0-9.]+\.toml$''',
-]
-[[allowlists]]
-description = "Upstream vendored solady test fixtures (canonical example tokens)"
-paths = [
-  '(^|/)\.deps/solady/test/',
-  '(^|/)contracts/lib/solady/test/',
-]
-[[allowlists]]
-description = "Well-known anvil/hardhat deterministic test keys"
-regexes = [
-  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
-  '''0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d''',
-  '''0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a''',
-]
+# A raw 32-byte EVM private key under a secret-looking name (JSON, env, TOML, YAML, Solidity, CLI
+# flag). Named keys only: a bare 64-hex is also a feed id or a hash, which the repo is full of.
+# `owner`/`admin` stay out of the name list (ADMIN_ART_PIN is a code hash).
+[[rules]]
+id = "btr-evm-private-key"
+description = "32-byte hex private key under a secret-looking name"
+secretGroup = 1
+regex = '''(?i)[a-z0-9_-]*(?:priv|secret|signer|deployer|keeper|relayer|funder|wallet|account|mnemonic|seed|pk|sk)[a-z0-9_-]*["'\x60]?\s*(?:[:= (]|=>)\s*["'\x60]?((?:0x)?[0-9a-f]{64})\b'''
+
+[[rules]]
+id = "btr-evm-private-key-literal"
+description = "32-byte key as a Solidity hex literal under a secret-looking name"
+regex = '''(?i)(?:priv|secret|signer|deployer|keeper|relayer|funder|wallet|pk|sk)[a-z0-9_]*\s*=\s*hex"[0-9a-f]{64}"'''
+
+[[rules]]
+id = "btr-mnemonic"
+description = "BIP39 12/24-word phrase under a mnemonic/seed key"
+regex = '''(?i)(?:mnemonic|seed[_ ]?phrase|seed)[a-z0-9_]*["'\x60]?\s*[:=]\s*["'\x60]?(?:[a-z]{3,8}\s+){11,23}[a-z]{3,8}\b'''
 
 [[rules]]
 id = "generic-jwt"
@@ -40,3 +40,18 @@ regexTarget = "match"
 regexes = [
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIi',
 ]
+
+# ABI keccak pins: abis.lock.json holds only content hashes. Path AND value, generic rule only.
+[[allowlists]]
+description = "abis.lock.json keccak pins"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^abis\.lock\.json$''']
+regexes = ['''(?:0x)?[a-f0-9]{64}''']
+
+[[allowlists]]
+description = "Public on-chain auth word in oracle test fixtures"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^src/oracle/p8(\.v2)?\.test\.ts$''']
+regexes = ['''ff46fcd2685aea76cbd1fc3788d4f942e67c3b9759a605d2d087570be44106e5''']

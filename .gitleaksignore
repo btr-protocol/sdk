@@ -1,0 +1,13 @@
+# Historic hits, none a secret: public anvil account #0 key in a deploy workflow and README test-account notes, vendored solady/forge-std test vectors and constants (commit 68961327).
+a7da2e61557af5ecdc71228cb19815539cc20f4e:.github/workflows/deploy-inputs.yml:btr-evm-private-key:59
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/forge-std/test/StdCheats.t.sol:btr-mnemonic:230
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/src/utils/ext/zksync/ERC1967BeaconProxy.sol:btr-evm-private-key:29
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/src/utils/ext/zksync/ERC1967Proxy.sol:btr-evm-private-key:29
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/JSONParserLib.t.sol:jwt:791
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/WebAuthn.t.sol:generic-api-key:49
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/WebAuthn.t.sol:generic-api-key:50
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/WebAuthn.t.sol:generic-api-key:70
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/WebAuthn.t.sol:generic-api-key:71
+689613274cf18857211ea22e04c84bb823d8e6ca:.deps/solady/test/utils/TestPlus.sol:btr-evm-private-key:60
+eeb5894535dd9c7b37c03c5febf135d2d63b5c46:README.md:btr-evm-private-key:64
+f2c2d40fbe728b19c2e9e926d5a7ef3741238c93:README.md:btr-evm-private-key:62
