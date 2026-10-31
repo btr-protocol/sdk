@@ -40,8 +40,8 @@ jobs:
             git -C "../$n" sparse-checkout set "${paths[@]}"
             g -C "../$n" checkout -q "$sha"
           }
-          sib back abis d8dcfa85beb65ea285e952be49801cd3ca4b1545
-          sib dex-evm src abi deployments 942b7294861634d18615bdcbc5838ede9222f720
+          sib back abis 98ba3b66116af0e3ac57f8286cbcb15a7a253478
+          sib dex-evm src abi deployments b9c775e227330bc1ebb8547f61d24def927f48b9
           sib shared evm/src 1f2d4fc4b75658543ea33dc8abb571245a7cab11
       - run: bun install --frozen-lockfile
       - run: bun run typecheck

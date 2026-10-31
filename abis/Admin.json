@@ -1842,5 +1842,29 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "function",
+    "name": "guardianHaltAt",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pool",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "leg",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint48",
+        "name": "",
+        "type": "uint48"
+      }
+    ],
+    "stateMutability": "view"
   }
 ]
