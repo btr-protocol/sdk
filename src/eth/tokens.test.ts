@@ -99,3 +99,11 @@ describe('tokenMatchesSearch', () => {
     expect(tokenMatchesSearch(symbol, search)).toBe(expected);
   });
 });
+
+// r2 C-M-10: a placeholder address table (zero addresses, deployer EOA as treasury) was exported
+// and read as a fallback. Deployed addresses come from `@sdk/venues` only.
+test('no placeholder contract registry is exported', async () => {
+  const eth = await import('./index');
+  for (const k of ['CONTRACTS', 'getContractAddress', 'getBtrAdmin', 'getBtrPoolFactory'])
+    expect(k in eth).toBe(false);
+});

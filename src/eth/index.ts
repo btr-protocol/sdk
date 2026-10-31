@@ -76,16 +76,6 @@ export {
   tokenMatchesSearch,
 } from './tokens';
 
-// Contracts (deployed addresses)
-export type { SupportedChainId } from './contracts';
-export {
-  CONTRACTS,
-  getContractAddress,
-  getBtrPoolFactory,
-  getBtrAdmin,
-  getBtrAccessControl,
-} from './contracts';
-
 // ABI
 export type { Abi, AbiEvent, AbiFunction } from './abi';
 export {
