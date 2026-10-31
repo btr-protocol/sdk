@@ -114,8 +114,10 @@ describe('NXR mark sources', () => {
     expect(nxrMark('cbBTC')).toBe(NXR_MARKS.CBBTC!);
     expect(nxrMark('USDT.b')).toBe(NXR_MARKS.USDT!);
     expect(nxrMark('weth')).toBe(NXR_MARKS.WETH!);
-    // `USDT.b` must not fold onto USDTB, a different registered asset.
-    expect(nxrMark('USDT.b')).not.toBe(NXR_MARKS.USDTB!);
+    // USDF-USD / USDTB-USD were dead on NXR (USDTB 94 days) and backed no leg, feed or display:
+    // no row, so they resolve to nothing rather than to a tape that never ticks.
+    expect(nxrMark('USDTB')).toBeNull();
+    expect(nxrMark('USDF')).toBeNull();
   });
 
   // Owner rule: a fiat wrapper marks the UNDERLYING currency. Its own ticker is an issuer claim,

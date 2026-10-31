@@ -71,11 +71,6 @@
       "symbol": "RLUSD-USDC"
     }
   },
-  "USDF": {
-    "usd": {
-      "symbol": "USDF-USD"
-    }
-  },
   "U": {
     "usd": {
       "symbol": "U-USD"
@@ -89,11 +84,6 @@
   "TUSD": {
     "usd": {
       "symbol": "TUSD-USD"
-    }
-  },
-  "USDTB": {
-    "usd": {
-      "symbol": "USDTB-USD"
     }
   },
   "FDUSD": {
