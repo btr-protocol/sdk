@@ -145,17 +145,6 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
-export {
-  cToll,
-  depositShares,
-  entryGapPbps,
-  exposureTollPbps,
-  hopSpreadPbps,
-  legSpreadPbps,
-  minLpOut,
-  staleExcess,
-} from './lpToll.js';
-export type { TollHop, TollLeg } from './lpToll.js';
 export type {
   LiabLeg,
   SwapLiabilityQuote,
@@ -444,6 +433,10 @@ export async function deposit(
     ],
   })) as Hex;
 }
+
+/** `minLpOut` for `Pool.depositMin`: the shown shares less the caller's slippage (bps), floored. */
+export const minLpOut = (shares: bigint, slippageBps: bigint): bigint =>
+  (shares * (10_000n - slippageBps)) / 10_000n;
 
 /**
  * The shares `deposit(token, amount)` would mint for `from` right now: an `eth_call` of the real
