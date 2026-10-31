@@ -1,0 +1,6 @@
+https://bsc-dataseed.binance.org
+https://bsc-rpc.publicnode.com
+https://gm.monad.at.htw.tech
+https://rpc.blockdaemon.testnet.arc.io
+https://rpc.testnet.arc.io
+https://rpc2.monad.xyz

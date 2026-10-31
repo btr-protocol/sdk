@@ -17,6 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { SERVED_CHAINS } from '../src/venues/deployments.generated';
 import { norm, trusted, unusable } from './lib/rpcUrl';
 
 /** RPCs handed to a wallet or read from a browser, per chain. */
@@ -63,6 +64,16 @@ ${Object.entries(rpcs)
 };
 `;
 
+/** `rpc-origins.txt`: the origins of the SERVED chains' picks, one per line, sorted. The browser
+ *  reads them on a WalletConnect session (the front's floor quorum), so every CSP the app runs
+ *  under (front `sws.toml`, the docs service's HTML policy) must allow exactly these: one list,
+ *  derived here, read by both. */
+export const renderOrigins = (
+  rpcs: Readonly<Record<number, readonly string[]>>,
+  served: ReadonlyArray<{ chainId: number }>,
+): string =>
+  `${[...new Set(served.flatMap(({ chainId }) => (rpcs[chainId] ?? []).map((u) => new URL(u).origin)))].sort().join('\n')}\n`;
+
 if (import.meta.main) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const dexEvm = process.env.BTR_DEX_EVM ?? join(root, '..', 'dex-evm');
@@ -70,7 +81,9 @@ if (import.meta.main) {
   if (!existsSync(src)) console.log(`gen-rpcs: ${src} absent: keeping the committed list`);
   else {
     const out = join(root, 'src', 'eth', 'rpcs.generated.ts');
-    writeFileSync(out, render(rpcsFromChains(JSON.parse(readFileSync(src, 'utf8')))));
+    const rpcs = rpcsFromChains(JSON.parse(readFileSync(src, 'utf8')));
+    writeFileSync(out, render(rpcs));
+    writeFileSync(join(root, 'rpc-origins.txt'), renderOrigins(rpcs, SERVED_CHAINS));
     try {
       await $`bunx biome format --write ${out}`.cwd(root).quiet();
     } catch {

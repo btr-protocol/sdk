@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render as renderRpcs, rpcsFromChains } from '../scripts/gen-rpcs';
+import { renderOrigins, render as renderRpcs, rpcsFromChains } from '../scripts/gen-rpcs';
 import { norm, trusted, unusable } from '../scripts/lib/rpcUrl';
 import {
   type Chains,
@@ -16,6 +16,7 @@ import {
   urlOf,
 } from '../scripts/refresh-rpcs';
 import { CHAIN_RPCS } from '../src/eth/rpcs.generated';
+import { SERVED_CHAINS } from '../src/venues/deployments.generated';
 import { BTR_CHAINS } from '../src/venues/index.js';
 
 const probe = (url: string, p50 = 100, batchMax = 100, browser = true): Probe => ({
@@ -273,4 +274,12 @@ test('served chains: the picks are browser rows taking a 16-call batch', () => {
       }
     }
   }
+});
+
+// Review F3: front sws.toml and the docs service's HTML CSP must allow exactly the quorum RPCs.
+// Both read this one committed file; it drifting from CHAIN_RPCS is a regenerate, not an edit.
+test('rpc-origins.txt = origins of the served chains in CHAIN_RPCS', () => {
+  const file = readFileSync(join(import.meta.dir, '..', 'rpc-origins.txt'), 'utf8');
+  expect(file).toBe(renderOrigins(CHAIN_RPCS, SERVED_CHAINS));
+  expect(file.trim().split('\n').length).toBeGreaterThanOrEqual(2 * SERVED_CHAINS.length);
 });
