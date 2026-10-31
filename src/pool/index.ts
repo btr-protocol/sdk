@@ -146,7 +146,6 @@ export async function getCoverageRatio(
 }
 
 export {
-  bandRefusesEntry,
   cToll,
   depositShares,
   entryGapPbps,

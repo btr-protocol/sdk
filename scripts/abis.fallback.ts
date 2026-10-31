@@ -86,6 +86,22 @@ export const ABI_FALLBACKS: Record<string, unknown[]> = {
       'payable',
     ),
     fn(
+      'depositMin',
+      [T('token', 'address'), T('amount', 'uint256'), T('minLpOut', 'uint256')],
+      [
+        {
+          name: 'r',
+          type: 'tuple',
+          components: [
+            T('lpAmount', 'uint256'),
+            T('actualDeposit', 'uint256'),
+            T('deadLp', 'uint256'),
+          ],
+        },
+      ],
+      'payable',
+    ),
+    fn(
       'withdraw',
       [
         T('token', 'address'),
