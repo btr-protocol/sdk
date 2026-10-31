@@ -253,8 +253,8 @@ function orderedParts(plan: SwapPlan): SwapPlan['parts'] {
 
 /** Single call pipeline: one encoder per EIP-5792 call shape, shared by the direct N-call path,
  *  the on-chain router path, and the LP batches — identical bytes, one owner. */
-/** [approve(0)?, approve(amount)]: the reset only when a read allowance sits strictly between 0
- *  and the amount (USDT-style tokens refuse nonzero -> nonzero). */
+/** [approve(0)?, approve(amount)]: the reset whenever a read allowance is nonzero (USDT-style
+ *  tokens refuse nonzero -> nonzero, whatever the new amount). */
 function approveCalls(
   token: Address,
   spender: Address,
@@ -262,8 +262,7 @@ function approveCalls(
   opts: Pick<BuildOpts, 'allowance'>,
 ): ExecCall[] {
   const cur = opts.allowance?.(token, spender);
-  const reset =
-    cur !== undefined && cur > 0n && cur < amount ? [approveCall(token, spender, 0n)] : [];
+  const reset = cur !== undefined && cur > 0n ? [approveCall(token, spender, 0n)] : [];
   return [...reset, approveCall(token, spender, amount)];
 }
 
@@ -613,18 +612,6 @@ export function totalValue(calls: ExecCall[]): bigint {
 // shared deadline per atomic batch, no on-chain router. Approval logic is REUSED
 // (buildApprovalCalls), never duplicated.
 
-interface MarketMintArgs {
-  /** 'market': Route A, [approve?, swap(X→target)…, deposit(target)]. */
-  mode: 'market';
-  /** Market legs ending in `depositToken` (planToLegs output). */
-  legs: ExecLeg[];
-  depositToken: Address;
-  /** Deposit size: pass Σ per-part minOut (the guaranteed floor); anything above it stays with
-   *  the user as target tokens. Deposits mint at index by design; no price guard exists. */
-  depositAmount: bigint;
-  /** `Pool.depositMin` floor on the shares minted (see `minLpOut`); absent sends plain `deposit`. */
-  minLpOut?: bigint;
-}
 interface TransferMintArgs {
   /** 'transfer': Route B, [approve?, deposit(X), swapLiability]. ONE approval total: the LP burn
    *  needs no allowance. Non-batchable for fresh deposits (anti-JIT); see lpRoutes gating. */
@@ -649,21 +636,9 @@ export function depositCallData(token: Address, amount: bigint, minLpOut?: bigin
 
 export function buildDepositCalls(
   pool: Address,
-  args: MarketMintArgs | TransferMintArgs,
+  args: TransferMintArgs,
   opts: BuildOpts,
 ): ExecCall[] {
-  if (args.mode === 'market') {
-    const swaps = buildSwapExecCalls(args.legs, opts);
-    return [
-      ...buildApprovalCalls(args.legs, opts),
-      ...swaps,
-      {
-        to: pool,
-        data: depositCallData(args.depositToken, args.depositAmount, args.minLpOut),
-        value: 0n,
-      },
-    ];
-  }
   const deadline = swapDeadline(opts);
   // ONE approval total: the LP burn needs no allowance. Built directly — the old path faked an
   // ExecLeg (minOut 0, never encoded as a swap) just to borrow buildApprovalCalls.

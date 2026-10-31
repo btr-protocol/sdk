@@ -62,6 +62,7 @@ const TARGETS = [
       'swap_qe',
       'deposit',
       'withdraw',
+      'depositMin',
       'withdrawTo',
       'swapLiability',
       'previewWithdraw',

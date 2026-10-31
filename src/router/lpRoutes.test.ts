@@ -137,92 +137,9 @@ afterEach(() => {
 });
 
 describe('rankDeposit (routes A / B)', () => {
-  test('both routes feasible: comparison picks the max target-LP out', async () => {
-    const pools = [healthyPool()];
-    const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, BE);
-    expect(routes.length).toBe(2);
-    expect(best?.feasible).toBe(true);
-    const [a, b] = routes;
-    expect(a.id).toBe('market-first');
-    expect(Math.abs(a.out - b.out) / a.out).toBeLessThan(1e-6);
-    expect(best?.id).toBe('market-first');
-    expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
-  });
-
-  test('deposit-first out is FACE like market-first: ranks on one unit at leg index != 1', async () => {
-    const idx = { NZDF: 2.027e18 };
-    const o = { ...BE, liquidityIndexWad: (s: string) => idx[s as keyof typeof idx] ?? 1e18 };
-    const { routes } = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, o);
-    const m = routes.find((r) => r.id === 'market-first');
-    const t = routes.find((r) => r.id === 'deposit-first');
-    expect(t?.out).toBeCloseTo(5_000, 4);
-    expect(Math.abs((t?.out ?? 0) - (m?.out ?? 0)) / 5_000).toBeLessThan(1e-6);
-    // shares stay in the liability step only: face / 2.027, floored by slippage
-    expect(t?.steps[1].amountOut).toBeCloseTo(5_000 / 2.027, 4);
-    expect(t?.steps[1].minOut).toBeCloseTo((5_000 / 2.027) * 0.995, 4);
-    // route floor is FACE too: shares floor re-scaled by the index
-    expect(t?.minOut).toBeCloseTo(5_000 * 0.995, 4);
-  });
-
-  test('route minOut is the encoded floor in out units (market-first deposits Σ final minOut at C)', async () => {
-    const p = [pool('core', { hubRes: 2_400_000 })]; // C = 1.1
-    const { routes } = await rankDeposit(p, 'AUDF', 'NZDF', 5_500, BE);
-    const m = routes.find((r) => r.id === 'market-first');
-    const swapFloor = m?.steps.filter((s) => s.kind === 'swap').reduce((a, s) => a + s.minOut, 0);
-    expect(m?.minOut).toBeCloseTo((swapFloor ?? 0) / 1.1, 6);
-    expect(m?.minOut).toBeGreaterThan(0);
-    const direct = await rankDeposit(p, 'AUDF', 'AUDF', 5_500, BE);
-    expect(direct.best?.minOut).toBeCloseTo(5_000, 6);
-  });
-
-  test('unplannable input never reaches POST /route (the backend 400s it)', async () => {
-    const stub = globalThis.fetch;
-    const routed: string[] = [];
-    // @ts-expect-error spy fetch
-    globalThis.fetch = (url: string, init: { body?: string }) => {
-      if (String(url).endsWith('/route')) routed.push(String(url));
-      return stub(url, init);
-    };
-    const pools = [healthyPool()];
-    // Sub-wei size: rounds to 0 base units at 6 decimals.
-    const dust = await rankDeposit(pools, 'AUDF', 'NZDF', 1e-9, BE);
-    // Target not listed by any pool yet (registry still loading, or a placeholder symbol).
-    const unlisted = await rankDeposit(pools, 'AUDF', 'JPYC', 5_000, BE);
-    expect(routed).toEqual([]);
-    for (const r of [dust, unlisted]) {
-      expect(r.routes.find((x) => x.id === 'market-first')?.reason).toBe('no-route');
-    }
-    await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, BE);
-    expect(routed.length).toBe(1);
-  });
-
-  test('a 422 capacity answer is reason "capacity", not a backend error', async () => {
-    const stub = globalThis.fetch;
-    // @ts-expect-error spy fetch
-    globalThis.fetch = (url: string, init: { body?: string }) =>
-      String(url).endsWith('/route')
-        ? Promise.resolve({
-            ok: false,
-            status: 422,
-            json: async () => ({ error: 'no_route', reason: 'capacity' }),
-          })
-        : stub(url, init);
+  test('a cross-asset deposit is deposit-then-liability only: no unfloored swap-then-deposit arm', async () => {
     const { routes } = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, BE);
-    expect(routes.find((r) => r.id === 'market-first')?.reason).toBe('capacity');
-  });
-
-  test('market route past capacity drops out; transfer wins by being the max feasible', async () => {
-    const pools = [healthyPool()];
-    const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 200_000, BE);
-    const a = routes.find((r) => r.id === 'market-first');
-    const b = routes.find((r) => r.id === 'deposit-first');
-    expect(a?.feasible).toBe(false);
-    expect(b?.feasible).toBe(true);
-    expect(best?.id).toBe('deposit-first');
-    expect(best?.out).toBeGreaterThan(0);
-    expect(best?.steps[0].kind).toBe('deposit');
-    expect(best?.steps[0].minOut).toBe(0);
-    expect(best?.steps[1].minOut).toBeLessThan(best?.steps[1].amountOut ?? 0);
+    expect(routes.map((r) => r.id)).toEqual(['deposit-first']);
   });
 
   test('season gating surfaces cooldown instead of quoting a reverting batch (§2.5)', async () => {
@@ -234,7 +151,7 @@ describe('rankDeposit (routes A / B)', () => {
     const b = gated.routes.find((r) => r.id === 'deposit-first');
     expect(b?.feasible).toBe(false);
     expect(b?.reason).toBe('cooldown');
-    expect(gated.best?.id).toBe('market-first');
+    expect(gated.best).toBeNull();
     const ok = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, {
       ...BE,
       maxRedeem: () => 10_000,
@@ -249,7 +166,7 @@ describe('rankDeposit (routes A / B)', () => {
       liabilityEnabled: (s) => s !== 'NZDF',
     });
     expect(routes.find((r) => r.id === 'deposit-first')?.reason).toBe('flag-disabled');
-    expect(best?.id).toBe('market-first');
+    expect(best).toBeNull();
   });
 });
 
@@ -370,33 +287,6 @@ const USER = `0x${'44'.repeat(20)}` as `0x${string}`;
 const opts: BuildOpts = { recipient: USER };
 
 describe('buildDepositCalls', () => {
-  test('Route A: [approvals?, swaps…, deposit]', () => {
-    const calls = buildDepositCalls(
-      POOL,
-      {
-        mode: 'market',
-        legs: [
-          {
-            pool: POOL,
-            tokenIn: TOK_X,
-            tokenOut: TOK_T,
-            amountIn: 1000n,
-            quotedOut: 990n,
-            minOut: 990n,
-          },
-        ],
-        depositToken: TOK_T,
-        depositAmount: 990n,
-      },
-      opts,
-    );
-    expect(calls.length).toBe(3);
-    expect(calls[0].to.toLowerCase()).toBe(TOK_X);
-    expect(calls[1].to.toLowerCase()).toBe(POOL);
-    expect(calls[2].to.toLowerCase()).toBe(POOL);
-    expect(calls.every((c) => c.data.startsWith('0x'))).toBe(true);
-  });
-
   test('Route B: exactly ONE approve, then deposit, then swapLiability', () => {
     const calls = buildDepositCalls(
       POOL,
@@ -532,18 +422,6 @@ describe('same-asset direct paths', () => {
 });
 
 describe('missing liability liquidity / single-pool scope edges', () => {
-  test('in-leg liabilities exhausted: transfer route is no-route, market empty, best null', async () => {
-    const pools = [mkPool('core', { AUDF: leg('AUDF', 1_000_000, 0), NZDF: leg('NZDF') })];
-    const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, BE);
-    const b = routes.find((r) => r.id === 'deposit-first');
-    expect(b?.feasible).toBe(false);
-    expect(b?.reason).toBe('no-route');
-    const a = routes.find((r) => r.id === 'market-first');
-    expect(a?.feasible).toBe(false);
-    expect(a?.reason).toBe('capacity');
-    expect(best).toBeNull();
-  });
-
   test('no SINGLE pool holds both legs: redeem enumerates nothing (cross-pool out of scope v1)', async () => {
     const pools = [mkPool('a', { AUDF: leg('AUDF') }), mkPool('b', { JPYC: leg('JPYC') })];
     const { best, routes } = await rankRedeem(pools, 'AUDF', 'JPYC', 5_000, BE);
@@ -563,39 +441,6 @@ describe('capacity clamp boundary', () => {
 });
 
 describe('market-mint sizing and liability-index conversion', () => {
-  test('market-mint deposit is sized at the terminal FLOOR, never the quote or summed hops', async () => {
-    const pools = [
-      mkPool('a', { AUDF: leg('AUDF') }),
-      mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') }),
-    ];
-    const { best } = await rankDeposit(pools, 'AUDF', 'NZDF', 10_000, BE);
-    expect(best?.steps.map((s) => s.kind)).toEqual(['swap', 'deposit']);
-    const [finalHop, deposit] = best?.steps ?? [];
-    expect(deposit?.amountIn).toBeCloseTo(finalHop?.minOut ?? 0, 8);
-    expect(deposit?.amountIn).toBeLessThan(finalHop?.amountOut ?? 0);
-    const summed = (best?.steps ?? [])
-      .filter((s) => s.kind === 'swap')
-      .reduce((n, s) => n + s.amountOut, 0);
-    expect(deposit?.amountIn).toBeLessThanOrEqual(summed);
-  });
-
-  test('a 2-hop market mint deposits only the FINAL leg floor, not hop 1 in another token', async () => {
-    const pools = [
-      mkPool('a', { AUDF: leg('AUDF') }),
-      mkPool('b', { AUDF: leg('AUDF'), NZDF: leg('NZDF') }),
-    ];
-    const { best } = await rankDeposit(pools, 'AUDF', 'NZDF', 10_000, BE);
-    const swaps = (best?.steps ?? []).filter((s) => s.kind === 'swap');
-    const deposit = (best?.steps ?? []).find((s) => s.kind === 'deposit');
-    const terminal = swaps.filter((s) => s.tokenOut === 'NZDF');
-    expect(terminal.length).toBeGreaterThan(0);
-    expect(deposit?.amountIn).toBeCloseTo(
-      terminal.reduce((n, s) => n + s.minOut, 0),
-      8,
-    );
-    expect(deposit?.tokenIn).toBe('NZDF');
-  });
-
   test('liability routes convert shares to face at accrued liquidity indexes', async () => {
     const pools = [healthyPool()];
     const indexes = { AUDF: 1.2e18, NZDF: 1.5e18 };

@@ -73,7 +73,7 @@ export function poolSolvency(state: PoolState): number | null {
 /** `PoolSolvencyLib.previewCap` from the sweep's sums: `nav`/`claim` over the usable legs (hub
  *  included), `darkCk` = each unusable leg's `c_k = R/L` (∞ at L = 0; 0/0 legs skipped). With no dark
  *  leg it is C (1 on an empty book); else C's lower bound `min(C_usable, min c_k)`, since the true C is
- *  a mediant of them whatever the dark marks read. Excludes the exit toll (`exitSpreadPbps`). */
+ *  a mediant of them whatever the dark marks read. Excludes the C-exposure exit toll (`exposureTollPbps`, `pool/lpToll.ts`). */
 export function exitCap(nav: number, claim: number, darkCk: number[] = []): number {
   const lo = Math.min(...darkCk);
   if (darkCk.length === 0) return claim > 0 ? nav / claim : 1;

@@ -8,11 +8,9 @@
 import {
   type NamedPoolWire,
   type QuoteRouteWire,
-  type RouteRequestWire,
   type WireMeta,
-  isNoCapacityError,
   poolStateToWire,
-  routeAsync,
+  type routeAsync,
 } from '../amm/aimm.js';
 import {
   type BackendConvertOpts,
@@ -26,7 +24,7 @@ import {
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
 import type { NamedPool, SwapPlan } from './route.js';
-import { assertSlip, poolHas, poolHolding } from './route.js';
+import { assertSlip, poolHolding } from './route.js';
 
 export interface LpRouteOpts {
   /** The caller's effective tolerance, resolved at quote time (spread-based by default in the
@@ -242,115 +240,6 @@ export function wirePlanToSwap(
 
 // ── mint: X -> target-LP ────────────────────────────────────────────────────────
 
-async function marketMint(
-  pools: NamedPool[],
-  wires: NamedPoolWire[],
-  xToken: string,
-  targetSym: string,
-  amountIn: number,
-  opts: LpRouteOpts,
-): Promise<RankedLpRoute | null> {
-  const b = needBackend(opts);
-  const slip = opts.slippageFrac;
-  const decOf = (s: string) => b.meta.decimalsOf(s);
-  const amountRaw = toRawHex(amountIn, decOf(xToken));
-  // The backend answers an unplannable request with a 400, so only ask it a question that can
-  // have an answer: a size that survives the base-unit round, both tokens in a listed pool.
-  const listed = (sym: string) => pools.some((p) => poolHas(p.state, sym));
-  if (BigInt(amountRaw) === 0n || !listed(xToken) || !listed(targetSym)) {
-    return unfeasible(MARKET_DEAD, 'no-route');
-  }
-  const req: RouteRequestWire = {
-    pools: wires,
-    token_in: xToken,
-    token_out: targetSym,
-    amount_in: amountRaw,
-  };
-  let res: Awaited<ReturnType<typeof routeAsync>>;
-  try {
-    res = await routeAsync(req, b.backendBase);
-  } catch (e) {
-    return unfeasible(MARKET_DEAD, isNoCapacityError(e) ? 'capacity' : 'backend-error');
-  }
-  let plan: SwapPlan;
-  try {
-    ({ plan } = wirePlanToSwap(
-      pools,
-      { tokenIn: xToken, tokenOut: targetSym, amountIn },
-      res,
-      decOf,
-    ));
-  } catch {
-    return unfeasible(MARKET_DEAD, 'backend-error');
-  }
-
-  const steps: LpRouteStep[] = [];
-  let placed = 0;
-  let depositExpected = 0;
-  let depositFloor = 0;
-  for (const part of plan.parts) {
-    placed += part.fraction * amountIn;
-    part.quote.fills.forEach((fill, i) => {
-      const isFinal = i === part.quote.fills.length - 1;
-      const minOut = fill.amountOut * (1 - slip);
-      steps.push({
-        kind: 'swap',
-        poolTag: fill.leg.poolTag,
-        poolAddr: fill.leg.poolAddr,
-        tokenIn: fill.leg.tokenIn,
-        tokenOut: fill.leg.tokenOut,
-        amountIn: fill.amountIn,
-        amountOut: fill.amountOut,
-        minOut,
-      });
-      if (isFinal) {
-        depositExpected += fill.amountOut;
-        depositFloor += minOut;
-      }
-    });
-  }
-  if (placed < amountIn * 0.999) {
-    return unfeasible(
-      {
-        id: 'market-first',
-        label: 'market swap, then deposit',
-        out: plan.amountOut,
-        minOut: 0,
-        hops: steps.length + 1,
-        steps,
-      },
-      'capacity',
-      plan.amountOut,
-    );
-  }
-  const first = steps[0];
-  // The deposit MINTS AT C (`PoolLiquidityLib.deposit`: face = amt·WAD/C) and refuses without a rate.
-  const depositPool = pools.find((p) => p.tag === first?.poolTag);
-  const c = depositPool ? poolSolvency(depositPool.state) : null;
-  if (c === null) return unfeasible(MARKET_DEAD, 'feed-unavailable');
-  steps.push({
-    kind: 'deposit',
-    poolTag: first?.poolTag ?? '',
-    poolAddr: first?.poolAddr,
-    tokenIn: targetSym,
-    tokenOut: targetSym,
-    amountIn: depositFloor,
-    amountOut: depositExpected,
-    minOut: 0,
-  });
-
-  return {
-    id: 'market-first',
-    label: 'market swap, then deposit',
-    out: (plan.amountOut * tollKeep(opts.entryTollPbps)) / c,
-    // The deposit takes Σ final-leg floors and mints at C: that is the face the batch guarantees.
-    minOut: (depositFloor * tollKeep(opts.entryTollPbps)) / c,
-    hops: steps.length,
-    steps,
-    feasible: true,
-  };
-}
-
 async function transferMint(
   pools: NamedPool[],
   xToken: string,
@@ -468,10 +357,11 @@ export async function rankDeposit(
     };
     return { best: direct.feasible ? direct : null, routes: [direct] };
   }
-  const wires = wiresOf(pools, needBackend(opts));
-  const market = await marketMint(pools, wires, xToken, targetSym, amountIn, opts);
+  // Cross-asset deposits go deposit-then-liability-swap only. The swap-then-deposit arm is gone:
+  // its deposit leg runs unfloored in a later transaction (anti-JIT forbids batching it), and
+  // v2 deposits are allowlisted at genesis.
   const transfer = await transferMint(pools, xToken, targetSym, amountIn, opts);
-  const routes = rankRoutes([market, transfer].filter((r): r is RankedLpRoute => r !== null));
+  const routes = rankRoutes([transfer].filter((r): r is RankedLpRoute => r !== null));
   return { best: routes.find((r) => r.feasible) ?? null, routes };
 }
 

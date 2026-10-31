@@ -250,12 +250,13 @@ describe('approve reset (USDT-style tokens)', () => {
       .filter((c) => c.data.startsWith(APPROVE_SEL))
       .map((c) => approveAmount(c.data));
 
-  test('0 < allowance < need resets to 0 first', () => {
+  test('any nonzero read allowance resets to 0 first', () => {
     expect(approves(400n)).toEqual([0n, 1000n]);
+    expect(approves(1000n)).toEqual([0n, 1000n]);
+    expect(approves(5000n)).toEqual([0n, 1000n]);
   });
-  test('zero, covering or unread allowance keeps one approve', () => {
+  test('zero or unread allowance keeps one approve', () => {
     expect(approves(0n)).toEqual([1000n]);
-    expect(approves(1000n)).toEqual([1000n]);
     expect(approves(undefined)).toEqual([1000n]);
   });
 });
