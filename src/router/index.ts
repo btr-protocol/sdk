@@ -20,7 +20,7 @@ import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
-import { defaultDeadline } from '../pool/index.js';
+import { sendDeadline } from '../pool/index.js';
 import { applySlip } from '../utils/maths.js';
 import { type SwapPlan, assertSlip } from './route.js';
 
@@ -76,7 +76,7 @@ export interface BuildOpts {
   /** When true, approve max uint256 (reuse forever). When false/omitted (default), approve only the
    *  exact Σ amountIn for that (token, pool): standard exact-amount approve + swap. */
   approveMax?: boolean;
-  /** Unix-seconds swap expiry; defaults to now + 600s. Pass NO_DEADLINE to opt out. */
+  /** Unix-seconds swap expiry; defaults to now + 600s. Capped at MAX_DEADLINE_S past chain time. */
   deadline?: bigint;
   /** Chain's wrapped-native (WETH9) address. Required as soon as any leg sets wrapIn/unwrapOut. */
   wrappedNative?: Address;
@@ -288,7 +288,7 @@ function unwrapCall(wnative: Address, amount: bigint): ExecCall {
 
 /** Deadline is read at send time, never baked at batch-build time (see buildSwapCalls). */
 function swapDeadline(opts: BuildOpts): bigint {
-  return opts.deadline ?? defaultDeadline();
+  return sendDeadline(opts.deadline);
 }
 
 /** Carve the caller's EXACT input across the plan's parts, in the order given.
@@ -574,7 +574,7 @@ export function buildApprovalCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
   return [...wrap, ...approvals];
 }
 
-/** [swaps…, unwrap?]: `opts.deadline ?? defaultDeadline()` is read HERE, at call time: call this
+/** [swaps…, unwrap?]: `sendDeadline(opts.deadline)` is read HERE, at call time: call this
  *  immediately before the send so a deadline built during an earlier approval wait cannot expire it. */
 export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[] {
   const wnative = opts.wrappedNative?.toLowerCase();
@@ -989,7 +989,7 @@ export function buildRouterApprovalCalls(
 
 /** [Router.swap, unwrap?].
  *
- *  `opts.deadline ?? defaultDeadline()` is read HERE, at call time. Call this immediately before
+ *  `sendDeadline(opts.deadline)` is read HERE, at call time. Call this immediately before
  *  the send: a deadline built while an approval was still mining can already be spent. */
 export function buildRouterSwapExecCalls(
   router: Address,

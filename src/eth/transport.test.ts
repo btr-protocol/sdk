@@ -191,6 +191,24 @@ describe('httpTransport: a 400 is a verdict on the request', () => {
   });
 });
 
+// R3C-1 review: a hostile endpoint streaming an endless body grew the caller's heap unbounded.
+describe('httpTransport caps the response body', () => {
+  test('a body over maxResponseBytes is refused once, never retried', async () => {
+    let reads = 0;
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
+      reads++;
+      return ok(body, `0x${'ab'.repeat(4096)}`);
+    });
+    const p = httpTransport('http://rpc', { retries: 3, retryDelay: 1, maxResponseBytes: 1024 });
+    await expect(p.request({ method: 'eth_call', params: [] })).rejects.toThrow(/over 1024 bytes/);
+    expect(reads).toBe(1);
+    const roomy = httpTransport('http://rpc', { retryDelay: 1, maxResponseBytes: 1 << 20 });
+    expect(await roomy.request({ method: 'eth_call', params: [] })).toBe(`0x${'ab'.repeat(4096)}`);
+  });
+});
+
 describe('httpTransport rotates steady-state reads across endpoints', () => {
   test('consecutive reads walk the ring instead of pinning the first', async () => {
     const { reads } = ((): { reads: string[] } => {

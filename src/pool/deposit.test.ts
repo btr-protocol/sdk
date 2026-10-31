@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { buildDepositCalls, buildRedeemCalls } from '../router/index';
 import {
+  MAX_DEADLINE_S,
   defaultDeadline,
   deposit,
   minLpOut,
+  sendDeadline,
   simulateDeposit,
   simulatePoolCall,
   syncChainClock,
@@ -118,18 +120,60 @@ describe('LP builders refuse a zero floor', () => {
 });
 
 // r2 C-F-7: deadlines came off the device clock; a skewed device widened the window.
+// R3C-1: the clock source may lie too, so a skew past MAX_CLOCK_SKEW_S refuses instead.
 describe('syncChainClock', () => {
   const at = (timestamp: unknown) => ({ request: async () => ({ timestamp }) });
+  const hex = (s: number) => `0x${s.toString(16)}`;
+  const nowS = () => Math.floor(Date.now() / 1000);
   test('deadlines follow chain time, not the device clock', async () => {
-    const chainNow = Math.floor(Date.now() / 1000) - 3_600; // device one hour ahead
-    await syncChainClock(at(`0x${chainNow.toString(16)}`) as never);
+    const chainNow = nowS() - 90; // device 90 s ahead, inside the bound
+    await syncChainClock(at(hex(chainNow)) as never);
     const d = Number(defaultDeadline());
     expect(d - chainNow).toBeGreaterThanOrEqual(600);
     expect(d - chainNow).toBeLessThan(605);
-    await syncChainClock(at(`0x${Math.floor(Date.now() / 1000).toString(16)}`) as never);
+    await syncChainClock(at(hex(nowS())) as never);
+  });
+  test('a chain clock past the skew bound refuses and keeps the last offset', async () => {
+    await syncChainClock(at(hex(nowS())) as never);
+    const before = defaultDeadline();
+    await expect(syncChainClock(at(hex(nowS() + 3_600)) as never)).rejects.toThrow(/clock/);
+    await expect(syncChainClock(at(hex(nowS() - 121)) as never)).rejects.toThrow(/bound 120s/);
+    expect(defaultDeadline() - before).toBeLessThan(5n);
+    await syncChainClock(at(hex(nowS() - 200)) as never, 300);
+    await syncChainClock(at(hex(nowS())) as never);
   });
   test('no timestamp refuses', async () => {
     await expect(syncChainClock(at(undefined) as never)).rejects.toThrow(/timestamp/);
     await expect(syncChainClock({ request: async () => null } as never)).rejects.toThrow();
+  });
+});
+
+describe('sendDeadline', () => {
+  const POOL = `0x${'11'.repeat(20)}` as `0x${string}`;
+  const TOK = `0x${'22'.repeat(20)}` as `0x${string}`;
+  const nowS = BigInt(Math.floor(Date.now() / 1000));
+  test('defaults inside the window; a window past MAX_DEADLINE_S refuses', () => {
+    expect(sendDeadline() - nowS).toBeLessThanOrEqual(BigInt(MAX_DEADLINE_S));
+    expect(sendDeadline(nowS + 60n)).toBe(nowS + 60n);
+    expect(() => sendDeadline(nowS + BigInt(MAX_DEADLINE_S) + 10n)).toThrow(/past chain time/);
+    expect(() => sendDeadline(-1n)).toThrow(/>= 0/);
+  });
+  test('the calldata builders refuse a far-future deadline', () => {
+    const far = nowS + 86_400n;
+    const t = {
+      mode: 'transfer' as const,
+      token: TOK,
+      amount: 1n,
+      targetToken: TOK,
+      lpAmountIn: 1n,
+      minLpAmountOut: 1n,
+    };
+    expect(() =>
+      buildDepositCalls(POOL, t, {
+        recipient: POOL,
+        needsApproval: () => false,
+        deadline: far,
+      }),
+    ).toThrow(/past chain time/);
   });
 });

@@ -13,7 +13,7 @@ import {
   zeroAddress,
 } from '../eth/index.js';
 import { type MulticallResult, multicall } from '../eth/multicall.js';
-import { POOL_ABI, type SwapQuote, defaultDeadline } from '../pool/index.js';
+import { POOL_ABI, type SwapQuote, defaultDeadline, sendDeadline } from '../pool/index.js';
 import { type VenueKind, eqAddr, hasToken, staticVenuePools } from './registry.js';
 
 export interface VenueExecCall {
@@ -214,10 +214,7 @@ const SWAP_CALLDATA_LEN = 2 + 8 + 6 * 64;
  *  floor, same recipient. Anything that is not exactly this call is returned untouched. */
 function restamped(data: Hex, deadline?: bigint): Hex {
   if (data.length !== SWAP_CALLDATA_LEN || !data.startsWith(SWAP_SELECTOR)) return data;
-  if (deadline !== undefined && deadline < 0n) {
-    throw new Error('restamped: deadline must be >= 0');
-  }
-  const d = (deadline ?? defaultDeadline()).toString(16).padStart(64, '0');
+  const d = sendDeadline(deadline).toString(16).padStart(64, '0');
   return `${data.slice(0, data.length - 64)}${d}` as Hex;
 }
 

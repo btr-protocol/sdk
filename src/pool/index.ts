@@ -318,29 +318,57 @@ const txValue = (token: Address, amount: bigint): Hex =>
   isNative(token) ? `0x${amount.toString(16)}` : '0x0';
 /** Default tx validity window (seconds) when no deadline is supplied. */
 const DEFAULT_DEADLINE_S = 600;
+/** Widest validity window a send may carry, explicit deadlines included: past it a signed swap is
+ *  an option a searcher can hold. */
+export const MAX_DEADLINE_S = 1_800;
+/** Largest |chain time − device clock| {@link syncChainClock} accepts. A wider gap is a wrong
+ *  device clock or a lying RPC; either way the deadline it would anchor is not known. */
+export const MAX_CLOCK_SKEW_S = 120;
 /** Chain time minus this device's clock, seconds, from the last {@link syncChainClock}. */
 let chainSkewS = 0;
 
+const chainNowS = (): number => Math.floor(Date.now() / 1000) + chainSkewS;
+
 /**
- * Anchor every default deadline to CHAIN time: reads the latest block's timestamp through
- * `provider` (pass the wallet's) and keeps its offset from this device's clock. A device clock
- * hours ahead would otherwise hand out a window hours wide, a pending swap a searcher can hold;
- * one behind pre-expires it. Throws when the read fails or answers no timestamp, so a send never
- * goes out on an unknown clock. Unsynced (a server on NTP) the device clock stands.
+ * Anchor every deadline to CHAIN time: reads the latest block's timestamp through `provider`
+ * (pass the wallet's, or an independent quorum: never the quote server's relay) and keeps its
+ * offset from this device's clock. Refuses (throws) when the read fails, answers no timestamp,
+ * or differs from the device clock by more than `maxSkewS`: an RPC that lies about time would
+ * otherwise set the deadline, and a device hours off would hand out an hours-wide window. A
+ * refused sync leaves the previous offset. Unsynced (a server on NTP) the device clock stands.
  */
-export async function syncChainClock(provider: Eip1193Provider): Promise<void> {
+export async function syncChainClock(
+  provider: Eip1193Provider,
+  maxSkewS: number = MAX_CLOCK_SKEW_S,
+): Promise<void> {
   const block = (await provider.request({
     method: 'eth_getBlockByNumber',
     params: ['latest', false],
   })) as { timestamp?: unknown } | null;
   const ts = typeof block?.timestamp === 'string' ? Number(BigInt(block.timestamp)) : Number.NaN;
   if (!(Number.isSafeInteger(ts) && ts > 0)) throw new Error('chain clock: no block timestamp');
-  chainSkewS = ts - Math.floor(Date.now() / 1000);
+  const skew = ts - Math.floor(Date.now() / 1000);
+  if (!(Math.abs(skew) <= maxSkewS)) {
+    throw new Error(
+      `chain clock: chain time is ${skew}s off this device (bound ${maxSkewS}s); fix the device clock or the RPC`,
+    );
+  }
+  chainSkewS = skew;
 }
 
 /** Unix-seconds deadline `DEFAULT_DEADLINE_S` from now, on chain time once synced. */
-export const defaultDeadline = (): bigint =>
-  BigInt(Math.floor(Date.now() / 1000) + chainSkewS + DEFAULT_DEADLINE_S);
+export const defaultDeadline = (): bigint => BigInt(chainNowS() + DEFAULT_DEADLINE_S);
+
+/** The deadline a send encodes: `deadline` or {@link defaultDeadline}. Throws when it is negative
+ *  or more than {@link MAX_DEADLINE_S} past chain time. */
+export function sendDeadline(deadline?: bigint): bigint {
+  const d = deadline ?? defaultDeadline();
+  if (d < 0n) throw new Error('deadline must be >= 0');
+  if (d > BigInt(chainNowS() + MAX_DEADLINE_S)) {
+    throw new Error(`deadline more than ${MAX_DEADLINE_S}s past chain time`);
+  }
+  return d;
+}
 
 interface SwapParams {
   tokenIn: Address;
@@ -348,7 +376,7 @@ interface SwapParams {
   amountIn: bigint;
   minAmountOut: bigint;
   recipient: Address;
-  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
+  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Capped at MAX_DEADLINE_S past chain time. */
   deadline?: bigint;
   /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
@@ -367,7 +395,7 @@ interface WithdrawParams {
   token: Address;
   lpAmount: bigint;
   minAmountOut: bigint;
-  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Pass NO_DEADLINE to opt out. */
+  /** Unix-seconds expiry; defaults to now + DEFAULT_DEADLINE_S. Capped at MAX_DEADLINE_S past chain time. */
   deadline?: bigint;
   /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
@@ -406,7 +434,7 @@ export async function swap(
       params.amountIn,
       params.minAmountOut,
       params.recipient,
-      params.deadline ?? defaultDeadline(),
+      sendDeadline(params.deadline),
     ],
   });
 
@@ -515,12 +543,7 @@ export async function withdraw(
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'withdraw',
-    args: [
-      params.token,
-      params.lpAmount,
-      params.minAmountOut,
-      params.deadline ?? defaultDeadline(),
-    ],
+    args: [params.token, params.lpAmount, params.minAmountOut, sendDeadline(params.deadline)],
   });
 
   return (await provider.request({

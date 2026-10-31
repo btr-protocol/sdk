@@ -78,12 +78,43 @@ export interface TransportOpts {
   // (default unlimited). A larger window amortizes better but adds latency to every read -
   // keep it small (tens of ms) unless the caller is itself burst-shaped.
   batch?: boolean | { wait?: number; max?: number; maxBytes?: number };
+  // Largest response body read, bytes (default 32 MiB). A hostile endpoint streaming an endless
+  // body would otherwise grow the caller's heap until the tab or process dies; over the cap the
+  // read is cancelled and refused (not retried: the same endpoint would send it again).
+  maxResponseBytes?: number;
 }
 
 type Waiter = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 type Pending = Waiter & { method: string; params: unknown[]; key?: string; waiters: Waiter[] };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** `res`'s body as text, refused once it passes `max` bytes (declared or streamed). */
+async function readCapped(res: Response, max: number): Promise<string> {
+  const tooBig = () => new RpcError(`RPC response over ${max} bytes`, 413);
+  if (Number(res.headers.get('content-length')) > max) throw tooBig();
+  if (!res.body) return res.text();
+  const reader = res.body.getReader();
+  const parts: Uint8Array[] = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+    if (n > max) {
+      await reader.cancel().catch(() => {});
+      throw tooBig();
+    }
+    parts.push(value);
+  }
+  const all = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) {
+    all.set(p, o);
+    o += p.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
 
 export function httpTransport(
   urls: string | readonly string[],
@@ -98,6 +129,7 @@ export function httpTransport(
   const wait = batch?.wait ?? 0;
   const maxBatch = batch?.max ?? 100;
   const maxBytes = batch?.maxBytes ?? Number.POSITIVE_INFINITY;
+  const maxResponseBytes = opts.maxResponseBytes ?? 32 * 1024 * 1024;
 
   let id = 0;
   let queue: Pending[] = [];
@@ -134,7 +166,7 @@ export function httpTransport(
       if (res.status === 400)
         throw new RpcError(`HTTP 400: ${(await res.text()).slice(0, 200)}`, 400);
       if (!res.ok) throw new RpcNetworkError(`HTTP ${res.status}: ${res.statusText}`, res.status);
-      return (await res.json()) as RpcResponse;
+      return JSON.parse(await readCapped(res, maxResponseBytes)) as RpcResponse;
     } catch (e) {
       if (e instanceof RpcError) throw e;
       const err = e as { name?: string; message?: string } | undefined;
