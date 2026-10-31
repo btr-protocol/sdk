@@ -8,31 +8,41 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Bun tests + typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      # The ABI pin test reads the backend's served copies from the sibling checkout. back is
-      # private and pinned, like every sibling checkout across the repos. back pins sdk in turn, so
-      # pin back at a commit whose abis/ matches its head, not at the commit that bumps back's pins.
-      - run: |
-          git clone -q --filter=blob:none --no-checkout \
-            "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/back" ../back
-          git -C ../back sparse-checkout set abis
-          git -C ../back checkout -q d8dcfa85beb65ea285e952be49801cd3ca4b1545
-      # The solidity mirror test re-parses the DECLARING sources; it hard-fails without them.
-      - run: |
-          git clone -q --filter=blob:none --no-checkout \
-            "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/dex-evm" ../dex-evm
-          git -C ../dex-evm sparse-checkout set src abi deployments
-          git -C ../dex-evm checkout -q 942b7294861634d18615bdcbc5838ede9222f720
-          git clone -q --filter=blob:none --no-checkout \
-            "https://x-access-token:${{ secrets.CI_SIBLING_TOKEN }}@github.com/btr-protocol/shared" ../shared
-          git -C ../shared sparse-checkout set evm/src
-          git -C ../shared checkout -q 1f2d4fc4b75658543ea33dc8abb571245a7cab11
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      # Siblings are private, pinned and cloned with a one-shot auth header: the token is passed to each
+      # git command via `-c http.extraheader` (env, masked), never written to .git/config or a remote
+      # URL, so the bun install and tests below (PR code) cannot read it from disk.
+      # The ABI pin test reads the backend's served copies from the sibling checkout. back pins sdk in
+      # turn, so pin back at a commit whose abis/ matches its head, not at the commit that bumps back's pins.
+      # The solidity mirror test re-parses the DECLARING sources (dex-evm, shared); it hard-fails without them.
+      - name: Sibling checkouts (pinned, credential not persisted)
+        env:
+          CI_SIBLING_TOKEN: ${{ secrets.CI_SIBLING_TOKEN }}
+        run: |
+          set -euo pipefail
+          AUTH=$(printf 'x-access-token:%s' "$CI_SIBLING_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          g() { git -c "http.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
+          sib() { # name sparse-paths... sha
+            local n=$1 sha=${!#}; local paths=("${@:2:$#-2}")
+            g clone -q --filter=blob:none --no-checkout "https://github.com/btr-protocol/$n" "../$n"
+            git -C "../$n" sparse-checkout set "${paths[@]}"
+            g -C "../$n" checkout -q "$sha"
+          }
+          sib back abis d8dcfa85beb65ea285e952be49801cd3ca4b1545
+          sib dex-evm src abi deployments 942b7294861634d18615bdcbc5838ede9222f720
+          sib shared evm/src 1f2d4fc4b75658543ea33dc8abb571245a7cab11
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
