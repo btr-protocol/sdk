@@ -33,3 +33,13 @@ test('every routable symbol has a token; feeds decode to their ticker', () => {
       expect(BigInt(id).toString()).toBe(v.tickerIds[n]);
   }
 });
+
+test('CoopArb: every generation keeps its own address; coopArb is one of them', () => {
+  for (const v of Object.values(DEPLOYED_VENUES)) {
+    const gens = Object.entries(v.contracts)
+      .filter(([k]) => /^coopArbV\d+$/.test(k))
+      .map(([, a]) => a.toLowerCase());
+    expect(new Set(gens).size).toBe(gens.length);
+    if (v.contracts.coopArb) expect(gens).toContain(v.contracts.coopArb.toLowerCase());
+  }
+});
