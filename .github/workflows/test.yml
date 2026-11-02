@@ -5,6 +5,7 @@ name: CI
 
 on:
   push:
+    branches: [main]  # branch pushes run via pull_request only: no CI_SIBLING_TOKEN on bare pushes
   pull_request:
   workflow_dispatch:
 
