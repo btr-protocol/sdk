@@ -191,6 +191,32 @@ describe('httpTransport: a 400 is a verdict on the request', () => {
   });
 });
 
+// R4C-7: the 400 body was read uncapped.
+describe('httpTransport caps a 400 body', () => {
+  test('an endless 400 stream is cancelled at the cap and still a 400 verdict', async () => {
+    let pulled = 0;
+    let cancelled = false;
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init) as MockRequest;
+      if (body.method === 'eth_chainId') return ok(body);
+      const stream = new ReadableStream<Uint8Array>({
+        pull(c) {
+          pulled += 1024;
+          c.enqueue(new Uint8Array(1024).fill(120));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      return new Response(stream, { status: 400 });
+    });
+    const p = httpTransport('http://rpc', { retries: 3, retryDelay: 1 });
+    await expect(p.request({ method: 'eth_call', params: [] })).rejects.toThrow(/HTTP 400/);
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(64 * 1024);
+  });
+});
+
 // R3C-1 review: a hostile endpoint streaming an endless body grew the caller's heap unbounded.
 describe('httpTransport caps the response body', () => {
   test('a body over maxResponseBytes is refused once, never retried', async () => {

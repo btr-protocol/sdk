@@ -9,7 +9,8 @@
  * ! V4 dates a push with a CYCLIC clock (`tsDs` = deciseconds since midnight UTC, no epoch).
  * Reconstruct a v5 source time against the pushing block's timestamp.
  *
- * Source: dex-evm src/oracles/ExternalOracleV4.sol + NxrSignerSet.sol.
+ * Source: the deployed V4 fleet (no dex-evm source at the current pin). Content-pinned in
+ * `abis.lock.json`; field names follow dex-evm `IOracle.FeedData` (`maxDevBps`), as back/abis does.
  */
 
 const FEED_DATA_COMPONENTS = [

@@ -163,8 +163,11 @@ export function httpTransport(
       if (res.status === 429) throw new RpcRateLimitError('rate limited', 429);
       // 400 is a verdict on the REQUEST (a relay refusing a shape or a limit): sending it again,
       // or to another endpoint, cannot change it.
-      if (res.status === 400)
-        throw new RpcError(`HTTP 400: ${(await res.text()).slice(0, 200)}`, 400);
+      if (res.status === 400) {
+        // Capped: a hostile endpoint must not stream an error body for the whole abort window.
+        const detail = await readCapped(res, 4096).catch(() => '');
+        throw new RpcError(`HTTP 400: ${detail.slice(0, 200)}`, 400);
+      }
       if (!res.ok) throw new RpcNetworkError(`HTTP ${res.status}: ${res.statusText}`, res.status);
       return JSON.parse(await readCapped(res, maxResponseBytes)) as RpcResponse;
     } catch (e) {
