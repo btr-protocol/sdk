@@ -8,11 +8,7 @@
   "segments": [
     {
       "tier": 1,
-      "pks": [
-        "0xa11ce",
-        "0xa11cf",
-        "0xa11d0"
-      ],
+      "pks": ["0xa11ce", "0xa11cf", "0xa11d0"],
       "signerBitmap": 3,
       "lanes": [
         {
@@ -85,11 +81,7 @@
     },
     {
       "tier": 2,
-      "pks": [
-        "0xd00d",
-        "0xd00e",
-        "0xd00f"
-      ],
+      "pks": ["0xd00d", "0xd00e", "0xd00f"],
       "signerBitmap": 5,
       "lanes": [
         {

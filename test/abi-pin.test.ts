@@ -9,8 +9,8 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
 import { ACCESS_CONTROL_ABI } from '../src/abis/AccessControl';
+import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
 import { abiHash } from '../src/abis/hash';
 
 const repo = join(import.meta.dir, '..');
