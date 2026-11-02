@@ -42,6 +42,11 @@ export const trusted = (chainId: number, url: string): boolean => {
   );
 };
 
+/** Operator root of an endpoint: the last two host labels (eTLD+1). A quorum of endpoints sharing it has one DNS/operator
+ *  trust root. ponytail: no public-suffix list (every listed host is a plain two-label registrable domain), add one if a `.co.uk` style host is listed. */
+export const operator = (url: string): string =>
+  new URL(url).hostname.split('.').slice(-2).join('.');
+
 /** Why a URL can never be listed, or null. A key in the URL is a secret in a public file; a
  *  placeholder is a template; a long path segment is a key by shape; an IP literal, a bare label
  *  or a port is an internal address a probe could be pointed at; and the URL lands in a committed

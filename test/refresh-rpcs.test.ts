@@ -1,7 +1,12 @@
 import { expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { renderOrigins, render as renderRpcs, rpcsFromChains } from '../scripts/gen-rpcs';
+import {
+  renderOrigins,
+  render as renderRpcs,
+  rpcsFromChains,
+  sharedOperators,
+} from '../scripts/gen-rpcs';
 import { norm, trusted, unusable } from '../scripts/lib/rpcUrl';
 import {
   type Chains,
@@ -238,7 +243,8 @@ test('gen-rpcs: browser rows only, trusted wide first, never paid; any row when 
   expect(rpcs).toEqual({
     1: ['https://web.example.org'],
     56: ['https://s.example.org'],
-    143: ['https://rpc1.monad.xyz', 'https://rpc2.monad.xyz'],
+    // one operator per pick: rpc2.monad.xyz (trusted) loses to the next operator
+    143: ['https://rpc1.monad.xyz', 'https://other-wide.example.org'],
   });
   expect(renderRpcs(rpcs)).toContain('56: ["https://s.example.org"],');
   expect(renderRpcs({ 1: ["https://x/'a"] })).toContain(`["https://x/'a"]`);
@@ -282,4 +288,19 @@ test('rpc-origins.txt = origins of the served chains in CHAIN_RPCS', () => {
   const file = readFileSync(join(import.meta.dir, '..', 'rpc-origins.txt'), 'utf8');
   expect(file).toBe(renderOrigins(CHAIN_RPCS, SERVED_CHAINS));
   expect(file.trim().split('\n').length).toBeGreaterThanOrEqual(2 * SERVED_CHAINS.length);
+});
+
+// R4C-6: unanimity over endpoints of one operator has one DNS/operator trust root.
+test('served chains: quorum endpoints have distinct eTLD+1 operators', () => {
+  expect(sharedOperators(CHAIN_RPCS, SERVED_CHAINS)).toEqual([]);
+});
+
+test('sharedOperators flags a pair of one operator; picks skip a repeated operator', () => {
+  const a = 'https://rpc.a.arc.io';
+  const b = 'https://rpc.b.arc.io';
+  const c = 'https://x.publicnode.com';
+  expect(sharedOperators({ 1: [a, b] }, [{ chainId: 1 }])).toHaveLength(1);
+  expect(sharedOperators({ 1: [a, c] }, [{ chainId: 1 }])).toEqual([]);
+  const rows = [a, b, c].map((url) => ({ url, browser: true }));
+  expect(rpcsFromChains({ rpc: { '1': rows } })[1]).toEqual([c, a]); // publicnode is trusted, so ranks first
 });

@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
 import { SERVED_CHAINS } from '../src/venues/deployments.generated';
-import { norm, trusted, unusable } from './lib/rpcUrl';
+import { norm, operator, trusted, unusable } from './lib/rpcUrl';
 
 /** RPCs handed to a wallet or read from a browser, per chain. */
 export const TOP = 2;
@@ -39,11 +39,14 @@ export function rpcsFromChains(file: { rpc: Record<string, Row[]> }): Record<num
     // extension does not do CORS.
     const eligible = rows.filter((r) => typeof r === 'string' || !r.paid);
     const web = eligible.filter((r) => typeof r !== 'string' && r.browser);
-    const picks = (web.length ? web : eligible)
+    // One operator per pick (R4C-6): a second row of an operator already picked only fills a short list.
+    const ranked = (web.length ? web : eligible)
       .map((r, i) => ({ r, i, k: rank(r) }))
       .sort((a, b) => a.k - b.k || a.i - b.i)
-      .slice(0, TOP)
       .map(({ r }) => norm(typeof r === 'string' ? r : r.url));
+    const seen = new Set<string>();
+    const distinct = ranked.filter((u) => !seen.has(operator(u)) && seen.add(operator(u)));
+    const picks = [...distinct, ...ranked.filter((u) => !distinct.includes(u))].slice(0, TOP);
     for (const u of picks) {
       const why = unusable(u, undefined);
       if (why) throw new Error(`gen-rpcs: chain ${id} ${u}: ${why}`);
@@ -51,6 +54,19 @@ export function rpcsFromChains(file: { rpc: Record<string, Row[]> }): Record<num
     if (picks.length) out[Number(id)] = picks;
   }
   return out;
+}
+
+/** Served chains whose quorum endpoints share an eTLD+1 operator: one DNS/operator compromise would pass unanimity.
+ *  Empty = ok. Fails the generator run and `test/refresh-rpcs.test.ts`. */
+export function sharedOperators(
+  rpcs: Readonly<Record<number, readonly string[]>>,
+  served: ReadonlyArray<{ chainId: number }>,
+): string[] {
+  return served.flatMap(({ chainId }) => {
+    const urls = rpcs[chainId] ?? [];
+    const ops = urls.map(operator);
+    return new Set(ops).size === urls.length ? [] : [`chain ${chainId}: ${ops.join(', ')}`];
+  });
 }
 
 export const render = (rpcs: Record<number, string[]>) =>
@@ -82,6 +98,9 @@ if (import.meta.main) {
   else {
     const out = join(root, 'src', 'eth', 'rpcs.generated.ts');
     const rpcs = rpcsFromChains(JSON.parse(readFileSync(src, 'utf8')));
+    const shared = sharedOperators(rpcs, SERVED_CHAINS);
+    if (shared.length)
+      throw new Error(`gen-rpcs: quorum endpoints share an operator: ${shared.join('; ')}`);
     writeFileSync(out, render(rpcs));
     writeFileSync(join(root, 'rpc-origins.txt'), renderOrigins(rpcs, SERVED_CHAINS));
     try {
