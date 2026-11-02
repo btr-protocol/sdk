@@ -79,7 +79,8 @@ export type ProtocolLiquidityMetric = 'liq.dep.usd' | 'liq.wd.usd' | 'liq.net.us
 export interface YieldRates {
   /** Swap-fee APR, simple, annualized over the trailing window. */
   feeApr: number | null;
-  /** Hook APR, already diluted by the invested share. null = unhooked OR hooked and still measuring. */
+  /** Hook APR, already diluted by the invested share. null = no hook in the window OR hooked and still
+   *  measuring. Non-zero with `hooked` false = a hook cleared inside the window (its in-window part). */
   strategyApr: number | null;
   /** Coverage-toll APR. MEMO: restores coverage, not in `apr`. */
   tollApr: number | null;
@@ -92,7 +93,8 @@ export interface YieldRates {
   apy: number | null;
   /** Average LP-claim USD base the rates are over: the weight when blending rates. */
   liabilitiesUsd: number | null;
-  /** Any leg under this scope is hooked. false ⇒ "No hook" whatever `strategyApr` reads. */
+  /** Any leg under this scope is hooked NOW (latest chain read). false with a non-zero `strategyApr` =
+   *  a hook cleared inside the window; false with null or 0 = "No hook". */
   hooked: boolean;
 }
 
