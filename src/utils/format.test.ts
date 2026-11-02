@@ -9,6 +9,7 @@ import {
   parseUnits,
   subscriptZeros,
   toInputValue,
+  toUnits,
 } from './format';
 
 // App-wide percent law: THREE significant digits at every magnitude, trailing zeros trimmed.
@@ -217,5 +218,27 @@ describe('parseUnits', () => {
     ['.'],
   ])('parseUnits(%p) throws instead of inventing 0n', (value) => {
     expect(() => parseUnits(value, 18)).toThrow(/not a decimal/);
+  });
+});
+
+// Float → units: the exponent-form sizes `parseUnits(String(v))` and `toFixed` choke on.
+describe('toUnits', () => {
+  test.each([
+    [1, 18, 10n ** 18n],
+    [1.5, 6, 1_500_000n],
+    [5e-7, 18, 500_000_000_000n],
+    [2.5e21, 18, 25n * 10n ** 38n],
+    [1e-7, 6, 0n],
+    [0.9999999, 6, 999_999n],
+    [0, 6, 0n],
+    [-1, 6, 0n],
+    [Number.NaN, 6, 0n],
+    [Number.POSITIVE_INFINITY, 6, 0n],
+  ])('toUnits(%p, %p) === %p', (v, d, expected) => {
+    expect(toUnits(v, d)).toBe(expected);
+  });
+
+  test('refuses decimals outside [0, 18]', () => {
+    for (const d of [-1, 19, 1.5]) expect(() => toUnits(1, d)).toThrow();
   });
 });

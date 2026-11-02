@@ -21,6 +21,7 @@ import type { Abi } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
 import type { Address, Hex } from '../eth/types.js';
 import { sendDeadline } from '../pool/index.js';
+import { toUnits } from '../utils/format.js';
 import { applySlip } from '../utils/maths.js';
 import { type SwapPlan, assertSlip } from './route.js';
 
@@ -223,27 +224,6 @@ function serverTolCeiling(caller: string, opts: PlanLegOpts): number {
 /** EIP-7528 native sentinel. Legs are always expressed in the wrapped address; this only guards it. */
 const SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 const isSentinel = (a: Address): boolean => a.toLowerCase() === SENTINEL;
-
-/** Human amount → integer units. Goes through `toExponential` rather than `toFixed`: at
- *  1e21 and above `toFixed` emits exponential notation ("1e+21"), which the old `parseUnits`
- *  path could not read, silently producing a garbage `minOut` for any large-supply token.
- *  Rounds DOWN, so a `minOut` built from this is never rounded up past what the quote saw. */
-const toUnits = (v: number, decimals: number): bigint => {
-  if (!Number.isFinite(v) || v <= 0) return 0n;
-  // >18 decimals used to be silently clamped to 18, which is a 10^(d-18) UNDERSTATEMENT of every
-  // amount built from it - an input leg the wallet under-pays and a floor the user never agreed
-  // to. Listing already reverts above 18 on chain, so no live token can reach this; refuse it here
-  // too rather than encode a number that means something else.
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
-    throw new Error(`toUnits: decimals must be an integer in [0, 18], got ${decimals}`);
-  }
-  const [mant, exp] = v.toExponential(15).split('e');
-  const digits = mant.replace('.', '');
-  // toExponential(15) is always one integer digit plus 15 fractional ones.
-  const shift = Number(exp) - (digits.length - 1) + decimals;
-  const n = BigInt(digits);
-  return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
-};
 
 /** Single route-plan pipeline: every plan→calls mapping starts here — largest part first, so the
  *  sequential fallback fills the biggest slice first and residual dust rides on the last part. */

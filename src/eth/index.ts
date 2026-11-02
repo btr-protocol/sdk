@@ -183,6 +183,7 @@ export {
 export {
   formatUnits,
   parseUnits,
+  toUnits,
 } from '../utils/format.js';
 
 export {

@@ -108,6 +108,26 @@ export function parseUnits(value: string, decimals: number): bigint {
   return BigInt((intPart || '0') + padded);
 }
 
+/** Float token amount → integer units at 16 significant digits, truncated below the unit (a
+ *  `minOut` or an `amount_in` built from it never rounds up a whole unit). `parseUnits(String(v))`
+ *  and `toFixed` emit exponent form below 1e-6 / at 1e21 and above; `Math.round(v * 10 ** d)` is
+ *  inexact past 2^53. 0n for non-positive or non-finite `v`. Throws on decimals outside [0, 18]:
+ *  listing reverts above 18 on chain, and a clamp would understate every amount by 10^(d-18).
+ *  Valuation (`backendConvert` + `quoteFromWire`) rounds to nearest on purpose: dust is priced,
+ *  never sent. */
+export function toUnits(v: number, decimals: number): bigint {
+  if (!Number.isFinite(v) || v <= 0) return 0n;
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+    throw new Error(`toUnits: decimals must be an integer in [0, 18], got ${decimals}`);
+  }
+  // toExponential(15) is always one integer digit plus 15 fractional ones.
+  const [mant, exp] = v.toExponential(15).split('e');
+  const digits = mant.replace('.', '');
+  const shift = Number(exp) - (digits.length - 1) + decimals;
+  const n = BigInt(digits);
+  return shift >= 0 ? n * 10n ** BigInt(shift) : n / 10n ** BigInt(-shift);
+}
+
 // ─────────────────────────────────────────────────────────────
 // Numbers
 // ─────────────────────────────────────────────────────────────

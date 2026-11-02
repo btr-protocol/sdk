@@ -23,6 +23,7 @@ import {
   poolSolvency,
   quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
+import { toUnits } from '../utils/format.js';
 import type { NamedPool, SwapPlan } from './route.js';
 import { assertSlip, poolHolding } from './route.js';
 
@@ -169,9 +170,7 @@ export const hexToF64 = (h: string, dec: number): number => {
 export const toRawHex = (amountTok: number, dec: number): string => {
   if (!Number.isFinite(amountTok) || amountTok < 0) throw new Error('toRawHex: non-finite amount');
   if (amountTok > Number.MAX_SAFE_INTEGER) throw new Error('toRawHex: amount exceeds 2^53');
-  const scaled = Math.round(amountTok * 10 ** dec);
-  if (!Number.isFinite(scaled) || scaled < 0) throw new Error('toRawHex: non-finite amount');
-  return `0x${BigInt(scaled).toString(16)}`;
+  return `0x${toUnits(amountTok, dec).toString(16)}`;
 };
 
 function wiresOf(pools: NamedPool[], b: BackendConvertOpts & { meta: WireMeta }): NamedPoolWire[] {
