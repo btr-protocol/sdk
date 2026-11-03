@@ -34,15 +34,18 @@ export const getChainId = (p: Eip1193Provider) =>
 export const getGasPrice = (p: Eip1193Provider) => cmd<string>(p, 'eth_gasPrice').then(toBig);
 export const getBlockNumber = (p: Eip1193Provider) => cmd<string>(p, 'eth_blockNumber').then(toBig);
 
-const getTransactionCount = (p: Eip1193Provider, addr: Address) =>
-  cmd<string>(p, 'eth_getTransactionCount', [addr, 'latest']).then(toInt);
-
 /** Deployed bytecode at `addr`, `0x` for an EOA. The ONE `eth_getCode` in the SDK: the
  *  contract test and the EIP-7702 delegation test both read the same reply. */
 export const getCode = (p: Eip1193Provider, addr: Address, block = 'latest') =>
   cmd<Hex>(p, 'eth_getCode', [addr, block]);
 
-export const getNonce = (p: Eip1193Provider, addr: Address) => getTransactionCount(p, addr);
+/** Next nonce of `addr` counting its txs still in the mempool: the ONE `eth_getTransactionCount`
+ *  in the stack (bots, front and the client nonce lane all read it). `pending`, not `latest`: a
+ *  fresh lane (restart, second process, a wallet on the same key) reading `latest` reissues the
+ *  nonce of a tx still in flight, which either fails "replacement underpriced" or REPLACES it; a
+ *  public RPC also lags on `latest`. Parsed in bigint space, like the chain id. */
+export const pendingNonce = (p: Eip1193Provider, addr: Address) =>
+  cmd<string>(p, 'eth_getTransactionCount', [addr, 'pending']).then(toBig);
 
 // ─────────────────────────────────────────────────────────────
 // Contracts & Tx

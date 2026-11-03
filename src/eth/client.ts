@@ -12,7 +12,7 @@ import {
   ethCall,
   getChainId,
   getGasPrice,
-  getNonce,
+  pendingNonce,
   sendTransaction as rpcSendTransaction,
 } from './rpc';
 import { type TransportOpts, httpTransport } from './transport';
@@ -139,7 +139,7 @@ function nextNonce(provider: Eip1193Provider, from: Address): Promise<bigint> {
   const prev = lane.tip;
   const issued = (async () => {
     const last = await prev;
-    const onChain = BigInt(await getNonce(provider, from));
+    const onChain = await pendingNonce(provider, from);
     let reuse: bigint | undefined;
     for (const n of lane.free) {
       if (n < onChain) lane.free.delete(n);

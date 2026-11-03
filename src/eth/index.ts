@@ -100,7 +100,7 @@ export {
   getChainId,
   getGasPrice,
   getBlockNumber,
-  getNonce,
+  pendingNonce,
   getCode,
   ethCall,
   estimateGas,
