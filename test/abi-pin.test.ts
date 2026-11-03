@@ -101,14 +101,18 @@ describe('PoolFactory parity is pinned across repos', () => {
   });
 });
 
-// The backend serves its own copy of each ABI; it must be the surface the lock pins.
+// The backend serves its own copy of each ABI. PoolFactory must equal the lock. Pool may differ
+// from the lock ONLY until the v2 cutover: back serves the live v1 Pool (dex-evm 7ade4b9), the
+// SDK pins v2; BACK_POOL_V1 is the explicit pair, delete it (and the branch) at cutover.
+const BACK_POOL_V1 = '0x1423b5f6f98d0d09980ea1bf92b25430d0190aa418d90c27175148d12f51be39';
 describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
   const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
-  for (const name of ['Pool', 'PoolFactory']) {
-    test(`back/abis/${name}.json hashes to the lock`, () => {
-      expect(abiHash(readAbi(join(backAbis, `${name}.json`)))).toBe(lock[name]);
-    });
-  }
+  test('back/abis/PoolFactory.json hashes to the lock', () => {
+    expect(abiHash(readAbi(join(backAbis, 'PoolFactory.json')))).toBe(lock.PoolFactory);
+  });
+  test('back/abis/Pool.json is the pinned v1 or the lock (post-cutover)', () => {
+    expect([BACK_POOL_V1, lock.Pool]).toContain(abiHash(readAbi(join(backAbis, 'Pool.json'))));
+  });
 });
 
 // The guardian/safety ABIs come from the bundle, hash-verified, never the wire. A
