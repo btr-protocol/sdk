@@ -10,6 +10,7 @@
  * bound a floor 99.9% under the quote passes it.
  */
 
+import type { QuoteBaseWire } from '../amm/aimm.js';
 import { btrFetchRaw, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
 import { ChainError, parseChainError } from './errors.js';
@@ -27,14 +28,7 @@ export interface Refused {
   args: string[];
 }
 
-export interface QuotedAmount {
-  amount_out: string;
-  spread_pbps: number;
-  proto_fee: string;
-  lp_fee: string;
-  cov_toll: string;
-  mark_price: string;
-  mid_price: string;
+export interface QuotedAmount extends QuoteBaseWire {
   route_hops: string[];
   hop_amounts: string[];
   tol_pbps: number;

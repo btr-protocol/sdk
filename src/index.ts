@@ -21,7 +21,7 @@
  * @module @btr-protocol/sdk
  */
 
-// Re-export from utils (excluding types that conflict with pool module)
+// Re-export from utils
 export {
   BPS_PRECISION,
   PRECISION_1E18,

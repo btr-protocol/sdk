@@ -22,6 +22,7 @@ const PINNED: Record<string, keyof typeof ABIS> = {
   MarkStore: 'MARK_STORE_ABI',
   MarkStoreV2: 'MARK_STORE_ABI_V2',
   ExternalOracleV4: 'EXTERNAL_ORACLE_V4_ABI',
+  Faucet: 'FAUCET_ABI',
 };
 
 test('every exported ABI has a content pin and matches it', () => {

@@ -1,8 +1,6 @@
 /**
- * Common constants and types used across the SDK
+ * Common constants used across the SDK
  */
-
-import type { Address } from '../eth/index.js';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -33,20 +31,3 @@ export const BRAND = Object.freeze({
   telegram: 'BTRProtocol',
   supportEmail: 'tech@btr.markets',
 });
-
-export type SupportedChainId = number;
-
-// ─────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────
-
-type TokenAddress = Address;
-
-export interface SwapQuote {
-  tokenIn: TokenAddress;
-  tokenOut: TokenAddress;
-  amountIn: bigint;
-  amountOut: bigint;
-  priceImpact: number;
-  fee: bigint;
-}

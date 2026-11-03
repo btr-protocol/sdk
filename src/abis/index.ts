@@ -14,6 +14,7 @@
 export * from './AccessControl.js';
 export * from './Admin.js';
 export * from './ExternalOracleV4.js';
+export * from './Faucet.js';
 export * from './MarkStore.js';
 export * from './MarkStore.v2.js';
 export * from './Flash.js';

@@ -718,18 +718,26 @@ export interface PathRequestWire {
   amount_in: string;
 }
 
-export interface QuoteResponseWire {
+/** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
+ *  chain mode (`chain_api.rs:QuotedAmount`, `/v1/chain/quote`) alike. The one TS home: each
+ *  surface's wire type extends this, never re-lists it. 0x hex amounts, WAD prices. */
+export interface QuoteBaseWire {
   amount_out: string;
-  gross_out: string;
-  avg_price: string;
   mid_price: string;
   mark_price: string;
   spread_pbps: number;
   cov_toll: string;
   proto_fee: string;
   lp_fee: string;
-  /** Gross clamped at the coverage argmax; a size past the overshoot band is an error. */
-  saturated: boolean;
+}
+
+/** Book-mode `/quote` + `/quote-path` response (`back crates/quote/src/lib.rs:QuoteResponse`). */
+export interface QuoteResponseWire extends QuoteBaseWire {
+  gross_out: string;
+  avg_price: string;
+  /** Gross clamped at the coverage argmax. Current back no longer sends it (b9b9875 refuses a
+   *  gross past the cap instead), so absent reads as unsaturated. */
+  saturated?: boolean;
 }
 
 /**
