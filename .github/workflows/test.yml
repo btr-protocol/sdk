@@ -7,7 +7,12 @@ on:
   push:
     branches: [main]  # branch pushes run via pull_request only: no CI_SIBLING_TOKEN on bare pushes
   pull_request:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -304,3 +304,15 @@ test('sharedOperators flags a pair of one operator; picks skip a repeated operat
   const rows = [a, b, c].map((url) => ({ url, browser: true }));
   expect(rpcsFromChains({ rpc: { '1': rows } })[1]).toEqual([c, a]); // publicnode is trusted, so ranks first
 });
+
+// The CI sibling pin must contain Arc's independent provider; the old pin had only arc.io.
+test('Arc registry produces the committed independent quorum', () => {
+  if (!existsSync(SIBLING)) throw new Error('needs ../dex-evm/deployments');
+  const registry = JSON.parse(readFileSync(SIBLING, 'utf8'));
+  const arc = rpcsFromChains(registry)[5042002];
+  expect(arc).toEqual([
+    'https://rpc.blockdaemon.testnet.arc.io',
+    'https://arc-testnet-rpc.publicnode.com',
+  ]);
+  expect(sharedOperators({ 5042002: arc }, [{ chainId: 5042002 }])).toEqual([]);
+});
