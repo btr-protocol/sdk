@@ -41,6 +41,10 @@
       "types": "./src/pool/index.ts",
       "default": "./src/pool/index.ts"
     },
+    "./pool/slippage": {
+      "types": "./src/pool/slippage.ts",
+      "default": "./src/pool/slippage.ts"
+    },
     "./router": {
       "types": "./src/router/index.ts",
       "default": "./src/router/index.ts"

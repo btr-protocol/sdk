@@ -388,6 +388,8 @@ export interface PoolRiskParams {
   pool: {
     tag: string;
     address: string;
+    /** `Pool.storageVersion()`: absent from a back that predates the field. */
+    storageVersion?: number;
     base: string | null;
     legs: number;
     /** Legs whose getAsset read back; the rest did not decode. */

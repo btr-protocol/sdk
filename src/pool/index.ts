@@ -482,9 +482,7 @@ export async function deposit(
   })) as Hex;
 }
 
-/** `minLpOut` for `Pool.depositMin`: the shown shares less the caller's slippage (bps), floored. */
-export const minLpOut = (shares: bigint, slippageBps: bigint): bigint =>
-  (shares * (10_000n - slippageBps)) / 10_000n;
+export { minLpOut } from './slippage';
 
 /**
  * `functionName(args)` on the pool as `from` would run it right now: an `eth_call` of the real
