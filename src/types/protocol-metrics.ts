@@ -91,8 +91,10 @@ export interface YieldRates {
    * meaningless) or the window is under 24h, even though `apr` is set: read `apr` then.
    */
   apy: number | null;
-  /** Average LP-claim USD base the rates are over: the weight when blending rates. */
+  /** Latest LP claim in USD, valued at the same mark as `tvlUsd`. Compare with `tvlUsd` for NAV. */
   liabilitiesUsd: number | null;
+  /** Window-average LP claim in USD: the base the rates are over, so the weight when blending rates. */
+  rateBaseUsd: number | null;
   /** Any leg under this scope is hooked NOW (latest chain read). false with a non-zero `strategyApr` =
    *  a hook cleared inside the window; false with null or 0 = "No hook". */
   hooked: boolean;
