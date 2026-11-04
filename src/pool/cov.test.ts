@@ -121,3 +121,10 @@ describe('codec', () => {
     expect(() => packCov({ ...t, covMinBps: 1100 })).toThrow();
   });
 });
+
+describe('knee decode masks the kappa code to 6 bits', () => {
+  test('bits above the uint16 word do not leak into kappa', () => {
+    const w = (20 << 6) | 10;
+    expect(unpackKnee(w | (1 << 16))).toEqual(unpackKnee(w));
+  });
+});

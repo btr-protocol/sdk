@@ -20,6 +20,7 @@ function pool(
     tag,
     state: {
       base: 'USDC',
+      exitTollWad: 0n,
       legs: {
         AUDF: buildLeg(
           'AUDF',
@@ -244,15 +245,29 @@ describe('crossExit walls mirror the chain with a C toll', () => {
   });
 });
 
-describe('crossExit with no exit toll word', () => {
-  test.each([undefined, null, 0n])('exitTollWad %p pays the gross, never NaN', async (w) => {
+describe('crossExit exit toll word: unknown vs zero', () => {
+  const cross = async (w: bigint | null | undefined) => {
     const p = healthyPool();
     p.state.exitTollWad = w;
-    const r = (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
-      (x) => x.id === 'cross-exit',
-    );
+    const r = await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE);
+    return r.routes.find((x) => x.id === 'cross-exit');
+  };
+  test.each([undefined, null])('exitTollWad %p is pending: no number, not quoted', async (w) => {
+    const r = await cross(w);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('toll-pending');
+    expect(r?.out).toBe(0);
+  });
+  test('a real 0n toll pays the gross, never NaN', async () => {
+    const r = await cross(0n);
+    expect(r?.feasible).toBe(true);
     expect(Number.isFinite(r?.out)).toBe(true);
     expect(r?.out).toBeGreaterThan(0);
+  });
+  test('a toll above 100% is not fillable (chain caps at payout, exit reverts)', async () => {
+    const r = await cross(2n * 10n ** 18n);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('toll-exceeds-payout');
   });
 });
 
@@ -510,6 +525,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     tag,
     state: {
       base: 'USDC',
+      exitTollWad: 0n,
       legs,
       hub: {
         res: 2_000_000,

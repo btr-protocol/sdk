@@ -89,7 +89,7 @@ export interface KneeTerms {
 }
 
 export function unpackKnee(kneeBits: number): KneeTerms {
-  return { kneeCovBps: (kneeBits & 63) * 200, kappaKneeBps: kappaBps(kneeBits >> 6) };
+  return { kneeCovBps: (kneeBits & 63) * 200, kappaKneeBps: kappaBps((kneeBits >> 6) & 63) };
 }
 
 /** `CovLib.packKnee`: needs c_min (the knee sits in `(c_min, 0.98]`). */

@@ -31,7 +31,7 @@ interface Side {
 
 /** `(bk, kb2)`: the knee's distance from c_min (WAD) and κ₂ bps; (0, 0) = no knee. */
 function kneeOf(b: bigint, kneeBits: bigint): [bigint, bigint] {
-  const kb2 = BigInt(kappaBps(Number(kneeBits >> 6n)));
+  const kb2 = BigInt(kappaBps(Number((kneeBits >> 6n) & 63n)));
   if (kb2 === 0n) return [0n, 0n];
   return [((kneeBits & 63n) * 2n - (b & 63n) * 2n) * 10n ** 16n, kb2];
 }

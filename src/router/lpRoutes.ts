@@ -408,7 +408,11 @@ async function crossExit(
   // so only `out = gross - toll` is debited. The backend computes it from `claim.toll_wad`
   // (`Quote.cToll`); without one, derive it from the state's `exitTollWad` at the gross.
   const tw = holder.state.exitTollWad;
-  const tollFrac = tw != null && tw > 0n ? Number(tw) / WAD : 0;
+  // Absent = params not loaded: unknown, never 0 (a 0 overstates the payout and minOut reverts).
+  if (tw == null) return unfeasible(CROSS_DEAD, 'toll-pending');
+  // Chain: toll capped at the payout, so a toll >= 100% leaves nothing and the exit reverts.
+  if (tw >= BigInt(WAD)) return unfeasible(CROSS_DEAD, 'toll-exceeds-payout');
+  const tollFrac = tw > 0n ? Number(tw) / WAD : 0;
   const toll = Math.min(q.cToll ?? gross * tollFrac, gross);
   // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
   // of the payout after the C toll; a wall saturates it to the whole payout (`ZeroValue`).
