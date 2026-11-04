@@ -220,24 +220,26 @@ export interface PoolLeg {
   decimals: number;
   profile: AimmProfile;
   kappaCovBps: number;
+  /** `CovLib.floorBps(Asset.covBits)`: the leg's coverage floor, bps (0 = none). */
+  covFloorBps: number;
+  /** `CovLib.kneeBps(Asset.covBits)`: the coverage-toll knee above 1.0, bps (0 = at the peg). */
+  covKneeBps: number;
   confidence?: number;
   staleExcess?: number;
-  /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
-   *  leg the chain would revert on past its band. Absent = 0 / no base check. */
-  refBandBps?: number;
-  /** `oracleBits` bit 6 (INTERNAL, priced at 1.0): peg test tightens to min(code·250, band). */
+  /** `Asset.flags` (bits 12..15 = depeg code) + the base's mark/flags: the backend refuses a leg
+   *  the chain would revert on past its band. Absent = 0 / no base check. */
+  flags?: number;
+  /** `oracleBits` bit 6 (INTERNAL, priced at 1.0): the peg test runs at max(code, 1)·250 bps. */
   internal?: boolean;
   /** `oracleBits` bit 7 (UOA): the lane attests USD and `twap` is that over `baseMark`; the chain
    *  peg-tests the USD mark, so the wire sends `twap·baseMark` as `peg_mark`. */
   uoa?: boolean;
   baseMark?: number;
-  baseRefBandBps?: number;
+  baseFlags?: number;
   /** `Asset.anchor` symbol (the parent in the pool's anchor tree); absent = the base. */
   anchor?: string;
   /** Stored class words (`classHead` + `classRisk`); absent = no `CLASS_ROWS_BIT`. */
   class?: ClassWire;
-  /** The lane's R-tier mark, base per token; absent = a reference agreeing with `twap`. */
-  refMark?: number;
   lane?: number;
   maxDevBps?: number;
 }
@@ -260,6 +262,8 @@ interface HubBook {
   liab: number;
   vegaBps: number;
   kappaCovBps: number;
+  covFloorBps: number;
+  covKneeBps: number;
 }
 
 export interface PoolState {
@@ -330,7 +334,7 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps: number,
-  feed?: { confidence?: number; staleExcess?: number },
+  feed?: { confidence?: number; staleExcess?: number; covFloorBps?: number; covKneeBps?: number },
 ): PoolLeg {
   return {
     token,
@@ -342,6 +346,8 @@ export function buildLeg(
     decimals,
     profile,
     kappaCovBps,
+    covFloorBps: feed?.covFloorBps ?? 0,
+    covKneeBps: feed?.covKneeBps ?? 0,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
   };
@@ -392,6 +398,8 @@ interface PricingWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_floor_bps: number;
+  cov_knee_bps: number;
 }
 interface SpokeWire {
   token: string;
@@ -404,13 +412,12 @@ interface SpokeWire {
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
-  ref_band_bps: number;
+  flags: number;
   internal: boolean;
   peg_mark: string | null;
   decimals?: number;
   anchor?: string | null;
   class?: ClassWire | null;
-  ref_mark?: string | null;
   lane?: number | null;
   max_dev_bps?: number;
 }
@@ -429,6 +436,8 @@ interface EndpointWire {
   liabilities: string;
   vega_bps: number;
   kappa_cov_bps: number;
+  cov_floor_bps: number;
+  cov_knee_bps: number;
 }
 export interface NamedPoolWire {
   tag: string;
@@ -441,11 +450,13 @@ export interface NamedPoolWire {
   base_liabilities?: string | null;
   base_vega_bps?: number | null;
   base_kappa_cov_bps?: number | null;
+  base_cov_floor_bps?: number | null;
+  base_cov_knee_bps?: number | null;
   /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
    *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
   base_decimals?: number | null;
   base_mark: string | null;
-  base_ref_band_bps: number;
+  base_flags: number;
   base_class?: ClassWire | null;
   spokes: SpokeWire[];
 }
@@ -693,6 +704,8 @@ interface QuoteRequestWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_floor_bps: number;
+  cov_knee_bps: number;
   amount_in: string;
   reserves: string;
   liabilities: string;
@@ -705,11 +718,11 @@ interface QuoteRequestWire {
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
-  ref_band_bps: number;
+  flags: number;
   internal: boolean;
   peg_mark: string | null;
   base_mark: string | null;
-  base_ref_band_bps: number;
+  base_flags: number;
   /** This leg's and the counterparty's stored class words: the backend applies the pair's rows
    *  over the `min_fee_pbps` / `kappa_cov_bps` RECORD above. */
   class: ClassWire | null;
@@ -758,6 +771,8 @@ export const INTERIOR_ENDPOINT: EndpointWire = {
   liabilities: '0x0',
   vega_bps: 0,
   kappa_cov_bps: 0,
+  cov_floor_bps: 0,
+  cov_knee_bps: 0,
 };
 
 /**
@@ -772,6 +787,8 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
     liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
+    cov_floor_bps: hub.covFloorBps,
+    cov_knee_bps: hub.covKneeBps,
   };
 }
 
@@ -803,6 +820,8 @@ export function legToQuoteBody(
     vega_bps: leg.profile.vega,
     min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
+    cov_floor_bps: leg.covFloorBps,
+    cov_knee_bps: leg.covKneeBps,
     amount_in: toU128Hex(amountInTok * 10 ** (selling ? decimalsIn : leg.decimals)),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
     liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
@@ -822,12 +841,12 @@ export function legToQuoteBody(
 const wadHex = (x: number): string => toHex(BigInt(Math.round(x * 1e18)));
 const baseDepegWire = (leg?: PoolLeg) => ({
   base_mark: leg?.baseMark != null ? wadHex(leg.baseMark) : null,
-  base_ref_band_bps: leg?.baseRefBandBps ?? 0,
+  base_flags: leg?.baseFlags ?? 0,
 });
 const pegMarkWire = (leg: PoolLeg): string | null =>
   leg.uoa && leg.baseMark != null ? wadHex(leg.twap * leg.baseMark) : null;
 const depegWire = (leg: PoolLeg) => ({
-  ref_band_bps: leg.refBandBps ?? 0,
+  flags: leg.flags ?? 0,
   internal: leg.internal ?? false,
   peg_mark: pegMarkWire(leg),
   ...baseDepegWire(leg),
@@ -942,6 +961,8 @@ export function poolStateToWire(
     base_liabilities: hub?.liabilities ?? null,
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
+    base_cov_floor_bps: hub?.cov_floor_bps ?? null,
+    base_cov_knee_bps: hub?.cov_knee_bps ?? null,
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
     base_class: state.baseClass ?? null,
@@ -954,6 +975,8 @@ export function poolStateToWire(
         vega_bps: leg.profile.vega,
         min_fee_pbps: leg.profile.minFeePbps,
         kappa_cov_bps: leg.kappaCovBps,
+        cov_floor_bps: leg.covFloorBps,
+        cov_knee_bps: leg.covKneeBps,
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),
       liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
@@ -962,13 +985,12 @@ export function poolStateToWire(
       confidence_bps: leg.confidence ?? null,
       stale_excess: leg.staleExcess ?? 0,
       proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
-      ref_band_bps: leg.refBandBps ?? 0,
+      flags: leg.flags ?? 0,
       internal: leg.internal ?? false,
       peg_mark: pegMarkWire(leg),
       decimals: leg.decimals,
       anchor: leg.anchor ?? null,
       class: leg.class ?? null,
-      ref_mark: leg.refMark != null ? wadHex(leg.refMark) : null,
       lane: leg.lane ?? null,
       max_dev_bps: leg.maxDevBps ?? 0,
     })),

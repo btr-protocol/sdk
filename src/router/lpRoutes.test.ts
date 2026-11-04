@@ -42,7 +42,14 @@ function pool(
           0,
         ),
       },
-      hub: { res: o?.hubRes ?? 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: {
+        res: o?.hubRes ?? 2_000_000,
+        liab: 2_000_000,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        covFloorBps: 0,
+        covKneeBps: 0,
+      },
     },
   };
 }
@@ -242,6 +249,15 @@ describe("rankRedeem (routes A' / B')", () => {
     expect(best?.feasible).toBe(true);
   });
 
+  test('a cross exit that would take the output leg under its coverage floor is infeasible', async () => {
+    const p = healthyPool();
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covFloorBps: 10_000 }; // R/L = 1.0 sits on the floor
+    const { routes } = await rankRedeem([p], 'NZDF', 'AUDF', 5_000, BE);
+    const cross = routes.find((r) => r.id === 'cross-exit');
+    expect(cross?.feasible).toBe(false);
+    expect(cross?.reason).toBe('coverage-floor');
+  });
+
   test('unseasoned target-LP gates BOTH redeem routes as cooldown; best goes null', async () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankRedeem(pools, 'NZDF', 'AUDF', 5_000, {
@@ -365,7 +381,14 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     state: {
       base: 'USDC',
       legs,
-      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: {
+        res: 2_000_000,
+        liab: 2_000_000,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        covFloorBps: 0,
+        covKneeBps: 0,
+      },
     },
   };
 }

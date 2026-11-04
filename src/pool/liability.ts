@@ -41,9 +41,30 @@ export interface LiabLeg {
   liabilities: number;
   /** Asset.liquidityIndexWad: face-per-share in WAD. Default WAD (1 share = 1 face). */
   indexWad?: number;
+  /** `CovLib.floorBps(Asset.covBits)`: the leg's coverage floor, bps. Absent / 0 = none. */
+  covFloorBps?: number;
 }
 
 const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
+
+/** `CovLib.floorBps`: `Asset.covBits` bits 0..8, 25 bps units. */
+export const covFloorBps = (covBits: number): number => (covBits & 0x1ff) * 25;
+/** `CovLib.kneeBps`: `Asset.covBits` bits 9..15, 10 bps units. */
+export const covKneeBps = (covBits: number): number => (covBits >> 9) * 10;
+
+/** `CovLib.breach`: a book moving `(r0, l0)` -> `(r1, l1)` ends under the floor while LOWERING
+ *  coverage. An inflow, or a leg without a floor, never breaches (the chain reverts
+ *  `ThresholdViolation(r1·BPS/l1, floor)`). Cross-multiplied like the chain's. */
+export function covBreach(
+  floorBps: number,
+  r0: number,
+  l0: number,
+  r1: number,
+  l1: number,
+): boolean {
+  if (!(floorBps > 0) || !(l1 > 0) || r1 * 1e4 >= floorBps * l1) return false;
+  return r1 * l0 < r0 * l1;
+}
 
 /** PoolIOLib.checkRiskFlags(asset.flags, LIABILITY_SWAP_ENABLED_BIT) as a predicate. */
 export const liabilitySwapEnabled = (flags: number): boolean =>
@@ -178,6 +199,18 @@ export async function quoteSwapLiabilityCoreAsync(
   const conv = markCapBinding ? markCap : q.amountOut;
 
   const liabOut = conv / poolC;
+  // The credited leg's claims grow with no reserve moving: coverage falls, to its floor at most
+  // (`PoolLiquidityLib.swapLiability`), else the chain reverts.
+  if (
+    covBreach(
+      outLeg.covFloorBps ?? 0,
+      outLeg.reserves,
+      outLeg.liabilities,
+      outLeg.reserves,
+      outLeg.liabilities + liabOut,
+    )
+  )
+    return null;
   const lpAmountOut = (liabOut * WAD) / idxOut;
   if (!(lpAmountOut > 0)) return null;
 

@@ -54,14 +54,15 @@ export interface Asset {
   maxLiabWeightBps: number;
   /** Oracle wiring: store lane 0..5 | INTERNAL 6 | UOA 7 (`decodeLegOracle`). */
   oracleBits: number;
-  /** Depeg band vs the lane's R tier, bps (low 12 bits; 12..15 = depeg code). 0 = disarmed. */
-  refBandBps: number;
+  /** Coverage terms, raw (`CovLib`): floor in 25 bps units (bits 0..8) | toll knee in 10 bps
+   *  units (bits 9..15). Read them in bps with {@link covFloorBps} / {@link covKneeBps}. */
+  covBits: number;
 }
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
 export type _AssetMatchesAbi = Assert<FieldsMatch<Asset, AssetFields>>;
 
-export { toAsset } from './asset.js';
+export { riskConfigOf, toAsset } from './asset.js';
 
 export interface SwapQuote {
   amountOut: bigint;
@@ -151,6 +152,9 @@ export type {
 } from './liability.js';
 export {
   WAD as WAD_F,
+  covBreach,
+  covFloorBps,
+  covKneeBps,
   exitCap,
   exitValue,
   legCoverage,
@@ -191,7 +195,7 @@ export {
   wireOf,
   p8ClassOf,
   p8StoreWord,
-  p8TierSlot,
+  p8WordSlot,
   POOL_STORAGE_V5,
   readMarks,
   HOOK_PRE_OUTFLOW,

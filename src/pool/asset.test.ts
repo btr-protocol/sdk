@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../abis/Pool.js';
 import { type AbiParameter, decodeFn, encodeAbiParameters } from '../eth/abi';
 import type { Hex } from '../eth/types';
-import { getAsset, getSwapQuote, toAsset } from './index';
+import { getAsset, getSwapQuote, riskConfigOf, toAsset } from './index';
 
 const getAssetOutputs = (POOL_ABI as readonly { name?: string; outputs?: AbiParameter[] }[]).find(
   (f) => f.name === 'getAsset',
@@ -25,7 +25,7 @@ const row = {
   kappaCovBps: 1500n,
   maxLiabWeightBps: 0n,
   oracleBits: 0n,
-  refBandBps: 0n,
+  covBits: 0n,
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 
@@ -95,5 +95,12 @@ describe('getSwapQuote returns the uint16/int8 fields as numbers', () => {
     expect(q.spreadPbps / 1e6).toBeCloseTo(0.000459);
     expect(q.amountOut).toBe(990n);
     expect(q.routeHops).toEqual([]);
+  });
+});
+
+describe('riskConfigOf — covFloor / covKnee unpacked from Asset.covBits', () => {
+  test('floor 25 bps units, knee 10 bps units', () => {
+    const a = toAsset({ ...row, covBits: 40n | (5n << 9n) });
+    expect(riskConfigOf(a)).toMatchObject({ covFloorBps: 1_000, covKneeBps: 50 });
   });
 });

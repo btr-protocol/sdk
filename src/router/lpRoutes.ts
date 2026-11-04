@@ -17,6 +17,7 @@ import {
   type LiabLeg,
   WAD,
   backendConvert,
+  covBreach,
   exitValue,
   legCoverage,
   poolExitCap,
@@ -53,6 +54,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       reserves: s.hub.res,
       liabilities: s.hub.liab,
       indexWad,
+      covFloorBps: s.hub.covFloorBps,
     };
   }
   const leg = s.legs[symbol];
@@ -62,6 +64,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     reserves: leg.res,
     liabilities: leg.liab,
     indexWad,
+    covFloorBps: leg.covFloorBps,
   };
 }
 
@@ -397,6 +400,19 @@ async function crossExit(
   const markCap = fair * q.markPrice;
   const out = q.amountOut > markCap ? markCap : q.amountOut;
   if (!(out > 0)) return unfeasible(CROSS_DEAD, 'no-route');
+  // `_applyWithdraw`: the output leg's reserves fall by `out` while coverage drops; past its
+  // floor the chain reverts. The route fee's LP credit (liabilities up) is not modelled, which
+  // only ever makes the real book tighter than this one by that sliver.
+  if (
+    covBreach(
+      toLeg.covFloorBps ?? 0,
+      toLeg.reserves,
+      toLeg.liabilities,
+      toLeg.reserves - out,
+      toLeg.liabilities,
+    )
+  )
+    return unfeasible(CROSS_DEAD, 'coverage-floor');
 
   const shell: RouteShell = {
     id: 'cross-exit',

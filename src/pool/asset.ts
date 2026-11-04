@@ -1,4 +1,6 @@
 import type { Asset } from './index.js';
+import { covFloorBps, covKneeBps } from './liability.js';
+import type { RiskConfig } from './storage.js';
 
 const ASSET_NUMBER_FIELDS = [
   'minDispersionPbps',
@@ -12,7 +14,7 @@ const ASSET_NUMBER_FIELDS = [
   'kappaCovBps',
   'maxLiabWeightBps',
   'oracleBits',
-  'refBandBps',
+  'covBits',
 ] as const satisfies readonly (keyof Asset)[];
 
 /** A decoded `getAsset` tuple, shaped as `Asset` says. The ABI decoder returns EVERY uint as a
@@ -34,4 +36,16 @@ export function toAsset(raw: unknown): Asset {
     out[k] = typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : Number.NaN;
   }
   return out;
+}
+
+/** `getRiskConfig` off a decoded `Asset`: the coverage terms unpacked from `covBits` (`CovLib`). */
+export function riskConfigOf(a: Asset): RiskConfig {
+  return {
+    flags: a.flags,
+    kappaCovBps: a.kappaCovBps,
+    depositCapCode: a.depositCapCode,
+    maxLiabWeightBps: a.maxLiabWeightBps,
+    covFloorBps: covFloorBps(a.covBits),
+    covKneeBps: covKneeBps(a.covBits),
+  };
 }

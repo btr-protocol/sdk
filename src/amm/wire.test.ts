@@ -16,7 +16,14 @@ import { STABLE_PROFILE } from './profiles';
 // `_covToll(cOut, …)`) and the endpoint-max vega (`acc.vegaBps = max(cIn, cOut)`) - because the
 // first cut of this codec dropped both and every spoke->base sell was quoted toll-free.
 
-const HUB = { res: 200_000, liab: 250_000, vegaBps: 10_000, kappaCovBps: 600 };
+const HUB = {
+  res: 200_000,
+  liab: 250_000,
+  vegaBps: 10_000,
+  kappaCovBps: 600,
+  covFloorBps: 2_500,
+  covKneeBps: 50,
+};
 const meta = { addressOf: (s: string): string => `0x${s}`, decimalsOf: (): number => 18 };
 
 const state = (hub?: PoolState['hub']): PoolState => ({
@@ -47,6 +54,8 @@ describe('hubEndpointWire', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_floor_bps: 2_500,
+      cov_knee_bps: 50,
     });
   });
 });
@@ -93,38 +102,38 @@ describe('depeg wire', () => {
   const banded = (): PoolState => {
     const s = state(HUB);
     Object.assign(s.legs.USDT, {
-      refBandBps: (4 << 12) | 50,
+      flags: 4 << 12,
       internal: true,
       baseMark: 0.5,
-      baseRefBandBps: 8 << 12,
+      baseFlags: 8 << 12,
     });
     return s;
   };
 
-  test('pools and spokes carry ref_band_bps + base_mark + base_ref_band_bps', () => {
+  test('pools and spokes carry flags + base_mark + base_flags', () => {
     const w = poolStateToWire('p', undefined, banded(), meta, 6);
-    expect(w.spokes[0].ref_band_bps).toBe((4 << 12) | 50);
+    expect(w.spokes[0].flags).toBe(4 << 12);
     expect(w.spokes[0].internal).toBe(true);
     expect(w.base_mark).toBe('0x6f05b59d3b20000');
-    expect(w.base_ref_band_bps).toBe(8 << 12);
+    expect(w.base_flags).toBe(8 << 12);
   });
 
   test('legs carry the same three fields', () => {
     const b = legToQuoteBody(banded().legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
-    expect(b.ref_band_bps).toBe((4 << 12) | 50);
+    expect(b.flags).toBe(4 << 12);
     expect(b.internal).toBe(true);
     expect(b.base_mark).toBe('0x6f05b59d3b20000');
-    expect(b.base_ref_band_bps).toBe(8 << 12);
+    expect(b.base_flags).toBe(8 << 12);
   });
 
-  test('unknown base mark goes out null (no base check), bands default 0', () => {
+  test('unknown base mark goes out null (no base check), flags default 0', () => {
     const b = legToQuoteBody(state(HUB).legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT);
     expect(b).toMatchObject({
-      ref_band_bps: 0,
+      flags: 0,
       internal: false,
       peg_mark: null,
       base_mark: null,
-      base_ref_band_bps: 0,
+      base_flags: 0,
     });
   });
 
@@ -150,6 +159,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_floor_bps: 2_500,
+      cov_knee_bps: 50,
     });
   });
 
@@ -160,6 +171,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x0',
       vega_bps: 0,
       kappa_cov_bps: 0,
+      cov_floor_bps: 0,
+      cov_knee_bps: 0,
     });
   });
 
