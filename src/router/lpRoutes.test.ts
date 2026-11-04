@@ -221,6 +221,26 @@ describe('crossExit degenerate quotes', () => {
   });
 });
 
+describe('crossExit floor mirrors the chain with a C toll', () => {
+  // 100k out of a 1M/1M leg; a 10% toll stays in reserves, so only 90k is debited: R/L = 0.91.
+  const at = async (floorBps: number) => {
+    const p = healthyPool();
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covFloorBps: floorBps };
+    const o = { ...BE, exitToll: { frac: 0.1, protoSharePct: 0 } };
+    return (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, o)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  test('on the floor passes, one bp above breaches; step pays out net of toll', async () => {
+    const ok = await at(9_100);
+    expect(ok?.feasible).toBe(true);
+    expect(ok?.out).toBeCloseTo(90_000, 6);
+    const bad = await at(9_101);
+    expect(bad?.feasible).toBe(false);
+    expect(bad?.reason).toBe('coverage-floor');
+  });
+});
+
 describe('slippageFrac validation', () => {
   for (const bad of [1, -0.1, Number.NaN]) {
     test(`rejects ${bad}`, async () => {

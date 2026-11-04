@@ -35,6 +35,8 @@ export interface LpRouteOpts {
   liabilityEnabled?: (symbol: string) => boolean;
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
+  /** C-exposure exit toll (`mintRate` tollWad / 1e18) and the pool's `protoSharePct`; absent = 0. */
+  exitToll?: { frac: number; protoSharePct: number };
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: BackendConvertOpts & { meta: WireMeta };
 }
@@ -398,18 +400,33 @@ async function crossExit(
   }
   // Lemma B mark cap, and NO output-leg haircut: the claim was settled at C on the way in.
   const markCap = fair * q.markPrice;
-  const out = q.amountOut > markCap ? markCap : q.amountOut;
+  const gross = q.amountOut > markCap ? markCap : q.amountOut;
+  if (!(gross > 0)) return unfeasible(CROSS_DEAD, 'no-route');
+  // `_quoteWithdrawCross`: the C toll (capped at the output) stays in the output leg's reserves,
+  // so only `out = gross - toll` is debited.
+  const tollFrac = opts.exitToll?.frac ?? 0;
+  const toll = Math.min(gross * tollFrac, gross);
+  const out = gross - toll;
   if (!(out > 0)) return unfeasible(CROSS_DEAD, 'no-route');
-  // `_applyWithdraw`: the output leg's reserves fall by `out` while coverage drops; past its
-  // floor the chain reverts. The route fee's LP credit (liabilities up) is not modelled, which
-  // only ever makes the real book tighter than this one by that sliver.
+  // `_applyWithdraw`: reserves fall by `out`; liabilities rise by the route fee's LP credit and the
+  // treasury face (route proto fee + the toll's proto slice), each `fee*WAD/g` (g = lastGoodC = c,
+  // stamped by `mintRate`) and dropped to 0 when it exceeds the book (`_credit`). Same inputs as
+  // the chain, so the floor check accepts iff the chain does.
+  const credit = (fee: number, liab: number): number => {
+    const f = c > 1 ? fee / c : fee;
+    return f > 0 && liab > 0 && f <= liab ? f : 0;
+  };
+  const lpCredit = credit((q.grossOut * q.lpFeeBps) / 1e4, toLeg.liabilities);
+  const protoFee =
+    (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (opts.exitToll?.protoSharePct ?? 0)) / 100;
+  const face = credit(protoFee, toLeg.liabilities + lpCredit);
   if (
     covBreach(
       toLeg.covFloorBps ?? 0,
       toLeg.reserves,
       toLeg.liabilities,
       toLeg.reserves - out,
-      toLeg.liabilities,
+      toLeg.liabilities + lpCredit + face,
     )
   )
     return unfeasible(CROSS_DEAD, 'coverage-floor');
