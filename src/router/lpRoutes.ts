@@ -13,17 +13,19 @@ import {
   type routeAsync,
 } from '../amm/aimm.js';
 import {
-  type BackendConvertOpts,
   type LiabLeg,
   WAD,
-  backendConvert,
   covWallsF,
   exitValue,
   legCoverage,
   poolExitCap,
   poolSolvency,
-  quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
+import {
+  type BackendConvertOpts,
+  backendConvert,
+  quoteSwapLiabilityCoreAsync,
+} from '../pool/liabilityQuote.js';
 import { toUnits } from '../utils/format.js';
 import type { NamedPool, SwapPlan } from './route.js';
 import { assertSlip, poolHolding } from './route.js';

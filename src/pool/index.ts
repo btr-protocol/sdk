@@ -146,7 +146,6 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
-export * from './cov.js';
 export type {
   LiabLeg,
   SwapLiabilityQuote,
@@ -160,9 +159,6 @@ export {
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
-  quoteSwapLiabilityCoreAsync,
 } from './liability.js';
 export type {
   Custody,

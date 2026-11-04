@@ -6,7 +6,6 @@ import { type PoolState, buildLeg } from '../amm/aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
-  backendConvert,
   covWallsF,
   exitCap,
   exitValue,
@@ -14,10 +13,13 @@ import {
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
+} from './liability';
+import {
+  backendConvert,
   quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
-} from './liability';
+} from './liabilityQuote';
 
 const legOf = (symbol: string, reserves: number, liabilities: number) => ({
   symbol,

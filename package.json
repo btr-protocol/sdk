@@ -45,6 +45,14 @@
       "types": "./src/pool/slippage.ts",
       "default": "./src/pool/slippage.ts"
     },
+    "./pool/liabilityQuote": {
+      "types": "./src/pool/liabilityQuote.ts",
+      "default": "./src/pool/liabilityQuote.ts"
+    },
+    "./router/lpRoutes": {
+      "types": "./src/router/lpRoutes.ts",
+      "default": "./src/router/lpRoutes.ts"
+    },
     "./router": {
       "types": "./src/router/index.ts",
       "default": "./src/router/index.ts"

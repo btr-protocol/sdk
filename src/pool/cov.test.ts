@@ -1,20 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  covCap,
-  covDebitToll,
-  covLegToll,
-  covSwapToll,
-  covToll,
-  covWalls,
-  kappaBps,
-  kappaCode,
-  packCov,
-  packKnee,
-  unpackCov,
-  unpackKnee,
-} from './cov';
+import { kappaBps, kappaCode, packCov, packKnee, unpackCov, unpackKnee } from './cov';
+import { covCap, covDebitToll, covLegToll, covSwapToll, covToll, covWalls } from './covLaw';
 
 // dex-evm `tools/covlaw.py` writes the vectors (column-major decimal strings); the Solidity
 // `CovLaw.t.sol` replays the same file. Absent sibling checkout = skipped, never a green no-op in CI
