@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   covCap,
+  covDebitToll,
   covLegToll,
   covSwapToll,
   covToll,
@@ -71,6 +72,22 @@ describe.skipIf(!have)('cov_vectors.json replay (bit-exact)', () => {
         amt as bigint,
       );
       expect(got === null ? [0n, true] : [got, false]).toEqual([t as bigint, refused === 1n]);
+    }
+  });
+  test('debit', () => {
+    const r = rows('debit');
+    expect(r.length).toBe(239);
+    for (const [b, res, l, face, out, cw, d] of r as bigint[][]) {
+      expect(
+        covDebitToll(
+          b as bigint,
+          res as bigint,
+          l as bigint,
+          face as bigint,
+          out as bigint,
+          cw as bigint,
+        ),
+      ).toBe(d as bigint);
     }
   });
   test('swap', () => {

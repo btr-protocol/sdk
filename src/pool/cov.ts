@@ -195,6 +195,24 @@ export function covToll(
   return [p1 > p0 ? cdiv(l1 * (p1 - p0), WAD) : 0n, false];
 }
 
+/** `CovLib.debitToll`: the Φ⁺ toll of debiting `face` from a leg's claims at constant reserves (a
+ *  cross exit's or liability swap's from-leg), scaled to the payout `out = face·C·rate`:
+ *  `min(cdiv(cdiv(t·out, face)·WAD, C), out)`. A wall saturates to `out`. Requires `face ≤ l`. */
+export function covDebitToll(
+  b: bigint,
+  r: bigint,
+  l: bigint,
+  face: bigint,
+  out: bigint,
+  cWad: bigint,
+): bigint {
+  const [t, wall] = covToll(b, 0n, 0n, r, l, r, l - face);
+  if (wall) return out;
+  if (t === 0n) return 0n;
+  const d = cdiv(cdiv(t * out, face) * WAD, cWad);
+  return d < out ? d : out;
+}
+
 /** `CovLib.walls`: does the move end on/over a pole? */
 export function covWalls(b: bigint, r0: bigint, l0: bigint, r1: bigint, l1: bigint): boolean {
   const a = r1 * l0;
