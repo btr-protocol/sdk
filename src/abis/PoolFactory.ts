@@ -172,72 +172,6 @@ export const POOL_FACTORY_ABI = [
     type: 'function',
   },
   {
-    inputs: [
-      {
-        internalType: 'bytes32',
-        name: 'feedId',
-        type: 'bytes32',
-      },
-      {
-        internalType: 'uint256',
-        name: 't',
-        type: 'uint256',
-      },
-    ],
-    name: 'feedOf',
-    outputs: [
-      {
-        components: [
-          {
-            internalType: 'uint256',
-            name: 'mark1e18',
-            type: 'uint256',
-          },
-          {
-            internalType: 'uint32',
-            name: 'sigmaPbps',
-            type: 'uint32',
-          },
-          {
-            internalType: 'uint32',
-            name: 'updatedAtSecs',
-            type: 'uint32',
-          },
-          {
-            internalType: 'uint16',
-            name: 'ttlSecs',
-            type: 'uint16',
-          },
-          {
-            internalType: 'uint16',
-            name: 'confidenceBps',
-            type: 'uint16',
-          },
-          {
-            internalType: 'uint16',
-            name: 'flags',
-            type: 'uint16',
-          },
-          {
-            internalType: 'uint16',
-            name: 'maxDevBps',
-            type: 'uint16',
-          },
-          {
-            internalType: 'uint48',
-            name: 'sourceTsMs',
-            type: 'uint48',
-          },
-        ],
-        internalType: 'struct IOracle.FeedData',
-        name: 'f',
-        type: 'tuple',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
     inputs: [],
     name: 'getAllPoolsCount',
     outputs: [
@@ -304,7 +238,7 @@ export const POOL_FACTORY_ABI = [
           },
         ],
         internalType: 'struct IOracle.FeedData',
-        name: '',
+        name: 'f',
         type: 'tuple',
       },
     ],

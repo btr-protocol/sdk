@@ -102,13 +102,7 @@ export const MARK_STORE_ABI: Abi = [
     type: 'function',
   },
   {
-    inputs: [
-      {
-        internalType: 'uint256',
-        name: 't',
-        type: 'uint256',
-      },
-    ],
+    inputs: [],
     name: 'domainSeparator',
     outputs: [
       {
@@ -138,11 +132,6 @@ export const MARK_STORE_ABI: Abi = [
       {
         internalType: 'uint8',
         name: 'lane',
-        type: 'uint8',
-      },
-      {
-        internalType: 'uint8',
-        name: 'tierMask',
         type: 'uint8',
       },
     ],
@@ -178,11 +167,6 @@ export const MARK_STORE_ABI: Abi = [
         name: 'lane',
         type: 'uint8',
       },
-      {
-        internalType: 'uint8',
-        name: 'tierMask',
-        type: 'uint8',
-      },
     ],
     name: 'reanchor',
     outputs: [],
@@ -203,13 +187,7 @@ export const MARK_STORE_ABI: Abi = [
     type: 'function',
   },
   {
-    inputs: [
-      {
-        internalType: 'uint8',
-        name: 't',
-        type: 'uint8',
-      },
-    ],
+    inputs: [],
     name: 'rosterHash',
     outputs: [
       {
@@ -223,11 +201,6 @@ export const MARK_STORE_ABI: Abi = [
   },
   {
     inputs: [
-      {
-        internalType: 'uint8',
-        name: 't',
-        type: 'uint8',
-      },
       {
         internalType: 'address[]',
         name: 'signers',
@@ -284,32 +257,8 @@ export const MARK_STORE_ABI: Abi = [
   {
     inputs: [
       {
-        internalType: 'uint256',
-        name: 't',
-        type: 'uint256',
-      },
-    ],
-    name: 'tierVerifier',
-    outputs: [
-      {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
         internalType: 'uint8',
         name: 'lane',
-        type: 'uint8',
-      },
-      {
-        internalType: 'uint8',
-        name: 'tierMask',
         type: 'uint8',
       },
     ],
@@ -321,12 +270,6 @@ export const MARK_STORE_ABI: Abi = [
   {
     anonymous: false,
     inputs: [
-      {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'tier',
-        type: 'uint256',
-      },
       {
         indexed: false,
         internalType: 'address[]',
@@ -356,12 +299,6 @@ export const MARK_STORE_ABI: Abi = [
         indexed: true,
         internalType: 'uint256',
         name: 'lane',
-        type: 'uint256',
-      },
-      {
-        indexed: false,
-        internalType: 'uint256',
-        name: 'tierMask',
         type: 'uint256',
       },
       {
