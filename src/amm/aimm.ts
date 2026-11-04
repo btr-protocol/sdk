@@ -488,6 +488,11 @@ interface DepthRowWire {
   size: number;
   cum: number;
 }
+/** `/depth` `profile`: `[offsetBp from mark, to-token mass per bp]` per side, each ascending in offset. */
+export interface DepthProfile {
+  bids: [number, number][];
+  asks: [number, number][];
+}
 export interface DepthBookWire {
   mark: number;
   mid: number;
@@ -502,6 +507,8 @@ export interface DepthBookWire {
   poolCount?: number;
   /** Itineraries merged into it: > `poolCount` whenever routes share a pool. */
   routeCount?: number;
+  /** Back's smooth liquidity profile (see `DepthProfile`); the overlay draws it as is. */
+  profile?: DepthProfile;
 }
 export interface DepthRequestWire {
   pools: NamedPoolWire[];

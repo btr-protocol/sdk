@@ -1,6 +1,6 @@
 /** Shared collector ↔ SDK ↔ front protocol-metrics contract. */
 
-/** `all` = since inception, bounded by the back's 365 d ceiling (`METRICS_WINDOW_MS.all`); last so the list stays ascending. */
+/** `all` = since inception (the back reaches 20 y behind and clamps to the first row); last so the list stays ascending. */
 export const METRICS_WINDOWS = ['1h', '6h', '12h', '24h', '48h', '7d', '30d', 'all'] as const;
 export type MetricsWindow = (typeof METRICS_WINDOWS)[number];
 export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
@@ -11,14 +11,14 @@ export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
   '48h': 48 * 3600_000,
   '7d': 7 * 24 * 3600_000,
   '30d': 30 * 24 * 3600_000,
-  all: 365 * 24 * 3600_000,
+  all: 20 * 365 * 24 * 3600_000,
 };
 /** Dropdown text of a window. */
 export const metricsWindowLabel = (w: MetricsWindow): string => (w === 'all' ? 'All time' : w);
 /** Dense column / tile suffix (`APR · All`). */
 export const metricsWindowTag = (w: MetricsWindow): string => (w === 'all' ? 'All' : w);
 export const DEFAULT_METRICS_WINDOW: MetricsWindow = '48h';
-export type MetricsGrain = '1m' | '2m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
+export type MetricsGrain = '1m' | '2m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '7d';
 export type MetricsSource = 'live' | 'empty';
 
 /**
@@ -37,11 +37,15 @@ export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>>
   '48h': '15m', // 192
   '7d': '30m', // 336
   '30d': '4h', // 180
-  all: '1d', // <= 365
+  all: '1d', // daily while the span is <= 400 d, then weekly (`grainForSpan`)
 };
+
+/** Past this span a daily bucket would exceed ~400 points; weekly takes over (the back's ladder). */
+const DAILY_MAX_SPAN_MS = 400 * 24 * 3600_000;
 
 /** Grain for a free-form from..to span. Requires METRICS_WINDOWS to stay ascending. */
 export function grainForSpan(spanMs: number): MetricsGrain {
+  if (spanMs > DAILY_MAX_SPAN_MS) return '7d';
   for (const w of METRICS_WINDOWS)
     if (spanMs <= METRICS_WINDOW_MS[w]) return METRICS_WINDOW_GRAIN[w];
   return '1d';

@@ -19,6 +19,7 @@ export type {
   RouteRequestWire,
   QuoteRouteWire,
   DepthBookWire,
+  DepthProfile,
   DepthRequestWire,
   WireMeta,
   PathRequestWire,
