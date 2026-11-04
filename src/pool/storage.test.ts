@@ -482,6 +482,13 @@ describe('versioned readers', () => {
     expect(await readSolvencyState(providerWith(4, new Map([[0n, slot0]])), POOL)).toEqual({
       lastGoodCWad: 970n * 10n ** 15n,
     });
+    // layout v10 (storageVersion 12): no flashFeePbps, the uint40 sits at byte 25
+    const slot0v12 = word(
+      ((970_000_000n << 200n) | (1n << 192n) | (1n << 160n) | 0xbbn).toString(16),
+    );
+    expect(await readSolvencyState(providerWith(12, new Map([[0n, slot0v12]])), POOL)).toEqual({
+      lastGoodCWad: 970n * 10n ** 15n,
+    });
     expect(await readSolvencyState(providerWith(4, new Map([[13n, rate]])), POOL)).toEqual({
       lastGoodCWad: 0n,
     });

@@ -579,19 +579,21 @@ export async function readSwapGateMember(
   );
 }
 
-/** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3; on v4 the uint40 `lastGoodCWad9` in slot
+/** `PoolStorage.lastGoodCWad` (slot 14 on v2, 13 on v3; on v4+ the uint40 `lastGoodCWad9` in slot
  *  0's tail, 1e-9 WAD): the degraded same-asset exit cap (`exitCap`), WAD; 0 until an LP
  *  entrypoint has observed a rate. */
 export async function readSolvencyState(
   provider: Eip1193Provider,
   pool: Address,
 ): Promise<{ lastGoodCWad: bigint }> {
-  const layout = poolStorageOf(await readStorageVersion(provider, pool));
+  const version = await readStorageVersion(provider, pool);
+  const layout = poolStorageOf(version);
   if ('lastGoodCWad' in layout) {
     return { lastGoodCWad: BigInt(await getStorageAt(provider, pool, layout.lastGoodCWad)) };
   }
   const slot0 = BigInt(await getStorageAt(provider, pool, layout.lastGoodCWad9));
-  return { lastGoodCWad: (slot0 >> 216n) * 10n ** 9n };
+  // v4..v9 keep it at byte 27; layout v10 (storage version 12) dropped `flashFeePbps`, so byte 25.
+  return { lastGoodCWad: (slot0 >> (layoutOf(version) === 10 ? 200n : 216n)) * 10n ** 9n };
 }
 
 const U128 = (1n << 128n) - 1n;
