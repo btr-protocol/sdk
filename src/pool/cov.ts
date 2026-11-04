@@ -253,7 +253,7 @@ export function covCap(
   return v > 0n ? v : 0n;
 }
 
-/** `CovLib.legToll`: a swap leg's toll; `null` = refused past the cap. */
+/** `CovLib._legToll` (internal; what `swapToll` sums): a swap leg's toll; `null` = refused past the cap. */
 export function covLegToll(
   b: bigint,
   kneeBits: bigint,

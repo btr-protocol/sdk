@@ -278,9 +278,10 @@ export interface PoolState {
   hub?: HubBook;
   /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
   baseClass?: ClassWire;
-  /** `Pool.exitTollWad()`: the C-exposure exit toll as a raw WAD uint256 (1e18 = 100%). Sent to the
-   *  backend as `claim.toll_wad` on an exit; absent = the backend's own default. */
-  exitTollWad?: bigint;
+  /** Third return word of `Pool.poolSolvencyWad()` (the `exitTollWad` view is gone): the C-exposure
+   *  exit toll as a raw WAD uint256 (1e18 = 100%). Sent to the backend as `claim.toll_wad` on an exit;
+   *  absent, null or 0 = no toll (a pool that predates the word, or one at C >= 1). */
+  exitTollWad?: bigint | null;
   /** `FeeParams.protoSharePct` (0..100): the treasury's slice of the exit toll. Absent = 0. */
   protoSharePct?: number;
 }

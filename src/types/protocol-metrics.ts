@@ -409,7 +409,7 @@ export interface PoolRiskParams {
     protoSharePct: number | null;
     flowCooldownSecs: number | null;
     solvencyArmed: boolean | null;
-    /** `Pool.exitTollWad()` (WAD, decimal string): the C-exposure toll a cross exit pays; null = the pool predates the view. */
+    /** Third return word of `Pool.poolSolvencyWad()` (WAD, decimal string): the C-exposure toll a cross exit pays; null or "0" = no toll (the pool predates the word). */
     exitTollWad?: string | null;
     lastGoodC: number | null;
     /** Whole base tokens when every leg shares one cap (`depositCapUniform`); null = uncapped. */

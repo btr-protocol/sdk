@@ -254,7 +254,8 @@ function claimWire(
   decIn: number,
   tokenIn: string,
   tokenOut: string,
-  tollWad?: bigint,
+  tollWad: bigint | null | undefined,
+  exit: boolean,
 ): { credit: boolean; face: string; c_wad: string; toll_wad?: string } {
   if (!(poolC !== undefined && Number.isFinite(poolC) && poolC > 0)) {
     throw new Error(`backendConvert: claim ${tokenIn}->${tokenOut} needs the pool rate C`);
@@ -263,7 +264,10 @@ function claimWire(
     credit,
     face: `0x${BigInt(Math.round((fairIn / poolC) * 10 ** decIn)).toString(16)}`,
     c_wad: `0x${BigInt(Math.round(poolC * 1e18)).toString(16)}`,
-    ...(tollWad !== undefined ? { toll_wad: `0x${tollWad.toString(16)}` } : {}),
+    // An exit always names its toll: absent/null/0 on the state is "no toll", not the backend default.
+    ...(exit
+      ? { toll_wad: `0x${(tollWad != null && tollWad > 0n ? tollWad : 0n).toString(16)}` }
+      : {}),
   };
 }
 
@@ -305,7 +309,8 @@ export function backendConvert(
             decIn,
             tokenIn,
             tokenOut,
-            mode === 'exit' ? state.exitTollWad : undefined,
+            state.exitTollWad,
+            mode === 'exit',
           );
     const w = await quotePathAsync(
       {

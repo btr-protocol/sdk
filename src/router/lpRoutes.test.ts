@@ -243,6 +243,18 @@ describe('crossExit walls mirror the chain with a C toll', () => {
   });
 });
 
+describe('crossExit with no exit toll word', () => {
+  test.each([undefined, null, 0n])('exitTollWad %p pays the gross, never NaN', async (w) => {
+    const p = healthyPool();
+    p.state.exitTollWad = w;
+    const r = (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
+      (x) => x.id === 'cross-exit',
+    );
+    expect(Number.isFinite(r?.out)).toBe(true);
+    expect(r?.out).toBeGreaterThan(0);
+  });
+});
+
 describe('crossExit claim law: the from-leg debit', () => {
   // Hub-class terms on the from leg (NZDF): c_max 2.35, κ⁺ 14336. The stub is the backend's claim
   // contract on the uploaded books: `amount_out` = the quote (identity at C), `debit_toll` the
