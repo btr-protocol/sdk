@@ -1,6 +1,6 @@
 /** Shared collector ↔ SDK ↔ front protocol-metrics contract. */
 
-/** `all` is the widest window the back will serve (365 d, its clamp), last so the list stays ascending. */
+/** `all` = since inception, bounded by the back's 365 d ceiling (`METRICS_WINDOW_MS.all`); last so the list stays ascending. */
 export const METRICS_WINDOWS = ['1h', '6h', '12h', '24h', '48h', '7d', '30d', 'all'] as const;
 export type MetricsWindow = (typeof METRICS_WINDOWS)[number];
 export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
@@ -13,8 +13,6 @@ export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
   '30d': 30 * 24 * 3600_000,
   all: 365 * 24 * 3600_000,
 };
-/** What the back is asked for: `all` is its 365 d clamp, spelled as a free-form window it already parses. */
-export const metricsWindowParam = (w: MetricsWindow): string => (w === 'all' ? '365d' : w);
 /** Dropdown text of a window. */
 export const metricsWindowLabel = (w: MetricsWindow): string => (w === 'all' ? 'All time' : w);
 /** Dense column / tile suffix (`APR · All`). */
@@ -213,6 +211,8 @@ export interface ProtocolMetricsSummary {
   window: MetricsWindow | null;
   /** The window every rate and flow in this response covers (default 7d, same as `/pools/metrics`). */
   windowMs: number;
+  /** Earliest indexed state of any leg (epoch ms): where an `all` range starts. Null/absent when unknown. */
+  inceptionMs?: number | null;
   asOf: number;
   source: MetricsSource;
   stale: boolean;
