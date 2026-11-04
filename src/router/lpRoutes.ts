@@ -302,7 +302,7 @@ async function transferMint(
       outLeg,
       faceIn,
       c,
-      backendConvert(holder.state, xToken, targetSym, b),
+      backendConvert(holder.state, xToken, targetSym, b, 'credit'),
     );
   } catch {
     return unfeasible(shell, 'backend-error');
@@ -388,10 +388,10 @@ async function crossExit(
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   const fair = withdrawValue * c;
-  const convert = backendConvert(holder.state, targetSym, outToken, b);
+  const convert = backendConvert(holder.state, targetSym, outToken, b, 'exit');
   let q: Awaited<ReturnType<typeof convert>>;
   try {
-    q = await convert(fair);
+    q = await convert(fair, c);
   } catch {
     return unfeasible(CROSS_DEAD, 'backend-error');
   }
@@ -406,8 +406,11 @@ async function crossExit(
   // so only `out = gross - toll` is debited.
   const tollFrac = opts.exitToll?.frac ?? 0;
   const toll = Math.min(gross * tollFrac, gross);
-  const out = gross - toll;
-  if (!(out > 0)) return unfeasible(CROSS_DEAD, 'no-route');
+  // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
+  // of the payout after the C toll; a wall saturates it to the whole payout (`ZeroValue`).
+  const debit = q.debitToll ?? 0;
+  const out = gross - toll > debit ? gross - toll - debit : 0;
+  if (!(out > 0)) return unfeasible(CROSS_DEAD, debit > 0 ? 'coverage-wall' : 'no-route');
   // `_applyWithdraw`: reserves fall by `out`; liabilities rise by the route fee's LP credit and the
   // treasury face (route proto fee + the toll's proto slice), each `fee*WAD/g` (g = lastGoodC = c,
   // stamped by `mintRate`) and dropped to 0 when it exceeds the book (`_credit`). Same inputs as
@@ -511,7 +514,7 @@ async function transferExit(
       toLeg,
       lpFaceIn,
       c,
-      backendConvert(holder.state, targetSym, outToken, b),
+      backendConvert(holder.state, targetSym, outToken, b, 'credit'),
     );
   } catch {
     return unfeasible(shell, 'backend-error');

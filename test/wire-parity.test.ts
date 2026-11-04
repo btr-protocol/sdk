@@ -135,7 +135,14 @@ describe('outage vs no-liquidity', () => {
               STABLE_PROFILE,
             ),
           },
-          hub: { res: 3_000_000, liab: 2_000_000, kappaCovBps: 0, covFloorBps: 0, covKneeBps: 0 },
+          hub: {
+            res: 3_000_000,
+            liab: 2_000_000,
+            vegaBps: 0,
+            kappaCovBps: 0,
+            covBits: 0,
+            kneeBits: 0,
+          },
         },
       },
     ];

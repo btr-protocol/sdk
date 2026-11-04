@@ -291,6 +291,10 @@ export interface Quote {
   /** The delivering leg's gross was clamped at the coverage-wall argmax: `amountOut` is the
    *  flat top of the wall, not a price, so refuse the size rather than display it. */
   saturated?: boolean;
+  /** Claim law (`backendConvert` exit / credit): the from-leg debit toll, out-token units. */
+  debitToll?: number;
+  /** Claim law, liability swap: the credited leg's toll on its claims, out-token units. */
+  creditToll?: number;
   route: string[];
 }
 
@@ -735,8 +739,12 @@ export interface PathRequestWire {
   pool: NamedPoolWire;
   token_in: string;
   token_out: string;
-  /** 0x hex, raw at `token_in`'s decimals. */
+  /** 0x hex, raw at `token_in`'s decimals. Ignored under `claim` (the server prices `face·C`). */
   amount_in: string;
+  /** Price an LP conversion on its CLAIMS (`PoolLiquidityLib`) instead of a swap: `credit` false =
+   *  cross withdraw (out-leg toll + from-leg debit), true = liability swap (debit + credit tolls
+   *  out of the re-credited value). `face` = claim burned (raw at `token_in`), `c_wad` = pool rate. */
+  claim?: { credit: boolean; face: string; c_wad: string };
 }
 
 /** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
@@ -759,6 +767,10 @@ export interface QuoteResponseWire extends QuoteBaseWire {
   /** Gross clamped at the coverage argmax. Current back no longer sends it (b9b9875 refuses a
    *  gross past the cap instead), so absent reads as unsaturated. */
   saturated?: boolean;
+  /** Claim law only: the from-leg's Φ⁺ debit toll, 0x hex in the out token's raw units. */
+  debit_toll?: string;
+  /** Claim law, liability swap only: the credited leg's Φ⁻ toll on its claims (out units). */
+  credit_toll?: string;
 }
 
 /**
@@ -931,6 +943,12 @@ export function quoteFromWire(
     protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
     saturated: w.saturated === true,
+    ...(w.debit_toll !== undefined
+      ? { debitToll: Number(BigInt(w.debit_toll)) / 10 ** wireDecimals }
+      : {}),
+    ...(w.credit_toll !== undefined
+      ? { creditToll: Number(BigInt(w.credit_toll)) / 10 ** wireDecimals }
+      : {}),
     route,
   };
 }

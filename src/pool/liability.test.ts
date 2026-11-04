@@ -294,6 +294,41 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
     }
   });
 
+  test('the liability swap is priced on CLAIMS: credit claim law, C and face on the wire, both tolls back', async () => {
+    const calls: { claim?: { credit: boolean; face: string; c_wad: string } }[] = [];
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_url: string, init: { body?: string }) => {
+      calls.push(JSON.parse(init.body ?? '{}'));
+      return {
+        ok: true,
+        json: async () => ({
+          ...quoteWire(4_900_000_000n),
+          debit_toll: '0x2faf080', // 50 out units
+          credit_toll: '0x2faf080',
+        }),
+      };
+    };
+    try {
+      const q = await quoteSwapLiabilityAsync(
+        balancedState(),
+        legOf('AUDF', 1_000_000, 1_000_000),
+        legOf('NZDF', 1_000_000, 1_000_000),
+        5_000,
+        backendOpts,
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.claim?.credit).toBe(true);
+      expect(BigInt(calls[0]?.claim?.face ?? '0x0')).toBe(5_000n * 10n ** 6n);
+      expect(BigInt(calls[0]?.claim?.c_wad ?? '0x0')).toBe(10n ** 18n);
+      // `amount_out` is already net of both claim tolls: it is what is re-credited.
+      expect(q?.conv).toBeCloseTo(4_900, 6);
+      expect([q?.debitToll, q?.creditToll]).toEqual([50, 50]);
+    } finally {
+      // @ts-expect-error restore the real fetch
+      globalThis.fetch = undefined;
+    }
+  });
+
   test('an under-covered in-leg in a whole pool settles at C = 1, not at its own 60%', async () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(9_990_000_000n) });

@@ -9,7 +9,8 @@
 // swapLiability pipeline (PoolLiquidityLib.swapLiability):
 //   1. liabIn      = lpAmountIn * idxIn / WAD
 //   2. fairIn      = liabIn * C                     (mintRate: refuses when a mark is unusable)
-//   3. conv        = backendConvert(in -> out, fairIn); spread/toll/skew embedded
+//   3. conv        = backendConvert(in -> out, fairIn, 'credit'): the CLAIM law (no swap toll; the
+//                    from-leg debit and the credit leg's pair-row Φ⁻ come out of the value)
 //   4. markCap     = fairIn * q.markPrice   [Lemma B cap, _markCap]; conv clamped
 //   5. liabOut     = conv / C (quote output is a TOKEN amount, `liabilities` is a FACE book;
 //                    dividing by C re-denominates to face_in·m_in/m_out - no second haircut)
@@ -155,6 +156,9 @@ export interface SwapLiabilityQuote {
   impactBps: number;
   /** Settlement discount at C, bps of liabIn: real component of impactBps (0 when C ≥ 1). */
   haircutInBps: number;
+  /** Claim tolls inside `convQuoted` (out units): the debited leg's Φ⁺ and the credited leg's Φ⁻. */
+  debitToll: number;
+  creditToll: number;
   /** Half-spread actually deducted from the conversion output (path model). */
   convSpreadBps: number;
   /** Pure-curve movement along the fill. */
@@ -178,7 +182,7 @@ export async function quoteSwapLiabilityCoreAsync(
   outLeg: LiabLeg,
   lpAmountIn: number,
   poolC: number,
-  convert: (fairIn: number) => Promise<Quote | null>,
+  convert: (fairIn: number, poolC: number) => Promise<Quote | null>,
 ): Promise<SwapLiabilityQuote | null> {
   if (!(lpAmountIn > 0) || !(Number.isFinite(poolC) && poolC > 0)) return null;
   const idxIn = idxOf(inLeg);
@@ -189,7 +193,7 @@ export async function quoteSwapLiabilityCoreAsync(
   const fairIn = liabIn * poolC;
   const haircutIn = liabIn > fairIn ? liabIn - fairIn : 0;
 
-  const q = await convert(fairIn);
+  const q = await convert(fairIn, poolC);
   if (!q) return null;
   const markCap = fairIn * q.markPrice;
   const markCapBinding = q.amountOut > markCap;
@@ -226,10 +230,36 @@ export async function quoteSwapLiabilityCoreAsync(
     lpAmountOut,
     impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
     haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
+    debitToll: q.debitToll ?? 0,
+    creditToll: q.creditToll ?? 0,
     convSpreadBps: q.spreadBps / 2,
     convImpactBps: q.priceImpactBps,
     markClampBps:
       q.amountOut > 0 && markCapBinding ? ((q.amountOut - conv) / q.amountOut) * 1e4 : 0,
+  };
+}
+
+/** Which law prices the conversion: `swap` the pool's swap law; `exit` a cross withdraw's claim
+ *  law (out-leg toll, from-leg debit reported in `Quote.debitToll`); `credit` a liability swap's
+ *  (`Quote.amountOut` is the re-credited value after both claim tolls). */
+export type ConvertMode = 'swap' | 'exit' | 'credit';
+
+/** `claim` wire of `PathRequestWire`: the claim face burned is `fairIn / C` (`fairIn = face·C`). */
+function claimWire(
+  credit: boolean,
+  fairIn: number,
+  poolC: number | undefined,
+  decIn: number,
+  tokenIn: string,
+  tokenOut: string,
+): { credit: boolean; face: string; c_wad: string } {
+  if (!(poolC !== undefined && Number.isFinite(poolC) && poolC > 0)) {
+    throw new Error(`backendConvert: claim ${tokenIn}->${tokenOut} needs the pool rate C`);
+  }
+  return {
+    credit,
+    face: `0x${BigInt(Math.round((fairIn / poolC) * 10 ** decIn)).toString(16)}`,
+    c_wad: `0x${BigInt(Math.round(poolC * 1e18)).toString(16)}`,
   };
 }
 
@@ -251,21 +281,27 @@ export function backendConvert(
   tokenIn: string,
   tokenOut: string,
   opts: BackendConvertOpts,
-): (fairIn: number) => Promise<Quote | null> {
+  mode: ConvertMode = 'swap',
+): (fairIn: number, poolC?: number) => Promise<Quote | null> {
   const dec = (t: string): number | undefined =>
     t === state.base ? opts.baseDecimals : state.legs[t]?.decimals;
   const decIn = dec(tokenIn);
   const decOut = dec(tokenOut);
-  return async (fairIn: number): Promise<Quote | null> => {
+  return async (fairIn: number, poolC?: number): Promise<Quote | null> => {
     if (decIn === undefined || decOut === undefined || tokenIn === tokenOut) {
       throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${state.base}`);
     }
+    const claim =
+      mode === 'swap'
+        ? undefined
+        : claimWire(mode === 'credit', fairIn, poolC, decIn, tokenIn, tokenOut);
     const w = await quotePathAsync(
       {
         pool: poolStateToWire('pool', undefined, state, opts.meta, opts.baseDecimals),
         token_in: tokenIn,
         token_out: tokenOut,
         amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
+        ...(claim ? { claim } : {}),
       },
       opts.backendBase,
     );
@@ -289,7 +325,7 @@ export async function quoteSwapLiabilityAsync(
     outLeg,
     lpAmountIn,
     c,
-    backendConvert(state, inLeg.symbol, outLeg.symbol, opts),
+    backendConvert(state, inLeg.symbol, outLeg.symbol, opts, 'credit'),
   );
 }
 

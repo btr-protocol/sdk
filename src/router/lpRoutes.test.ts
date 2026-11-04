@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { buildLeg } from '../amm/aimm.js';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
+import { covDebitToll, packCov } from '../pool/cov';
 import { type BuildOpts, buildDepositCalls, buildRedeemCalls } from './index';
 import { type LpRouteOpts, rankDeposit, rankRedeem } from './lpRoutes';
 import type { NamedPool } from './route.js';
@@ -239,6 +240,101 @@ describe('crossExit walls mirror the chain with a C toll', () => {
     const bad = await at(120_000);
     expect(bad?.feasible).toBe(false);
     expect(bad?.reason).toBe('coverage-wall');
+  });
+});
+
+describe('crossExit claim law: the from-leg debit', () => {
+  // Hub-class terms on the from leg (NZDF): c_max 2.35, κ⁺ 14336. The stub is the backend's claim
+  // contract on the uploaded books: `amount_out` = the quote (identity at C), `debit_toll` the
+  // sdk's own bigint port of `CovLib.debitToll` (replayed bit-exact in cov.test.ts).
+  const BITS = packCov({
+    covMinBps: 1000,
+    covTargetBps: 10_070,
+    covFlatBps: 500,
+    covMaxBps: 23_500,
+    kappaCovBps: 32,
+    kappaPosBps: 14_336,
+  });
+  type Claim = { credit: boolean; face: string; c_wad: string };
+  let seen: { claim?: Claim } | undefined;
+  const install = () => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_url: string, init: { body?: string }) => {
+      const body = JSON.parse(init.body ?? '{}');
+      if (!body.claim.credit) seen = body;
+      const c = body.claim;
+      const sp = (
+        body.pool.spokes as { token: string; reserves: string; liabilities: string }[]
+      ).find((x) => x.token === body.token_in);
+      const face = BigInt(c.face);
+      const fair = (face * BigInt(c.c_wad)) / 10n ** 18n;
+      const debit = covDebitToll(
+        BigInt(BITS),
+        BigInt(sp?.reserves ?? '0x0'),
+        BigInt(sp?.liabilities ?? '0x0'),
+        face,
+        fair,
+        BigInt(c.c_wad),
+      );
+      const hex = (v: bigint) => `0x${v.toString(16)}`;
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: hex(fair),
+          gross_out: hex(fair),
+          avg_price: WAD_HEX,
+          mid_price: WAD_HEX,
+          mark_price: WAD_HEX,
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+          debit_toll: hex(debit),
+        }),
+      };
+    };
+  };
+  const exit = async (o: { res: number; liab: number; audfRes?: number }, face: number) => {
+    install();
+    seen = undefined;
+    const p = pool('core', { nzdfRes: o.res, nzdfLiab: o.liab, audfRes: o.audfRes });
+    p.state.legs.NZDF = { ...p.state.legs.NZDF, covBits: BITS };
+    return (await rankRedeem([p], 'NZDF', 'AUDF', face, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  const expectDebit = (res: number, liab: number, face: number, c: number): number => {
+    const e6 = 10n ** 6n;
+    const cw = BigInt(Math.round(c * 1e18));
+    const f = BigInt(Math.round(face * 1e6));
+    const fair = (f * cw) / 10n ** 18n;
+    return (
+      Number(covDebitToll(BigInt(BITS), BigInt(res) * e6, BigInt(liab) * e6, f, fair, cw)) / 1e6
+    );
+  };
+
+  test('over-covered leg (c = 1.2, burning 10 % of L) pays the debit the swap law never quotes', async () => {
+    const r = await exit({ res: 1_200_000, liab: 1_000_000 }, 100_000);
+    expect(r?.feasible).toBe(true);
+    expect(seen?.claim?.credit).toBe(false);
+    expect(BigInt(seen?.claim?.face ?? '0x0')).toBe(100_000n * 10n ** 6n);
+    const c = 1.05; // pool rate: (2M + 1M + 1.2M) / (2M + 1M + 1M)
+    const debit = expectDebit(1_200_000, 1_000_000, 100_000, c);
+    expect(debit).toBeGreaterThan(10_000);
+    expect(r?.out).toBeCloseTo(100_000 * c - debit, 4);
+  });
+  test('below C = 1 the debit scales up by 1/C', async () => {
+    const r = await exit({ res: 1_200_000, liab: 1_000_000, audfRes: 100_000 }, 100_000);
+    const c = (2_000_000 + 100_000 + 1_200_000) / 4_000_000; // 0.825
+    const debit = expectDebit(1_200_000, 1_000_000, 100_000, c);
+    expect(r?.out).toBeCloseTo(100_000 * c - debit, 4);
+    const unscaled = (debit * c) / 1; // the pre-R7 formula charged t·out/face, (1−C) short
+    expect(debit).toBeGreaterThan(unscaled);
+  });
+  test('at a wall the whole payout is the debit: refused, in-kind exit stays open', async () => {
+    const r = await exit({ res: 2_400_000, liab: 1_000_000 }, 250_000);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('coverage-wall');
   });
 });
 
