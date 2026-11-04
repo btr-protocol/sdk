@@ -133,7 +133,7 @@ export function verifyPushP8(
 export type P8Verified = { wire: 2; segments: P8SegmentV2[] } | { wire: 3; segments: P8Segment[] };
 
 /** Verify one `publishMarks` tx input against the wire the pool's `storageVersion` runs: 5..9 =
- *  wire 2 (`p8.v2.ts`, `auth` = word `P8_AUTH_READ_V2`), 10 = wire 3 (`signers` required). Exact
+ *  wire 2 (`p8.v2.ts`, `auth` = word `P8_AUTH_READ_V2`), 11 = wire 3 (`signers` required). Exact
  *  match like `layoutOf`; any other version throws. */
 export function verifyPushP8At(
   storageVersion: number,

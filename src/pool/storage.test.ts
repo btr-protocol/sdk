@@ -7,6 +7,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { buildCurve } from '../amm/aimm';
 import { keccak256 } from '../eth/index';
 import type { Eip1193Provider } from '../eth/types';
+import { toAsset } from './asset';
+import { covFloorBps, covKneeBps } from './liability';
 import {
   MARK_STORE_V5,
   MARK_STORE_V10,
@@ -26,6 +28,7 @@ import {
   curvePointer,
   curveSlot,
   decodeClassHead,
+  decodeClassRisk,
   decodeCustody,
   decodeLegOracle,
   decodeMark,
@@ -42,7 +45,7 @@ import {
   p8Conf,
   p8Sigma,
   p8StoreWord,
-  p8TierSlot,
+  p8WordSlot,
   poolStorageOf,
   readClassHead,
   readCurve,
@@ -118,17 +121,14 @@ test('packed field offsets match the Solidity struct packing', () => {
       kappaCovBps: [2, 25],
       maxLiabWeightBps: [2, 27],
       oracleBits: [2, 29],
-      refBandBps: [2, 30],
+      covBits: [2, 30],
     },
-    // Quote-source half (feedId, primary, mode, quoteUnit) then the breaker half.
+    // Quote-source half only: the R tier / ref band is gone.
     OracleConfig: {
       feedId: [0, 0],
       primary: [1, 0],
       mode: [1, 20],
       quoteUnit: [1, 21],
-      refBandBps: [1, 22],
-      refFeedId: [2, 0],
-      refPrimary: [3, 0],
     },
     HookSlot: {
       target: [0, 0],
@@ -206,14 +206,9 @@ describe('the v4 marks word (MarkWordLib)', () => {
       TTL_SHIFT: 107,
       MAX_DEV_SHIFT: 123,
       HALT_SHIFT: 134,
-      REF_SHIFT: 135,
-      REF_OBS_SHIFT: 167,
-      REF_CONF_SHIFT: 199,
-      REF_TTL_SHIFT: 215,
-      REF_HALT_SHIFT: 231,
       INTERNAL_SHIFT: 232,
       UOA_SHIFT: 233,
-      REF_BAND_SHIFT: 234,
+      DEPEG_SHIFT: 234,
       MAX_DEV_MAX: 2047,
     });
   });
@@ -225,9 +220,11 @@ describe('the v4 marks word (MarkWordLib)', () => {
     expect(laneFloat(((1 << 24) | (127 << 25)) >>> 0)).toBe(1n << 135n);
   });
 
-  test('decode the three MarkWordLib vectors', () => {
-    const v1 = decodeMarkWord('0x000192012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234');
-    expect(v1.primary).toEqual({
+  test('decode the MarkWordLib vectors (one word per leg, depeg code at 234)', () => {
+    // Shared with core tests/storage.rs `mark_word_v4_decodes_the_marks_word_lib_vectors`.
+    expect(
+      decodeMarkWord('0x0000120000000000000000000000000190708000100001406b49d21e67bc2234'),
+    ).toEqual({
       mark1e18: 1_000_099_971_145_400_320n,
       obs: 1_800_000_030,
       sigmaPbps: 320,
@@ -237,22 +234,11 @@ describe('the v4 marks word (MarkWordLib)', () => {
       halted: false,
       internal: false,
       uoa: true,
-      refBandBps: 100,
+      depegCode: 4,
     });
-    expect(v1.ref).toEqual({
-      mark1e18: 1_000_199_992_343_789_568n,
-      obs: 1_800_000_020,
-      sigmaPbps: 0,
-      confidenceBps: 1,
-      ttlSecs: 600,
-      maxDevBps: 0,
-      halted: false,
-      internal: false,
-      uoa: false,
-      refBandBps: 0,
-    });
-    const v2 = decodeMarkWord('0x03fffdfffffffffffffffffffffffffffffffffffdf5e100ffffffffefffffff');
-    expect(v2.primary).toEqual({
+    expect(
+      decodeMarkWord('0x0000010000000000000000000000007ffffffffffdf5e100ffffffffefffffff'),
+    ).toEqual({
       mark1e18: 340_282_356_779_733_661_637_539_395_458_142_568_448n,
       obs: 0xffffffff,
       sigmaPbps: 100_000_000,
@@ -262,23 +248,7 @@ describe('the v4 marks word (MarkWordLib)', () => {
       halted: true,
       internal: true,
       uoa: false,
-      refBandBps: 0xffff,
-    });
-    expect(v2.ref.mark1e18).toBe(87_112_283_335_611_817_379_210_085_237_284_497_522_688n);
-    expect(v2.ref.halted).toBe(true);
-    const r1 = decodeMarkWord('0x000000812c01f435a4e9003fb2e4b30000000000000000000000000000000000');
-    expect(r1.primary.mark1e18).toBe(0n);
-    expect(r1.ref).toEqual({
-      mark1e18: 3_299_999_960_581_778_964_480n,
-      obs: 1_800_000_000,
-      sigmaPbps: 0,
-      confidenceBps: 1000,
-      ttlSecs: 600,
-      maxDevBps: 0,
-      halted: true,
-      internal: false,
-      uoa: false,
-      refBandBps: 0,
+      depegCode: 0,
     });
   });
 });
@@ -295,7 +265,6 @@ describe('marks words (MarkWordLib)', () => {
       HALT_SHIFT: 230,
       INTERNAL_SHIFT: 231,
       UOA_SHIFT: 232,
-      REF_BAND_SHIFT: 233,
       MAX_DEV_MAX: 2047,
     });
   });
@@ -313,7 +282,7 @@ describe('marks words (MarkWordLib)', () => {
       halted: false,
       internal: false,
       uoa: true,
-      refBandBps: 100,
+      depegCode: 0,
     });
     expect(
       decodeMark('0x01fffefffffffffffdf5e100ffffffffffffffffffffffffffffffffffffffff'),
@@ -327,9 +296,9 @@ describe('marks words (MarkWordLib)', () => {
       halted: true,
       internal: true,
       uoa: false,
-      refBandBps: 0xffff,
+      depegCode: 0,
     });
-    // Word 1 (reference feed): the same feed bits, no mirror.
+    // The same feed bits in any other word decode alike; the v3 word has no depeg code.
     expect(
       decodeMark('0x000000400012c01f400000006b49d20000000000000000b2e4b323d9c5100000'),
     ).toEqual({
@@ -342,7 +311,7 @@ describe('marks words (MarkWordLib)', () => {
       halted: true,
       internal: false,
       uoa: false,
-      refBandBps: 0,
+      depegCode: 0,
     });
   });
 
@@ -523,7 +492,7 @@ describe('versioned readers', () => {
     expect(st).toEqual({ lastGoodCWad: 0n });
   });
 
-  test('readMarks: both words on v3, null on v2', async () => {
+  test('readMarks: word 0 on v3, null on v2', async () => {
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const base = mappingBase(TOKEN, POOL_STORAGE_V3.marks);
     const slots = new Map([
@@ -531,27 +500,26 @@ describe('versioned readers', () => {
       [base + 1n, '0x000000400012c01f400000006b49d20000000000000000b2e4b323d9c5100000'],
     ]);
     const m = await readMarks(providerWith(3, slots), POOL, TOKEN);
-    expect(m?.primary.mark1e18).toBe(1_000_100_000_000_000_000n);
-    expect(m?.ref.mark1e18).toBe(3300n * 10n ** 18n);
+    expect(m?.mark1e18).toBe(1_000_100_000_000_000_000n);
+    expect(m).not.toHaveProperty('ref');
     expect(await readMarks(providerWith(2, slots), POOL, TOKEN)).toBeNull();
   });
 
   test('readOracleConfig: v5 off Asset slot 2, v2 off slot 5', async () => {
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
-    // oracleBits = lane 5 | INTERNAL | UOA at byte 29; refBandBps 150 | depeg code 3 at byte 30.
-    const slot2 = word(((0xc5n << 232n) | ((150n | (3n << 12n)) << 240n)).toString(16));
+    // oracleBits = lane 5 | INTERNAL | UOA at byte 29; covBits (floor 40, knee 5) at byte 30.
+    const slot2 = word(((0xc5n << 232n) | ((40n | (5n << 9n)) << 240n)).toString(16));
     const v5 = new Map([[mappingBase(TOKEN, 4n) + 2n, slot2]]);
     expect(await readOracleConfig(providerWith(5, v5), POOL, TOKEN)).toEqual({
       lane: 5,
       mode: 1,
       quoteUnit: 1,
-      refBandBps: 150,
     });
     const packed = word(((1n << 176n) | (0x42n << 0n)).toString(16));
     const v2 = new Map([[mappingBase(TOKEN, 5n) + 1n, packed]]);
     const legacy = await readOracleConfig(providerWith(2, v2), POOL, TOKEN);
     expect('lane' in legacy).toBe(false);
-    expect(legacy).toMatchObject({ refBandBps: 1, mode: 0, quoteUnit: 0 });
+    expect(legacy).toMatchObject({ mode: 0, quoteUnit: 0 });
   });
 
   test('readMarks: one word at slot 13 on v4', async () => {
@@ -559,13 +527,12 @@ describe('versioned readers', () => {
     const slots = new Map([
       [
         mappingBase(TOKEN, 13n),
-        '0x000192012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234',
+        '0x0000120000000000000000000000000190708000100001406b49d21e67bc2234',
       ],
     ]);
     const m = await readMarks(providerWith(4, slots), POOL, TOKEN);
-    expect(m?.primary.mark1e18).toBe(1_000_099_971_145_400_320n);
-    expect(m?.primary.refBandBps).toBe(100);
-    expect(m?.ref.mark1e18).toBe(1_000_199_992_343_789_568n);
+    expect(m?.mark1e18).toBe(1_000_099_971_145_400_320n);
+    expect(m?.depegCode).toBe(4);
   });
 });
 
@@ -586,65 +553,80 @@ describe('layout v5', () => {
     expect([POOL_STORAGE_V5.classHead, POOL_STORAGE_V5.classRisk]).toEqual([16n, 17n]);
   });
 
-  test('store base is the page-aligned keccak256("btr.markstore.p8.v3") - 1', () => {
-    const id = BigInt(keccak256(new TextEncoder().encode('btr.markstore.p8.v3')));
+  test('store base is the page-aligned keccak256("btr.markstore.p8.v4") - 1', () => {
+    const id = BigInt(keccak256(new TextEncoder().encode('btr.markstore.p8.v4')));
     expect<bigint>(MARK_STORE_V10.MS).toBe((id - 1n) & ~127n);
     expect<bigint>(MARK_STORE_V10.MS & 127n).toBe(0n);
     expect([MARK_STORE_V10.AUTH, MARK_STORE_V10.META]).toEqual([0x20n, 0x21n]);
   });
 
   test('store word vectors match dex-evm MarkWordLib.t.sol and core', () => {
-    const raw = '0x000190012c0000b5a4e90a33de16c98190708000100001406b49d21e67bc2234';
-    const leg = decodeStoreWord(raw, { internal: false, uoa: true, refBandBps: 100 });
-    expect(leg.primary.sigmaPbps).toBe(400);
-    expect(leg.primary.obs).toBe(1_800_000_030);
-    expect(leg.ref.obs).toBe(1_800_000_020);
-    expect(leg.primary.maxDevBps).toBe(50);
-    expect([leg.primary.ttlSecs, leg.ref.ttlSecs]).toEqual([3600, 600]);
+    const raw = '0x0001900000000000000000000000000190708000100001406b49d21e67bc2234';
+    const leg = decodeStoreWord(raw, { internal: false, uoa: true, depegCode: 2 });
+    expect(leg).toEqual({
+      mark1e18: 1_000_099_971_145_400_320n,
+      obs: 1_800_000_030,
+      sigmaPbps: 400,
+      confidenceBps: 2,
+      ttlSecs: 3600,
+      maxDevBps: 50,
+      halted: false,
+      internal: false,
+      uoa: true,
+      depegCode: 2,
+    });
   });
 
-  test('Asset slot 2 carries the leg oracle wiring', () => {
-    const slot2 = `0x${((((4n << 12n) | 150n) << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
+  test('Asset slot 2 carries the leg oracle wiring and the depeg code (flags bits 12..15)', () => {
+    const f = POOL_STRUCTS.Asset.flags[1];
+    const slot2 = `0x${(((4n << 12n) << BigInt(8 * f)) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
     expect(decodeLegOracle(slot2 as `0x${string}`)).toEqual({
       lane: 7,
       internal: true,
       uoa: false,
-      refBandBps: 150,
+      depegCode: 4,
     });
+  });
+
+  test('Asset slot 2 covBits: floor 25 bps units 0..8, knee 10 bps units 9..15', () => {
+    const bits = 40 | (5 << 9);
+    expect([covFloorBps(bits), covKneeBps(bits)]).toEqual([1000, 50]);
+    const [, off] = POOL_STRUCTS.Asset.covBits;
+    const slot2 = `0x${(BigInt(bits) << BigInt(8 * off)).toString(16).padStart(64, '0')}` as const;
+    expect(u16At(slot2, off)).toBe(bits);
+    // the getAsset decode path: ABI bigints in, numbers out
+    const a = toAsset({ covBits: BigInt(bits) });
+    expect(a.covBits).toBe(bits);
+    expect([covFloorBps(a.covBits), covKneeBps(a.covBits)]).toEqual([1000, 50]);
   });
 });
 
 /** P8 words dumped from dex-evm `MarkStoreP8Migrate.t.sol` (`_populate`) at NOW; `W` =
  *  `Pool.fallback`'s answer per lane. Same fixture as core `p8_fixture`. */
-describe('P8 mark store, wire 3 (storageVersion 10)', () => {
+describe('P8 mark store, wire 3 (storageVersion 11)', () => {
   const NOW = 1_790_609_870;
   const CLASSES = `0x${[
     '000000000000000000000000000000000000000000000000000000000a692249',
     '000000000500323fc0000a00647f80002581909600007d03212c0000500323fc',
     '00000000000000000000000000000000000000000000280191fe0000500323fc',
-    '9f565915885d2711090cff7ae34213da4080440ed72d78f99086ab658acbc947',
+    'b340a27964fe4fd09a521888b3a074561a8e117aec49ff9afef7628d2931572a',
   ].join('')}` as `0x${string}`;
   const P = [
     '0xaaea26c01c002823bc223484000023bc2d931c002823bc22340c03ffe3bc16d6',
     '0xaaea26c01c00282cffcb6afc00282fb1b967fc00282d043c0af800283474bb55',
     '0xaaea26200003ffc00000000003ffc0000000fc03ffc00000001c00002f9131e6',
   ] as const;
-  const R = [
-    '0xaae9d80014000023bc16d614000023bc16d614000023bc16d614000023bc16d6',
-    '0xaaea26200800002cffcb6afc00002fb1b9670800002d043c0a0800003474bb55',
-    '0xaae9d8000000000000000000000000000000fc03ffc00000001400002f9127a1',
-  ] as const;
   const W = [
-    '00000001fe0002b55d3b0033de0b6b01901fe000180000a06aba85b067bc16d6',
-    '00000001fe0002b55d3b0033de0b6b01901fe000380000a06aba898867bc2234',
-    '00000001fe0002b55d3b0033de0b6b01901fe001400000a06aba89b067bc2d93',
-    '00000001fe0002b55d3b0033de0b6b01901fe000380000a06aba898867bc2234',
-    '000000012c0001355d44c444ba5daac32012c000000001f46aba898800000000',
-    '000000012c0001355d44c43d821e05032012c000000001f46aba898800000000',
-    '000000012c0000355d44c400000000032012c000000001f46aba898800000000',
-    '000000012c0001355d44c43cffe5b5032012c0003800012c6aba898879ffcb6a',
-    '000000012c0002b55d3b003fc893d0832012c000380001f46aba89887f9131e6',
-    '00000001fe0000355d39000000000001901fe000000000a06aba858800000000',
+    '00000000000000000000000000000001901fe000180000a06aba85b067bc16d6',
+    '00000000000000000000000000000001901fe000380000a06aba898867bc2234',
+    '00000000000000000000000000000001901fe001400000a06aba89b067bc2d93',
+    '00000000000000000000000000000001901fe000380000a06aba898867bc2234',
+    '000000000000000000000000000000432012c000000001f46aba898800000000',
+    '000000000000000000000000000000032012c000000001f46aba898800000000',
+    '000000000000000000000000000000032012c000000001f46aba898800000000',
+    '000000000000000000000000000000032012c0003800012c6aba898879ffcb6a',
+    '000000000000000000000000000000032012c000380001f46aba89887f9131e6',
+    '00000000000000000000000000000001901fe000000000a06aba858800000000',
   ];
   const cls = decodeP8Classes(CLASSES, 3)!;
 
@@ -652,7 +634,7 @@ describe('P8 mark store, wire 3 (storageVersion 10)', () => {
     for (let l = 0; l < 10; l++) {
       const floor = p8ClassOf(cls, l)[2];
       const want = `0x${floor.toString(16).padStart(6, '0')}${W[l]!.slice(6)}`;
-      expect<string>(p8StoreWord(P[l >> 2]!, R[l >> 2]!, l, cls, NOW)).toBe(want);
+      expect<string>(p8StoreWord(P[l >> 2]!, l, cls, NOW)).toBe(want);
     }
   });
 
@@ -670,38 +652,37 @@ describe('P8 mark store, wire 3 (storageVersion 10)', () => {
     expect(p8ClassOf(cls, 0)).toEqual([1020, 50, 160]);
     expect(p8ClassOf(cls, 7)).toEqual([600, 100, 300]);
     expect(p8ClassOf(cls, 10)).toEqual([0, 0, 0]);
-    expect(p8TierSlot(2, 5)).toBe(MARK_STORE_V10.MS + 17n);
+    expect(p8WordSlot(5)).toBe(MARK_STORE_V10.MS + 1n);
     expect(decodeP8Classes(`0x${'00'.repeat(128)}`)).toBeNull();
   });
 
-  test('readMarks: v10 pool on a P8 impl reads both tier words', async () => {
+  test('readMarks: v11 pool on a P8 impl reads the one word', async () => {
     const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
     const slots = new Map<bigint, string>([
       [mappingBase(TOKEN, POOL_STORAGE_V10.unlisted) + 2n, pad((BigInt(7) << 232n).toString(16))],
       [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, pad('cc'.repeat(20))],
-      [p8TierSlot(1, 7), P[1]],
-      [p8TierSlot(2, 7), R[1]],
+      [p8WordSlot(7), P[1]],
     ]);
     const provider = {
       request: async ({ method, params }: { method: string; params: unknown[] }) => {
         if (method === 'eth_call') {
           const { data } = params[0] as { data: string };
-          return data === '0x31e77853' ? CLASSES : pad('a');
+          return data === '0x31e77853' ? CLASSES : pad('b');
         }
         return slots.get(BigInt(params[1] as string)) ?? pad('0');
       },
     } as unknown as Eip1193Provider;
     const m = await readMarks(provider, POOL, TOKEN, NOW);
-    const want = decodeStoreWord(p8StoreWord(P[1], R[1], 7, cls, NOW), {
+    const want = decodeStoreWord(p8StoreWord(P[1], 7, cls, NOW), {
       internal: false,
       uoa: false,
-      refBandBps: 0,
+      depegCode: 0,
     });
     expect(m).toEqual(want);
-    expect(m!.primary.mark1e18 > 0n && m!.ref.mark1e18 > 0n).toBe(true);
-    expect(m!.primary.ttlSecs).toBe(600);
+    expect(m!.mark1e18 > 0n).toBe(true);
+    expect(m!.ttlSecs).toBe(600);
   });
 
   test('readMarks: classes() reverted or not P8 fails closed', async () => {
@@ -712,7 +693,7 @@ describe('P8 mark store, wire 3 (storageVersion 10)', () => {
       ({
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method !== 'eth_call') return pad('0');
-          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('a');
+          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('b');
         },
       }) as unknown as Eip1193Provider;
     // right id, no lane classed: Pool's constructor rejects it, so no layout is known
@@ -762,22 +743,17 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     '0x6ab14f4e1cf411acffcb6afcf411afb1b967fcf411ad043c0af8f411b474bb55',
     '0x6ab14f4e0000000000000000000000000000fc03ffc00000001cf411af9131e6',
   ] as const;
-  const R = [
-    '0x6ab14f4e14f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d614f7ffe3bc16d6',
-    '0x6ab14f4e08f411acffcb6afcf411afb1b96708f411ad043c0a08f411b474bb55',
-    '0x6ab14f4e0000000000000000000000000000fc03ffc000000014f7ffef9127a1',
-  ] as const;
   const W = [
-    '00000007080002b5589fa7b3de0b6b0190708000180003a06ab13f4f67bc16d6',
-    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
-    '00000007080002b5589fa7b3de0b6b0190708001400003a06ab14f3067bc2d93',
-    '00000007080002b5589fa7b3de0b6b0190708000380003a06ab14f0867bc2234',
-    '000000012c00013558a78444ba5daac32012c000000003a06ab14f0800000000',
-    '000000012c00013558a7843d821e05032012c000000003a06ab14f0800000000',
-    '000000012c00003558a78400000000032012c000000003a06ab14f0800000000',
-    '000000012c00013558a7843cffe5b5032012c000380003a06ab14f0879ffcb6a',
-    '000000012c0002b5589fa7bfc893d0832012c000380003a06ab14f087f9131e6',
-    '0000000708000035589fa7800000000190708000000000a06ab13f4f00000000',
+    '0000000000000000000000000000000190708000180003a06ab13f4f67bc16d6',
+    '0000000000000000000000000000000190708000380003a06ab14f0867bc2234',
+    '0000000000000000000000000000000190708001400003a06ab14f3067bc2d93',
+    '0000000000000000000000000000000190708000380003a06ab14f0867bc2234',
+    '000000000000000000000000000000432012c000000003a06ab14f0800000000',
+    '000000000000000000000000000000032012c000000003a06ab14f0800000000',
+    '000000000000000000000000000000032012c000000003a06ab14f0800000000',
+    '000000000000000000000000000000032012c000380003a06ab14f0879ffcb6a',
+    '000000000000000000000000000000032012c000380003a06ab14f087f9131e6',
+    '0000000000000000000000000000000190708000000000a06ab13f4f00000000',
   ];
   const cls = decodeP8Classes(CLASSES, 2)!;
 
@@ -785,7 +761,7 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     for (let l = 0; l < 10; l++) {
       const floor = p8ClassOf(cls, l)[2];
       const want = `0x${floor.toString(16).padStart(6, '0')}${W[l]!.slice(6)}`;
-      expect<string>(p8StoreWord(P[l >> 2]!, R[l >> 2]!, l, cls, 0, 2)).toBe(want);
+      expect<string>(p8StoreWord(P[l >> 2]!, l, cls, 0, 2)).toBe(want);
     }
   });
 
@@ -803,19 +779,18 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     expect(p8ClassOf(cls, 0)).toEqual([3600, 50, 160]);
     expect(p8ClassOf(cls, 7)).toEqual([600, 100, 300]);
     expect(p8ClassOf(cls, 10)).toEqual([0, 0, 0]);
-    expect(p8TierSlot(2, 5, 2)).toBe(MARK_STORE_V5.MS + 17n);
+    expect(p8WordSlot(5, 2)).toBe(MARK_STORE_V5.MS + 1n);
     expect(decodeP8Classes(`0x${'00'.repeat(128)}`, 2)).toBeNull();
   });
 
-  test('readMarks: v5 pool on a P8 impl reads both tier words', async () => {
+  test('readMarks: v5 pool on a P8 impl reads the one word', async () => {
     const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
     const slots = new Map<bigint, string>([
       [mappingBase(TOKEN, POOL_STORAGE_V5.assets) + 2n, pad((BigInt(7) << 232n).toString(16))],
       [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, pad('cc'.repeat(20))],
-      [p8TierSlot(1, 7, 2), P[1]],
-      [p8TierSlot(2, 7, 2), R[1]],
+      [p8WordSlot(7, 2), P[1]],
     ]);
     const provider = {
       request: async ({ method, params }: { method: string; params: unknown[] }) => {
@@ -827,14 +802,14 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
       },
     } as unknown as Eip1193Provider;
     const m = await readMarks(provider, POOL, TOKEN);
-    const want = decodeStoreWord(p8StoreWord(P[1], R[1], 7, cls, 0, 2), {
+    const want = decodeStoreWord(p8StoreWord(P[1], 7, cls, 0, 2), {
       internal: false,
       uoa: false,
-      refBandBps: 0,
+      depegCode: 0,
     });
     expect(m).toEqual(want);
-    expect(m!.primary.mark1e18 > 0n && m!.ref.mark1e18 > 0n).toBe(true);
-    expect(m!.primary.ttlSecs).toBe(600);
+    expect(m!.mark1e18 > 0n).toBe(true);
+    expect(m!.ttlSecs).toBe(600);
   });
 
   test('readMarks: classes() reverted or not P8 fails closed', async () => {
@@ -888,7 +863,7 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     expect(decodeP8Classes(CLASSES, 3)).toBeNull();
   });
 
-  test('wire 3 table under a v5..9 pool, and wire 2 table under v10, are refused', async () => {
+  test('wire 3 table under a v5..9 pool, and wire 2 table under v11, are refused', async () => {
     const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
@@ -903,30 +878,34 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
       '000000000000000000000000000000000000000000000000000000000a692249',
       '00000000050032e100000a0065c200002581909600007d03212c000050032e10',
       '0000000000000000000000000000000000000000000028019708000050032e10',
-      keccak256(new TextEncoder().encode('btr.markstore.p8.v3')).slice(2),
+      keccak256(new TextEncoder().encode('btr.markstore.p8.v4')).slice(2),
     ].join('')}` as `0x${string}`;
     for (const v of ['5', '9'])
       await expect(readMarks(at(v, v3Table), POOL, TOKEN)).rejects.toThrow('not a P8 table');
-    await expect(readMarks(at('a', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    await expect(readMarks(at('b', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
   });
 });
 
 /**
- * Layout v10 against dex-evm release/pool-v2-rc2 83773c0: the words of core
+ * Layout v10 (storageVersion 11 on the one-tier pool). The recorded words are from dex-evm
+ * release/pool-v2-rc2 83773c0: the words of core
  * `tests/fixtures/tree_vectors_v10.txt` phase A (`CoreTreeVectorsV10` probe, the 450-swap scene),
  * where the chain's own `recordOf` / `curveAt` (`script/lib/AssetLib.sol`) put the 7 legs at
  * 139..169 and curve 1 at 128. The curve is the same `DEFAULT_CURVE` the v5 recording carried as
- * SSTORE2 code, so the v10 words must decode to that blob exactly.
+ * SSTORE2 code, so the v10 words must decode to that blob exactly. That scene cannot be re-recorded
+ * here, so its legs are read under version 11 with the ref-band bytes replaced by hand: Asset slot 2
+ * byte 30 holds covBits (40 | 5<<9) where refBandBps 150 was, and the ClassHead famRow is repacked
+ * kappa 0..13 | minFeePbps 14..27 without the old bits above 28.
  */
 describe('wire dispatch', () => {
-  test('5..9 = wire 2, 10 = wire 3, everything else refused', () => {
+  test('5..9 = wire 2, 11 = wire 3, everything else refused (10 = the retired R-tier layout)', () => {
     for (const v of [5, 6, 7, 8, 9]) {
       expect(wireOf(v)).toBe(2);
       expect(markStoreOf(v)).toBe(MARK_STORE_V5);
     }
-    expect(wireOf(10)).toBe(3);
-    expect(markStoreOf(10)).toBe(MARK_STORE_V10);
-    for (const v of [0, 1, 2, 3, 4, 11, 12]) expect(() => wireOf(v)).toThrow();
+    expect(wireOf(11)).toBe(3);
+    expect(markStoreOf(11)).toBe(MARK_STORE_V10);
+    for (const v of [0, 1, 2, 3, 4, 10, 12]) expect(() => wireOf(v)).toThrow();
   });
 });
 
@@ -964,9 +943,9 @@ describe('layout v10', () => {
     // USDT0's record: Asset 0..2, Custody (+3), ClassHead (+4: USD, famRow pack(20, 20, 500))
     [144n, '0x000000000000000000000274a48a7800000000000000000000000246139ca800'],
     [145n, '0x000000000000000000000000a4ad4f68d0b91cfd19687c881e50f3a00242828c'],
-    [146n, '0x0096010000006400b00006ffff02bd03e80001000003e8000de0b6b3a7640000'],
+    [146n, '0x0a28010000006400b00006ffff02bd03e80001000003e8000de0b6b3a7640000'],
     [147n, '0x0000000000000000000000000000000000000000000000000000000000000001'],
-    [148n, '0x00000000000000000000000000000000000000fa050014000000000000000001'],
+    [148n, '0x0000000000000000000000000000000000000000050014000000000000000001'],
   ]);
   const V5_BLOB =
     '0x000003e813880000000000000000000000000000000000001f4017700fa007d0050000003081a26359ffffffa8b0421a00000000746a528800ffffff8b95ad7800000000000000000000000000000000000000000000000000fffffff4ae8d4f36000000033bd7a037fffffff64c791f560000002a09f322e3ffffffcde071cc8f0000000000000000fffffffffffffffffffda2eef260ee34ffffffff98850bfa000000019debd01cfffffffd931e47d60000001eb880721cfffffff10b3abaf90000000000000000fffffffffffffffffffcabfaf5a339730000000000000000000000019debd01d000000026ce1b82a0000001eb880721c0000000ef4c545070000000000000000fffffffffffffffffffcabfaf5a3397300000000677af407000000033bd7a03f00000009b386e0aa0000002a09f322e3000000321f8e33710000000000000000fffffffffffffffffffda2eef260ee770000000b5172b0c3';
@@ -982,14 +961,14 @@ describe('layout v10', () => {
   const words = (from: bigint, n: number) =>
     Array.from({ length: n }, (_, i) => BigInt(SLOTS.get(from + BigInt(i)) ?? ZERO));
 
-  test('dispatch is exact: 5..9 = v5, 10 = v10, anything else throws', async () => {
+  test('dispatch is exact: 5..9 = v5, 11 = v10 layout, anything else (10 included) throws', async () => {
     for (const v of [5, 6, 7, 8, 9]) expect(layoutOf(v)).toBe(5);
-    expect(layoutOf(10)).toBe(10);
-    expect(poolStorageOf(10)).toBe(POOL_STORAGE_V10);
-    for (const v of [0, 1, 11, 12]) expect(() => layoutOf(v)).toThrow('no storage layout');
+    expect(layoutOf(11)).toBe(10);
+    expect(poolStorageOf(11)).toBe(POOL_STORAGE_V10);
+    for (const v of [0, 1, 10, 12]) expect(() => layoutOf(v)).toThrow('no storage layout');
     const pool = `0x${'cc'.repeat(20)}` as `0x${string}`;
-    await expect(readCurve(at(11), pool, 1)).rejects.toThrow('no storage layout');
-    await expect(readMarks(at(11), pool, LEGS[0][0])).rejects.toThrow('no storage layout');
+    await expect(readCurve(at(10), pool, 1)).rejects.toThrow('no storage layout');
+    await expect(readMarks(at(12), pool, LEGS[0][0])).rejects.toThrow('no storage layout');
   });
 
   test('slots match dex-evm Pool storageLayout and PoolConstantsLib (pinned by hand)', () => {
@@ -1058,7 +1037,7 @@ describe('layout v10', () => {
       {
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method === 'eth_getCode') throw new Error('v10 reads no code');
-          return at(10).request({ method, params } as never);
+          return at(11).request({ method, params } as never);
         },
       } as unknown as Eip1193Provider,
       POOL,
@@ -1066,27 +1045,30 @@ describe('layout v10', () => {
     );
     expect(v10).not.toBeNull();
     expect(v10).toEqual(await readCurve(at(5), `0x${'dd'.repeat(20)}`, 1));
-    expect(await readCurve(at(10), POOL, 2)).toBeNull();
+    expect(await readCurve(at(11), POOL, 2)).toBeNull();
   });
 
   test('records: Asset slot 2, Custody +3, ClassHead +4 with famRow', async () => {
     const usdt = LEGS[1][0];
-    expect(await readOracleConfig(at(10), POOL, usdt)).toEqual({
+    expect(await readOracleConfig(at(11), POOL, usdt)).toEqual({
       lane: 1,
       mode: 0,
       quoteUnit: 0,
-      refBandBps: 150,
     });
-    expect(await readCustody(at(10), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
-    const head = await readClassHead(at(10), POOL, usdt);
-    expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });
+    expect(u16At(SLOTS.get(146n) as `0x${string}`, POOL_STRUCTS.Asset.covBits[1])).toBe(
+      40 | (5 << 9),
+    );
+    expect(await readCustody(at(11), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    const head = await readClassHead(at(11), POOL, usdt);
+    expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) });
+    expect(decodeClassRisk(head.famRow)).toEqual({ kappaCovBps: 20, minFeePbps: 20 });
     expect(decodeClassHead(BigInt(SLOTS.get(148n)!))).toEqual(head);
     // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +4
     const t = `0x${'11'.repeat(20)}` as const;
     const u = mappingBase(t, 4n);
     const slots = new Map(SLOTS);
     slots.set(u + 4n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
-    expect(await readClassHead(at(10, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
+    expect(await readClassHead(at(11, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
   });
 });
 

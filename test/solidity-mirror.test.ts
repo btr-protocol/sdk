@@ -189,14 +189,10 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     const c = poolConsts();
     expect(c.get('CLASS_ROWS_BIT')).toBe(CLASS_ROWS_BIT);
     expect(c.get('MAX_FAMILY')).toBe(MAX_FAMILY);
-    // ClassRiskLib.pack: kappa | band << BAND_SHIFT | fee << FEE_SHIFT, widths from the masks.
-    expect([c.get('CLASS_BAND_SHIFT'), c.get('CLASS_FEE_SHIFT')]).toEqual([14, 23]);
-    const row = 10_000n | (500n << 14n) | (10_000n << 23n);
-    expect(decodeClassRisk(row)).toEqual({
-      kappaCovBps: 10_000,
-      refBandBps: 500,
-      minFeePbps: 10_000,
-    });
+    // ClassRiskLib.pack: kappa | fee << FEE_SHIFT, widths from the masks.
+    expect([c.get('CLASS_KAPPA_SHIFT'), c.get('CLASS_FEE_SHIFT')]).toEqual([0, 14]);
+    const row = 10_000n | (10_000n << 14n);
+    expect(decodeClassRisk(row)).toEqual({ kappaCovBps: 10_000, minFeePbps: 10_000 });
     expect(M.KNOWN_FLAGS_MASK & CLASS_ROWS_BIT).toBe(CLASS_ROWS_BIT);
   });
 

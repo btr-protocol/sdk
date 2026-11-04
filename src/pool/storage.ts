@@ -41,7 +41,12 @@ function isNativeKey(token: Address): boolean {
 import { MARK_STORE_ABI } from '../abis/MarkStore.js';
 import { MARK_STORE_ABI_V2 } from '../abis/MarkStore.v2.js';
 import { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
-import type { Assert, FieldsMatch, OracleConfigFields } from '../abis/structs.generated.js';
+import type {
+  Assert,
+  FieldsMatch,
+  OracleConfigFields,
+  RiskConfigFields,
+} from '../abis/structs.generated.js';
 import { POOL_STORAGE, POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD, POOL_STORAGE_V3 } from './layout.v3.generated.js';
 import { MARK_WORD_V4, POOL_STORAGE_V4 } from './layout.v4.generated.js';
@@ -105,11 +110,12 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
 export function layoutOf(storageVersion: number): 2 | 3 | 4 | 5 | 10 {
   if (storageVersion === 2 || storageVersion === 3 || storageVersion === 4) return storageVersion;
   if (storageVersion >= 5 && storageVersion <= 9) return 5;
-  if (storageVersion === 10) return 10;
+  // 11 = the one-tier v2 pool; the v1 fleet's 10 (R tier) is refused until its cutover.
+  if (storageVersion === 11) return 10;
   throw new Error(`Pool.storageVersion() ${storageVersion}: no storage layout for it`);
 }
 
-/** The P8 mark store wire a storage version runs: 5..9 = wire 2 (Arc, Monad v1), 10 = wire 3.
+/** The P8 mark store wire a storage version runs: 5..9 = wire 2 (Arc, Monad v1), 11 = wire 3.
  *  Exact match; any other version throws, so a store is never read through the other wire's
  *  slots, clocks or id. */
 export function wireOf(storageVersion: number): 2 | 3 {
@@ -166,19 +172,17 @@ export const CLASS_ROWS_BIT = 1 << 7;
 /** `PoolConstantsLib.MAX_FAMILY`: highest peg-family id and row key (0 = the leg's default row). */
 export const MAX_FAMILY = 4;
 
-/** A `classRisk` / `classHead.row` word (`ClassRiskLib.pack`): kappaCovBps 0..13 | refBandBps
- *  14..22 | minFeePbps 23..36, bits 37..63 zero. */
+/** A `classRisk` / `classHead.row` word (`ClassRiskLib.pack`): kappaCovBps 0..13 | minFeePbps
+ *  14..27, bits 28..63 zero. */
 export interface ClassRisk {
   kappaCovBps: number;
-  refBandBps: number;
   minFeePbps: number;
 }
 
 export function decodeClassRisk(pack: bigint): ClassRisk {
   return {
     kappaCovBps: Number(pack & 0x3fffn),
-    refBandBps: Number((pack >> 14n) & 0x1ffn),
-    minFeePbps: Number((pack >> 23n) & 0x3fffn),
+    minFeePbps: Number((pack >> 14n) & 0x3fffn),
   };
 }
 
@@ -190,24 +194,31 @@ export function decodeClassHead(word: bigint): { family: number; row: bigint; fa
   return { family: Number(word & 0xffn), row: (word >> 8n) & U64, famRow: (word >> 72n) & U64 };
 }
 
-/** `IPool.RiskConfig`: 2×uint16. Still an ABI/memory type (`getAsset` returns both fields), but
- *  no longer a storage struct of its own: both fields live in `Asset` slot 2. */
+/** `IPool.RiskConfig` as `getRiskConfig` returns it (ABI/memory type; every field lives in `Asset`
+ *  slot 2, the coverage terms packed in `covBits`). */
 export interface RiskConfig {
   flags: number;
   /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). */
   kappaCovBps: number;
+  depositCapCode: number;
+  maxLiabWeightBps: number;
+  /** Coverage floor (bps of L, multiple of 25): a settle that would leave the leg below it with
+   *  coverage falling reverts. 0 = none. */
+  covFloorBps: number;
+  /** Coverage-toll knee above 1.0 (bps, multiple of 10); 0 = the toll peaks at 1.0. */
+  covKneeBps: number;
 }
+
+export type _RiskConfigMatchesAbi = Assert<FieldsMatch<RiskConfig, RiskConfigFields>>;
 
 /** `IPool.OracleConfig` as a layout-v5 pool stores it, in `Asset` slot 2. */
 export interface OracleConfig {
-  /** Store lane (< 64) carrying the leg's P and R tiers. */
+  /** Store lane (< 64) carrying the leg's mark. */
   lane: number;
   /** 0 = EXTERNAL, 1 = INTERNAL (quote = 1.0 peg; the P mark gates depeg only). */
   mode: number;
   /** 0 = ANCHOR_UNIT, 1 = UNIT_OF_ACCOUNT (the pool divides by the base's own mark). */
   quoteUnit: number;
-  /** Depeg band vs the lane's R tier, bps. 0 = disarmed. */
-  refBandBps: number;
 }
 
 export type _OracleConfigMatchesAbi = Assert<FieldsMatch<OracleConfig, OracleConfigFields>>;
@@ -215,14 +226,10 @@ export type _OracleConfigMatchesAbi = Assert<FieldsMatch<OracleConfig, OracleCon
 /** The `oracleConfigs` mapping entry of layout v2..v4 (slot 5; reserved from v5). */
 export interface LegacyOracleConfig {
   feedId: Hex;
-  refFeedId: Hex;
   primary: Address;
-  refBandBps: number;
   mode: number;
   /** 0 = ANCHOR_UNIT, 1 = UNIT_OF_ACCOUNT. */
   quoteUnit: number;
-  /** Ref-band oracle instance; zero address = fallback to primary. */
-  refPrimary: Address;
 }
 
 /** Mapping entry base slot: keccak256(abi.encode(key, mappingSlot)). */
@@ -509,26 +516,17 @@ export async function readOracleConfig(
       lane: leg.lane,
       mode: leg.internal ? 1 : 0,
       quoteUnit: leg.uoa ? 1 : 0,
-      refBandBps: leg.refBandBps,
     };
   }
   const base = mappingBase(key, POOL_STORAGE.oracleConfigs);
   const f = POOL_STRUCTS.OracleConfig;
   const at = (slot: number) => getStorageAt(provider, pool, base + BigInt(slot));
-  const [feedId, refFeedId, packed, refWord] = await Promise.all([
-    at(f.feedId[0]),
-    at(f.refFeedId[0]),
-    at(f.primary[0]),
-    at(f.refPrimary[0]),
-  ]);
+  const [feedId, packed] = await Promise.all([at(f.feedId[0]), at(f.primary[0])]);
   return {
     feedId,
-    refFeedId,
     primary: addressAt(packed, f.primary[1]),
-    refBandBps: u16At(packed, f.refBandBps[1]),
     mode: u8At(packed, f.mode[1]),
     quoteUnit: u8At(packed, f.quoteUnit[1]),
-    refPrimary: addressAt(refWord, f.refPrimary[1]),
   };
 }
 
@@ -605,8 +603,8 @@ export function decodeCustody(word: Hex): Custody {
   return { treasuryShares: w & U128, invested: w >> 128n };
 }
 
-/** A `marks` word (layout v3): a feed exactly as the pool prices it, plus, on word 0 only, the
- *  config mirror. The pool gates `now - obs` against `ttlSecs`. */
+/** A `marks` word: a feed exactly as the pool prices it, plus the config mirror. The pool gates
+ *  `now - obs` against `ttlSecs`. */
 interface MarkWord {
   mark1e18: bigint;
   obs: number;
@@ -619,8 +617,8 @@ interface MarkWord {
   internal: boolean;
   /** `OracleConfig.quoteUnit == UOA`: the mark is divided by the base mark. */
   uoa: boolean;
-  /** 0 = band disarmed, and word 1 is then 0. */
-  refBandBps: number;
+  /** `Asset.flags` bits 12..15: the leg's depeg code (band = code·250 bps); 0 on a v3 word. */
+  depegCode: number;
 }
 
 export function decodeMark(word: Hex): MarkWord {
@@ -636,7 +634,7 @@ export function decodeMark(word: Hex): MarkWord {
     halted: field(w, m.HALT_SHIFT, 1) === 1,
     internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
     uoa: field(w, m.UOA_SHIFT, 1) === 1,
-    refBandBps: field(w, m.REF_BAND_SHIFT, 16),
+    depegCode: 0,
   };
 }
 
@@ -647,36 +645,21 @@ export function laneFloat(f: number): bigint {
   return e >= 16n ? mant << (e - 16n) : mant >> (16n - e);
 }
 
-/** A layout-v4 `marks` word as its two feeds. The mirror rides on `primary`; `ref` carries no σ
- *  nor maxDev (the pool never reads them) and is all 0 while the band is disarmed. */
-export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } {
+/** A layout-v4 `marks` word: the feed plus the config mirror (INTERNAL, UOA, depeg code). */
+export function decodeMarkWord(word: Hex): MarkWord {
   const w = BigInt(word);
   const m = MARK_WORD_V4;
   return {
-    primary: {
-      mark1e18: laneFloat(field(w, 0, 32)),
-      obs: field(w, m.OBS_SHIFT, 32),
-      sigmaPbps: field(w, m.SIGMA_SHIFT, 27),
-      confidenceBps: field(w, m.CONF_SHIFT, 16),
-      ttlSecs: field(w, m.TTL_SHIFT, 16),
-      maxDevBps: field(w, m.MAX_DEV_SHIFT, 11),
-      halted: field(w, m.HALT_SHIFT, 1) === 1,
-      internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
-      uoa: field(w, m.UOA_SHIFT, 1) === 1,
-      refBandBps: field(w, m.REF_BAND_SHIFT, 16),
-    },
-    ref: {
-      mark1e18: laneFloat(field(w, m.REF_SHIFT, 32)),
-      obs: field(w, m.REF_OBS_SHIFT, 32),
-      sigmaPbps: 0,
-      confidenceBps: field(w, m.REF_CONF_SHIFT, 16),
-      ttlSecs: field(w, m.REF_TTL_SHIFT, 16),
-      maxDevBps: 0,
-      halted: field(w, m.REF_HALT_SHIFT, 1) === 1,
-      internal: false,
-      uoa: false,
-      refBandBps: 0,
-    },
+    mark1e18: laneFloat(field(w, 0, 32)),
+    obs: field(w, m.OBS_SHIFT, 32),
+    sigmaPbps: field(w, m.SIGMA_SHIFT, 27),
+    confidenceBps: field(w, m.CONF_SHIFT, 16),
+    ttlSecs: field(w, m.TTL_SHIFT, 16),
+    maxDevBps: field(w, m.MAX_DEV_SHIFT, 11),
+    halted: field(w, m.HALT_SHIFT, 1) === 1,
+    internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
+    uoa: field(w, m.UOA_SHIFT, 1) === 1,
+    depegCode: field(w, m.DEPEG_SHIFT, 4),
   };
 }
 
@@ -685,7 +668,8 @@ export function decodeLegOracle(slot2: Hex): {
   lane: number;
   internal: boolean;
   uoa: boolean;
-  refBandBps: number;
+  /** `Asset.flags` bits 12..15. */
+  depegCode: number;
 } {
   const f = POOL_STRUCTS.Asset;
   const b = u8At(slot2, f.oracleBits[1]);
@@ -693,7 +677,7 @@ export function decodeLegOracle(slot2: Hex): {
     lane: b & MARK_STORE_V10.LANE_MASK,
     internal: (b & MARK_STORE_V10.INTERNAL_BIT) !== 0,
     uoa: (b & MARK_STORE_V10.UOA_BIT) !== 0,
-    refBandBps: u16At(slot2, f.refBandBps[1]) & 0xfff, // 12..15 = depeg code
+    depegCode: u16At(slot2, f.flags[1]) >> 12,
   };
 }
 
@@ -701,14 +685,14 @@ export function decodeLegOracle(slot2: Hex): {
  *  config in the mirror fields. Byte-identical to dex-evm `MarkWordLib.compose`. */
 export function decodeStoreWord(
   word: Hex,
-  leg: { internal: boolean; uoa: boolean; refBandBps: number },
-): { primary: MarkWord; ref: MarkWord } {
+  leg: { internal: boolean; uoa: boolean; depegCode: number },
+): MarkWord {
   const out = decodeMarkWord(word);
   const floor = Number(BigInt(word) >> BigInt(MARK_STORE_V10.MIN_SIGMA_SHIFT));
-  out.primary.sigmaPbps = Math.max(out.primary.sigmaPbps, floor);
-  out.primary.internal = leg.internal;
-  out.primary.uoa = leg.uoa;
-  out.primary.refBandBps = leg.refBandBps;
+  out.sigmaPbps = Math.max(out.sigmaPbps, floor);
+  out.internal = leg.internal;
+  out.uoa = leg.uoa;
+  out.depegCode = leg.depegCode;
   return out;
 }
 
@@ -728,7 +712,7 @@ export type P8Classes = { laneCls: bigint; clsA: bigint; clsB: bigint };
 const CLASSES_SELECTOR = '0x31e77853';
 const P8_STORE_ID = {
   2: keccak256(new TextEncoder().encode('btr.markstore.p8')),
-  3: keccak256(new TextEncoder().encode('btr.markstore.p8.v3')),
+  3: keccak256(new TextEncoder().encode('btr.markstore.p8.v4')),
 } as const;
 
 /** The P8 class table off a `classes()` return; `null` for any other store id, including the
@@ -756,54 +740,46 @@ export function p8Sigma(s8: number, floor: number): number {
   return s8 === 0 ? floor : Math.max(floor, (16 | (s8 & 15)) * 2 ** ((s8 >> 4) + 2));
 }
 
-/** Tier `t` (1 = P, 2 = R) word slot of `lane` in a P8 store: 4 lanes per word. */
-export function p8TierSlot(tier: 1 | 2, lane: number, wire: 2 | 3 = 3): bigint {
-  return (
-    (wire === 2 ? MARK_STORE_V5 : MARK_STORE_V10).MS + (BigInt(tier - 1) << 4n) + BigInt(lane >> 2)
-  );
+/** The word slot of `lane` in a P8 store: 4 lanes per word. */
+export function p8WordSlot(lane: number, wire: 2 | 3 = 3): bigint {
+  return (wire === 2 ? MARK_STORE_V5 : MARK_STORE_V10).MS + BigInt(lane >> 2);
 }
 
-/** `lane`'s store word from its P8 tier words: `Pool.fallback`'s decode plus the class minSigma at
+/** `lane`'s store word from its P8 word: `Pool.fallback`'s decode plus the class minSigma at
  *  `MIN_SIGMA_SHIFT` (the D2b field), so `decodeStoreWord` reads it unchanged. Byte-identical to
  *  core `p8::store_word`. Lane at 56j: mant u24 | e6 24 | age u12 30 | σ8 42 | st u6 50 (62 halted,
  *  63 dark); clock u32 at 224. Wire 3: clock and age count 250 ms ticks mod 2^32, so the decode
  *  needs `nowSecs` (the chain's `block.timestamp`). Wire 2: both count seconds, `nowSecs` unused. */
 export function p8StoreWord(
   pw: Hex,
-  rw: Hex,
   lane: number,
   c: P8Classes,
   nowSecs: number,
   wire: 2 | 3 = 3,
 ): Hex {
   const sh = BigInt(56 * (lane & 3));
-  const [P, R] = [BigInt(pw), BigInt(rw)];
-  const [p, r] = [(P >> sh) & ((1n << 56n) - 1n), (R >> sh) & ((1n << 56n) - 1n)];
+  const P = BigInt(pw);
+  const p = (P >> sh) & ((1n << 56n) - 1n);
   const M30 = 0x3fffffffn;
   const nt = BigInt(nowSecs) * 4n;
   if ((p & M30) === 0n && p >> 50n < 62n) return `0x${'0'.repeat(64)}`;
   const [ttl, maxDev, floor] = p8ClassOf(c, lane);
-  const tier = (v: bigint, tw: bigint, cs: bigint): bigint => {
-    const st = v >> 50n;
-    // The lane's tick (clock - age, mod 2^32) unwrapped to within +-2^31 ticks of now, floored to
-    // its second; 0 before genesis.
-    const d = (((tw >> 224n) - ((v >> 30n) & 0xfffn) - nt) & 0xffffffffn) ^ 0x80000000n;
-    const o = nt + d - 0x80000000n;
-    const obs =
-      wire === 2 ? ((tw >> 224n) - ((v >> 30n) & 0xfffn)) & 0xffffffffn : o > 0n ? o >> 2n : 0n;
-    const live = st < 62n && (v & M30) !== 0n;
-    const f = ((v & 0xffffffn) | ((v & 0x3f000000n) << 1n)) + 0x21000000n;
-    return (obs << 32n) | (live ? f | (BigInt(p8Conf(Number(st))) << cs) : 0n);
-  };
+  const st = p >> 50n;
+  // The lane's tick (clock - age, mod 2^32) unwrapped to within +-2^31 ticks of now, floored to
+  // its second; 0 before genesis.
+  const d = (((P >> 224n) - ((p >> 30n) & 0xfffn) - nt) & 0xffffffffn) ^ 0x80000000n;
+  const o = nt + d - 0x80000000n;
+  const obs =
+    wire === 2 ? ((P >> 224n) - ((p >> 30n) & 0xfffn)) & 0xffffffffn : o > 0n ? o >> 2n : 0n;
+  const live = st < 62n && (p & M30) !== 0n;
+  const f = ((p & 0xffffffn) | ((p & 0x3f000000n) << 1n)) + 0x21000000n;
   const w =
-    tier(p, P, 91n) |
-    (tier(r, R, 64n) << 135n) |
+    (obs << 32n) |
+    (live ? f | (BigInt(p8Conf(Number(st))) << 91n) : 0n) |
     (BigInt(p8Sigma(Number((p >> 42n) & 0xffn), floor)) << 64n) |
     (BigInt(ttl) << 107n) |
-    (BigInt(ttl) << 215n) |
     (BigInt(maxDev) << 123n) |
-    (BigInt(p >> 50n === 62n) << 134n) |
-    (BigInt(r >> 50n === 62n) << 231n) |
+    (BigInt(st === 62n) << 134n) |
     (BigInt(floor) << BigInt(MARK_STORE_V10.MIN_SIGMA_SHIFT));
   return `0x${w.toString(16).padStart(64, '0')}`;
 }
@@ -824,14 +800,14 @@ async function readP8Classes(
   return c;
 }
 
-/** A leg's two feeds as its pool prices them; `null` on a v2 pool, which reads its oracle live.
+/** A leg's feed as its pool prices it; `null` on a v2 pool, which reads its oracle live.
  *  `nowSecs` is the chain time the P8 tick words are unwrapped against. */
 export async function readMarks(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
   nowSecs = Math.floor(Date.now() / 1000),
-): Promise<{ primary: MarkWord; ref: MarkWord } | null> {
+): Promise<MarkWord | null> {
   const storageVersion = await readStorageVersion(provider, pool);
   const version = layoutOf(storageVersion);
   if (version < 3) return null;
@@ -845,21 +821,13 @@ export async function readMarks(
     const leg = decodeLegOracle(slot2);
     const impl = addressAt(implWord, 0);
     const cls = await readP8Classes(provider, impl, wire);
-    const [pw, rw] = await Promise.all([
-      getStorageAt(provider, impl, p8TierSlot(1, leg.lane, wire)),
-      getStorageAt(provider, impl, p8TierSlot(2, leg.lane, wire)),
-    ]);
-    return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls, nowSecs, wire), leg);
+    const pw = await getStorageAt(provider, impl, p8WordSlot(leg.lane, wire));
+    return decodeStoreWord(p8StoreWord(pw, leg.lane, cls, nowSecs, wire), leg);
   }
   if (version >= 4) {
     return decodeMarkWord(
       await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V4.marks)),
     );
   }
-  const base = mappingBase(key, POOL_STORAGE_V3.marks);
-  const [w0, w1] = await Promise.all([
-    getStorageAt(provider, pool, base),
-    getStorageAt(provider, pool, base + 1n),
-  ]);
-  return { primary: decodeMark(w0), ref: decodeMark(w1) };
+  return decodeMark(await getStorageAt(provider, pool, mappingBase(key, POOL_STORAGE_V3.marks)));
 }

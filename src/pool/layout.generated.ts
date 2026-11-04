@@ -71,16 +71,13 @@ export const POOL_STRUCTS = {
     kappaCovBps: [2, 25],
     maxLiabWeightBps: [2, 27],
     oracleBits: [2, 29],
-    refBandBps: [2, 30],
+    covBits: [2, 30],
   },
   OracleConfig: {
     feedId: [0, 0],
     primary: [1, 0],
     mode: [1, 20],
     quoteUnit: [1, 21],
-    refBandBps: [1, 22],
-    refFeedId: [2, 0],
-    refPrimary: [3, 0],
   },
   HookSlot: {
     target: [0, 0],

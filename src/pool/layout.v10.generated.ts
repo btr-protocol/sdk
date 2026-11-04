@@ -1,4 +1,4 @@
-// `PoolStorage` layout v10 (`Pool.storageVersion() == 10`, fresh fleets only): solc
+// `PoolStorage` layout v10 (`Pool.storageVersion() == 11`, fresh fleets only): solc
 // `storageLayout` of dex-evm `out/Pool.sol/Pool.json` (`forge inspect src/Pool.sol:Pool
 // storage-layout`, release/pool-v2-rc2 83773c0) plus the area constants of
 // `PoolConstantsLib.sol`. A listed leg's `Asset` is no mapping entry: it is a 5-slot record in the
@@ -71,16 +71,16 @@ export const POOL_AREA_V10 = {
 } as const;
 
 /**
- * Wire 3 `MarkStore` (`storageVersion() == 10`) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
- * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds both tiers in the
+ * Wire 3 `MarkStore` (`storageVersion() == 11`) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
+ * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds the feed in the
  * `MARK_WORD_V4` layout with the lane's σ floor at `MIN_SIGMA_SHIFT` in place of the mirror bits.
- * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` (0x20) holds each tier's
- * counts, tier `t` at bit `32 (t - 1)`: `n u8 | k u8 | nRelayers u8`; `META` (0x21) = `nLanes u8 |
- * registered bitmap << 64`; signers at `0x30 + 16 (t - 1) + i`, relayers at `0x50 + 16 (t - 1) + i`.
- * `MS` is page-aligned: `keccak256("btr.markstore.p8.v3") - 1`, low 7 bits cleared.
+ * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` (0x20) holds the counts
+ * `n u8 | k u8 | nRelayers u8`; `META` (0x21) = `nLanes u8 | registered bitmap << 64`; signer `i`
+ * at `0x30 + i`, relayer `i` at `0x50 + i`. `MS` is page-aligned:
+ * `keccak256("btr.markstore.p8.v4") - 1`, low 7 bits cleared.
  */
 export const MARK_STORE_V10 = {
-  MS: 0x9f565915885d2711090cff7ae34213da4080440ed72d78f99086ab658acbc900n,
+  MS: 0xb340a27964fe4fd09a521888b3a074561a8e117aec49ff9afef7628d29315700n,
   AUTH: 0x20n,
   META: 0x21n,
   MIN_SIGMA_SHIFT: 232,

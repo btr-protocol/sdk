@@ -78,13 +78,13 @@ const W2_AUTH = 0xff46fcd2685aea76cbd1fc3788d4f942e67c3b9759a605d2d087570be44106
 const w2ctx = { factory: W2_FACTORY, chainId: 143, auth: W2_AUTH };
 
 describe('version dispatch', () => {
-  test('wire 2 push verifies under v5..9, wire 3 push under v10', () => {
+  test('wire 2 push verifies under v5..9, wire 3 push under v11', () => {
     for (const v of [5, 9]) {
       const r = verifyPushP8At(v, W2, w2ctx);
       expect(r.wire).toBe(2);
       expect(r.segments.map((s) => s.ok)).toEqual([true]);
     }
-    const r3 = verifyPushP8At(10, G.calldataHex, ctx);
+    const r3 = verifyPushP8At(11, G.calldataHex, ctx);
     expect(r3.wire).toBe(3);
     expect(r3.segments.map((s) => s.ok)).toEqual([true, true]);
   });
@@ -103,14 +103,14 @@ describe('version dispatch', () => {
     expect(asV2).toBe(false);
     const asV3 = (() => {
       try {
-        return verifyPushP8At(10, W2, { ...w2ctx, signers }).segments.some((s) => s.ok);
+        return verifyPushP8At(11, W2, { ...w2ctx, signers }).segments.some((s) => s.ok);
       } catch {
         return false;
       }
     })();
     expect(asV3).toBe(false);
     // wire 3 without the stored signers, and versions with no P8 store, throw
-    expect(() => verifyPushP8At(10, G.calldataHex, { ...ctx, signers: undefined })).toThrow();
+    expect(() => verifyPushP8At(11, G.calldataHex, { ...ctx, signers: undefined })).toThrow();
     for (const v of [4, 11]) expect(() => verifyPushP8At(v, W2, w2ctx)).toThrow();
   });
 });

@@ -62,9 +62,6 @@ export const POOL_STRUCTS_V3 = {
     primary: [1, 0],
     mode: [1, 20],
     quoteUnit: [1, 21],
-    refBandBps: [1, 22],
-    refFeedId: [2, 0],
-    refPrimary: [3, 0],
   },
   HookSlot: {
     target: [0, 0],
@@ -78,9 +75,8 @@ export const POOL_STRUCTS_V3 = {
 } as const satisfies Record<string, Record<string, readonly [number, number]>>;
 
 /**
- * `MarkWordLib` bit offsets. `marks[t]` is a `uint256[2]`: word 0 at the mapping-entry base (the
- * primary feed + config mirror), word 1 at base + 1 (the reference feed in the same bits, mirror
- * bits 0).
+ * `MarkWordLib` bit offsets of the `marks` word at the mapping-entry base: the feed plus the
+ * config mirror (a v3 pool's second, reference word is no longer read).
  */
 export const MARK_WORD = {
   OBS_SHIFT: 128,
@@ -91,6 +87,5 @@ export const MARK_WORD = {
   HALT_SHIFT: 230,
   INTERNAL_SHIFT: 231,
   UOA_SHIFT: 232,
-  REF_BAND_SHIFT: 233,
   MAX_DEV_MAX: 2047,
 } as const;
