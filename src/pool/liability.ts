@@ -45,6 +45,8 @@ export interface LiabLeg {
   indexWad?: number;
   /** `Asset.covBits`: the leg's coverage terms (`unpackCov`). Absent / 0 = no wall check. */
   covBits?: number;
+  /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
+  minLiquidity?: number;
 }
 
 const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
@@ -252,7 +254,8 @@ function claimWire(
   decIn: number,
   tokenIn: string,
   tokenOut: string,
-): { credit: boolean; face: string; c_wad: string } {
+  tollWad?: bigint,
+): { credit: boolean; face: string; c_wad: string; toll_wad?: string } {
   if (!(poolC !== undefined && Number.isFinite(poolC) && poolC > 0)) {
     throw new Error(`backendConvert: claim ${tokenIn}->${tokenOut} needs the pool rate C`);
   }
@@ -260,6 +263,7 @@ function claimWire(
     credit,
     face: `0x${BigInt(Math.round((fairIn / poolC) * 10 ** decIn)).toString(16)}`,
     c_wad: `0x${BigInt(Math.round(poolC * 1e18)).toString(16)}`,
+    ...(tollWad !== undefined ? { toll_wad: `0x${tollWad.toString(16)}` } : {}),
   };
 }
 
@@ -294,7 +298,15 @@ export function backendConvert(
     const claim =
       mode === 'swap'
         ? undefined
-        : claimWire(mode === 'credit', fairIn, poolC, decIn, tokenIn, tokenOut);
+        : claimWire(
+            mode === 'credit',
+            fairIn,
+            poolC,
+            decIn,
+            tokenIn,
+            tokenOut,
+            mode === 'exit' ? state.exitTollWad : undefined,
+          );
     const w = await quotePathAsync(
       {
         pool: poolStateToWire('pool', undefined, state, opts.meta, opts.baseDecimals),

@@ -243,6 +243,9 @@ export interface PoolLeg {
   class?: ClassWire;
   lane?: number;
   maxDevBps?: number;
+  /** `Asset.minLiquidity` in token units (like `res`): `withdrawTo` reverts `InsufficientAmount`
+   *  when the payout would leave the leg's reserves below `out + minLiquidity`. Absent = 0. */
+  minLiquidity?: number;
 }
 
 /**
@@ -265,6 +268,8 @@ interface HubBook {
   kappaCovBps: number;
   covBits: number;
   kneeBits: number;
+  /** As {@link PoolLeg.minLiquidity}, for the hub (token units of the base). Absent = 0. */
+  minLiquidity?: number;
 }
 
 export interface PoolState {
@@ -273,6 +278,11 @@ export interface PoolState {
   hub?: HubBook;
   /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
   baseClass?: ClassWire;
+  /** `Pool.exitTollWad()`: the C-exposure exit toll as a raw WAD uint256 (1e18 = 100%). Sent to the
+   *  backend as `claim.toll_wad` on an exit; absent = the backend's own default. */
+  exitTollWad?: bigint;
+  /** `FeeParams.protoSharePct` (0..100): the treasury's slice of the exit toll. Absent = 0. */
+  protoSharePct?: number;
 }
 
 export interface Quote {
@@ -293,6 +303,9 @@ export interface Quote {
   saturated?: boolean;
   /** Claim law (`backendConvert` exit / credit): the from-leg debit toll, out-token units. */
   debitToll?: number;
+  /** Claim law (`backendConvert` exit): the C-exposure exit toll the backend computed from
+   *  `claim.toll_wad`, out-token units. The payout is `amountOut - cToll - debitToll`. */
+  cToll?: number;
   /** Claim law, liability swap: the credited leg's toll on its claims, out-token units. */
   creditToll?: number;
   route: string[];
@@ -744,7 +757,7 @@ export interface PathRequestWire {
   /** Price an LP conversion on its CLAIMS (`PoolLiquidityLib`) instead of a swap: `credit` false =
    *  cross withdraw (out-leg toll + from-leg debit), true = liability swap (debit + credit tolls
    *  out of the re-credited value). `face` = claim burned (raw at `token_in`), `c_wad` = pool rate. */
-  claim?: { credit: boolean; face: string; c_wad: string };
+  claim?: { credit: boolean; face: string; c_wad: string; toll_wad?: string };
 }
 
 /** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
@@ -769,6 +782,8 @@ export interface QuoteResponseWire extends QuoteBaseWire {
   saturated?: boolean;
   /** Claim law only: the from-leg's Φ⁺ debit toll, 0x hex in the out token's raw units. */
   debit_toll?: string;
+  /** Claim law, exit only: the C-exposure toll, 0x hex in the out token's raw units. */
+  c_toll?: string;
   /** Claim law, liability swap only: the credited leg's Φ⁻ toll on its claims (out units). */
   credit_toll?: string;
 }
@@ -946,6 +961,7 @@ export function quoteFromWire(
     ...(w.debit_toll !== undefined
       ? { debitToll: Number(BigInt(w.debit_toll)) / 10 ** wireDecimals }
       : {}),
+    ...(w.c_toll !== undefined ? { cToll: Number(BigInt(w.c_toll)) / 10 ** wireDecimals } : {}),
     ...(w.credit_toll !== undefined
       ? { creditToll: Number(BigInt(w.credit_toll)) / 10 ** wireDecimals }
       : {}),

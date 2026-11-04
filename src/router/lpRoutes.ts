@@ -35,8 +35,6 @@ export interface LpRouteOpts {
   liabilityEnabled?: (symbol: string) => boolean;
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
-  /** C-exposure exit toll (`mintRate` tollWad / 1e18) and the pool's `protoSharePct`; absent = 0. */
-  exitToll?: { frac: number; protoSharePct: number };
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: BackendConvertOpts & { meta: WireMeta };
 }
@@ -57,6 +55,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       liabilities: s.hub.liab,
       indexWad,
       covBits: s.hub.covBits,
+      minLiquidity: s.hub.minLiquidity,
     };
   }
   const leg = s.legs[symbol];
@@ -67,6 +66,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     liabilities: leg.liab,
     indexWad,
     covBits: leg.covBits,
+    minLiquidity: leg.minLiquidity,
   };
 }
 
@@ -403,9 +403,10 @@ async function crossExit(
   const gross = q.amountOut > markCap ? markCap : q.amountOut;
   if (!(gross > 0)) return unfeasible(CROSS_DEAD, 'no-route');
   // `_quoteWithdrawCross`: the C toll (capped at the output) stays in the output leg's reserves,
-  // so only `out = gross - toll` is debited.
-  const tollFrac = opts.exitToll?.frac ?? 0;
-  const toll = Math.min(gross * tollFrac, gross);
+  // so only `out = gross - toll` is debited. The backend computes it from `claim.toll_wad`
+  // (`Quote.cToll`); without one, derive it from the state's `exitTollWad` at the gross.
+  const tollFrac = Number(holder.state.exitTollWad ?? 0n) / WAD;
+  const toll = Math.min(q.cToll ?? gross * tollFrac, gross);
   // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
   // of the payout after the C toll; a wall saturates it to the whole payout (`ZeroValue`).
   const debit = q.debitToll ?? 0;
@@ -421,7 +422,7 @@ async function crossExit(
   };
   const lpCredit = credit((q.grossOut * q.lpFeeBps) / 1e4, toLeg.liabilities);
   const protoFee =
-    (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (opts.exitToll?.protoSharePct ?? 0)) / 100;
+    (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (holder.state.protoSharePct ?? 0)) / 100;
   const face = credit(protoFee, toLeg.liabilities + lpCredit);
   if (
     covWallsF(
@@ -433,6 +434,9 @@ async function crossExit(
     )
   )
     return unfeasible(CROSS_DEAD, 'coverage-wall');
+  // `withdrawTo` reverts `InsufficientAmount` when the out leg would fall under its keeper floor.
+  if (toLeg.reserves < out + (toLeg.minLiquidity ?? 0))
+    return unfeasible(CROSS_DEAD, 'min-liquidity');
 
   const shell: RouteShell = {
     id: 'cross-exit',

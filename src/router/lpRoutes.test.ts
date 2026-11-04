@@ -228,8 +228,8 @@ describe('crossExit walls mirror the chain with a C toll', () => {
   const at = async (amount: number) => {
     const p = healthyPool();
     p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 45 };
-    const o = { ...BE, exitToll: { frac: 0.1, protoSharePct: 0 } };
-    return (await rankRedeem([p], 'NZDF', 'AUDF', amount, o)).routes.find(
+    p.state.exitTollWad = 10n ** 17n; // 10%, no `c_toll` on the stub wire: derived from state
+    return (await rankRedeem([p], 'NZDF', 'AUDF', amount, BE)).routes.find(
       (r) => r.id === 'cross-exit',
     );
   };
@@ -643,5 +643,57 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
     // hub 2.4M/2M: C = 4.4 / 4 = 1.1, so 5,500 buys 5,000 face.
     const dep = await rankDeposit([pool('core', { hubRes: 2_400_000 })], 'AUDF', 'AUDF', 5_500, BE);
     expect(dep.best?.out).toBeCloseTo(5_000, 6);
+  });
+});
+
+describe('crossExit exit toll + keeper floor', () => {
+  let seen: { claim?: { toll_wad?: string } } | undefined;
+  // identity quote carrying a backend `c_toll` of 5% of the output
+  const install = () => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_u: string, init: { body?: string }) => {
+      const b = JSON.parse(init.body ?? '{}');
+      if (b.claim && !b.claim.credit) seen = b;
+      const out = BigInt(b.amount_in);
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: `0x${out.toString(16)}`,
+          gross_out: `0x${out.toString(16)}`,
+          avg_price: WAD_HEX,
+          mid_price: WAD_HEX,
+          mark_price: WAD_HEX,
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+          c_toll: `0x${(out / 20n).toString(16)}`,
+        }),
+      };
+    };
+  };
+  const run = async (mutate?: (p: NamedPool) => void) => {
+    install();
+    const p = healthyPool();
+    p.state.exitTollWad = 5n * 10n ** 16n;
+    mutate?.(p);
+    return (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  test('sends toll_wad and pays amount_out - c_toll', async () => {
+    const r = await run();
+    expect(seen?.claim?.toll_wad).toBe(`0x${(5n * 10n ** 16n).toString(16)}`);
+    expect(r?.feasible).toBe(true);
+    expect(r?.out).toBeCloseTo(95_000, 6);
+  });
+  test('out leg below out + minLiquidity is unfeasible', async () => {
+    const mk = (min: number) => (p: NamedPool) => {
+      p.state.legs.AUDF = { ...p.state.legs.AUDF, minLiquidity: min };
+    };
+    expect((await run(mk(905_000)))?.feasible).toBe(true);
+    const bad = await run(mk(905_001));
+    expect(bad?.feasible).toBe(false);
+    expect(bad?.reason).toBe('min-liquidity');
   });
 });
