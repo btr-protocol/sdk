@@ -47,8 +47,8 @@ function pool(
         liab: 2_000_000,
         vegaBps: 0,
         kappaCovBps: 0,
-        covFloorBps: 0,
-        covKneeBps: 0,
+        covBits: 0,
+        kneeBits: 0,
       },
     },
   };
@@ -221,23 +221,24 @@ describe('crossExit degenerate quotes', () => {
   });
 });
 
-describe('crossExit floor mirrors the chain with a C toll', () => {
-  // 100k out of a 1M/1M leg; a 10% toll stays in reserves, so only 90k is debited: R/L = 0.91.
-  const at = async (floorBps: number) => {
+describe('crossExit walls mirror the chain with a C toll', () => {
+  // c_min 90% (code 45). A 10% toll stays in reserves: 100k out of a 1M/1M leg debits 90k
+  // (R/L = 0.91, clear of c_min); 120k debits 108k (R/L = 0.892, past it).
+  const at = async (amount: number) => {
     const p = healthyPool();
-    p.state.legs.AUDF = { ...p.state.legs.AUDF, covFloorBps: floorBps };
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 45 };
     const o = { ...BE, exitToll: { frac: 0.1, protoSharePct: 0 } };
-    return (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, o)).routes.find(
+    return (await rankRedeem([p], 'NZDF', 'AUDF', amount, o)).routes.find(
       (r) => r.id === 'cross-exit',
     );
   };
-  test('on the floor passes, one bp above breaches; step pays out net of toll', async () => {
-    const ok = await at(9_100);
+  test('above c_min passes and pays out net of toll; past it is walled', async () => {
+    const ok = await at(100_000);
     expect(ok?.feasible).toBe(true);
     expect(ok?.out).toBeCloseTo(90_000, 6);
-    const bad = await at(9_101);
+    const bad = await at(120_000);
     expect(bad?.feasible).toBe(false);
-    expect(bad?.reason).toBe('coverage-floor');
+    expect(bad?.reason).toBe('coverage-wall');
   });
 });
 
@@ -269,13 +270,13 @@ describe("rankRedeem (routes A' / B')", () => {
     expect(best?.feasible).toBe(true);
   });
 
-  test('a cross exit that would take the output leg under its coverage floor is infeasible', async () => {
+  test('a cross exit that would take the output leg onto c_min is infeasible', async () => {
     const p = healthyPool();
-    p.state.legs.AUDF = { ...p.state.legs.AUDF, covFloorBps: 10_000 }; // R/L = 1.0 sits on the floor
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 50 }; // c_min code 50 = 100%: R/L = 1.0 sits on it
     const { routes } = await rankRedeem([p], 'NZDF', 'AUDF', 5_000, BE);
     const cross = routes.find((r) => r.id === 'cross-exit');
     expect(cross?.feasible).toBe(false);
-    expect(cross?.reason).toBe('coverage-floor');
+    expect(cross?.reason).toBe('coverage-wall');
   });
 
   test('unseasoned target-LP gates BOTH redeem routes as cooldown; best goes null', async () => {
@@ -406,8 +407,8 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
         liab: 2_000_000,
         vegaBps: 0,
         kappaCovBps: 0,
-        covFloorBps: 0,
-        covKneeBps: 0,
+        covBits: 0,
+        kneeBits: 0,
       },
     },
   };

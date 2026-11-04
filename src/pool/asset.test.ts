@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../abis/Pool.js';
 import { type AbiParameter, decodeFn, encodeAbiParameters } from '../eth/abi';
 import type { Hex } from '../eth/types';
+import { packCov, packKnee } from './cov';
 import { getAsset, getSwapQuote, riskConfigOf, toAsset } from './index';
 
 const getAssetOutputs = (POOL_ABI as readonly { name?: string; outputs?: AbiParameter[] }[]).find(
@@ -22,10 +23,10 @@ const row = {
   decimals: 6n,
   deadSeedPow10: 3n,
   flags: 7n,
-  kappaCovBps: 1500n,
   maxLiabWeightBps: 0n,
   oracleBits: 0n,
   covBits: 0n,
+  kneeBits: 0n,
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 
@@ -36,12 +37,12 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says', () =>
       functionName: 'getAsset',
       data: encoded,
     });
-    expect(typeof raw.kappaCovBps).toBe('bigint');
+    expect(typeof raw.maxLiabWeightBps).toBe('bigint');
+    expect(typeof raw.covBits).toBe('bigint');
   });
 
   test('every small field becomes a number; the 96/128-bit books stay bigint', () => {
     const a = toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: encoded }));
-    expect(a.kappaCovBps).toBe(1500);
     expect(a.maxLiabWeightBps).toBe(0);
     expect(a.flags).toBe(7);
     expect(a.decimals).toBe(6);
@@ -51,16 +52,16 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says', () =>
   });
 
   test('a field the ABI did not carry is NaN, never 0', () => {
-    const { kappaCovBps: _drop, ...stale } = row;
+    const { covBits: _drop, ...stale } = row;
     const a = toAsset(stale);
-    expect(Number.isNaN(a.kappaCovBps)).toBe(true);
+    expect(Number.isNaN(a.covBits)).toBe(true);
     expect(toAsset({ ...row, flags: null }).flags).toBeNaN();
   });
 
   test('getAsset returns the shaped row', async () => {
     const provider = { request: async () => encoded } as never;
     const a = await getAsset(provider, row.anchor as Hex, row.anchor as Hex);
-    expect(a.kappaCovBps).toBe(1500);
+    expect(a.flags).toBe(7);
   });
 });
 
@@ -98,9 +99,28 @@ describe('getSwapQuote returns the uint16/int8 fields as numbers', () => {
   });
 });
 
-describe('riskConfigOf — covFloor / covKnee unpacked from Asset.covBits', () => {
-  test('floor 25 bps units, knee 10 bps units', () => {
-    const a = toAsset({ ...row, covBits: 40n | (5n << 9n) });
-    expect(riskConfigOf(a)).toMatchObject({ covFloorBps: 1_000, covKneeBps: 50 });
+describe('riskConfigOf — coverage terms unpacked from Asset.covBits / kneeBits', () => {
+  test('c_min | t | flat | c_max | κ⁻ | κ⁺ and the knee', () => {
+    // c_min 10%, t 1.0070, flat 5%, c_max 2.35, κ⁻ 32, κ⁺ 14336; knee c_k 20%, κ₂ 64
+    const cov = packCov({
+      covMinBps: 1000,
+      covTargetBps: 10_070,
+      covFlatBps: 500,
+      covMaxBps: 23_500,
+      kappaCovBps: 32,
+      kappaPosBps: 14_336,
+    });
+    const knee = packKnee(1000, { kneeCovBps: 2000, kappaKneeBps: 64 });
+    const a = toAsset({ ...row, covBits: BigInt(cov), kneeBits: BigInt(knee) });
+    expect(riskConfigOf(a)).toMatchObject({
+      kappaCovBps: 32,
+      covMinBps: 1000,
+      covTargetBps: 10_070,
+      covFlatBps: 500,
+      covMaxBps: 23_500,
+      kappaPosBps: 14_336,
+      kneeCovBps: 2000,
+      kappaKneeBps: 64,
+    });
   });
 });

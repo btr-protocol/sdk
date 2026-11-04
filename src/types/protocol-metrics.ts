@@ -307,10 +307,10 @@ export interface LegRiskParams {
   minDispBps: number;
   vegaBps: number;
   kappaBps: number;
-  /** `CovLib.floorBps(Asset.covBits)`; 0 = none. */
-  covFloorBps: number;
-  /** `CovLib.kneeBps(Asset.covBits)`: toll knee above 1.0; 0 = at the peg. */
-  covKneeBps: number;
+  /** `Asset.covBits` (u32, `unpackCov`). */
+  covBits: number;
+  /** `Asset.kneeBits` (u16, `unpackKnee`); 0 = no knee. */
+  kneeBits: number;
   /** Keeper push trigger from the density fit; null without a fit row. */
   fitThetaBps: number | null;
   /** Whole base tokens; null = uncapped. */

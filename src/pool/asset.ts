@@ -1,5 +1,5 @@
+import { unpackCov, unpackKnee } from './cov.js';
 import type { Asset } from './index.js';
-import { covFloorBps, covKneeBps } from './liability.js';
 import type { RiskConfig } from './storage.js';
 
 const ASSET_NUMBER_FIELDS = [
@@ -11,10 +11,10 @@ const ASSET_NUMBER_FIELDS = [
   'decimals',
   'deadSeedPow10',
   'flags',
-  'kappaCovBps',
   'maxLiabWeightBps',
   'oracleBits',
   'covBits',
+  'kneeBits',
 ] as const satisfies readonly (keyof Asset)[];
 
 /** A decoded `getAsset` tuple, shaped as `Asset` says. The ABI decoder returns EVERY uint as a
@@ -40,12 +40,19 @@ export function toAsset(raw: unknown): Asset {
 
 /** `getRiskConfig` off a decoded `Asset`: the coverage terms unpacked from `covBits` (`CovLib`). */
 export function riskConfigOf(a: Asset): RiskConfig {
+  const c = unpackCov(a.covBits);
+  const k = unpackKnee(a.kneeBits);
   return {
     flags: a.flags,
-    kappaCovBps: a.kappaCovBps,
+    kappaCovBps: c.kappaCovBps,
     depositCapCode: a.depositCapCode,
     maxLiabWeightBps: a.maxLiabWeightBps,
-    covFloorBps: covFloorBps(a.covBits),
-    covKneeBps: covKneeBps(a.covBits),
+    covMinBps: c.covMinBps,
+    covTargetBps: c.covTargetBps,
+    covFlatBps: c.covFlatBps,
+    covMaxBps: c.covMaxBps,
+    kappaPosBps: c.kappaPosBps,
+    kneeCovBps: k.kneeCovBps,
+    kappaKneeBps: k.kappaKneeBps,
   };
 }

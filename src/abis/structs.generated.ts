@@ -16,10 +16,10 @@ export type AssetFields =
   | 'decimals'
   | 'deadSeedPow10'
   | 'flags'
-  | 'kappaCovBps'
   | 'maxLiabWeightBps'
   | 'oracleBits'
-  | 'covBits';
+  | 'covBits'
+  | 'kneeBits';
 
 export type DepositResultFields = 'lpAmount' | 'actualDeposit' | 'deadLp';
 
@@ -44,8 +44,13 @@ export type RiskConfigFields =
   | 'kappaCovBps'
   | 'depositCapCode'
   | 'maxLiabWeightBps'
-  | 'covFloorBps'
-  | 'covKneeBps';
+  | 'covMinBps'
+  | 'covTargetBps'
+  | 'covFlatBps'
+  | 'covMaxBps'
+  | 'kappaPosBps'
+  | 'kneeCovBps'
+  | 'kappaKneeBps';
 
 export type RiskFencesFields =
   | 'minFeeHardMinPbps'

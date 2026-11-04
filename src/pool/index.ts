@@ -47,16 +47,16 @@ export interface Asset {
   deadSeedPow10: number;
   /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */
   flags: number;
-  /** κ (bps): convex coverage-wall strength. Every listed leg carries 50 ≤ κ ≤ BPS.
-   *  Was `RiskConfig.kappaCovBps`. */
-  kappaCovBps: number;
   /** Per-leg ceiling on this leg's share of the pool claim book (bps of B). 0 = disabled (default). */
   maxLiabWeightBps: number;
   /** Oracle wiring: store lane 0..5 | INTERNAL 6 | UOA 7 (`decodeLegOracle`). */
   oracleBits: number;
-  /** Coverage terms, raw (`CovLib`): floor in 25 bps units (bits 0..8) | toll knee in 10 bps
-   *  units (bits 9..15). Read them in bps with {@link covFloorBps} / {@link covKneeBps}. */
+  /** Coverage terms, raw (`CovLib`): c_min | t | flat | c_max | κ⁻ | κ⁺. Read them in bps with
+   *  `unpackCov`. */
   covBits: number;
+  /** Knee of the negative barrier (`unpackKnee`): c_k code | κ₂ code << 6. Slot 3, valid only
+   *  while `flags` carries `KNEE_BIT` (the chain keeps them equal); 0 otherwise. */
+  kneeBits: number;
 }
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
@@ -146,15 +146,14 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
+export * from './cov.js';
 export type {
   LiabLeg,
   SwapLiabilityQuote,
 } from './liability.js';
 export {
   WAD as WAD_F,
-  covBreach,
-  covFloorBps,
-  covKneeBps,
+  covWallsF,
   exitCap,
   exitValue,
   legCoverage,

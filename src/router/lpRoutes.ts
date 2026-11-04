@@ -17,7 +17,7 @@ import {
   type LiabLeg,
   WAD,
   backendConvert,
-  covBreach,
+  covWallsF,
   exitValue,
   legCoverage,
   poolExitCap,
@@ -56,7 +56,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       reserves: s.hub.res,
       liabilities: s.hub.liab,
       indexWad,
-      covFloorBps: s.hub.covFloorBps,
+      covBits: s.hub.covBits,
     };
   }
   const leg = s.legs[symbol];
@@ -66,7 +66,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     reserves: leg.res,
     liabilities: leg.liab,
     indexWad,
-    covFloorBps: leg.covFloorBps,
+    covBits: leg.covBits,
   };
 }
 
@@ -421,15 +421,15 @@ async function crossExit(
     (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (opts.exitToll?.protoSharePct ?? 0)) / 100;
   const face = credit(protoFee, toLeg.liabilities + lpCredit);
   if (
-    covBreach(
-      toLeg.covFloorBps ?? 0,
+    covWallsF(
+      toLeg.covBits ?? 0,
       toLeg.reserves,
       toLeg.liabilities,
       toLeg.reserves - out,
       toLeg.liabilities + lpCredit + face,
     )
   )
-    return unfeasible(CROSS_DEAD, 'coverage-floor');
+    return unfeasible(CROSS_DEAD, 'coverage-wall');
 
   const shell: RouteShell = {
     id: 'cross-exit',

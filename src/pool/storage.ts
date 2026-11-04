@@ -110,8 +110,9 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
 export function layoutOf(storageVersion: number): 2 | 3 | 4 | 5 | 10 {
   if (storageVersion === 2 || storageVersion === 3 || storageVersion === 4) return storageVersion;
   if (storageVersion >= 5 && storageVersion <= 9) return 5;
-  // 11 = the one-tier v2 pool; the v1 fleet's 10 (R tier) is refused until its cutover.
-  if (storageVersion === 11) return 10;
+  // 12 = the one-tier v2 pool (6-slot record, u32 covBits, knee slot); 10 and 11 (5-slot record)
+  // are refused.
+  if (storageVersion === 12) return 10;
   throw new Error(`Pool.storageVersion() ${storageVersion}: no storage layout for it`);
 }
 
@@ -194,19 +195,28 @@ export function decodeClassHead(word: bigint): { family: number; row: bigint; fa
   return { family: Number(word & 0xffn), row: (word >> 8n) & U64, famRow: (word >> 72n) & U64 };
 }
 
-/** `IPool.RiskConfig` as `getRiskConfig` returns it (ABI/memory type; every field lives in `Asset`
- *  slot 2, the coverage terms packed in `covBits`). */
+/** `IPool.RiskConfig` as `getRiskConfig` returns it: 11 words (ABI/memory type; the fields live in
+ *  `Asset` slot 2 and the knee in slot 3, the coverage terms packed in `covBits`/`kneeBits`). */
 export interface RiskConfig {
   flags: number;
-  /** κ (bps): convex coverage-wall strength. 0 = off (volatiles). */
+  /** κ⁻ (bps, minifloat step, 0 < κ⁻ ≤ 20480): the negative barrier's curvature. */
   kappaCovBps: number;
   depositCapCode: number;
   maxLiabWeightBps: number;
-  /** Coverage floor (bps of L, multiple of 25): a settle that would leave the leg below it with
-   *  coverage falling reverts. 0 = none. */
-  covFloorBps: number;
-  /** Coverage-toll knee above 1.0 (bps, multiple of 10); 0 = the toll peaks at 1.0. */
-  covKneeBps: number;
+  /** c_min (bps, 2% steps, ≤ 9000): the negative pole and hard wall. */
+  covMinBps: number;
+  /** t (bps, 5 bps steps, 10000..10300): toll-free coverage. */
+  covTargetBps: number;
+  /** Width of the toll-free zone above t (bps, 5% steps, ≤ 3000). */
+  covFlatBps: number;
+  /** c_max (bps, 5% steps, 10500..25000): the positive pole and hard wall. */
+  covMaxBps: number;
+  /** κ⁺ (bps, minifloat step; 0 = a bare c_max cap). */
+  kappaPosBps: number;
+  /** Knee c_k (bps, 2% steps); 0 with κ₂ = 0 = no knee. */
+  kneeCovBps: number;
+  /** κ₂ (bps, minifloat step; 0 = no knee). */
+  kappaKneeBps: number;
 }
 
 export type _RiskConfigMatchesAbi = Assert<FieldsMatch<RiskConfig, RiskConfigFields>>;

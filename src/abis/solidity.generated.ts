@@ -83,7 +83,7 @@ export const HALT_MASK = 5;
 export const HALT_SETTABLE_MASK = 1;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 65533;
+export const KNOWN_FLAGS_MASK = 65535;
 export const LIABILITY_SWAP_ENABLED_BIT = 32;
 export const PEGGED_BIT = 8;
 export const SWAP_ENABLED_BIT = 16;
@@ -101,10 +101,8 @@ export const MIN_KAPPA_COV_BPS = 50;
 export const MIN_KAPPA_COV_BPS_PEGGED = 10;
 export const ORACLE_MODE_EXTERNAL = 0;
 export const ORACLE_MODE_INTERNAL = 1;
-export const PEG_CAP_BPS = 15000;
 export const QUOTE_UNIT_ANCHOR = 0;
 export const QUOTE_UNIT_UOA = 1;
-export const VOL_CAP_BPS = 20000;
 
 // Staleness (PricingLib).
 export const MAX_STALE_GRACE_SECS = 3;

@@ -1,9 +1,9 @@
 // `PoolStorage` layout v10 (`Pool.storageVersion() == 11`, fresh fleets only): solc
 // `storageLayout` of dex-evm `out/Pool.sol/Pool.json` (`forge inspect src/Pool.sol:Pool
 // storage-layout`, release/pool-v2-rc2 83773c0) plus the area constants of
-// `PoolConstantsLib.sol`. A listed leg's `Asset` is no mapping entry: it is a 5-slot record in the
-// area (slot 128 up) found through `legIndex` (`recordSlot`), with `Custody` at +3 and `ClassHead`
-// (`family u8 | row u64 | famRow u64`) at +4. Curves are area words found through `curveIndex`
+// `PoolConstantsLib.sol`. A listed leg's `Asset` is no mapping entry: it is a 6-slot record in the
+// area (slot 128 up) found through `legIndex` (`recordSlot`), with `Custody` at +4 and `ClassHead`
+// (`family u8 | row u64 | famRow u64`) at +5. Curves are area words found through `curveIndex`
 // (`curveSlot`), no SSTORE2 code. Slot 4 (`unlisted`) holds only never-listed tokens; slots 5, 6, 7,
 // 11 and 16 are reserved. `storage.test.ts` restates it by hand.
 
@@ -50,10 +50,11 @@ export const POOL_MAPPINGS_V10 = [
 export const POOL_AREA_V10 = {
   /** First area slot (page 1); records and curve blobs are bump-allocated from here. */
   AREA_BASE: 128n,
-  /** Record = `Asset` (0..2) | `Custody` (+3) | `ClassHead` (+4). */
-  RECORD_SLOTS: 5n,
-  RECORD_CUSTODY: 3n,
-  RECORD_CLASS_HEAD: 4n,
+  /** Record = `Asset` (0..3, slot 3 = `kneeBits`) | `Custody` (+4) | `ClassHead` (+5). */
+  RECORD_SLOTS: 6n,
+  RECORD_KNEE: 3n,
+  RECORD_CUSTODY: 4n,
+  RECORD_CLASS_HEAD: 5n,
   /** `legIndex` words: entry `uint160(token) | recordSlot << 160`, probe from `uint160 % 32`. */
   LEG_INDEX_SLOTS: 32,
   LEG_MAX: 24,

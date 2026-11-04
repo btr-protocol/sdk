@@ -7,9 +7,7 @@ import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
   backendConvert,
-  covBreach,
-  covFloorBps,
-  covKneeBps,
+  covWallsF,
   exitCap,
   exitValue,
   legCoverage,
@@ -42,8 +40,8 @@ function balancedState(): PoolState {
       liab: 2_000_000,
       vegaBps: 0,
       kappaCovBps: 0,
-      covFloorBps: 0,
-      covKneeBps: 0,
+      covBits: 0,
+      kneeBits: 0,
     },
   };
 }
@@ -53,7 +51,7 @@ describe('the one off-chain replica of pool-level settlement', () => {
   const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
     base: 'USDC',
     legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE, 0) },
-    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0, covFloorBps: 0, covKneeBps: 0 },
+    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0, covBits: 0, kneeBits: 0 },
   });
 
   test('poolSolvency is Σ R·m / Σ L·m, marks in base per token', () => {
@@ -144,16 +142,16 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
     return convert;
   }
 
-  test('the credited leg keeps its coverage floor (CovLib.requireFloor), else null', async () => {
-    // R 1_000_000 / L 1_000_000 = 1.0; floor 9_900 bps lets L grow to R/0.99 = 1_010_101.
-    const floored = { ...outLeg, covFloorBps: 9_900 };
-    const ok = await quoteSwapLiabilityCoreAsync(inLeg, floored, 10_000, 1, makeConvert(10_000));
+  test('the credited leg stays off c_min (CovLib.requireWalls), else null', async () => {
+    // c_min 90% (code 45): L may grow to R/0.9 = 1_111_111.
+    const walled = { ...outLeg, covBits: 45 };
+    const ok = await quoteSwapLiabilityCoreAsync(inLeg, walled, 10_000, 1, makeConvert(10_000));
     expect(ok?.liabOut).toBe(10_000);
-    const over = await quoteSwapLiabilityCoreAsync(inLeg, floored, 20_000, 1, makeConvert(20_000));
+    const over = await quoteSwapLiabilityCoreAsync(inLeg, walled, 120_000, 1, makeConvert(120_000));
     expect(over).toBeNull();
-    // an unfloored leg takes the same credit
+    // a leg with no terms takes the same credit
     expect(
-      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 20_000, 1, makeConvert(20_000)),
+      await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 120_000, 1, makeConvert(120_000)),
     ).not.toBeNull();
   });
 
@@ -351,8 +349,8 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
       liab: 2_000_000,
       vegaBps: 0,
       kappaCovBps: 0,
-      covFloorBps: 0,
-      covKneeBps: 0,
+      covBits: 0,
+      kneeBits: 0,
     },
   });
 
@@ -465,18 +463,11 @@ describe('minLpAmountOut (applySlip semantics, rounds DOWN)', () => {
 });
 
 describe('CovLib mirror', () => {
-  test('covBits codec: floor 25 bps units (0..8), knee 10 bps units (9..15)', () => {
-    const bits = 40 | (5 << 9);
-    expect([covFloorBps(bits), covKneeBps(bits)]).toEqual([1_000, 50]);
-    expect([covFloorBps(0x1ff), covKneeBps(0xfe00)]).toEqual([12_775, 1_270]);
-  });
-
-  test('breach: only a move that lowers coverage can end under the floor', () => {
-    expect(covBreach(0, 100, 100, 1, 100)).toBe(false); // no floor
-    expect(covBreach(9_000, 100, 100, 90, 100)).toBe(false); // exactly at the floor
-    expect(covBreach(9_000, 100, 100, 89, 100)).toBe(true); // outflow under it
-    expect(covBreach(9_000, 80, 100, 85, 100)).toBe(false); // already under, coverage rising
-    expect(covBreach(9_000, 80, 100, 79, 100)).toBe(true); // already under, falling further
-    expect(covBreach(9_000, 100, 100, 100, 0)).toBe(false); // empty book
+  test('covWallsF: only a move ending on or past a pole walls (c_min 90%, code 45)', () => {
+    expect(covWallsF(0, 100, 100, 1, 100)).toBe(false); // no terms
+    expect(covWallsF(45, 100, 100, 91, 100)).toBe(false); // above c_min
+    expect(covWallsF(45, 100, 100, 90, 100)).toBe(true); // on c_min
+    expect(covWallsF(45, 80, 100, 85, 100)).toBe(false); // under, coverage rising
+    expect(covWallsF(45, 100, 100, 100, 0)).toBe(false); // empty book
   });
 });

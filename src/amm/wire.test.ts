@@ -21,8 +21,8 @@ const HUB = {
   liab: 250_000,
   vegaBps: 10_000,
   kappaCovBps: 600,
-  covFloorBps: 2_500,
-  covKneeBps: 50,
+  covBits: 2_500,
+  kneeBits: 50,
 };
 const meta = { addressOf: (s: string): string => `0x${s}`, decimalsOf: (): number => 18 };
 
@@ -54,8 +54,8 @@ describe('hubEndpointWire', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
-      cov_floor_bps: 2_500,
-      cov_knee_bps: 50,
+      cov_bits: 2_500,
+      knee_bits: 50,
     });
   });
 });
@@ -159,8 +159,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
-      cov_floor_bps: 2_500,
-      cov_knee_bps: 50,
+      cov_bits: 2_500,
+      knee_bits: 50,
     });
   });
 
@@ -171,8 +171,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x0',
       vega_bps: 0,
       kappa_cov_bps: 0,
-      cov_floor_bps: 0,
-      cov_knee_bps: 0,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 
