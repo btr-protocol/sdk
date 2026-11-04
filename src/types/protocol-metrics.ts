@@ -407,7 +407,6 @@ export interface PoolRiskParams {
     /** Legs whose getAsset read back; the rest did not decode. */
     listed: number;
     protoSharePct: number | null;
-    flashFeeBps: number | null;
     flowCooldownSecs: number | null;
     solvencyArmed: boolean | null;
     lastGoodC: number | null;

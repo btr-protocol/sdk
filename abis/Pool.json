@@ -486,11 +486,6 @@
             "internalType": "uint8"
           },
           {
-            "name": "flashFeePbps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
             "name": "flowCooldownSecs",
             "type": "uint16",
             "internalType": "uint16"
@@ -1123,11 +1118,6 @@
             "internalType": "uint8"
           },
           {
-            "name": "flashFeePbps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
             "name": "flowCooldownSecs",
             "type": "uint16",
             "internalType": "uint16"
@@ -1539,11 +1529,6 @@
             "name": "protoSharePct",
             "type": "uint8",
             "internalType": "uint8"
-          },
-          {
-            "name": "flashFeePbps",
-            "type": "uint16",
-            "internalType": "uint16"
           },
           {
             "name": "flowCooldownSecs",

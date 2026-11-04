@@ -59,6 +59,7 @@ export const Role = {
   RISK_STEWARD: 4,
   GUARDIAN: 5,
   GUARDIAN_REVOKE: 6,
+  FLASH_BORROWER: 7,
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
@@ -110,6 +111,7 @@ export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.
 export const LANE_ARB_OP = 4096;
+export const LANE_FLASH_BORROWER = 8192;
 export const PERM_GUARDIAN = 131072;
 export const PERM_KEEPER = 65536;
 export const PERM_RISK_STEWARD = 262144;

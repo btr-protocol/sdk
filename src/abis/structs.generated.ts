@@ -33,7 +33,7 @@ export type FeedDataFields =
   | 'maxDevBps'
   | 'sourceTsMs';
 
-export type FeeParamsFields = 'protoSharePct' | 'flashFeePbps' | 'flowCooldownSecs';
+export type FeeParamsFields = 'protoSharePct' | 'flowCooldownSecs';
 
 export type HookSlotFields = 'target' | 'flags' | 'lastCreditAt';
 

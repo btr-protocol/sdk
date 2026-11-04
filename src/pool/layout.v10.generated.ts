@@ -12,7 +12,6 @@ export const POOL_STORAGE_V10 = {
   baseToken: 0n,
   initialized: 0n,
   protoSharePct: 0n,
-  flashFeePbps: 0n,
   flowCooldownSecs: 0n,
   solvencyArmed: 0n,
   lastGoodCWad9: 0n,
