@@ -307,6 +307,10 @@ export interface LegRiskParams {
   minDispBps: number;
   vegaBps: number;
   kappaBps: number;
+  /** `CovLib.floorBps(Asset.covBits)`; 0 = none. */
+  covFloorBps: number;
+  /** `CovLib.kneeBps(Asset.covBits)`: toll knee above 1.0; 0 = at the peg. */
+  covKneeBps: number;
   /** Keeper push trigger from the density fit; null without a fit row. */
   fitThetaBps: number | null;
   /** Whole base tokens; null = uncapped. */
@@ -318,20 +322,14 @@ export interface LegRiskParams {
   oracle: {
     /** The leg's feed off the deployment record (a MITCH id padded to 32 bytes); null when the record names none. */
     feedId: string | null;
-    refFeedId: string | null;
     primary: string | null;
-    refPrimary: string | null;
     /** Global lane index the leg's mark is addressed by; null before layout v5. */
     lane: number | null;
     mode: 'external' | 'internal';
     quoteUnit: 'anchor' | 'unitOfAccount';
-    /** Band vs the lane's R tier, bits 0..11 of `Asset.refBandBps`; 0 = disarmed. */
-    refBandBps: number;
     /** Bits 12..15: peg test at `depegCode·250` bps vs 1.0; 0 = off. */
     depegCode: number;
     gate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable';
-    /** Ref feed state; null when refBandBps = 0. */
-    refGate: 'ok' | 'paused' | 'stale' | 'dead' | 'uncertain' | 'unreadable' | null;
     halted: boolean | null;
     ttlSecs: number | null;
     maxDevBps: number | null;
