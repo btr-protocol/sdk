@@ -272,8 +272,8 @@ describe("rankRedeem (routes A' / B')", () => {
 
   test('a cross exit that would take the output leg onto c_min is infeasible', async () => {
     const p = healthyPool();
-    p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 50 }; // c_min code 50 = 100%: R/L = 1.0 sits on it
-    const { routes } = await rankRedeem([p], 'NZDF', 'AUDF', 5_000, BE);
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 45 }; // c_min code 45 = 90% (max): a 200k exit of 1M leaves R/L = 0.8, past it
+    const { routes } = await rankRedeem([p], 'NZDF', 'AUDF', 200_000, BE);
     const cross = routes.find((r) => r.id === 'cross-exit');
     expect(cross?.feasible).toBe(false);
     expect(cross?.reason).toBe('coverage-wall');

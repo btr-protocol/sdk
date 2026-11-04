@@ -1,4 +1,4 @@
-import { unpackCov, unpackKnee } from './cov.js';
+import { readKnee, unpackCov, unpackKnee } from './cov.js';
 import type { Asset } from './index.js';
 import type { RiskConfig } from './storage.js';
 
@@ -41,7 +41,7 @@ export function toAsset(raw: unknown): Asset {
 /** `getRiskConfig` off a decoded `Asset`: the coverage terms unpacked from `covBits` (`CovLib`). */
 export function riskConfigOf(a: Asset): RiskConfig {
   const c = unpackCov(a.covBits);
-  const k = unpackKnee(a.kneeBits);
+  const k = unpackKnee(readKnee(a.flags, a.kneeBits));
   return {
     flags: a.flags,
     kappaCovBps: c.kappaCovBps,

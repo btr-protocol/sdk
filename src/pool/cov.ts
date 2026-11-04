@@ -25,6 +25,10 @@ function isqrt(n: bigint): bigint {
 /** `PoolConstantsLib.KNEE_BIT`: `Asset.flags` bit 1; slot 3 (`kneeBits`) is live only while set. */
 export const KNEE_BIT = 1 << 1;
 
+/** The knee word a quote reads: `kneeBits` only while `flags` carries `KNEE_BIT`, else 0 (PricingLib, PoolLiquidityLib). */
+export const readKnee = (flags: number, kneeBits: number): number =>
+  flags & KNEE_BIT ? kneeBits : 0;
+
 // ---- codec -----------------------------------------------------------------------------------
 
 /** `CovLib.kappaBps`: minifloat code (4 steps per octave) -> bps. */
