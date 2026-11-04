@@ -1,6 +1,7 @@
 /** Shared collector ↔ SDK ↔ front protocol-metrics contract. */
 
-export const METRICS_WINDOWS = ['1h', '6h', '12h', '24h', '48h', '7d', '30d'] as const;
+/** `all` is the widest window the back will serve (365 d, its clamp), last so the list stays ascending. */
+export const METRICS_WINDOWS = ['1h', '6h', '12h', '24h', '48h', '7d', '30d', 'all'] as const;
 export type MetricsWindow = (typeof METRICS_WINDOWS)[number];
 export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
   '1h': 3600_000,
@@ -10,7 +11,14 @@ export const METRICS_WINDOW_MS: Readonly<Record<MetricsWindow, number>> = {
   '48h': 48 * 3600_000,
   '7d': 7 * 24 * 3600_000,
   '30d': 30 * 24 * 3600_000,
+  all: 365 * 24 * 3600_000,
 };
+/** What the back is asked for: `all` is its 365 d clamp, spelled as a free-form window it already parses. */
+export const metricsWindowParam = (w: MetricsWindow): string => (w === 'all' ? '365d' : w);
+/** Dropdown text of a window. */
+export const metricsWindowLabel = (w: MetricsWindow): string => (w === 'all' ? 'All time' : w);
+/** Dense column / tile suffix (`APR · All`). */
+export const metricsWindowTag = (w: MetricsWindow): string => (w === 'all' ? 'All' : w);
 export const DEFAULT_METRICS_WINDOW: MetricsWindow = '48h';
 export type MetricsGrain = '1m' | '2m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
 export type MetricsSource = 'live' | 'empty';
@@ -31,6 +39,7 @@ export const METRICS_WINDOW_GRAIN: Readonly<Record<MetricsWindow, MetricsGrain>>
   '48h': '15m', // 192
   '7d': '30m', // 336
   '30d': '4h', // 180
+  all: '1d', // <= 365
 };
 
 /** Grain for a free-form from..to span. Requires METRICS_WINDOWS to stay ascending. */
