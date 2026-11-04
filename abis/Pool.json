@@ -1641,17 +1641,9 @@
         "name": "ok",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "exitTollWad",
-    "inputs": [],
-    "outputs": [
+      },
       {
-        "name": "",
+        "name": "tollWad",
         "type": "uint256",
         "internalType": "uint256"
       }
