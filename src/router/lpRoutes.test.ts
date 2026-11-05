@@ -271,6 +271,39 @@ describe('crossExit exit toll word: unknown vs zero', () => {
   });
 });
 
+describe('unknown exit toll: every LP exit route is pending', () => {
+  test.each([undefined, null])(
+    'exitTollWad %p: transfer-exit and same-asset pending, no best',
+    async (w) => {
+      const p = healthyPool();
+      p.state.exitTollWad = w;
+      const x = await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE);
+      expect(x.best).toBeNull();
+      expect(x.routes.every((r) => !r.feasible && r.reason === 'toll-pending')).toBe(true);
+      expect(x.routes.map((r) => r.id).sort()).toEqual(['cross-exit', 'transfer-exit']);
+      const s = await rankRedeem([p], 'NZDF', 'NZDF', 100_000, BE);
+      expect(s.best).toBeNull();
+      expect(s.routes[0].reason).toBe('toll-pending');
+    },
+  );
+  test('a known toll is netted on the same-asset and transfer exits', async () => {
+    const at = async (tw: bigint) => {
+      const p = healthyPool();
+      p.state.exitTollWad = tw;
+      return {
+        same: (await rankRedeem([p], 'NZDF', 'NZDF', 100_000, BE)).best,
+        transfer: (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
+          (r) => r.id === 'transfer-exit',
+        ),
+      };
+    };
+    const z = await at(0n);
+    const t = await at(10n ** 17n);
+    expect(t.same?.out).toBeCloseTo((z.same?.out ?? 0) * 0.9, 6);
+    expect(t.transfer?.out).toBeCloseTo((z.transfer?.out ?? 0) * 0.9, 6);
+  });
+});
+
 describe('crossExit claim law: the from-leg debit', () => {
   // Hub-class terms on the from leg (NZDF): c_max 2.35, κ⁺ 14336. The stub is the backend's claim
   // contract on the uploaded books: `amount_out` = the quote (identity at C), `debit_toll` the

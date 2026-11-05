@@ -467,6 +467,11 @@ async function crossExit(
   return seasonGate(shell, targetSym, lpFaceIn, opts);
 }
 
+/** `_quoteWithdrawSame` payout net of the C toll: `fee = ceil(amt * tw / WAD)` (`_cToll`), tw < WAD. */
+function sameAssetNet(gross: number, tw: bigint): number {
+  return tw > 0n ? gross - Math.min(gross * (Number(tw) / WAD), gross) : gross;
+}
+
 async function transferExit(
   pools: NamedPool[],
   targetSym: string,
@@ -515,6 +520,10 @@ async function transferExit(
   if (flagged) return flagged;
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
   if (!gated.feasible) return gated;
+  // The same-asset leg of this route pays the C toll (`_quoteWithdrawSame`): unknown = pending.
+  const tw = holder.state.exitTollWad;
+  if (tw == null) return unfeasible(shell, 'toll-pending');
+  if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
 
@@ -533,10 +542,9 @@ async function transferExit(
   if (!q) return unfeasible(shell, 'no-route');
 
   // Same-asset exit of the credited face: `min(c_leg, C)` on the destination leg AFTER the credit.
-  const exitOut = exitValue(
-    q.liabOut,
-    legCoverage(toLeg.reserves, toLeg.liabilities + q.liabOut),
-    c,
+  const exitOut = sameAssetNet(
+    exitValue(q.liabOut, legCoverage(toLeg.reserves, toLeg.liabilities + q.liabOut), c),
+    tw,
   );
   shell.steps[0].amountOut = q.lpAmountOut;
   shell.steps[0].minOut = q.lpAmountOut * (1 - slip);
@@ -581,12 +589,18 @@ export async function rankRedeem(
     };
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
+    const tw = holder.state.exitTollWad;
+    if (tw == null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
+    if (tw >= BigInt(WAD))
+      return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
     const slip = opts.slippageFrac;
     // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
-    // the hatch stays open. The C-exposure exit toll is not modelled: the caller's slippage and
-    // `previewWithdraw` cover it.
+    // the hatch stays open. Net of the C toll (`_quoteWithdrawSame`).
     const cap = poolExitCap(holder.state);
-    const actual = exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap);
+    const actual = sameAssetNet(
+      exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap),
+      tw,
+    );
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;
