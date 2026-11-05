@@ -38,7 +38,15 @@ export interface LiabLeg {
   covBits?: number;
   /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
   minLiquidity?: number;
+  /** `Custody.invested`, face units: the hook tranche at book. Absent = 0 (not reported). */
+  invested?: number;
 }
+
+/** `PoolLiquidityLib._requireCrossable`: a cross withdraw / liability swap burning `face` of this
+ *  leg's claims at pool rate `c` reverts `InsufficientAmount` when `(liabilities - face)·c` would
+ *  sit under the invested tranche. */
+export const crossFenced = (leg: LiabLeg, face: number, c: number): boolean =>
+  (leg.invested ?? 0) > 0 && (leg.liabilities - face) * c < (leg.invested ?? 0);
 
 export const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
 

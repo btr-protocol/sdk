@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { buildLeg } from '../amm/aimm.js';
+import { buildLeg, poolStateToWire } from '../amm/aimm.js';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { packCov } from '../pool/cov';
 import { covDebitToll } from '../pool/covLaw';
+import { poolSolvency } from '../pool/liability';
 import { type BuildOpts, buildDepositCalls, buildRedeemCalls } from './index';
 import { type LpRouteOpts, rankDeposit, rankRedeem } from './lpRoutes';
 import type { NamedPool } from './route.js';
@@ -757,5 +758,26 @@ describe('crossExit exit toll + keeper floor', () => {
     const bad = await run(mk(905_001));
     expect(bad?.feasible).toBe(false);
     expect(bad?.reason).toBe('min-liquidity');
+  });
+  test('residual claims at C under the invested tranche fence the exit', async () => {
+    const edge = (f: number) => (p: NamedPool) => {
+      const nz = p.state.legs.NZDF;
+      const c = poolSolvency(p.state) ?? Number.NaN;
+      p.state.legs.NZDF = { ...nz, invested: (nz.liab - 100_000) * c * f };
+    };
+    expect((await run(edge(0.999)))?.feasible).toBe(true);
+    const bad = await run(edge(1.001));
+    expect(bad?.feasible).toBe(false);
+    expect(bad?.reason).toBe('fence');
+  });
+  test('invested rides the wire only when reported', () => {
+    const p = healthyPool();
+    p.state.legs.NZDF = { ...p.state.legs.NZDF, invested: 1.5 };
+    const w = poolStateToWire(p.tag, p.addr, p.state, BE.backend!.meta, 6);
+    expect(w.spokes.find((s) => s.token === 'NZDF')?.invested).toBe(
+      `0x${(1_500_000).toString(16)}`,
+    );
+    expect(w.spokes.find((s) => s.token === 'AUDF')?.invested).toBeUndefined();
+    expect(w.base_invested).toBeUndefined();
   });
 });

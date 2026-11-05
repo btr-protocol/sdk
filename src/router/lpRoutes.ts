@@ -16,6 +16,7 @@ import {
   type LiabLeg,
   WAD,
   covWallsF,
+  crossFenced,
   exitValue,
   legCoverage,
   poolExitCap,
@@ -58,6 +59,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       indexWad,
       covBits: s.hub.covBits,
       minLiquidity: s.hub.minLiquidity,
+      invested: s.hub.invested,
     };
   }
   const leg = s.legs[symbol];
@@ -69,6 +71,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     indexWad,
     covBits: leg.covBits,
     minLiquidity: leg.minLiquidity,
+    invested: leg.invested,
   };
 }
 
@@ -296,6 +299,7 @@ async function transferMint(
   // The deposit mints face `amountIn / C`; that face is what the liability swap then burns.
   const faceIn = amountIn / c;
   shell.steps[1].amountIn = faceIn;
+  if (crossFenced(inLeg, faceIn, c)) return unfeasible(shell, 'fence');
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
   try {
@@ -389,6 +393,8 @@ async function crossExit(
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
+  // `_requireCrossable`: the residual claims at C must still cover the from leg's hook tranche.
+  if (crossFenced(fromLeg, withdrawValue, c)) return unfeasible(CROSS_DEAD, 'fence');
   const fair = withdrawValue * c;
   const convert = backendConvert(holder.state, targetSym, outToken, b, 'exit');
   let q: Awaited<ReturnType<typeof convert>>;
@@ -526,6 +532,8 @@ async function transferExit(
   if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
+  if (crossFenced(fromLeg, (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD, c))
+    return unfeasible(shell, 'fence');
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
   try {
