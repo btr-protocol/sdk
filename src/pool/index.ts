@@ -153,7 +153,6 @@ export type {
 export {
   WAD as WAD_F,
   covWallsF,
-  crossFenced,
   exitCap,
   exitValue,
   legCoverage,

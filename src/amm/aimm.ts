@@ -246,9 +246,6 @@ export interface PoolLeg {
   /** `Asset.minLiquidity` in token units (like `res`): `withdrawTo` reverts `InsufficientAmount`
    *  when the payout would leave the leg's reserves below `out + minLiquidity`. Absent = 0. */
   minLiquidity?: number;
-  /** `Custody.invested` in token units: the hook tranche at book. A cross exit / liability swap
-   *  that leaves `(liab - face)·C` under it reverts `InsufficientAmount`. Absent = 0 (not reported). */
-  invested?: number;
 }
 
 /**
@@ -273,8 +270,6 @@ interface HubBook {
   kneeBits: number;
   /** As {@link PoolLeg.minLiquidity}, for the hub (token units of the base). Absent = 0. */
   minLiquidity?: number;
-  /** As {@link PoolLeg.invested}, for the hub. */
-  invested?: number;
 }
 
 export interface PoolState {
@@ -358,13 +353,7 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps: number,
-  feed?: {
-    confidence?: number;
-    staleExcess?: number;
-    covBits?: number;
-    kneeBits?: number;
-    invested?: number;
-  },
+  feed?: { confidence?: number; staleExcess?: number; covBits?: number; kneeBits?: number },
 ): PoolLeg {
   return {
     token,
@@ -380,7 +369,6 @@ export function buildLeg(
     kneeBits: feed?.kneeBits ?? 0,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
-    ...(feed?.invested ? { invested: feed.invested } : {}),
   };
 }
 
@@ -451,8 +439,6 @@ interface SpokeWire {
   class?: ClassWire | null;
   lane?: number | null;
   max_dev_bps?: number;
-  /** `Custody.invested`, native raw 0x hex; omitted = not reported. */
-  invested?: string;
 }
 /**
  * One ENDPOINT of a swap path: the wire form of the chain's `PricingLib.EndpointCache`.
@@ -491,8 +477,6 @@ export interface NamedPoolWire {
   base_mark: string | null;
   base_flags: number;
   base_class?: ClassWire | null;
-  /** The hub's `Custody.invested`, native raw 0x hex; omitted = not reported. */
-  base_invested?: string;
   spokes: SpokeWire[];
 }
 export interface RouteRequestWire {
@@ -1018,9 +1002,6 @@ export function poolStateToWire(
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
     base_class: state.baseClass ?? null,
-    ...(state.hub?.invested
-      ? { base_invested: toU128Hex(state.hub.invested * 10 ** hubDecimals) }
-      : {}),
     spokes: Object.values(state.legs).map((leg) => ({
       token: leg.token,
       address: meta.addressOf(leg.token),
@@ -1048,7 +1029,6 @@ export function poolStateToWire(
       class: leg.class ?? null,
       lane: leg.lane ?? null,
       max_dev_bps: leg.maxDevBps ?? 0,
-      ...(leg.invested ? { invested: toU128Hex(leg.invested * 10 ** leg.decimals) } : {}),
     })),
   };
 }

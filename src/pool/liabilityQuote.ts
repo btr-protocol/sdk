@@ -15,7 +15,6 @@ import {
   type SwapLiabilityQuote,
   WAD,
   covWallsF,
-  crossFenced,
   idxOf,
   poolSolvency,
 } from './liability.js';
@@ -43,7 +42,6 @@ export async function quoteSwapLiabilityCoreAsync(
   const liabIn = (lpAmountIn * idxIn) / WAD;
   if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
 
-  if (crossFenced(inLeg, liabIn, poolC)) return null;
   const fairIn = liabIn * poolC;
   const haircutIn = liabIn > fairIn ? liabIn - fairIn : 0;
 
