@@ -107,8 +107,9 @@ export interface YieldRates {
   /** Window-average LP claim in USD: the base the rates are over, so the weight when blending rates. */
   rateBaseUsd: number | null;
   /** Any leg under this scope is hooked NOW (latest chain read). false with a non-zero `strategyApr` =
-   *  a hook cleared inside the window; false with null or 0 = "No hook". */
-  hooked: boolean;
+   *  a hook cleared inside the window; false with null or 0 = "No hook". null = the hook read failed
+   *  (or an older back's roster stub): unknown, never "No hook". */
+  hooked: boolean | null;
 }
 
 /** Minimum shape required to display yield without fabricating totals. */
