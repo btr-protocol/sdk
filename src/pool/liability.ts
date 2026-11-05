@@ -16,8 +16,8 @@
 //                    dividing by C re-denominates to face_in·m_in/m_out - no second haircut)
 //   6. lpAmountOut = liabOut / idxOut (deadOut ~ 0 on any seeded live leg)
 //
-// Protocol-fee EXEMPT and no accrueLpFee booking on-chain: the swapper pays the full embedded
-// spread only; no reserves move.
+// Charged as a swap: the quote's fee is already in `conv`; on-chain its LP slice raises the out
+// leg's index and its protocol slice books as treasury face at C. No reserves move.
 
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import type { PoolState } from '../amm/aimm.js';
