@@ -113,7 +113,6 @@ export const STALE_Z = 472;
 export const LANE_ARB_OP = 4096;
 export const LANE_FLASH_BORROWER = 8192;
 export const PERM_GUARDIAN = 131072;
-export const PERM_KEEPER = 65536;
 export const PERM_RISK_STEWARD = 262144;
 
 /** Packed `ConstantsLib` timelock schedules, seconds per `Tier`. */
