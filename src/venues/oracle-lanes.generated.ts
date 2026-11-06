@@ -4,7 +4,7 @@
 // always the whole table; an optional chain-id argument only filters it for inspection.
 //
 // A feed is addressed by its globalIndex: slotId = gi / lanesPerSlot, lane = gi % lanesPerSlot.
-// `expBias` is 0 on wire 8: the lane exponent is absolute.
+// `expBias` is 0 on wires 8 and 9: the lane exponent is absolute.
 // Lane symbol -> on-chain feed name: `<SYM>-USDC` for every spoke, `USDC-USD` for the reference.
 //
 // A chain appears TWICE, once per tier verifyingContract (`role`): the primary every pool leg
@@ -15,8 +15,8 @@ import type { Address } from '../eth/types.js';
 
 /** Wire generation. The tag is the BLOB version byte, not the contract's name:
  *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 'v5', ExternalOracleV5 'v6',
- *  MarkStoreP8 'v8'. */
-export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8';
+ *  MarkStoreP8 'v8' (wire 2) and 'v9' (wire 3, pool v2; verifyingContract = the PoolFactory). */
+export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8' | 'v9';
 
 /** Which of a generation's two deployed instances a map addresses. */
 export type OracleRole = 'primary' | 'reference';
@@ -26,7 +26,7 @@ export interface OracleLaneFeed {
   globalIndex: number;
   /** Decode bias: mark1e18 = mantissa << (exp + expBias). */
   expBias: number;
-  /** Risk/encode class ('stable' | 'fx' | 'volatile' | 'equity'). */
+  /** Risk/encode class ('stable' | 'fx' | 'volatile' | 'equity'; wire 9 uses the store's class names: 'alt' | 'major' | 'gold'). */
   cls: string;
   /** Reference feed (USDC-USD denominator), not a spoke. */
   ref?: boolean;
@@ -152,6 +152,29 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
       WBTC: { globalIndex: 3, expBias: 0, cls: 'volatile' },
       WETH: { globalIndex: 4, expBias: 0, cls: 'volatile' },
       XAUT0: { globalIndex: 5, expBias: 0, cls: 'volatile' },
+    },
+  },
+  {
+    chainId: 143,
+    wire: 'v9',
+    role: 'primary',
+    oracle: '0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0',
+    lanesPerSlot: 4,
+    domainName: 'BTR ExternalOracleV4',
+    feeds: {
+      'USDC-USD': { globalIndex: 0, expBias: 0, cls: 'stable', ref: true },
+      WMON: { globalIndex: 1, expBias: 0, cls: 'alt' },
+      CBBTC: { globalIndex: 2, expBias: 0, cls: 'major' },
+      WBTC: { globalIndex: 3, expBias: 0, cls: 'major' },
+      WETH: { globalIndex: 4, expBias: 0, cls: 'major' },
+      XAUT0: { globalIndex: 5, expBias: 0, cls: 'gold' },
+      MUSD: { globalIndex: 6, expBias: 0, cls: 'stable' },
+      AUSD: { globalIndex: 7, expBias: 0, cls: 'stable' },
+      GHO: { globalIndex: 8, expBias: 0, cls: 'stable' },
+      USDT0: { globalIndex: 9, expBias: 0, cls: 'stable' },
+      USDE: { globalIndex: 10, expBias: 0, cls: 'stable' },
+      USDAT: { globalIndex: 11, expBias: 0, cls: 'stable' },
+      SYRUPUSDC: { globalIndex: 12, expBias: 0, cls: 'stable' },
     },
   },
 ];

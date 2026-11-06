@@ -20,12 +20,22 @@ import json
 import os
 import sys
 
-DEX = os.path.join(os.path.dirname(__file__), "../../dex-evm/deployments")
+# BTR_DEX_EVM overrides the sibling dex-evm checkout (e.g. a worktree at another ref).
+DEX = os.path.join(os.environ.get("BTR_DEX_EVM") or os.path.join(os.path.dirname(__file__), "../../dex-evm"), "deployments")
 OUT = os.path.join(os.path.dirname(__file__), "../src/venues/oracle-lanes.generated.ts")
 
 def load(path):
     with open(path) as f:
         return json.load(f)
+
+
+def checksum(addr):
+    """EIP-55. pycryptodome is only needed for wire 9, whose address comes from a lowercase table."""
+    from Crypto.Hash import keccak
+
+    a = addr.lower().removeprefix("0x")
+    h = keccak.new(digest_bits=256, data=a.encode()).hexdigest()
+    return "0x" + "".join(c.upper() if int(h[i], 16) >= 8 else c for i, c in enumerate(a))
 
 
 def feeds_ts(d):
@@ -58,6 +68,7 @@ def map_ts(wire, lanes, addr, per_slot, domain, role):
 
 want = set(sys.argv[1:])
 seen = set()
+seen9 = set()
 
 maps = []
 # Wire 8 (MarkStoreP8, 4 lanes per tier word): the chain's `<chainId>.deploy.json` carries `feeds`
@@ -88,11 +99,45 @@ for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
             raise SystemExit(f"{os.path.basename(rec_path)}: live oracle but no {key}")
         maps.append(map_ts("v8", lanes, rec[key], 4, "BTR ExternalOracleV4", role))
 
+# Wire 9 (MarkStoreP8 "wire 3", pool v2): same 4 x 56-bit lanes, absolute exponent. The lanes are the
+# manifest's own `assets.<sym>.lane.gi` (a pending manifest has no deploy record yet), one tier only
+# (the store has no reference tier), and the EIP-712 verifyingContract is the fleet's PoolFactory, a
+# CREATE3 address known before deploy: deployments/create3-addresses.json `<create3Prefix>PoolFactory`.
+# Pending manifests (deployments/pending/) are included: the lane map must exist before the deploy.
+c3_path = os.path.join(DEX, "create3-addresses.json")
+# ponytail: allowlist grows per reviewed v2 launch; add chain after review
+WIRE9_REVIEWED = {143}
+for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json")) + glob.glob(os.path.join(DEX, "pending", "*.manifest.json"))):
+    m = load(path)
+    if m.get("oracle", {}).get("wire") != 9:
+        continue
+    chain = str(m["chain"]["id"])
+    if m["chain"].get("class") == "local" or (want and chain not in want) or m["chain"]["id"] not in WIRE9_REVIEWED:
+        continue
+    key = ("v9", path)
+    if key in seen9:
+        raise SystemExit(f"{path} listed twice")
+    seen9.add(key)
+    seen.add(chain)
+    c3 = load(c3_path)["contracts"][m["chain"].get("create3Prefix", "") + "PoolFactory"]
+    addr = c3.get(m["chain"]["create3Fleet"])
+    if not addr:
+        raise SystemExit(f"{path}: no {m['chain']['create3Fleet']} address for {m['chain'].get('create3Prefix', '')}PoolFactory in create3-addresses.json")
+    feeds = {
+        sym: {"globalIndex": a["lane"]["gi"], "expBias": 0, "cls": a["cls"], "ref": a.get("ref")}
+        for sym, a in m["assets"].items()
+        if isinstance(a, dict) and a.get("lane")
+    }
+    gis = sorted(f["globalIndex"] for f in feeds.values())
+    if gis != list(range(len(gis))):
+        raise SystemExit(f"{path}: lane map not dense 0..{len(gis) - 1}: {gis}")
+    maps.append(map_ts("v9", {"chainId": m["chain"]["id"], "feeds": feeds}, checksum(addr), 4, "BTR ExternalOracleV4", "primary"))
+
 # An unmatched filter would quietly rewrite the file with fewer chains than the operator asked for.
 if want - seen:
-    raise SystemExit(f"no live wire-8 record in {DEX} for chain(s) {', '.join(sorted(want - seen))}")
+    raise SystemExit(f"no live wire-8/9 record in {DEX} for chain(s) {', '.join(sorted(want - seen))}")
 if not maps:
-    raise SystemExit(f"no live wire-8 records in {DEX} - refusing to write an empty map table")
+    raise SystemExit(f"no live wire-8/9 records in {DEX} - refusing to write an empty map table")
 
 body = "\n".join(maps)
 
@@ -102,7 +147,7 @@ out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
 // always the whole table; an optional chain-id argument only filters it for inspection.
 //
 // A feed is addressed by its globalIndex: slotId = gi / lanesPerSlot, lane = gi % lanesPerSlot.
-// `expBias` is 0 on wire 8: the lane exponent is absolute.
+// `expBias` is 0 on wires 8 and 9: the lane exponent is absolute.
 // Lane symbol -> on-chain feed name: `<SYM>-USDC` for every spoke, `USDC-USD` for the reference.
 //
 // A chain appears TWICE, once per tier verifyingContract (`role`): the primary every pool leg
@@ -113,8 +158,8 @@ import type {{ Address }} from '../eth/types.js';
 
 /** Wire generation. The tag is the BLOB version byte, not the contract's name:
  *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 'v5', ExternalOracleV5 'v6',
- *  MarkStoreP8 'v8'. */
-export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8';
+ *  MarkStoreP8 'v8' (wire 2) and 'v9' (wire 3, pool v2; verifyingContract = the PoolFactory). */
+export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8' | 'v9';
 
 /** Which of a generation's two deployed instances a map addresses. */
 export type OracleRole = 'primary' | 'reference';
@@ -124,7 +169,7 @@ export interface OracleLaneFeed {{
   globalIndex: number;
   /** Decode bias: mark1e18 = mantissa << (exp + expBias). */
   expBias: number;
-  /** Risk/encode class ('stable' | 'fx' | 'volatile' | 'equity'). */
+  /** Risk/encode class ('stable' | 'fx' | 'volatile' | 'equity'; wire 9 uses the store's class names: 'alt' | 'major' | 'gold'). */
   cls: string;
   /** Reference feed (USDC-USD denominator), not a spoke. */
   ref?: boolean;
