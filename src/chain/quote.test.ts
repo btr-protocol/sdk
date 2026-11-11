@@ -8,11 +8,13 @@ function hex(n: number | bigint): string {
   return `0x${n.toString(16)}`;
 }
 
-function quoted(amountOut: bigint, tolPbps: number) {
+/** `tol` defaults to 229: `pct=50` of the 459 pbps spread the helper serves (truncated by the
+ *  service), so the default body is one a real `slippage::floor` can author. */
+function quoted(amountOut: bigint, tolPbps: number, spreadPbps = 459) {
   const minOut = (amountOut * BigInt(1_000_000 - tolPbps)) / 1_000_000n;
   return {
     amount_out: hex(amountOut),
-    spread_pbps: 459,
+    spread_pbps: spreadPbps,
     proto_fee: '0x0',
     lp_fee: '0x0',
     cov_toll: '0x0',
@@ -25,12 +27,17 @@ function quoted(amountOut: bigint, tolPbps: number) {
   };
 }
 
-function quoteBody(block: number, amountOut = 1_000_000n, tol = 5_000): ChainQuoteResponse {
+function quoteBody(
+  block: number,
+  amountOut = 1_000_000n,
+  tol = 229,
+  spread = 459,
+): ChainQuoteResponse {
   return {
     chain_id: 1,
     block: { number: block, timestamp: 1_700_000_000 },
     source: 'chain',
-    amounts: [quoted(amountOut, tol)],
+    amounts: [quoted(amountOut, tol, spread)],
     flags: { in: 2, out: 2, swap_enabled: true, halted: false },
   };
 }
@@ -78,6 +85,18 @@ describe('chain quote client', () => {
     expect('amount_out' in a).toBe(true);
   });
 
+  // `maxTolPbps` is the CALLER's ceiling. The service's SlippageWire has no such field, so sending
+  // it would be an unknown-key 400 risk on a strict deserializer.
+  test('does not send the caller-side ceiling to the server', async () => {
+    let body: { slippage?: Record<string, unknown> } = {};
+    globalThis.fetch = (async (_u: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body)) as typeof body;
+      return new Response(JSON.stringify(quoteBody(100)), { status: 200 });
+    }) as unknown as typeof fetch;
+    await chainQuote({ ...REQ, slippage: { mode: 'spread', pct: 50, maxTolPbps: 5_000 } });
+    expect(body.slippage).toEqual({ mode: 'spread', pct: 50 });
+  });
+
   // A-1119 cross-repo pin: the back `slippage::floor` must derive `min_out` from the RETURNED
   // `tol_pbps`, so for the pinned `pct=50, spread=459` case (`tol=229`) the served pair is
   // `out·999771/1e6`. The old spread formula (`out·(1e8−50·459)/1e8`) differs and is rejected.
@@ -123,6 +142,55 @@ describe('chain quote client', () => {
     // 100 pbps is where `slippage::floor` clamps a 50 pbps request, so it is the legal ceiling.
     stub(quoteBody(101, 1_000_000n, 100));
     await expect(chainQuote(req)).resolves.toBeDefined();
+  });
+
+  // The reported case: pct=50 of a 459 pbps spread authorizes 229 pbps, but `policyTolPbps` used
+  // 50% of the uint16 field maximum (32 767), so a server floor at 2.00% (20 000 pbps) — ~87x
+  // looser than the user's intent — passed. It must now throw floor_violation.
+  test('rejects a 20 000 pbps floor on a pct=50 / 459 pbps spread', async () => {
+    stub(quoteBody(100, 1_000_000n, 20_000));
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('accepts the 229 pbps floor the served 459 pbps spread authorizes', async () => {
+    stub(quoteBody(100, 1_000_000n, 229));
+    await expect(chainQuote(REQ)).resolves.toBeDefined();
+  });
+
+  // The absolute ceiling is independent of the spread: even a quote that claims the field maximum
+  // spread (65 535 pbps) cannot authorize a 2% tolerance under the 1% default.
+  test('defaults the absolute ceiling to 1% of the quote', async () => {
+    stub(quoteBody(100, 1_000_000n, 20_000, 65_535));
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    stub(quoteBody(101, 1_000_000n, 10_000, 65_535));
+    await expect(chainQuote(REQ)).resolves.toBeDefined();
+  });
+
+  // Both bounds hold: 5 000 pbps is under the 1% ceiling but ~21x the served spread's 229 pbps.
+  test('rejects a floor wider than pct% of the served spread', async () => {
+    stub(quoteBody(100, 1_000_000n, 5_000));
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('honours a caller maxTolPbps tighter than the 1% default', async () => {
+    const req = { ...REQ, slippage: { mode: 'spread', pct: 50, maxTolPbps: 200 } as const };
+    stub(quoteBody(100, 1_000_000n, 200));
+    await expect(chainQuote(req)).resolves.toBeDefined();
+    stub(quoteBody(101, 1_000_000n, 201));
+    await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('refuses a maxTolPbps outside the legal range before the request', async () => {
+    for (const maxTolPbps of [99, 999_001, 100.5]) {
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls += 1;
+        return new Response('{}', { status: 200 });
+      }) as unknown as typeof fetch;
+      const req = { ...REQ, slippage: { mode: 'spread', pct: 50, maxTolPbps } as const };
+      await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'bad_request' });
+      expect(calls).toBe(0);
+    }
   });
 
   test('drops a response from an older block than the last accepted', async () => {
@@ -308,6 +376,28 @@ describe('chain route shape', () => {
   test('a joined A->H->B part spending exactly amount_in passes', async () => {
     stub(body([AB]));
     expect((await route()).best?.parts[0].hops).toHaveLength(2);
+  });
+
+  // Route floors carry no `spread_pbps`, so only the request's absolute ceiling bounds them; a
+  // 20 000 pbps floor is not a pct=50 spread policy's answer at any spread.
+  test('a spread request bounds route floors by its absolute ceiling', async () => {
+    const b = body([AB]);
+    b.best.floors[0] = {
+      token: TOUT,
+      amount_out: hex(1_000_000n),
+      tol_pbps: 20_000,
+      min_out: hex(980_000n),
+    };
+    stub(b);
+    await expect(
+      chainRoute({
+        chain_id: 1,
+        token_in: TIN,
+        token_out: TOUT,
+        amount_in: hex(IN),
+        slippage: { mode: 'spread', pct: 50 },
+      }),
+    ).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
   test.each([
