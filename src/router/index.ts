@@ -190,7 +190,9 @@ export interface PlanLegOpts {
   /** Ceiling on the server's `tol_pbps`, in pbps, from the CALLER's own slippage policy. REQUIRED
    *  whenever `serverFloors` is set: {@link assertServerFloor} can only prove the floor agrees
    *  with the server's own `amount_out`, and the widest tolerance the service will author (99.9%)
-   *  satisfies that check while floring nothing. Supply the user's own maximum. */
+   *  satisfies that check while flooring nothing. Supply the user's own maximum — for spread mode
+   *  derive it with `slippageTolPbps` from `../chain/quote.js`, which applies the 1% absolute
+   *  default and the served-spread bound the quote client enforces. */
   maxTolPbps?: number;
   /** The pair the USER asked for, as token addresses (the WRAPPED address on a gas-token side,
    *  as the plan is expressed). Supply both for every swap: every part must enter on `expectedIn`

@@ -81,6 +81,22 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 // calls = deduplicated [...approvals, ...swaps] — EIP-5792 wallet_sendCalls or sequential
 ```
 
+## Chain quoting trust boundary
+
+`chainQuote` / `chainRoute` reject a server-authored floor (`tol_pbps`) wider than the request's own
+slippage policy. Spread mode also takes a caller-owned absolute ceiling:
+
+```ts
+await chainQuote({ ...req, slippage: { mode: 'spread', pct: 50, maxTolPbps: 5_000 } });
+```
+
+- `maxTolPbps` defaults to **10 000 pbps (1%)** and is validated to `100..999_000`.
+- The policy tolerance is `min(MAX_TOL_PBPS, pct% of the spread-field maximum, maxTolPbps)`.
+- When the response names its own `spread_pbps`, `tol_pbps` is also capped at
+  `ceil(pct% of that spread) + 1`, so a plausible spread cannot excuse an enormous tolerance.
+- Building calldata from `serverFloors` needs the same ceiling as `planToLegs` /
+  `planToRouterPlan`'s `maxTolPbps`; `slippageTolPbps(slippage)` returns it.
+
 ## Toolchain
 
 Runtime/bundler is [bun](https://bun.sh), type checker is `tsgo`, lint/format is biome.
