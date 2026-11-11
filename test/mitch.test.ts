@@ -19,7 +19,7 @@ import {
 } from '../src/oracle/mitch';
 import { DEPLOYED_VENUES } from '../src/venues/deployments.generated';
 
-const ARC = 5042002;
+const MONAD = 143;
 /** Arc `WETH-USDC`. Kept as a literal: re-reading it from the table would assert nothing. */
 const WETH_USDC = 438724262896861184n;
 
@@ -96,8 +96,8 @@ describe('MITCH feed identity', () => {
   });
 });
 
-describe(`chain ${ARC} tickerIds`, () => {
-  const tickers = DEPLOYED_VENUES[ARC]!.tickerIds;
+describe(`chain ${MONAD} tickerIds`, () => {
+  const tickers = DEPLOYED_VENUES[MONAD]!.tickerIds;
 
   test('the record carries them at all', () => {
     expect(Object.keys(tickers).length).toBeGreaterThan(0);

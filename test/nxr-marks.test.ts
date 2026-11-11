@@ -14,56 +14,8 @@ import { activeRefMarksUsd, chainVenue } from '../src/venues/registry';
  * against its own thin ticker instead of the currency it tracks.
  */
 const DEX = resolve(import.meta.dir, '../../dex-evm/deployments');
-const roster = (chain: string): string[] => {
-  const p = resolve(DEX, `${chain}.risk-params.json`);
-  return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')).symbols as string[]) : [];
-};
 
 describe('NXR mark sources', () => {
-  test.each(['arc'])('every %s roster symbol has a declared mark source', (chain) => {
-    const syms = roster(chain);
-    if (!syms.length) return; // sdk-only checkout: contract repo is closed source
-    const missing = syms.filter((s) => !nxrMark(s));
-    expect(missing, 'add these to NXR_MARKS').toEqual([]);
-  });
-
-  // The live Arc roster grew from the original four-core ceremony set. Keep a structural pin:
-  // every symbol must resolve to a USDC mark, without
-  // freezing the deployment roster and forcing ceremony edits into SDK tests.
-  test('every live arc roster symbol maps to a USDC-denominated pair', () => {
-    const syms = roster('arc');
-    if (!syms.length) return;
-    expect(syms.length).toBeGreaterThan(0);
-    const pair = (s: string) => nxrPair(s, s === 'USDC' ? 'USD' : 'USDC')!.nxrSymbol;
-    for (const sym of syms) expect(pair(sym), sym).toMatch(/USDC|USD$/);
-    // Held out of the four-core roster but keeping their NXR_MARKS rows, so re-listing is a roster
-    // line and nothing more. Each is held for its own reason and none of them is USDC-seedable
-    // today: USDE-USDC probed `dead`, USDG-USDC `stale`, BRLA-USDC served an empty body
-    // (2026-08-14). One unseedable leg fails the fetch for the WHOLE roster, not just itself.
-    for (const held of ['USDE', 'USDG', 'BRLA']) {
-      expect(syms).not.toContain(held);
-      expect(nxrMark(held), held).not.toBeNull();
-      expect(
-        nxrPair(held, 'USDC'),
-        `${held} must not claim a USDC source it cannot serve`,
-      ).toBeNull();
-    }
-    // RLUSD is held for a different reason and so asserts differently: its USDC row is well-formed
-    // and stays, but every basis (USDC/USDT/USD) went dark upstream of any one venue in a
-    // non-recovering resubscribe loop (dex 773cc31, 2026-08-14). Re-listing is a roster line.
-    expect(syms).not.toContain('RLUSD');
-    expect(nxrPair('RLUSD', 'USDC')).not.toBeNull();
-    // The only mixed-case symbol in the emit is renamed. `.` and case quirks are both
-    // forbidden in a roster symbol: it is simultaneously the risk-params key, the seed-marks key,
-    // the `feed_<SYM>` record key and the keeper feed name, and Foundry reads `.` as a JSONPath
-    // separator, so `parseJsonAddress(sot, ".USDT.b")` looks up `{"USDT":{"b":…}}` and reads absent.
-    for (const s of syms) expect(s, s).toMatch(/^[A-Z0-9]{1,16}$/);
-    expect(syms).toContain('CBBTC');
-    expect(syms).not.toContain('cbBTC');
-  });
-
-  // BNB's roster lives in its manifest, one row per asset with its own quoteUnit: 1 wants the USD
-  // row, 0 the USDC one. `ref` rows are depeg lanes, not pool legs, and the hub marks USDC-USD.
   test('every bnb manifest asset has a mark on its quoteUnit basis', () => {
     const p = resolve(DEX, 'bnb.manifest.json');
     if (!existsSync(p)) return;
@@ -171,8 +123,8 @@ describe('NXR mark sources', () => {
   // Every on-chain feed name resolves its mark source THROUGH this table. A feed the deployment
   // record carries but `NXR_MARKS` does not is a leg nothing can seed or push, and it would only
   // surface at ceremony time.
-  test('every deployed arc feed resolves its mapping from this table, not a copy', () => {
-    const feeds = Object.keys(chainVenue(5_042_002).feedIds);
+  test('every deployed monad feed resolves its mapping from this table, not a copy', () => {
+    const feeds = Object.keys(chainVenue(143).feedIds);
     expect(feeds.length).toBeGreaterThan(0);
     for (const name of feeds) {
       const symbol = name.slice(0, name.lastIndexOf('-'));

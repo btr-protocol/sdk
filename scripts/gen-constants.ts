@@ -100,7 +100,7 @@ group('`Asset.flags` / `RiskConfig.flags` bits and masks (PoolConstantsLib).', c
 group('Pool wire constants (PoolConstantsLib).', c.pool);
 group('Staleness (PricingLib).', c.pricing);
 group(
-  "`AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.",
+  "`AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED).",
   c.perms,
 );
 

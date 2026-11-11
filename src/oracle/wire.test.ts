@@ -50,7 +50,7 @@ describe('push digest + signature recovery (V4 domain)', () => {
   const domain: Eip712Domain = {
     name: 'BTR ExternalOracleV4',
     version: '1',
-    chainId: 5042002,
+    chainId: 143,
     verifyingContract: '0x842c2736F072A8A7b523D23bd3Ef21F21AC24d5C',
   };
 

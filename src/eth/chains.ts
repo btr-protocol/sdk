@@ -191,27 +191,6 @@ export const CHAINS: Record<number, ChainConfig> = {
     // 0x4200…0006 has no code. Pools initialize with wnative=address(0).
   },
 
-  5042002: {
-    id: 5042002,
-    name: 'Arc Testnet',
-    // Order lives in chains.json, not here: blockdaemon leads because it takes the 20k-block
-    // eth_getLogs span the admin safety scan sends; rpc.testnet.arc.io caps it near 10k.
-    // *.testnet.arc.network is retired (NXDOMAIN since 2026-10-18): Arc serves these from arc.io.
-    rpcUrls: rpcs(5042002),
-    // See 5042: native is 18 decimals, the ERC-20 view of the same balance is 6.
-    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-    blockExplorerUrls: ['https://testnet.arcscan.app'],
-    // No `wrappedNative`: 0x3600… is the ERC-20 USDC view (6d) and the pool base, not a
-    // WETH9. No deposit()/withdraw(uint256) in its bytecode; pools use wnative=address(0).
-    // It IS the gas balance though, which is a different claim and a live footgun - see
-    // `nativeErc20`. Four stablePool deposits reverted TransferFromFailed() on 2026-08 (e.g.
-    // 0xbaceb5a8…, 0x706d7a3a…) because MAX seeded the whole USDC balance and the tx's own fee
-    // came out of it first: short by exactly gasUsed × gasPrice, then each retry chased the
-    // receding balance.
-    nativeErc20: '0x3600000000000000000000000000000000000000',
-    testnet: true,
-  },
-
   8453: {
     id: 8453,
     name: 'Base',

@@ -8,8 +8,7 @@
  * word holding the keeper / guardian / risk-steward roles and the leg gate lanes) plus the
  * immutable per-tier `GOV_DELAYS` schedule set at deploy. Quorum policy: armQuorumPolicy latches
  * ceil(2n/3) on admin principals and guardianQuorumMax on guardians.
- * Source: dex-evm abi/AccessControl.json. Arc runs the pre-`perms` generation, whose role reads
- * are `ACCESS_CONTROL_LEGACY_ABI` (`@sdk/governance`); pick by `acGeneration(chainId)`.
+ * Source: dex-evm abi/AccessControl.json.
  */
 
 export const ACCESS_CONTROL_ABI = [

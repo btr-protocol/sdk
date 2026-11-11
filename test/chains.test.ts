@@ -14,11 +14,10 @@ import {
 describe('served chains', () => {
   test('lists the default chain first, live iff a record exists', () => {
     expect(BTR_CHAINS).toEqual([
-      { chainId: 5042002, slug: 'arc', status: 'live' },
-      { chainId: 56, slug: 'bnb', status: 'pending' },
       { chainId: 143, slug: 'monad', status: 'live' },
+      { chainId: 56, slug: 'bnb', status: 'pending' },
     ]);
-    expect(deployedChainIds()).toEqual([143, 5042002]);
+    expect(deployedChainIds()).toEqual([143]);
   });
 
   test('every deployed chain is a served chain', () => {
@@ -27,7 +26,7 @@ describe('served chains', () => {
   });
 
   test('default = first live chain', () => {
-    expect(defaultChainId()).toBe(5042002);
+    expect(defaultChainId()).toBe(143);
   });
 
   test('pending chain throws naming its ceremony', () => {
@@ -37,14 +36,15 @@ describe('served chains', () => {
 
   test('withChainId appends the chain', () => {
     expect(withChainId('/v1/pools', 56)).toBe('/v1/pools?chainId=56');
-    expect(withChainId('/v1/pools?x=1', 5042002)).toBe('/v1/pools?x=1&chainId=5042002');
+    expect(withChainId('/v1/pools?x=1', 143)).toBe('/v1/pools?x=1&chainId=143');
   });
 });
 
 describe('chain registry', () => {
   // The owner's list: BNB, Monad, X Layer, Base, Avalanche, Arbitrum, Ethereum, Robinhood, Arc
-  // (mainnet + testnet), Polygon, HyperEVM; plus local Anvil. A chain not here is not offered.
-  const LISTED = [1, 56, 137, 143, 196, 999, 4663, 5042, 5042002, 8453, 42161, 43114, 31337];
+  // (mainnet), Polygon, HyperEVM; plus local Anvil. A chain not here is not offered. Arc testnet
+  // (5042002) is retired (dex-evm deployments/retired.json) and is not listed.
+  const LISTED = [1, 56, 137, 143, 196, 999, 4663, 5042, 8453, 42161, 43114, 31337];
 
   test('is the listed chains plus Anvil, and covers every served chain', () => {
     expect(
@@ -103,11 +103,6 @@ test('lpReceipt: SYM is the manifest listed symbol, key matched case-insensitive
   });
   expect(lpReceipt(143, 'btr-core', 'XAUT0').symbol).toBe('BC-XAUT');
   expect(lpReceipt(143, 'btr-core', 'cbBTC').symbol).toBe('BC-cbBTC');
-  expect(lpReceipt(5042002, 'btr-stable-core', 'USDCB')).toEqual({
-    symbol: 'BS-USDC',
-    name: 'BTR Stable Pool USDC',
-  });
-  expect(lpReceipt(5042002, 'btr-fx-core', 'EURC').symbol).toBe('BF-EURC');
-  expect(lpReceipt(5042002, 'btr-nope', 'USDCB').symbol).toBe('LP-USDC');
+  expect(lpReceipt(143, 'btr-nope', 'WMON').symbol).toBe('LP-WMON');
   expect(lpReceipt(1, 'btr-core', 'USDC')).toEqual({ symbol: 'LP-USDC' });
 });
