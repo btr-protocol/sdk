@@ -202,6 +202,19 @@ describe('chain quote client', () => {
     }
   });
 
+  test('refuses a non-finite spread pct before the request', async () => {
+    for (const pct of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls += 1;
+        return new Response('{}', { status: 200 });
+      }) as unknown as typeof fetch;
+      const req = { ...REQ, slippage: { mode: 'spread', pct } as const };
+      await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'bad_request' });
+      expect(calls).toBe(0);
+    }
+  });
+
   test.each([undefined, '459', Number.NaN, Number.POSITIVE_INFINITY, -1, 65_536])(
     'rejects invalid spread_pbps %s',
     async (spread) => {

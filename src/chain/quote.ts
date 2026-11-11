@@ -234,7 +234,13 @@ function spreadMaxTolPbps(slip: { maxTolPbps?: number }): number {
 
 /** Refuse a caller-owned ceiling the wire could never honour before spending a request on it. */
 function validateSlippage(slip: Slippage): void {
-  if (slip.mode === 'spread') spreadMaxTolPbps(slip);
+  if (slip.mode !== 'spread') return;
+  if (!Number.isFinite(slip.pct))
+    throw new ChainError(
+      'bad_request',
+      `slippage.pct must be a finite number, got ${String(slip.pct)}`,
+    );
+  spreadMaxTolPbps(slip);
 }
 
 /** The wire policy has no `maxTolPbps` field: it is a caller-side bound, not a server instruction,
