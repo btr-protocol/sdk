@@ -13,8 +13,18 @@ into `src/abis/` before every typecheck, test and build. What makes that safe is
 a normalised content hash per ABI, and nothing is written that misses its pin — not the backend's
 answer, not a sibling checkout, not the file already on disk.
 
-- `fetchAbi('Pool' | 'Admin')` → the build-pinned copy, no network, no `localStorage`.
-- `fetchAbi(other)` → `GET {api}/v1/abis/{name}`, cached for the session only.
+- `fetchAbi('Pool', 143)` → the pinned deployed `pool-v1-s7` ABI; Admin, PoolFactory and
+  AccessControl also come from the deployed bundle without network or `localStorage`.
+- `fetchAbi(other, 143)` → `GET {api}/v1/abis/{name}?chain_id=143`; content and generation
+  are checked against `abis.lock.json.chains[143]`, then cached by API, chain, generation, name.
+- Name-only calls retain chain 143 for compatibility. Pass the chain explicitly in new code.
+  An unpinned chain requires an explicit expected generation as the third argument; the server
+  must confirm it. A different generation for an already pinned chain fails closed.
+- `abis.lock.json.bundled` pins the static build-head exports independently. They do not
+  identify deployed contracts. At rollout, add reviewed generated deployment JSONs under
+  `abis/generations/<generation>`, update that chain's generation and content pins, update
+  the deployment bundle imports in `src/abis/fetch.ts`, and run `bun test src/abis`.
+  Never relabel build-head data as a deployed generation.
 - `fetchVenues()` → `GET {api}/v1/venues` for chains and deployed addresses.
 - Quoting / routing → `POST {api}/quote` · `POST {api}/route`.
 - Point at your own deployment with `setApiRoot()`.
@@ -23,7 +33,7 @@ After a deliberate contract release, re-pin and **review the lock diff** — it 
 anchor:
 
 ```bash
-BTR_ABI_UPDATE=1 bun run fetch-abis     # re-pin
+BTR_DEX_EVM=../dex-evm BTR_ABI_UPDATE=1 bun run fetch-abis # re-pin build-head only
 BTR_ABI_ALLOW_STALE=1 bun run fetch-abis # offline build against the vendored STALE fallback
 ```
 

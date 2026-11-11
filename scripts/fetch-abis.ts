@@ -93,9 +93,8 @@ const selectorOf = (sig: string): string =>
     .toString('hex')
     .slice(0, 8)}`;
 
-const lock: Record<string, string> = existsSync(lockPath)
-  ? JSON.parse(readFileSync(lockPath, 'utf8'))
-  : {};
+const publication = JSON.parse(readFileSync(lockPath, 'utf8'));
+const lock: Record<string, string> = publication.bundled.pins;
 const repinned: Record<string, string> = {};
 
 /** Required fns present + selector canaries match; throws `integrity:` on mismatch.
@@ -144,8 +143,10 @@ function unwrap(v: unknown): unknown[] {
 }
 
 async function fromBackend(name: string): Promise<unknown[]> {
-  const res = await fetch(`${api}/v1/abis/${name}`, { signal: AbortSignal.timeout(10_000) });
+  const res = await fetch(`${api}/v1/abis/${name}?chain_id=143`, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`BTR API ${res.status} /v1/abis/${name}`);
+  if (res.headers.get('x-btr-abi-generation') !== publication.bundled.generation)
+    throw new Error('backend generation differs from bundled build-head pins; use BTR_DEX_EVM');
   return unwrap(await res.json());
 }
 
@@ -266,7 +267,7 @@ for (const t of TARGETS) {
 }
 
 if (REPIN) {
-  writeFileSync(lockPath, `${JSON.stringify({ ...lock, ...repinned }, null, 2)}\n`);
+  writeFileSync(lockPath, `${JSON.stringify({ ...publication, bundled: { ...publication.bundled, pins: { ...lock, ...repinned } } }, null, 2)}\n`);
   console.log('fetch-abis: abis.lock.json re-pinned — REVIEW THE DIFF before committing');
 }
 
