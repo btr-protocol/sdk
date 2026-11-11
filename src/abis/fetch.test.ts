@@ -2,7 +2,8 @@ import { afterEach, expect, test } from 'bun:test';
 import lock from '../../abis.lock.json';
 import { getApiRoot, setApiRoot } from '../api';
 import { type AbiFunction, getFunctionSignature, getSelector as selector } from '../eth/abi';
-import { fetchAbi, getAbiUrl, resetFetchAbiCacheForTest } from './fetch';
+import { fetchAbiWithMeta as fetchAbiWithMetaFromEntry } from '../index';
+import { fetchAbi, fetchAbiWithMeta, getAbiUrl, resetFetchAbiCacheForTest } from './fetch';
 import { abiHash } from './hash';
 
 const originalFetch = globalThis.fetch;
@@ -79,4 +80,38 @@ test('all deployed artifacts match chain/generation lock pins', async () => {
     ).json();
     expect(String(abiHash(abi))).toBe(pin);
   }
+});
+
+test('fetchAbiWithMeta reports the served generation when the header is present', async () => {
+  globalThis.fetch = (async () => reply('g1')) as unknown as typeof fetch;
+  expect(await fetchAbiWithMeta('Custom', { chainId: 56, generation: 'g1' })).toEqual({
+    abi: [],
+    generation: 'g1',
+    chainId: 56,
+  });
+  expect(fetchAbiWithMetaFromEntry).toBe(fetchAbiWithMeta);
+});
+
+test('an absent generation header is null, and fetchAbi still refuses it', async () => {
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return Response.json([]);
+  }) as unknown as typeof fetch;
+  const meta = await fetchAbiWithMeta('Custom', { chainId: 56, generation: 'g1' });
+  expect(meta).toEqual({ abi: [], generation: null, chainId: 56 });
+  await expect(fetchAbi('Custom', 56, 'g1')).rejects.toThrow('generation differs');
+  expect(
+    (await fetchAbiWithMeta('Custom', { chainId: 56, generation: 'g1' })).generation,
+  ).toBeNull();
+  expect(calls).toBe(1);
+});
+
+test('fetchAbiWithMeta names the bundled generation without a request', async () => {
+  globalThis.fetch = (() => {
+    throw new Error('bundled ABI went to wire');
+  }) as unknown as typeof fetch;
+  const meta = await fetchAbiWithMeta('Pool');
+  expect(meta).toMatchObject({ generation: 'pool-v1-s7', chainId: 143 });
+  expect(meta.abi).toBe(await fetchAbi('Pool', 143));
 });

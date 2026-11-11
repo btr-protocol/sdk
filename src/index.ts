@@ -46,6 +46,9 @@ export * from './amm/index.js';
 export * from './chain/quote.js';
 export * from './chain/errors.js';
 
+// ABI fetch with the served generation (`x-btr-abi-generation`, null when the back omits it)
+export { type AbiWithMeta, fetchAbiWithMeta } from './abis/fetch.js';
+
 // Base URL for the thin HTTP client (`setApiRoot`); the chain client reads it.
 export { getApiRoot, setApiRoot, withChainId } from './api.js';
 

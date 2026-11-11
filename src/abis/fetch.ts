@@ -20,7 +20,14 @@ for (const [name, abi] of Object.entries(bundled)) {
   if (abiHash(abi) !== chains['143'].pins[name])
     throw new Error(`fetchAbi: deployed ${name} misses its chain/generation pin`);
 }
-const hot = new Map<string, Abi>();
+export type AbiWithMeta = {
+  abi: Abi;
+  /** The generation the back stamped in `x-btr-abi-generation`; null when the header is absent (an older back). */
+  generation: string | null;
+  chainId: number;
+};
+
+const hot = new Map<string, AbiWithMeta>();
 
 function context(chainId: number, generation?: string): string {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('invalid ABI chain id');
@@ -34,28 +41,44 @@ function context(chainId: number, generation?: string): string {
 
 /** Omitting chainId preserves the legacy mainnet call; new callers should always pass it.
  * No localStorage cache. Cache identity includes API origin, chain, generation and name.
- * A pinned chain refuses an unexpected generation or changed ABI content. */
-export async function fetchAbi(name: string, chainId = 143, generation?: string): Promise<Abi> {
-  const selected = context(chainId, generation);
+ * A header naming another generation is refused; an absent header comes back as `generation: null`.
+ * A pinned chain refuses changed ABI content. */
+export async function fetchAbiWithMeta(
+  name: string,
+  opts: { chainId?: number; generation?: string } = {},
+): Promise<AbiWithMeta> {
+  const chainId = opts.chainId ?? 143;
+  const selected = context(chainId, opts.generation);
   const canonical =
     Object.keys(chains[String(chainId)]?.pins ?? {}).find(
       (n) => n.toLowerCase() === name.toLowerCase(),
     ) ?? name;
   if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error('invalid ABI name');
-  if (chainId === 143 && selected === 'pool-v1-s7' && bundled[canonical]) return bundled[canonical];
+  if (chainId === 143 && selected === 'pool-v1-s7' && bundled[canonical])
+    return { abi: bundled[canonical], generation: selected, chainId };
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
   if (cached) return cached;
   const res = await fetch(getAbiUrl(canonical, chainId), { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`BTR ABI ${res.status} ${canonical} on chain ${chainId}`);
-  if (res.headers.get('x-btr-abi-generation') !== selected)
+  const generation = res.headers.get('x-btr-abi-generation');
+  if (generation !== null && generation !== selected)
     throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
   const pin = chains[String(chainId)]?.pins[canonical];
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
-  hot.set(key, abi as Abi);
-  return abi as Abi;
+  const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
+  hot.set(key, meta);
+  return meta;
+}
+
+/** The ABI only. Refuses a response whose generation is absent or not the one requested. */
+export async function fetchAbi(name: string, chainId = 143, generation?: string): Promise<Abi> {
+  const { abi, generation: served } = await fetchAbiWithMeta(name, { chainId, generation });
+  if (served !== context(chainId, generation))
+    throw new Error('ABI response generation differs from requested generation');
+  return abi;
 }
 
 export function resetFetchAbiCacheForTest(): void {
