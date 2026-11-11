@@ -208,6 +208,20 @@ describe('chain quote client', () => {
     expect(err.fields).toEqual({ servedSpreadPbps: 459, tolPbps: 5_000 });
   });
 
+  test('a string tol_pbps from the wire is never carried into fields', async () => {
+    const req = { ...REQ, slippage: { mode: 'spread', pct: 50, maxTolPbps: 200 } as const };
+    stub({ ...quoteBody(103), amounts: [{ ...quoted(1_000_000n, 201), tol_pbps: '201' }] });
+    const ceil = (await chainQuote(req).catch((e: unknown) => e)) as ChainError;
+    expect(ceil).toBeInstanceOf(ChainError);
+    expect(ceil.fields?.tolPbps).toBeUndefined();
+    for (const v of Object.values(ceil.fields ?? {})) expect(typeof v).toBe('number');
+
+    stub({ ...quoteBody(104), amounts: [{ ...quoted(1_000_000n, 5_000), tol_pbps: '5000' }] });
+    const band = (await chainQuote(REQ).catch((e: unknown) => e)) as ChainError;
+    expect(band.kind).toBe('floor_violation');
+    expect(band.fields).toEqual({ servedSpreadPbps: 459 });
+  });
+
   test('exports the tolerance ceiling constant from the package entry', async () => {
     const entry = await import('../index');
     expect(entry.MAX_TOL_PBPS).toBe(999_000);

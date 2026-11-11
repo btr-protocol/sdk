@@ -43,11 +43,26 @@ function context(chainId: number, generation?: string): string {
  * No localStorage cache. Cache identity includes API origin, chain, generation and name.
  * A header naming another generation is refused; an absent header comes back as `generation: null`.
  * A pinned chain refuses changed ABI content. */
-export async function fetchAbiWithMeta(
+export function fetchAbiWithMeta(
   name: string,
   opts: { chainId?: number; generation?: string } = {},
 ): Promise<AbiWithMeta> {
-  const chainId = opts.chainId ?? 143;
+  return load(name, opts, false);
+}
+
+/** The ABI only. Refuses a response whose generation header is absent or not the one requested. */
+export async function fetchAbi(name: string, chainId = 143, generation?: string): Promise<Abi> {
+  return (await load(name, { chainId, generation }, true)).abi;
+}
+
+/** One load for both surfaces. `requireGeneration` refuses an absent header before the body is read.
+ * Only a generation-attested response is cached, so a refused or unattested one is refetched. */
+async function load(
+  name: string,
+  opts: { chainId?: number; generation?: string },
+  requireGeneration: boolean,
+): Promise<AbiWithMeta> {
+  const chainId = opts.chainId === undefined ? 143 : opts.chainId;
   const selected = context(chainId, opts.generation);
   const canonical =
     Object.keys(chains[String(chainId)]?.pins ?? {}).find(
@@ -64,21 +79,15 @@ export async function fetchAbiWithMeta(
   const generation = res.headers.get('x-btr-abi-generation');
   if (generation !== null && generation !== selected)
     throw new Error('ABI response generation differs from requested generation');
+  if (generation === null && requireGeneration)
+    throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
   const pin = chains[String(chainId)]?.pins[canonical];
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
   const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
-  hot.set(key, meta);
+  if (generation !== null) hot.set(key, meta);
   return meta;
-}
-
-/** The ABI only. Refuses a response whose generation is absent or not the one requested. */
-export async function fetchAbi(name: string, chainId = 143, generation?: string): Promise<Abi> {
-  const { abi, generation: served } = await fetchAbiWithMeta(name, { chainId, generation });
-  if (served !== context(chainId, generation))
-    throw new Error('ABI response generation differs from requested generation');
-  return abi;
 }
 
 export function resetFetchAbiCacheForTest(): void {

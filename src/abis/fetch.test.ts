@@ -92,19 +92,28 @@ test('fetchAbiWithMeta reports the served generation when the header is present'
   expect(fetchAbiWithMetaFromEntry).toBe(fetchAbiWithMeta);
 });
 
-test('an absent generation header is null, and fetchAbi still refuses it', async () => {
+test('an absent generation header is refused by fetchAbi and never cached', async () => {
   let calls = 0;
   globalThis.fetch = (async () => {
     calls++;
     return Response.json([]);
   }) as unknown as typeof fetch;
+  await expect(fetchAbi('Custom', 56, 'g1')).rejects.toThrow('generation differs');
   const meta = await fetchAbiWithMeta('Custom', { chainId: 56, generation: 'g1' });
   expect(meta).toEqual({ abi: [], generation: null, chainId: 56 });
+  expect(calls).toBe(2);
+});
+
+test('fetchAbi refuses an absent header before checking the body', async () => {
+  globalThis.fetch = (async () => Response.json({ not: 'an array' })) as unknown as typeof fetch;
   await expect(fetchAbi('Custom', 56, 'g1')).rejects.toThrow('generation differs');
-  expect(
-    (await fetchAbiWithMeta('Custom', { chainId: 56, generation: 'g1' })).generation,
-  ).toBeNull();
-  expect(calls).toBe(1);
+});
+
+test('an explicit null chain id is refused, not defaulted to 143', async () => {
+  await expect(fetchAbi('Pool', null as unknown as number)).rejects.toThrow('invalid ABI chain id');
+  await expect(fetchAbiWithMeta('Pool', { chainId: null as unknown as number })).rejects.toThrow(
+    'invalid ABI chain id',
+  );
 });
 
 test('fetchAbiWithMeta names the bundled generation without a request', async () => {
