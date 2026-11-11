@@ -20,7 +20,7 @@ const readAbi = (p: string): unknown[] => {
 };
 const POOL_ABI = readAbi(join(repo, 'abis', 'Pool.json'));
 // The backend's served copy lives in the sibling checkout; CI has none, so those checks skip.
-const backAbis = join(repo, '..', 'back', 'abis');
+const backAbis = join(repo, '..', 'back', 'abis/generations/pool-v1-s7');
 const hasBack = existsSync(join(backAbis, 'Pool.json'));
 
 // ── the hash itself ──────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ describe('abiHash pins content, not shape', () => {
 // The committed snapshot is what every build reads FIRST, so it carries the same pin the backend
 // answer must: drift from the lock stops the build rather than shipping an unreviewed ABI.
 describe('the committed ABI snapshot is pinned', () => {
-  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).bundled.pins;
 
   for (const name of ['Pool', 'Admin']) {
     test(`abis/${name}.json hashes to the lock`, () => {
@@ -78,7 +78,7 @@ describe('the committed ABI snapshot is pinned', () => {
 // committed SDK snapshot, the backend's `back/abis/PoolFactory.json` and the lock must agree, and
 // the official-grant surface must be the current one.
 describe('PoolFactory parity is pinned across repos', () => {
-  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).bundled.pins;
 
   test('the lock pins the committed SDK snapshot', () => {
     expect(lock.PoolFactory).toBe(abiHash(POOL_FACTORY_ABI));
@@ -106,7 +106,7 @@ describe('PoolFactory parity is pinned across repos', () => {
 // SDK pins v2; BACK_POOL_V1 is the explicit pair, delete it (and the branch) at cutover.
 const BACK_POOL_V1 = '0x1423b5f6f98d0d09980ea1bf92b25430d0190aa418d90c27175148d12f51be39';
 describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
-  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).chains['143'].pins;
   test('back/abis/PoolFactory.json hashes to the lock', () => {
     expect(abiHash(readAbi(join(backAbis, 'PoolFactory.json')))).toBe(lock.PoolFactory);
   });
@@ -128,9 +128,9 @@ describe('fetchAbi serves the pinned guardian ABIs from the bundle', () => {
     try {
       const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
       resetFetchAbiCacheForTest();
-      expect(await fetchAbi('PoolFactory')).toBe(POOL_FACTORY_ABI);
-      expect(await fetchAbi('accesscontrol')).toBe(ACCESS_CONTROL_ABI);
-      expect(await fetchAbi('pool')).toBe((await import('../src/abis/Pool')).POOL_ABI);
+      expect(await fetchAbi('PoolFactory')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/PoolFactory.json')));
+      expect(await fetchAbi('accesscontrol')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/AccessControl.json')));
+      expect(await fetchAbi('pool')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/Pool.json')));
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -191,7 +191,7 @@ describe('fetch-abis refuses what it cannot pin', () => {
     const server = Bun.serve({
       port: 0,
       fetch: () =>
-        new Response(JSON.stringify(hostile), { headers: { 'content-type': 'application/json' } }),
+        new Response(JSON.stringify(hostile), { headers: { 'content-type': 'application/json', 'x-btr-abi-generation': 'build-head' } }),
     });
     try {
       const r = await runScript(makeSandbox(), { BTR_API_URL: `http://127.0.0.1:${server.port}` });

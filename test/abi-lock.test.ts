@@ -9,7 +9,7 @@ import { abiHash } from '../src/abis/hash';
 import * as ABIS from '../src/abis/index';
 
 const repo = join(import.meta.dir, '..');
-const lock: Record<string, string> = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+const lock: Record<string, string> = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).bundled.pins;
 const PINNED: Record<string, keyof typeof ABIS> = {
   Pool: 'POOL_ABI',
   Admin: 'ADMIN_ABI',

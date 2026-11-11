@@ -1,75 +1,71 @@
-import lock from '../../abis.lock.json';
-/** ABIs lazy: hot cache only. Docs: https://btr.markets/docs/contracts#abis
- *
- *  ! NO COLD (localStorage) CACHE FOR ABIs, and nothing over the wire for a name this SDK already
- *  pins. An ABI decides how calldata is built, so a row that survives in a browser's storage is a
- *  standing instruction to encode the user's money a particular way — and the cold row had zero
- *  integrity in either direction: nothing authenticated the payload that filled it, and the
- *  version purge that was supposed to bound its lifetime keys on `VITE_APP_VERSION`, which the
- *  front pins to `npm_package_version` and has read `0.1.0` across every release. A poisoned
- *  `btr:cache:abi:pool` therefore outlived every deploy.
- *
- *  What replaces it is the build-time pin: `bun run fetch-abis` verifies Pool and Admin against
- *  the normalised content hashes in `abis.lock.json` before writing them, so the copies imported
- *  here ARE the backend's reviewed ABI. Serving those directly is both faster and the only
- *  integrity available at runtime; a name outside the pinned set still goes to the backend, is
- *  cached for the session only, and is exactly as trusted as the backend is.
- *
- *  PoolFactory and AccessControl are pinned the same way: the guardian/safety
- *  surfaces read through them, and a backend-served ABI there could suppress a pending upgrade
- *  from view. Every bundled copy is hash-checked against `abis.lock.json` at module load, so a
- *  tampered bundle fails loudly instead of encoding money a different way. */
-import { btrFetch, getApiRoot } from '../api.js';
-import type { Abi } from '../eth/abi.js';
-import { ACCESS_CONTROL_ABI } from './AccessControl.js';
-import { ADMIN_ABI } from './Admin.js';
-import { POOL_ABI } from './Pool.js';
-import { POOL_FACTORY_ABI } from './PoolFactory.js';
-import { abiHash } from './hash.js';
+/** Chain-scoped deployment ABIs. Build-head exports are separate decode/build surfaces. */
+import lock from "../../abis.lock.json";
+import accessControl from "../../abis/generations/pool-v1-s7/AccessControl.json";
+import admin from "../../abis/generations/pool-v1-s7/Admin.json";
+import pool from "../../abis/generations/pool-v1-s7/Pool.json";
+import poolFactory from "../../abis/generations/pool-v1-s7/PoolFactory.json";
+import { getApiRoot } from "../api.js";
+import type { Abi } from "../eth/abi.js";
+import { abiHash } from "./hash.js";
 
-/** Names answered from the bundle, hash-verified; keyed lowercase, as `fetchAbi` keys its cache. */
-const PINNED: Record<string, Abi> = {
-  pool: POOL_ABI,
-  admin: ADMIN_ABI,
-  poolfactory: POOL_FACTORY_ABI,
-  accesscontrol: ACCESS_CONTROL_ABI,
+type Deployment = { generation: string; pins: Record<string, string> };
+const chains: Record<string, Deployment> = lock.chains;
+const bundled: Record<string, Abi> = {
+  Pool: pool as Abi,
+  Admin: admin as Abi,
+  PoolFactory: poolFactory as Abi,
+  AccessControl: accessControl as Abi,
 };
-
-/** The `abis.lock.json` pin each bundled name must hash to. A name without a pin is a build
- *  error, not a fallback to the wire: silently serving an unpinned guardian ABI is the hole. */
-const PINS: Record<string, string> = {
-  pool: (lock as Record<string, string>).Pool,
-  admin: (lock as Record<string, string>).Admin,
-  poolfactory: (lock as Record<string, string>).PoolFactory,
-  accesscontrol: (lock as Record<string, string>).AccessControl,
-};
-
-for (const [name, abi] of Object.entries(PINNED)) {
-  const want = PINS[name];
-  if (!want) throw new Error(`fetchAbi: bundled ${name} ABI has no pin in abis.lock.json`);
-  if (abiHash(abi as unknown[]) !== want)
-    throw new Error(`fetchAbi: bundled ${name} ABI misses its abis.lock.json pin`);
+for (const [name, abi] of Object.entries(bundled)) {
+  if (abiHash(abi) !== chains["143"].pins[name])
+    throw new Error(`fetchAbi: deployed ${name} misses its chain/generation pin`);
 }
-
 const hot = new Map<string, Abi>();
-export async function fetchAbi(name: string): Promise<Abi> {
-  const k = name.toLowerCase();
-  const pinned = PINNED[k];
-  if (pinned) return pinned;
-  const hk = hot.get(k);
-  if (hk) return hk;
-  const abi = await btrFetch<Abi>(`/v1/abis/${name}`);
-  hot.set(k, abi);
-  return abi;
+
+function context(chainId: number, generation?: string): string {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("invalid ABI chain id");
+  const pinned = chains[String(chainId)];
+  const selected = generation ?? pinned?.generation;
+  if (!selected) throw new Error("ABI generation required for an unpinned chain");
+  if (pinned && selected !== pinned.generation)
+    throw new Error("ABI generation differs from chain pin");
+  return selected;
 }
-/** Test-only: drop the session cache so a test re-fetches the live ABI (never a stale shape). */
+
+/** Omitting chainId preserves the legacy mainnet call; new callers should always pass it.
+ * No localStorage cache. Cache identity includes API origin, chain, generation and name.
+ * A pinned chain refuses an unexpected generation or changed ABI content. */
+export async function fetchAbi(name: string, chainId = 143, generation?: string): Promise<Abi> {
+  const selected = context(chainId, generation);
+  const canonical =
+    Object.keys(chains[String(chainId)]?.pins ?? {}).find(
+      (n) => n.toLowerCase() === name.toLowerCase(),
+    ) ?? name;
+  if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error("invalid ABI name");
+  if (chainId === 143 && selected === "pool-v1-s7" && bundled[canonical]) return bundled[canonical];
+  const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
+  const cached = hot.get(key);
+  if (cached) return cached;
+  const res = await fetch(getAbiUrl(canonical, chainId), { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`BTR ABI ${res.status} ${canonical} on chain ${chainId}`);
+  if (res.headers.get("x-btr-abi-generation") !== selected)
+    throw new Error("ABI response generation differs from requested generation");
+  const abi = await res.json();
+  if (!Array.isArray(abi)) throw new Error("invalid ABI response");
+  const pin = chains[String(chainId)]?.pins[canonical];
+  if (pin && abiHash(abi) !== pin) throw new Error("ABI response misses chain/generation pin");
+  hot.set(key, abi as Abi);
+  return abi as Abi;
+}
+
 export function resetFetchAbiCacheForTest(): void {
   hot.clear();
 }
-export function getAbiUrl(name: string) {
-  return `${getApiRoot()}/v1/abis/${name}`;
+export function getAbiUrl(name: string, chainId = 143) {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("invalid ABI chain id");
+  return `${getApiRoot()}/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}`;
 }
-// GitHub mirror for docs: https://github.com/btr-protocol/abis/blob/main/${name}.json
+// Source mirror only; this URL does not establish a deployment generation.
 export function getAbiGithubUrl(name: string) {
   return `https://github.com/btr-protocol/abis/blob/main/${name}.json`;
 }
