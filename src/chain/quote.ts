@@ -15,7 +15,7 @@
 import type { QuoteBaseWire } from '../amm/aimm.js';
 import { btrFetchRaw, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
-import { ChainError, parseChainError } from './errors.js';
+import { ChainError, type ChainErrorFields, parseChainError } from './errors.js';
 
 /** Spread mode is a fraction of the SERVED spread on the server. `maxTolPbps` is the caller's own
  *  absolute ceiling on that fraction, in pbps: without it `pct=50` authorizes half of the uint16
@@ -269,6 +269,17 @@ export function slippageTolPbps(slip: Slippage): number {
   return Math.min(MAX_TOL_PBPS, Math.floor((pct * MAX_SPREAD_PBPS) / 100), spreadMaxTolPbps(slip));
 }
 
+/** `ChainError.fields` holds finite numbers only: a wire value such as `tol_pbps: "201"` is not a
+ *  bound, so that field is omitted rather than carried through as a string. */
+function boundFields(f: Partial<Record<keyof ChainErrorFields, unknown>>): ChainErrorFields {
+  const out: ChainErrorFields = {};
+  for (const k of ['servedSpreadPbps', 'tolPbps', 'maxTolPbps'] as const) {
+    const v = f[k];
+    if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+  }
+  return out;
+}
+
 /** One floor, typed. The generic `assertServerFloor` throws a plain `Error` for the builder; a
  *  wire-sourced violation is the client's to classify. */
 function checkFloor(
@@ -295,7 +306,7 @@ function checkFloor(
       throw new ChainError(
         'ceiling_exceeded',
         `server tol_pbps ${tolPbps} exceeds the caller ceiling ${callerMax}; raise maxTolPbps to accept this quote`,
-        { fields: { servedSpreadPbps, tolPbps, maxTolPbps: callerMax } },
+        { fields: boundFields({ servedSpreadPbps, tolPbps, maxTolPbps: callerMax }) },
       );
     }
   } catch (e) {
@@ -331,7 +342,7 @@ function checkServedSpread(amount: QuotedAmount, slip: Slippage): void {
     throw new ChainError(
       'floor_violation',
       `server tol_pbps ${amount.tol_pbps} exceeds ${ceiling} = ${slip.pct}% of the served ${spread} pbps spread`,
-      { fields: { servedSpreadPbps: spread, tolPbps: amount.tol_pbps } },
+      { fields: boundFields({ servedSpreadPbps: spread, tolPbps: amount.tol_pbps }) },
     );
   }
 }
