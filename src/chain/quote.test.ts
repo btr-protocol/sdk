@@ -202,12 +202,12 @@ describe('chain quote client', () => {
     }
   });
 
-  test.each([undefined, '459', NaN, Infinity, -1, 65_536])(
+  test.each([undefined, '459', Number.NaN, Number.POSITIVE_INFINITY, -1, 65_536])(
     'rejects invalid spread_pbps %s',
     async (spread) => {
       const b = quoteBody(100);
       const amount = b.amounts[0] as unknown as Record<string, unknown>;
-      if (spread === undefined) delete amount.spread_pbps;
+      if (spread === undefined) Reflect.deleteProperty(amount, 'spread_pbps');
       else amount.spread_pbps = spread;
       stub(b); // JSON encodes NaN/Infinity as null, which must also fail closed.
       await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
@@ -270,7 +270,7 @@ describe('chain quote client', () => {
       const tol = Math.min(999_000, Math.max(100, pbps));
       expect(slippageTolPbps(slippage)).toBe(tol);
       const b = quoteBody(100, 1_000_000n, tol);
-      delete (b.amounts[0] as unknown as Record<string, unknown>).spread_pbps;
+      Reflect.deleteProperty(b.amounts[0] as unknown as Record<string, unknown>, 'spread_pbps');
       stub(b);
       await expect(chainQuote({ ...REQ, slippage })).resolves.toBeDefined();
     }
