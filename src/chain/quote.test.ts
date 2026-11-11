@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { ChainError } from './errors.js';
-import { type ChainQuoteResponse, chainQuote, chainRoute, resetChainClientState } from './quote.js';
+import {
+  type ChainQuoteResponse,
+  chainQuote,
+  chainRoute,
+  resetChainClientState,
+  slippageTolPbps,
+} from './quote.js';
 
 const realFetch = globalThis.fetch;
 
@@ -161,7 +167,10 @@ describe('chain quote client', () => {
   // spread (65 535 pbps) cannot authorize a 2% tolerance under the 1% default.
   test('defaults the absolute ceiling to 1% of the quote', async () => {
     stub(quoteBody(100, 1_000_000n, 20_000, 65_535));
-    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(REQ)).rejects.toMatchObject({
+      kind: 'ceiling_exceeded',
+      message: expect.stringContaining('raise maxTolPbps'),
+    });
     stub(quoteBody(101, 1_000_000n, 10_000, 65_535));
     await expect(chainQuote(REQ)).resolves.toBeDefined();
   });
@@ -177,7 +186,7 @@ describe('chain quote client', () => {
     stub(quoteBody(100, 1_000_000n, 200));
     await expect(chainQuote(req)).resolves.toBeDefined();
     stub(quoteBody(101, 1_000_000n, 201));
-    await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'floor_violation' });
+    await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'ceiling_exceeded' });
   });
 
   test('refuses a maxTolPbps outside the legal range before the request', async () => {
@@ -191,6 +200,87 @@ describe('chain quote client', () => {
       await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'bad_request' });
       expect(calls).toBe(0);
     }
+  });
+
+  test.each([undefined, '459', NaN, Infinity, -1, 65_536])(
+    'rejects invalid spread_pbps %s',
+    async (spread) => {
+      const b = quoteBody(100);
+      const amount = b.amounts[0] as unknown as Record<string, unknown>;
+      if (spread === undefined) delete amount.spread_pbps;
+      else amount.spread_pbps = spread;
+      stub(b); // JSON encodes NaN/Infinity as null, which must also fail closed.
+      await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+    },
+  );
+
+  test('rejects a spread parsed as non-finite from JSON', async () => {
+    const json = JSON.stringify(quoteBody(100)).replace('"spread_pbps":459', '"spread_pbps":1e400');
+    globalThis.fetch = (async () => new Response(json)) as unknown as typeof fetch;
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test.each([5, 400])('clamps spread pct %s to the service range', async (pct) => {
+    const req = { ...REQ, slippage: { mode: 'spread', pct, maxTolPbps: 999_000 } as const };
+    const clamped = pct === 5 ? 10 : 300;
+    expect(slippageTolPbps(req.slippage)).toBe(Math.floor((clamped * 65_535) / 100));
+    const boundary = Math.ceil((clamped * 459) / 100) + 1;
+    stub(quoteBody(100, 1_000_000n, boundary));
+    await expect(chainQuote(req)).resolves.toBeDefined();
+    stub(quoteBody(101, 1_000_000n, boundary + 1));
+    await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('permits ceil(pct% spread)+1 and rejects +2', async () => {
+    stub(quoteBody(100, 1_000_000n, 231));
+    await expect(chainQuote(REQ)).resolves.toBeDefined();
+    stub(quoteBody(101, 1_000_000n, 232));
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test.each([100, 999_000])('accepts maxTolPbps endpoint %s', async (maxTolPbps) => {
+    const slippage = { mode: 'spread', pct: 50, maxTolPbps } as const;
+    expect(slippageTolPbps(slippage)).toBe(Math.min(32_767, maxTolPbps));
+    stub(quoteBody(100, 1_000_000n, 100));
+    await expect(chainQuote({ ...REQ, slippage })).resolves.toBeDefined();
+  });
+
+  test.each([
+    ['zero amount', '0', '0'],
+    ['negative amount', '-1', '0'],
+    ['zero minimum', '1', '0'],
+    ['negative minimum', '1', '-1'],
+  ])('rejects %s on a non-refused quote', async (_, amountOut, minOut) => {
+    const b = quoteBody(100);
+    Object.assign(b.amounts[0], { amount_out: amountOut, min_out: minOut });
+    stub(b);
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
+  });
+
+  test('leaves refused amounts alone', async () => {
+    const b = quoteBody(100);
+    b.amounts = [{ refused: { name: 'NoLiquidity', selector: '0x12345678', args: [] } }];
+    stub(b);
+    await expect(chainQuote(REQ)).resolves.toBeDefined();
+  });
+
+  test('relative mode ignores spread and keeps its existing clamps', async () => {
+    for (const pbps of [5, 5_000, 999_001]) {
+      const slippage = { mode: 'relative', pbps } as const;
+      const tol = Math.min(999_000, Math.max(100, pbps));
+      expect(slippageTolPbps(slippage)).toBe(tol);
+      const b = quoteBody(100, 1_000_000n, tol);
+      delete (b.amounts[0] as unknown as Record<string, unknown>).spread_pbps;
+      stub(b);
+      await expect(chainQuote({ ...REQ, slippage })).resolves.toBeDefined();
+    }
+  });
+
+  test('invalid server floors take priority over a caller ceiling', async () => {
+    const b = quoteBody(100, 1_000_000n, 20_000, 65_535);
+    Object.assign(b.amounts[0], { min_out: '1' });
+    stub(b);
+    await expect(chainQuote(REQ)).rejects.toMatchObject({ kind: 'floor_violation' });
   });
 
   test('drops a response from an older block than the last accepted', async () => {
@@ -379,7 +469,7 @@ describe('chain route shape', () => {
   });
 
   // Route floors carry no `spread_pbps`, so only the request's absolute ceiling bounds them; a
-  // 20 000 pbps floor is not a pct=50 spread policy's answer at any spread.
+  // 20 000 pbps floor exceeds the default 1% ceiling.
   test('a spread request bounds route floors by its absolute ceiling', async () => {
     const b = body([AB]);
     b.best.floors[0] = {
@@ -397,7 +487,19 @@ describe('chain route shape', () => {
         amount_in: hex(IN),
         slippage: { mode: 'spread', pct: 50 },
       }),
-    ).rejects.toMatchObject({ kind: 'floor_violation' });
+    ).rejects.toMatchObject({ kind: 'ceiling_exceeded' });
+  });
+
+  test.each([
+    ['0', '0'],
+    ['1', '0'],
+    ['-1', '0'],
+    ['1', '-1'],
+  ])('rejects non-positive route floor %s / %s', async (amountOut, minOut) => {
+    const b = body([AB]);
+    Object.assign(b.best.floors[0], { amount_out: amountOut, min_out: minOut });
+    stub(b);
+    expect(await kindOf()).toBe('floor_violation');
   });
 
   test.each([
