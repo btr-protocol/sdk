@@ -347,7 +347,7 @@ describe('chain id and typed data survive values JSON cannot hold', () => {
     // `parseInt` clamps at MAX_SAFE_INTEGER, which makes two DIFFERENT chains compare equal to
     // every guard that reads this number.
     await expect(getChainId(answer('0x20000000000000'))).rejects.toThrow(/exceeds 2\^53-1/);
-    expect(await getChainId(answer('0x4cef52'))).toBe(5_042_002);
+    expect(await getChainId(answer('0x8f'))).toBe(143);
   });
 
   test('signTypedData serialises a bigint chainId instead of throwing on it', async () => {
@@ -364,7 +364,7 @@ describe('chain id and typed data survive values JSON cannot hold', () => {
       p,
       `0x${'11'.repeat(20)}` as Address,
       {
-        domain: { name: 'BTR', chainId: 5_042_002n },
+        domain: { name: 'BTR', chainId: 143n },
         types: { M: [{ name: 'x', type: 'uint256' }] },
         primaryType: 'M',
         message: { x: 2n ** 90n },
@@ -372,7 +372,7 @@ describe('chain id and typed data survive values JSON cannot hold', () => {
     );
     const parsed = JSON.parse(sent as string);
     // Decimal strings: exact at any width, which a JSON number is not.
-    expect(parsed.domain.chainId).toBe('5042002');
+    expect(parsed.domain.chainId).toBe('143');
     expect(parsed.message.x).toBe((2n ** 90n).toString());
   });
 });

@@ -110,7 +110,7 @@ export const VOL_CAP_BPS = 20000;
 export const MAX_STALE_GRACE_SECS = 3;
 export const STALE_Z = 472;
 
-// `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED); Arc's AccessControl predates the word, see `acGeneration`.
+// `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED).
 export const LANE_ARB_OP = 4096;
 export const PERM_GUARDIAN = 131072;
 export const PERM_KEEPER = 65536;

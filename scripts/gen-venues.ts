@@ -34,6 +34,14 @@ const ROLES = new Set(['deployer', 'owner', 'guardian', 'treasury']);
 
 const read = (p: string) => JSON.parse(readFileSync(p, 'utf8'));
 
+/** Chains dex-evm retired (`deployments/retired.json`, keys are chain ids): never generated, so a
+ *  retired chain is absent from every served surface. Its records stay in dex as history. */
+export function retiredChainIds(dexEvm: string): Set<number> {
+  const p = join(dexEvm, 'deployments', 'retired.json');
+  if (!existsSync(p)) return new Set();
+  return new Set(Object.keys(read(p)).filter((k) => /^\d+$/.test(k)).map(Number));
+}
+
 /** Record key → router tag, back `registry::pool_tag` verbatim: `core` → `btr-core`,
  *  `<x>Pool` → `btr-<x>`, `<x>Core` → `btr-<x>-core`. Only manifest pool keys reach it, so
  *  back's contract-role exclusion has nothing to exclude here. */
@@ -50,8 +58,10 @@ const feedName = (k: string) => (k.includes('-') ? k : `${k}-USDC`);
 export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
   const dir = join(dexEvm, 'deployments');
   const slugs: Record<string, string> = read(join(dir, 'chains.json')).slugs;
+  const retired = retiredChainIds(dexEvm);
   const out: Record<number, Venue> = {};
   for (const [id, slug] of Object.entries(slugs).sort(([a], [b]) => Number(a) - Number(b))) {
+    if (retired.has(Number(id))) continue;
     const [dp, pp, mp] = [`${id}.deploy.json`, `${id}.pools.json`, `${slug}.manifest.json`].map(
       (f) => join(dir, f),
     );
@@ -151,7 +161,9 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
 export function servedChains(dexEvm: string): Array<{ chainId: number; slug: string }> {
   const dir = join(dexEvm, 'deployments');
   const { slugs, default: dflt } = read(join(dir, 'chains.json'));
+  const retired = retiredChainIds(dexEvm);
   return Object.entries<string>(slugs)
+    .filter(([id]) => !retired.has(Number(id)))
     .filter(([, slug]) => read(join(dir, `${slug}.manifest.json`)).chain.class !== 'local')
     .map(([id, slug]) => ({ chainId: Number(id), slug }))
     .sort(

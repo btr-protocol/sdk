@@ -29,9 +29,9 @@ import {
   quoteAllExactIn,
 } from '../src/venues/router';
 
-/** Arc testnet: the only chain BTR is deployed on. */
-const ARC = 5_042_002;
-const ARC_TOKENS = chainVenue(ARC).tokens;
+/** Monad: the only chain BTR is deployed on (Arc testnet is retired). */
+const MONAD = 143;
+const MONAD_TOKENS = chainVenue(MONAD).tokens;
 
 /** Encode a real Pool custom error exactly as the node would return it in `error.data`. */
 const revertData = (name: string, args: unknown[]) => {
@@ -43,8 +43,8 @@ const revertData = (name: string, args: unknown[]) => {
 
 const ZERO = '0x0000000000000000000000000000000000000000' as Address;
 const ALICE = '0x1111111111111111111111111111111111111111' as Address;
-const TOKEN_A = ARC_TOKENS.USDCB; // both in the stable core, so pools are candidates
-const TOKEN_B = ARC_TOKENS.USDT;
+const TOKEN_A = MONAD_TOKENS.USDC; // both in the one core, so pools are candidates
+const TOKEN_B = MONAD_TOKENS.USDT0;
 
 /** Provider that never answers — the quote path must fail on the recipient BEFORE any call. */
 const deadProvider: Eip1193Provider = {
@@ -55,7 +55,7 @@ const deadProvider: Eip1193Provider = {
 
 describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
   const base = {
-    chainId: ARC,
+    chainId: MONAD,
     provider: deadProvider,
     tokenIn: TOKEN_A,
     tokenOut: TOKEN_B,
@@ -93,8 +93,8 @@ describe('quoteAllExactIn refuses unsafe calldata inputs', () => {
 });
 
 describe('quoteAllExactIn separates a protocol halt from a transport failure', () => {
-  const poolTag = staticVenuePools(ARC)[0].tag;
-  const poolAddr = staticVenuePools(ARC)[0].address;
+  const poolTag = staticVenuePools(MONAD)[0].tag;
+  const poolAddr = staticVenuePools(MONAD)[0].address;
 
   const runWith = async (err: Error) => {
     const skips: { kind: string; reason: string; tag: string }[] = [];
@@ -104,7 +104,7 @@ describe('quoteAllExactIn separates a protocol halt from a transport failure', (
       },
     } as unknown as Eip1193Provider;
     await quoteAllExactIn({
-      chainId: ARC,
+      chainId: MONAD,
       provider,
       tokenIn: TOKEN_A,
       tokenOut: TOKEN_B,
@@ -285,23 +285,22 @@ describe('chain resolution refuses to guess', () => {
 
   // Pinned by tag and roster size so losing a broadcast core fails here, not downstream as an
   // unroutable pair. stocksCore is scripted (rosters) but not broadcast (pools).
-  test('arc resolves its broadcast cores; the scripted-only core stays unroutable', () => {
-    expect(deployedChainIds()).toContain(ARC);
-    const byTag = Object.fromEntries(staticVenuePools(ARC).map((p) => [p.tag, p]));
-    expect(Object.keys(byTag).sort()).toEqual(['btr-crypto-core', 'btr-stable-core']);
-    expect(byTag['btr-crypto-core']!.tokens).toHaveLength(9);
-    expect(chainVenue(ARC).rosters['btr-stocks-core']).toBeDefined();
-    expect(chainVenue(ARC).refFeeds).toContain('WETH-USDC');
+  test('monad resolves its broadcast core and the reference feeds it prices against', () => {
+    expect(deployedChainIds()).toContain(MONAD);
+    const byTag = Object.fromEntries(staticVenuePools(MONAD).map((p) => [p.tag, p]));
+    expect(Object.keys(byTag).sort()).toEqual(['btr-core']);
+    expect(byTag['btr-core']!.tokens).toHaveLength(11);
+    expect(chainVenue(MONAD).refFeeds).toContain('WMON-USDC');
   });
 
-  test('the hub USDCB is roster index 0 of every core and owns no feed', () => {
-    const v = chainVenue(ARC);
-    for (const roster of Object.values(v.rosters)) expect(roster[0]).toBe('USDCB');
-    expect(activeFeedId(ARC, 'USDCB')).toBeNull();
+  test('the hub USDC is roster index 0 of every core and resolves to its USDC-USD reference', () => {
+    const v = chainVenue(MONAD);
+    for (const roster of Object.values(v.rosters)) expect(roster[0]).toBe('USDC');
+    expect(activeFeedId(MONAD, 'USDC')).toBe(v.feedIds['USDC-USD']);
   });
 
   test('the error names what IS deployed, so the operator sees the mismatch', () => {
-    expect(() => chainVenue(0)).toThrow(/deployed: \[143, 5042002\]/);
+    expect(() => chainVenue(0)).toThrow(/deployed: \[143\]/);
   });
 
   test('every deployed chain resolves an oracle and at least one pool', () => {
@@ -314,7 +313,7 @@ describe('chain resolution refuses to guess', () => {
   });
 
   test('the base resolves to the signed USDC-USD reference, never a USDC/USDC identity', () => {
-    const id = ARC;
+    const id = MONAD;
     expect(activeFeedId(id, 'USDC')).toBe(chainVenue(id).feedIds['USDC-USD']!);
     expect(chainVenue(id).feedIds['USDC-USDC']).toBeUndefined();
   });
@@ -397,8 +396,8 @@ describe('the venue swap deadline is a send-time window, not a quote-time one', 
   // gas. `buildVenueExecCalls` re-stamps it, so the window starts when the call is BUILT.
   const quote = (deadline: bigint) => ({
     venue: 'btr' as const,
-    pool: staticVenuePools(ARC)[0].address,
-    tag: staticVenuePools(ARC)[0].tag,
+    pool: staticVenuePools(MONAD)[0].address,
+    tag: staticVenuePools(MONAD)[0].tag,
     tokenIn: TOKEN_A,
     tokenOut: TOKEN_B,
     amountIn: 1_000_000n,

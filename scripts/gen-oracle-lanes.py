@@ -63,12 +63,14 @@ maps = []
 # Wire 8 (MarkStoreP8, 4 lanes per tier word): the chain's `<chainId>.deploy.json` carries `feeds`
 # (sym -> globalIndex) and both tiers' EIP-712 verifyingContracts; the manifest carries the class.
 # The lane exponent is absolute, so every expBias is 0. A scaffold record (zero oracle) is skipped.
+# Retired chains (`retired.json`, keyed by chain id) are history, never a lane map.
+retired = {k for k in load(os.path.join(DEX, "retired.json")) if k.isdigit()}
 for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
     m = load(path)
     if m.get("oracle", {}).get("wire") != 8:
         continue
     chain = str(m["chain"]["id"])
-    if want and chain not in want:
+    if chain in retired or (want and chain not in want):
         continue
     rec_path = os.path.join(DEX, f"{chain}.deploy.json")
     rec = load(rec_path) if os.path.exists(rec_path) else {}

@@ -15,7 +15,6 @@ const OFFICIAL: Record<number, string[]> = {
   999: ['hyperliquid.xyz'],
   4663: ['robinhood.com'],
   5042: ['arc.network', 'arc.io'],
-  5042002: ['arc.network', 'arc.io'],
   8453: ['base.org'],
   42161: ['arbitrum.io'],
   43114: ['avax.network'],

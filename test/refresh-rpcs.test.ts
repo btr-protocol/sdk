@@ -7,6 +7,7 @@ import {
   rpcsFromChains,
   sharedOperators,
 } from '../scripts/gen-rpcs';
+import { retiredChainIds } from '../scripts/gen-venues';
 import { norm, trusted, unusable } from '../scripts/lib/rpcUrl';
 import {
   type Chains,
@@ -261,7 +262,9 @@ test('gen-rpcs: a key or an http URL in the list fails the run, never reaches th
 test('committed CHAIN_RPCS = chains.json', () => {
   if (!existsSync(SIBLING))
     throw new Error('refresh-rpcs.test.ts needs ../dex-evm/deployments (CI pins and clones it)');
-  expect(CHAIN_RPCS).toEqual(rpcsFromChains(JSON.parse(readFileSync(SIBLING, 'utf8'))));
+  const expected = rpcsFromChains(JSON.parse(readFileSync(SIBLING, 'utf8')));
+  for (const id of retiredChainIds(join(SIBLING, '..', '..'))) delete expected[id];
+  expect(CHAIN_RPCS).toEqual(expected);
 });
 
 // Served chains' picks must be browser rows that take a wide batch (the coalescer sends them).
@@ -305,14 +308,3 @@ test('sharedOperators flags a pair of one operator; picks skip a repeated operat
   expect(rpcsFromChains({ rpc: { '1': rows } })[1]).toEqual([c, a]); // publicnode is trusted, so ranks first
 });
 
-// The CI sibling pin must contain Arc's independent provider; the old pin had only arc.io.
-test('Arc registry produces the committed independent quorum', () => {
-  if (!existsSync(SIBLING)) throw new Error('needs ../dex-evm/deployments');
-  const registry = JSON.parse(readFileSync(SIBLING, 'utf8'));
-  const arc = rpcsFromChains(registry)[5042002];
-  expect(arc).toEqual([
-    'https://rpc.blockdaemon.testnet.arc.io',
-    'https://arc-testnet-rpc.publicnode.com',
-  ]);
-  expect(sharedOperators({ 5042002: arc }, [{ chainId: 5042002 }])).toEqual([]);
-});
