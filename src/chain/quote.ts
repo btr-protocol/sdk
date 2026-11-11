@@ -266,6 +266,7 @@ function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Sl
   try {
     assertServerFloor(BigInt(amountOut), tolPbps, BigInt(minOut), slippageTolPbps(slip));
   } catch (e) {
+    if (e instanceof ChainError) throw e; // caller-owned ceiling errors keep their kind
     throw new ChainError(
       'floor_violation',
       e instanceof Error ? e.message : 'server floor is inconsistent',
