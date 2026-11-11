@@ -253,7 +253,10 @@ function wireSlippage(slip: Slippage): Slippage {
  *  the server authors that too, so a bound built on it would bound nothing (the served-spread
  *  check is a SECOND bound, {@link checkServedSpread}; this one survives a lying server). A server
  *  tolerance TIGHTER than the policy is allowed through — it floors higher than asked, which costs
- *  a fill, not value. */
+ *  a fill, not value.
+ *
+ *  `front/src/lib/lpFloor.ts`'s `policyTolCeilingPbps` must call this function so the UI and SDK
+ *  share the only implementation of the policy bound. */
 export function slippageTolPbps(slip: Slippage): number {
   if (slip.mode === 'relative') return Math.min(MAX_TOL_PBPS, Math.max(MIN_TOL_PBPS, slip.pbps));
   const pct = clampPct(slip.pct);
@@ -264,7 +267,24 @@ export function slippageTolPbps(slip: Slippage): number {
  *  wire-sourced violation is the client's to classify. */
 function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Slippage): void {
   try {
-    assertServerFloor(BigInt(amountOut), tolPbps, BigInt(minOut), slippageTolPbps(slip));
+    const out = BigInt(amountOut);
+    const min = BigInt(minOut);
+    if (out <= 0n || min <= 0n) {
+      throw new Error('server amount_out and min_out must be positive');
+    }
+    // Check server validity before classifying a caller ceiling. Routes carry no spread, so the
+    // intrinsic policy bound still uses the spread field maximum there.
+    const intrinsicMax = slippageTolPbps(
+      slip.mode === 'spread' ? { ...slip, maxTolPbps: MAX_TOL_PBPS } : slip,
+    );
+    assertServerFloor(out, tolPbps, min, intrinsicMax);
+    const callerMax = slippageTolPbps(slip);
+    if (tolPbps > callerMax) {
+      throw new ChainError(
+        'ceiling_exceeded',
+        `server tol_pbps ${tolPbps} exceeds the caller ceiling ${callerMax}; raise maxTolPbps to accept this quote`,
+      );
+    }
   } catch (e) {
     if (e instanceof ChainError) throw e; // caller-owned ceiling errors keep their kind
     throw new ChainError(
@@ -282,7 +302,17 @@ function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Sl
 function checkServedSpread(amount: QuotedAmount, slip: Slippage): void {
   if (slip.mode !== 'spread') return;
   const spread = amount.spread_pbps;
-  if (typeof spread !== 'number' || !Number.isFinite(spread)) return;
+  if (
+    typeof spread !== 'number' ||
+    !Number.isFinite(spread) ||
+    spread < 0 ||
+    spread > MAX_SPREAD_PBPS
+  ) {
+    throw new ChainError(
+      'floor_violation',
+      `server spread_pbps must be a finite number in [0, ${MAX_SPREAD_PBPS}]`,
+    );
+  }
   const ceiling = Math.ceil((clampPct(slip.pct) * spread) / 100) + 1;
   if (!(amount.tol_pbps <= ceiling)) {
     throw new ChainError(
@@ -321,8 +351,8 @@ export async function chainQuote(
   acceptBlock(key, raw.block.number);
   for (const a of raw.amounts) {
     if (!isRefused(a)) {
-      checkFloor(a.amount_out, a.tol_pbps, a.min_out, req.slippage);
       checkServedSpread(a, req.slippage);
+      checkFloor(a.amount_out, a.tol_pbps, a.min_out, req.slippage);
     }
   }
   return raw;

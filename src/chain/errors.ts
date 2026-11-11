@@ -16,6 +16,7 @@ type ChainErrorKind =
   | 'refused'
   | 'transport'
   | 'floor_violation'
+  | 'ceiling_exceeded'
   | 'stale_block'
   | 'not_implemented';
 

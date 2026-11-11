@@ -92,10 +92,17 @@ await chainQuote({ ...req, slippage: { mode: 'spread', pct: 50, maxTolPbps: 5_00
 
 - `maxTolPbps` defaults to **10 000 pbps (1%)** and is validated to `100..999_000`.
 - The policy tolerance is `min(MAX_TOL_PBPS, pct% of the spread-field maximum, maxTolPbps)`.
-- When the response names its own `spread_pbps`, `tol_pbps` is also capped at
+- Spread-mode quote responses must carry a finite `spread_pbps` in `0..65_535`; `tol_pbps` is capped at
   `ceil(pct% of that spread) + 1`, so a plausible spread cannot excuse an enormous tolerance.
+- Spread-mode quotes with `pct% × spread` above 1% need an explicit higher `maxTolPbps`. A valid
+  quote above that caller ceiling throws `ceiling_exceeded` with guidance to raise `maxTolPbps`.
 - Building calldata from `serverFloors` needs the same ceiling as `planToLegs` /
   `planToRouterPlan`'s `maxTolPbps`; `slippageTolPbps(slippage)` returns it.
+
+The SDK bounds the **tolerance only**. `amount_out` itself is server-authored; the caller must
+re-price it on chain before signing (the front does). Floor self-consistency does not verify price.
+Route floors carry no `spread_pbps`, so their spread policy uses the field maximum plus the caller's
+absolute ceiling, without a served-spread check.
 
 ## Toolchain
 
