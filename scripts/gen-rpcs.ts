@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
 import { SERVED_CHAINS } from '../src/venues/deployments.generated';
-import { retiredChainIds } from './gen-venues';
+import { servedChainIds } from './gen-venues';
 import { norm, operator, trusted, unusable } from './lib/rpcUrl';
 
 /** RPCs handed to a wallet or read from a browser, per chain. */
@@ -99,7 +99,8 @@ if (import.meta.main) {
   else {
     const out = join(root, 'src', 'eth', 'rpcs.generated.ts');
     const rpcs = rpcsFromChains(JSON.parse(readFileSync(src, 'utf8')));
-    for (const id of retiredChainIds(dexEvm)) delete rpcs[id];
+    const served = servedChainIds(dexEvm);
+    for (const id of Object.keys(rpcs).map(Number)) if (!served.has(id)) delete rpcs[id];
     const shared = sharedOperators(rpcs, SERVED_CHAINS);
     if (shared.length)
       throw new Error(`gen-rpcs: quorum endpoints share an operator: ${shared.join('; ')}`);

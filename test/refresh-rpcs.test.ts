@@ -7,7 +7,7 @@ import {
   rpcsFromChains,
   sharedOperators,
 } from '../scripts/gen-rpcs';
-import { retiredChainIds } from '../scripts/gen-venues';
+import { servedChainIds } from '../scripts/gen-venues';
 import { norm, trusted, unusable } from '../scripts/lib/rpcUrl';
 import {
   type Chains,
@@ -263,7 +263,8 @@ test('committed CHAIN_RPCS = chains.json', () => {
   if (!existsSync(SIBLING))
     throw new Error('refresh-rpcs.test.ts needs ../dex-evm/deployments (CI pins and clones it)');
   const expected = rpcsFromChains(JSON.parse(readFileSync(SIBLING, 'utf8')));
-  for (const id of retiredChainIds(join(SIBLING, '..', '..'))) delete expected[id];
+  const served = servedChainIds(join(SIBLING, '..', '..'));
+  for (const id of Object.keys(expected).map(Number)) if (!served.has(id)) delete expected[id];
   expect(CHAIN_RPCS).toEqual(expected);
 });
 
