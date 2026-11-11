@@ -20,6 +20,16 @@ export type ChainErrorKind =
   | 'stale_block'
   | 'not_implemented';
 
+/** The numbers behind a tolerance bound the client refused, so a caller branches on values, not prose. */
+export type ChainErrorFields = {
+  /** The spread the served quote priced, in pbps. */
+  servedSpreadPbps?: number;
+  /** The tolerance the server returned for the amount, in pbps. */
+  tolPbps?: number;
+  /** The caller's absolute ceiling the tolerance exceeded, in pbps. */
+  maxTolPbps?: number;
+};
+
 export class ChainError extends Error {
   readonly kind: ChainErrorKind;
   /** HTTP status when the failure came from a response; 0 for a client-side rejection. */
@@ -28,11 +38,18 @@ export class ChainError extends Error {
   readonly retryAfterSecs: number | undefined;
   /** The server's `detail`, or the raw body when it did not parse. */
   readonly detail: string | undefined;
+  /** Structured bound values on `ceiling_exceeded` and served-spread `floor_violation`. */
+  readonly fields: ChainErrorFields | undefined;
 
   constructor(
     kind: ChainErrorKind,
     message: string,
-    opts: { status?: number; retryAfterSecs?: number; detail?: string } = {},
+    opts: {
+      status?: number;
+      retryAfterSecs?: number;
+      detail?: string;
+      fields?: ChainErrorFields;
+    } = {},
   ) {
     super(message);
     this.name = 'ChainError';
@@ -40,6 +57,7 @@ export class ChainError extends Error {
     this.status = opts.status ?? 0;
     this.retryAfterSecs = opts.retryAfterSecs;
     this.detail = opts.detail;
+    this.fields = opts.fields;
   }
 }
 

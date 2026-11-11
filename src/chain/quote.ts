@@ -204,7 +204,7 @@ async function post(path: string, body: unknown, opts: ChainClientOpts): Promise
 }
 
 /** `back/crates/quote/src/slippage.rs` MAX_TOL_PBPS: 99.9%. */
-const MAX_TOL_PBPS = 999_000;
+export const MAX_TOL_PBPS = 999_000;
 /** `SwapQuote.spreadPbps` is a uint16 BY CONSTRUCTION — `PricingLib.sol` solves its interior swing cap
  *  so a composed fence always fits the field — so this is the widest spread any quote can carry. */
 export const MAX_SPREAD_PBPS = 0xffff;
@@ -271,7 +271,13 @@ export function slippageTolPbps(slip: Slippage): number {
 
 /** One floor, typed. The generic `assertServerFloor` throws a plain `Error` for the builder; a
  *  wire-sourced violation is the client's to classify. */
-function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Slippage): void {
+function checkFloor(
+  amountOut: string,
+  tolPbps: number,
+  minOut: string,
+  slip: Slippage,
+  servedSpreadPbps?: number,
+): void {
   try {
     const out = BigInt(amountOut);
     const min = BigInt(minOut);
@@ -289,6 +295,7 @@ function checkFloor(amountOut: string, tolPbps: number, minOut: string, slip: Sl
       throw new ChainError(
         'ceiling_exceeded',
         `server tol_pbps ${tolPbps} exceeds the caller ceiling ${callerMax}; raise maxTolPbps to accept this quote`,
+        { fields: { servedSpreadPbps, tolPbps, maxTolPbps: callerMax } },
       );
     }
   } catch (e) {
@@ -324,6 +331,7 @@ function checkServedSpread(amount: QuotedAmount, slip: Slippage): void {
     throw new ChainError(
       'floor_violation',
       `server tol_pbps ${amount.tol_pbps} exceeds ${ceiling} = ${slip.pct}% of the served ${spread} pbps spread`,
+      { fields: { servedSpreadPbps: spread, tolPbps: amount.tol_pbps } },
     );
   }
 }
@@ -358,7 +366,7 @@ export async function chainQuote(
   for (const a of raw.amounts) {
     if (!isRefused(a)) {
       checkServedSpread(a, req.slippage);
-      checkFloor(a.amount_out, a.tol_pbps, a.min_out, req.slippage);
+      checkFloor(a.amount_out, a.tol_pbps, a.min_out, req.slippage, a.spread_pbps);
     }
   }
   return raw;

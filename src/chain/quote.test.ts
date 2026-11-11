@@ -189,6 +189,30 @@ describe('chain quote client', () => {
     await expect(chainQuote(req)).rejects.toMatchObject({ kind: 'ceiling_exceeded' });
   });
 
+  test('ceiling_exceeded carries the bound values as fields, message unchanged', async () => {
+    const req = { ...REQ, slippage: { mode: 'spread', pct: 50, maxTolPbps: 200 } as const };
+    stub(quoteBody(102, 1_000_000n, 201));
+    const err = (await chainQuote(req).catch((e: unknown) => e)) as ChainError;
+    expect(err).toBeInstanceOf(ChainError);
+    expect(err.kind).toBe('ceiling_exceeded');
+    expect(err.message).toBe(
+      'server tol_pbps 201 exceeds the caller ceiling 200; raise maxTolPbps to accept this quote',
+    );
+    expect(err.fields).toEqual({ servedSpreadPbps: 459, tolPbps: 201, maxTolPbps: 200 });
+  });
+
+  test('floor_violation past pct% of the served spread carries the spread and tolerance', async () => {
+    stub(quoteBody(100, 1_000_000n, 5_000));
+    const err = (await chainQuote(REQ).catch((e: unknown) => e)) as ChainError;
+    expect(err.kind).toBe('floor_violation');
+    expect(err.fields).toEqual({ servedSpreadPbps: 459, tolPbps: 5_000 });
+  });
+
+  test('exports the tolerance ceiling constant from the package entry', async () => {
+    const entry = await import('../index');
+    expect(entry.MAX_TOL_PBPS).toBe(999_000);
+  });
+
   test('refuses a maxTolPbps outside the legal range before the request', async () => {
     for (const maxTolPbps of [99, 999_001, 100.5]) {
       let calls = 0;
