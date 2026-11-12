@@ -213,7 +213,7 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     expect(c.get('MAX_STALE_GRACE_SECS')).toBe(M.MAX_STALE_GRACE_SECS);
   });
 
-  // The source holds the v4 codec; v3's `MARK_WORD` is frozen.
+  // The source holds the live store-word codec (`MARK_WORD_V4`, read by `decodeStoreWord`).
   test('MARK_WORD_V4 offsets match MarkWordLib.sol', () => {
     const c = constants(src(join(DEX, 'src', 'libraries', 'MarkWordLib.sol')));
     for (const [k, v] of Object.entries(MARK_WORD_V4)) expect([k, c.get(k)]).toEqual([k, v]);

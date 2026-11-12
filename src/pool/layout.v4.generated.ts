@@ -1,49 +1,6 @@
-// `PoolStorage` layout v4 (`Pool.storageVersion() >= 4`, BNB): solc `storageLayout` of dex-evm
-// `out/Pool.sol/Pool.json`, and `abi/constants.json` `marks` for the one `marks` word. v4 moves
-// `lastGoodCWad` into slot 0 (uint40, 1e-9 WAD) and packs a leg's two feeds into one word at
-// slot 13. `storage.test.ts` restates it by hand.
-
-import { POOL_STRUCTS_V3 } from './layout.v3.generated.js';
-
-/** Absolute slots of every `IPool.PoolStorage` field, mappings included. */
-export const POOL_STORAGE_V4 = {
-  baseToken: 0n,
-  initialized: 0n,
-  protoSharePct: 0n,
-  flashFeePbps: 0n,
-  flowCooldownSecs: 0n,
-  solvencyArmed: 0n,
-  lastGoodCWad9: 0n,
-  wnative: 1n,
-  treasury: 2n,
-  factory: 3n,
-  assets: 4n,
-  oracleConfigs: 5n,
-  curves: 6n,
-  custody: 7n,
-  assetHooks: 8n,
-  lpTokens: 9n,
-  poolAdmin: 10n,
-  legs: 12n,
-  marks: 13n,
-} as const;
-
-/** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
-export const POOL_MAPPINGS_V4 = [
-  'assets',
-  'oracleConfigs',
-  'curves',
-  'custody',
-  'assetHooks',
-  'lpTokens',
-  'marks',
-] as const;
-
-/** In-struct `[slot, byteOffset]`: v3's, plus `lastGoodCWad9` in slot 0's tail. */
-export const POOL_STRUCTS_V4 = {
-  ...POOL_STRUCTS_V3,
-  PoolStorage: { ...POOL_STRUCTS_V3.PoolStorage, lastGoodCWad9: [0, 27] },
-} as const satisfies Record<string, Record<string, readonly [number, number]>>;
+// The one mark-word codec the live pools use: the P8 store word (`MarkWordLib.compose`) that
+// `decodeStoreWord` reads for v5 and v10 pools. The name keeps its layout-v4 origin; the v4
+// `PoolStorage` slots and the v4 storage version are retired and no longer tabled here.
 
 /**
  * `MarkWordLib` bit offsets of the one `marks[t]` word. P (primary feed): markF 0..31, obs, σ,
