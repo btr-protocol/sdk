@@ -207,6 +207,9 @@ export interface BackendConvertOpts {
   meta: WireMeta;
   baseDecimals: number;
   backendBase?: string;
+  /** The pool's on-chain address (`NamedPool.addr`). REQUIRED: served mode prices the pool from
+   *  chain by it, and an address-less pool reads as HALTED, so every leg would be refused. */
+  poolAddress: string;
 }
 
 /**
@@ -232,7 +235,7 @@ export function backendConvert(
     }
     const w = await quotePathAsync(
       {
-        pool: poolStateToWire('pool', undefined, state, opts.meta, opts.baseDecimals),
+        pool: poolStateToWire('pool', opts.poolAddress, state, opts.meta, opts.baseDecimals),
         token_in: tokenIn,
         token_out: tokenOut,
         amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
@@ -244,7 +247,8 @@ export function backendConvert(
 }
 
 /** Backend-priced liability swap: same pipeline as the core, rate off `state`, conversion over
- *  POST /v1/quote. Null when the pool has no rate (a mark is unusable: the chain reverts). */
+ *  POST /v1/quote-path (`opts.poolAddress` names the pool). Null when the pool has no rate (a mark
+ *  is unusable: the chain reverts). */
 export async function quoteSwapLiabilityAsync(
   state: PoolState,
   inLeg: LiabLeg,

@@ -222,7 +222,12 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
     addressOf: () => null,
     decimalsOf: () => 6,
   };
-  const backendOpts = { meta, baseDecimals: 6, backendBase: 'https://q.example/v1' };
+  const backendOpts = {
+    meta,
+    baseDecimals: 6,
+    backendBase: 'https://q.example/v1',
+    poolAddress: '0xPoolAddr',
+  };
 
   const quoteWire = (amountOutRaw: bigint, midWad = 10n ** 18n) => ({
     amount_out: `0x${amountOutRaw.toString(16)}`,
@@ -262,9 +267,15 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].url.endsWith('/quote-path')).toBe(true);
       expect([calls[0].body.token_in, calls[0].body.token_out]).toEqual(['AUDF', 'NZDF']);
-      const pool = calls[0].body.pool as { base: string; base_decimals: number };
+      const pool = calls[0].body.pool as {
+        base: string;
+        base_decimals: number;
+        addr: string | null;
+      };
       expect(pool.base).toBe(state.base);
       expect(pool.base_decimals).toBe(backendOpts.baseDecimals);
+      // Served mode prices the pool from chain by this address; an address-less body reads HALTED.
+      expect(pool.addr).toBe(backendOpts.poolAddress);
       // Half of ONE 40 pbps path spread. Two summed leg quotes would have landed at 0.4.
       expect(q?.convSpreadBps).toBeCloseTo(40 / 100 / 2, 9);
     } finally {
@@ -357,6 +368,7 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
         meta,
         baseDecimals: 6,
         backendBase: 'https://q.example/v1',
+        poolAddress: '0xPoolAddr',
       })(amount);
       return {
         q,
