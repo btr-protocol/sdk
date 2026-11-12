@@ -56,27 +56,35 @@ export {
 
 /** `Pool.storageVersion()`. */
 const STORAGE_VERSION_SELECTOR = '0x403ebd03';
-const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
+/** How long a read `storageVersion()` serves (the back's cadence): a v1 -> v2 impl upgrade at the
+ *  same address is seen within this. */
+const STORAGE_VERSION_TTL_MS = 30_000;
+const versions = new WeakMap<Eip1193Provider, Map<string, { v: Promise<number>; at: number }>>();
 
 /**
  * `Pool.storageVersion()`: 5..9 = layout v5 (`POOL_STORAGE_V5`), 12 = layout v10
- * (`POOL_STORAGE_V10`, the v2 pool); any other version throws (`poolStorageOf`). Memoised per provider and pool:
- * a pool's layout moves only with an impl upgrade.
+ * (`POOL_STORAGE_V10`, the v2 pool); any other version throws (`poolStorageOf`). Cached per
+ * provider and pool for `STORAGE_VERSION_TTL_MS`: a pool's layout moves only with an impl upgrade,
+ * which the next read after the TTL picks up.
  */
 function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
-  const byPool = versions.get(provider) ?? new Map<string, Promise<number>>();
+  const byPool = versions.get(provider) ?? new Map<string, { v: Promise<number>; at: number }>();
   versions.set(provider, byPool);
   const key = pool.toLowerCase();
   const hit = byPool.get(key);
-  if (hit) return hit;
+  const now = Date.now();
+  if (hit && now - hit.at < STORAGE_VERSION_TTL_MS) return hit.v;
   const v = (
     provider.request({
       method: 'eth_call',
       params: [{ to: pool, data: STORAGE_VERSION_SELECTOR }, 'latest'],
     }) as Promise<Hex>
   ).then((r) => Number(BigInt(r)));
-  byPool.set(key, v);
-  v.catch(() => byPool.delete(key));
+  const entry = { v, at: now };
+  byPool.set(key, entry);
+  v.catch(() => {
+    if (byPool.get(key) === entry) byPool.delete(key);
+  });
   return v;
 }
 
@@ -135,24 +143,23 @@ export const CLASS_ROWS_BIT = 1 << 7;
 /** `PoolConstantsLib.MAX_FAMILY`: highest peg-family id and row key (0 = the leg's default row). */
 export const MAX_FAMILY = 4;
 
-/** A `classRisk` / `classHead.row` word (`ClassRiskLib.pack`): kappaCovBps 0..13 | refBandBps
- *  14..22 | minFeePbps 23..36, bits 37..63 zero. */
+/** A `classRisk` / `classHead.row` word (`ClassRiskLib.pack`): kappaCovBps 0..13 | minFeePbps
+ *  14..27 (`PoolConstantsLib.CLASS_FEE_SHIFT`), bits 28..63 zero. */
 export interface ClassRisk {
   kappaCovBps: number;
-  refBandBps: number;
   minFeePbps: number;
 }
 
 export function decodeClassRisk(pack: bigint): ClassRisk {
   return {
     kappaCovBps: Number(pack & 0x3fffn),
-    refBandBps: Number((pack >> 14n) & 0x1ffn),
-    minFeePbps: Number((pack >> 23n) & 0x3fffn),
+    minFeePbps: Number((pack >> 14n) & 0x3fffn),
   };
 }
 
 /** `IPool.ClassHead` word: family = low byte, default row = next 64 bits, then (v10) `famRow`, the
- *  leg's row in its own family (0 below v10). `ClassRiskLib.rowAt` reads `famRow` for the leg's own
+ *  leg's row in its own family (0 below v10); v10 also packs `expAt u32 | expHw u88` above bit 136
+ *  (not decoded here). `ClassRiskLib.rowAt` reads `famRow` for the leg's own
  *  family and `classRisk[leg][f]` for any other. */
 export function decodeClassHead(word: bigint): { family: number; row: bigint; famRow: bigint } {
   const U64 = 0xffff_ffff_ffff_ffffn;
@@ -327,7 +334,7 @@ export async function assetSlot(
   return mappingBase(key, POOL_STORAGE_V5.assets);
 }
 
-/** A leg's `ClassHead` (v10 record +4, v9 `classHead` mapping 16; zero below 9). */
+/** A leg's `ClassHead` (v10 record +5, v9 `classHead` mapping 16; zero below 9). */
 export async function readClassHead(
   provider: Eip1193Provider,
   pool: Address,
@@ -344,7 +351,7 @@ export async function readClassHead(
   return decodeClassHead(BigInt(await getStorageAt(provider, pool, at)));
 }
 
-/** A leg's `Custody` word: v10 record +3, v5..9 the `custody` mapping (slot 7). */
+/** A leg's `Custody` word: v10 record +4, v5..9 the `custody` mapping (slot 7). */
 export async function readCustody(
   provider: Eip1193Provider,
   pool: Address,
@@ -478,15 +485,19 @@ export async function readSwapGateMember(
   );
 }
 
-/** `PoolStorage.lastGoodCWad9`: the uint40 in slot 0's tail, 1e-9 WAD (v5 and v10 alike): the
- *  degraded same-asset exit cap (`exitCap`), WAD; 0 until an LP entrypoint has observed a rate. */
+/** `PoolStorage.lastGoodCWad9`: the uint40 in slot 0, 1e-9 WAD: the degraded same-asset exit cap
+ *  (`exitCap`), WAD; 0 until an LP entrypoint has observed a rate. v5 packs it at byte 27 (bit 216,
+ *  after `flashFeePbps` and `solvencyArmed`); v10 at byte 24 (bit 192, `PoolSolvencyLib.stampC`),
+ *  as core `decode_pool_slot0` / `decode_pool_slot0_v10` read it. */
 export async function readSolvencyState(
   provider: Eip1193Provider,
   pool: Address,
 ): Promise<{ lastGoodCWad: bigint }> {
-  const layout = poolStorageOf(await readStorageVersion(provider, pool));
-  const slot0 = BigInt(await getStorageAt(provider, pool, layout.lastGoodCWad9));
-  return { lastGoodCWad: (slot0 >> 216n) * 10n ** 9n };
+  const layout = layoutOf(await readStorageVersion(provider, pool));
+  const table = layout === 5 ? POOL_STORAGE_V5 : POOL_STORAGE_V10;
+  const slot0 = BigInt(await getStorageAt(provider, pool, table.lastGoodCWad9));
+  const shift = layout === 5 ? 216n : 192n;
+  return { lastGoodCWad: ((slot0 >> shift) & ((1n << 40n) - 1n)) * 10n ** 9n };
 }
 
 const U128 = (1n << 128n) - 1n;
