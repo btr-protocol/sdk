@@ -616,7 +616,7 @@ describe('layout v5', () => {
 
 /** P8 words dumped from dex-evm `MarkStoreP8Migrate.t.sol` (`_populate`) at NOW; `W` =
  *  `Pool.fallback`'s answer per lane. Same fixture as core `p8_fixture`. */
-describe('P8 mark store, wire 3 (storageVersion 10)', () => {
+describe('P8 mark store, wire 3 (storageVersion 12)', () => {
   const NOW = 1_790_609_870;
   const CLASSES = `0x${[
     '000000000000000000000000000000000000000000000000000000000a692249',
@@ -688,7 +688,7 @@ describe('P8 mark store, wire 3 (storageVersion 10)', () => {
       request: async ({ method, params }: { method: string; params: unknown[] }) => {
         if (method === 'eth_call') {
           const { data } = params[0] as { data: string };
-          return data === '0x31e77853' ? CLASSES : pad('a');
+          return data === '0x31e77853' ? CLASSES : pad('c');
         }
         return slots.get(BigInt(params[1] as string)) ?? pad('0');
       },
@@ -712,7 +712,7 @@ describe('P8 mark store, wire 3 (storageVersion 10)', () => {
       ({
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method !== 'eth_call') return pad('0');
-          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('a');
+          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('c');
         },
       }) as unknown as Eip1193Provider;
     // right id, no lane classed: Pool's constructor rejects it, so no layout is known
@@ -888,7 +888,7 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     expect(decodeP8Classes(CLASSES, 3)).toBeNull();
   });
 
-  test('wire 3 table under a v5..9 pool, and wire 2 table under v10, are refused', async () => {
+  test('wire 3 table under a v5..9 pool, and wire 2 table under v12, are refused', async () => {
     const POOL = `0x${'aa'.repeat(20)}` as `0x${string}`;
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
@@ -907,7 +907,7 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     ].join('')}` as `0x${string}`;
     for (const v of ['5', '9'])
       await expect(readMarks(at(v, v3Table), POOL, TOKEN)).rejects.toThrow('not a P8 table');
-    await expect(readMarks(at('a', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    await expect(readMarks(at('c', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
   });
 });
 
@@ -919,14 +919,14 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
  * SSTORE2 code, so the v10 words must decode to that blob exactly.
  */
 describe('wire dispatch', () => {
-  test('5..9 = wire 2, 10 = wire 3, everything else refused', () => {
+  test('5..9 = wire 2, 12 = wire 3, everything else refused (10 and 11 included)', () => {
     for (const v of [5, 6, 7, 8, 9]) {
       expect(wireOf(v)).toBe(2);
       expect(markStoreOf(v)).toBe(MARK_STORE_V5);
     }
-    expect(wireOf(10)).toBe(3);
-    expect(markStoreOf(10)).toBe(MARK_STORE_V10);
-    for (const v of [0, 1, 2, 3, 4, 11, 12]) expect(() => wireOf(v)).toThrow();
+    expect(wireOf(12)).toBe(3);
+    expect(markStoreOf(12)).toBe(MARK_STORE_V10);
+    for (const v of [0, 1, 2, 3, 4, 10, 11, 13]) expect(() => wireOf(v)).toThrow();
   });
 });
 
@@ -982,14 +982,27 @@ describe('layout v10', () => {
   const words = (from: bigint, n: number) =>
     Array.from({ length: n }, (_, i) => BigInt(SLOTS.get(from + BigInt(i)) ?? ZERO));
 
-  test('dispatch is exact: 5..9 = v5, 10 = v10, anything else throws', async () => {
+  test('dispatch is exact: 5..9 = v5, 12 = v10; 10, 11 and everything else throw', async () => {
     for (const v of [5, 6, 7, 8, 9]) expect(layoutOf(v)).toBe(5);
-    expect(layoutOf(10)).toBe(10);
-    expect(poolStorageOf(10)).toBe(POOL_STORAGE_V10);
-    for (const v of [0, 1, 11, 12]) expect(() => layoutOf(v)).toThrow('no storage layout');
+    expect(layoutOf(12)).toBe(10);
+    expect(poolStorageOf(12)).toBe(POOL_STORAGE_V10);
+    for (const v of [0, 1, 10, 11, 13])
+      expect(() => layoutOf(v)).toThrow('unsupported storageVersion');
     const pool = `0x${'cc'.repeat(20)}` as `0x${string}`;
-    await expect(readCurve(at(11), pool, 1)).rejects.toThrow('no storage layout');
-    await expect(readMarks(at(11), pool, LEGS[0][0])).rejects.toThrow('no storage layout');
+    await expect(readCurve(at(10), pool, 1)).rejects.toThrow('unsupported storageVersion');
+    await expect(readMarks(at(11), pool, LEGS[0][0])).rejects.toThrow('unsupported storageVersion');
+  });
+
+  test('a v2 pool (storageVersion 12) decodes its records through layoutOf', async () => {
+    const usdt = LEGS[1][0];
+    expect(layoutOf(12)).toBe(10);
+    expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({
+      lane: 1,
+      mode: 0,
+      quoteUnit: 0,
+      refBandBps: 150,
+    });
   });
 
   test('slots match dex-evm Pool storageLayout and PoolConstantsLib (pinned by hand)', () => {
@@ -1058,7 +1071,7 @@ describe('layout v10', () => {
       {
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method === 'eth_getCode') throw new Error('v10 reads no code');
-          return at(10).request({ method, params } as never);
+          return at(12).request({ method, params } as never);
         },
       } as unknown as Eip1193Provider,
       POOL,
@@ -1066,19 +1079,19 @@ describe('layout v10', () => {
     );
     expect(v10).not.toBeNull();
     expect(v10).toEqual(await readCurve(at(5), `0x${'dd'.repeat(20)}`, 1));
-    expect(await readCurve(at(10), POOL, 2)).toBeNull();
+    expect(await readCurve(at(12), POOL, 2)).toBeNull();
   });
 
   test('records: Asset slot 2, Custody +3, ClassHead +4 with famRow', async () => {
     const usdt = LEGS[1][0];
-    expect(await readOracleConfig(at(10), POOL, usdt)).toEqual({
+    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({
       lane: 1,
       mode: 0,
       quoteUnit: 0,
       refBandBps: 150,
     });
-    expect(await readCustody(at(10), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
-    const head = await readClassHead(at(10), POOL, usdt);
+    expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    const head = await readClassHead(at(12), POOL, usdt);
     expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });
     expect(decodeClassHead(BigInt(SLOTS.get(148n)!))).toEqual(head);
     // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +4
@@ -1086,7 +1099,7 @@ describe('layout v10', () => {
     const u = mappingBase(t, 4n);
     const slots = new Map(SLOTS);
     slots.set(u + 4n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
-    expect(await readClassHead(at(10, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
+    expect(await readClassHead(at(12, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
   });
 });
 

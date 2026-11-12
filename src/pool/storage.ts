@@ -9,8 +9,8 @@
  * (`layout.v3.generated.ts`: the `Custody` word, `marks`, and the slots after them moved), v4
  * (`layout.v4.generated.ts`: one `marks` word per leg, `lastGoodCWad` in slot 0) and v5
  * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`; storage versions 5..9) and
- * v10 (`layout.v10.generated.ts`: leg records and curves in the area behind `legIndex` /
- * `curveIndex`). Dispatch is exact: a version without tables throws. An ABI diff cannot see packing, so
+ * v10 (`layout.v10.generated.ts`, storage version 12: leg records and curves in the area behind
+ * `legIndex` / `curveIndex`). Dispatch is exact: a version without tables throws. An ABI diff cannot see packing, so
  * `bun run gen:check` (generated files vs artifacts), not test/abi-freshness.test.ts, is what
  * catches a repack; `src/pool/storage.test.ts` restates the numbers by hand as an offline pin.
  * Key = keccak256(abi.encode(key, mappingSlot)), same as Solidity 0.8.
@@ -79,8 +79,8 @@ const versions = new WeakMap<Eip1193Provider, Map<string, Promise<number>>>();
 
 /**
  * `Pool.storageVersion()`: 2 = layout v2 (Arc, `POOL_STORAGE`), 3 = layout v3 (`POOL_STORAGE_V3`),
- * 4 = layout v4 (`POOL_STORAGE_V4`), 5..9 = layout v5 (`POOL_STORAGE_V5`), 10 = layout v10
- * (`POOL_STORAGE_V10`); any other version throws (`poolStorageOf`). Memoised per provider and pool:
+ * 4 = layout v4 (`POOL_STORAGE_V4`), 5..9 = layout v5 (`POOL_STORAGE_V5`), 12 = layout v10
+ * (`POOL_STORAGE_V10`, the v2 pool); any other version throws (`poolStorageOf`). Memoised per provider and pool:
  * a pool's layout moves only with an impl upgrade.
  */
 function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<number> {
@@ -100,18 +100,19 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
   return v;
 }
 
-/** The layout family of a storage version; throws on a version this SDK has no tables for, so a
- *  newer pool is refused instead of read through an older layout's slots. */
+/** The layout family of a `Pool.storageVersion()`, as the back's core `PoolLayout::of` maps it
+ *  (core/src/storage.rs): 2..4 their own layouts, 5..=9 layout 5, 12 layout 10 (the v2 pool). 10,
+ *  11 and anything else throw, so a pool is never read through another layout's slots. */
 export function layoutOf(storageVersion: number): 2 | 3 | 4 | 5 | 10 {
   if (storageVersion === 2 || storageVersion === 3 || storageVersion === 4) return storageVersion;
   if (storageVersion >= 5 && storageVersion <= 9) return 5;
-  if (storageVersion === 10) return 10;
-  throw new Error(`Pool.storageVersion() ${storageVersion}: no storage layout for it`);
+  if (storageVersion === 12) return 10;
+  throw new Error(`unsupported storageVersion ${storageVersion}: no storage layout for it`);
 }
 
-/** The P8 mark store wire a storage version runs: 5..9 = wire 2 (Arc, Monad v1), 10 = wire 3.
- *  Exact match; any other version throws, so a store is never read through the other wire's
- *  slots, clocks or id. */
+/** The P8 mark store wire a storage version runs: 5..9 = wire 2 (Arc, Monad v1), 12 = wire 3 (the
+ *  v2 pool). Exact match; any other version throws, so a store is never read through the other
+ *  wire's slots, clocks or id. */
 export function wireOf(storageVersion: number): 2 | 3 {
   const layout = layoutOf(storageVersion);
   if (layout === 5) return 2;
