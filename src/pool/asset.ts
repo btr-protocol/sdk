@@ -9,17 +9,17 @@ const ASSET_NUMBER_FIELDS = [
   'decimals',
   'deadSeedPow10',
   'flags',
-  'kappaCovBps',
   'maxLiabWeightBps',
   'oracleBits',
-  'refBandBps',
+  'covBits',
+  'kneeBits',
 ] as const satisfies readonly (keyof Asset)[];
 
 /** A decoded `getAsset` tuple, shaped as `Asset` says. The ABI decoder returns EVERY uint as a
  *  bigint, so without this the ≤uint16 fields arrive as bigints behind a `number` type and a
  *  finite-number check refuses every one of them. A field the ABI did not carry (a stale fetched
  *  ABI) becomes NaN, never 0: `Number(undefined)` would be NaN anyway, but `Number(null)` is 0, and
- *  0 is a real value for `flags` (κ has a floor ≥ 50, so NaN, not 0, is the right refusal). */
+ *  0 is a real value for `flags` (a listed leg's `covBits` is never 0, so NaN, not 0, is the right refusal). */
 export function toAsset(raw: unknown): Asset {
   const r = raw as Record<string, unknown>;
   const out = {

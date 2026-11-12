@@ -39,6 +39,7 @@ import {
   readClassHead,
   readCurve,
   readCustody,
+  readLegCov,
   readMarks,
   readOracleConfig,
   readSolvencyState,
@@ -69,6 +70,25 @@ test('live Asset and HookSlot packing match the Solidity struct packing', () => 
       decimals: [2, 21],
       deadSeedPow10: [2, 22],
       flags: [2, 23],
+      maxLiabWeightBps: [2, 25],
+      oracleBits: [2, 27],
+      covBits: [2, 28],
+      kneeBits: [3, 0],
+    },
+    AssetV5: {
+      reserves: [0, 0],
+      liabilities: [0, 16],
+      anchor: [1, 0],
+      minLiquidity: [1, 20],
+      liquidityIndexWad: [2, 0],
+      minDispersionPbps: [2, 9],
+      curveId: [2, 13],
+      minFeePbps: [2, 15],
+      vegaBps: [2, 17],
+      depositCapCode: [2, 19],
+      decimals: [2, 21],
+      deadSeedPow10: [2, 22],
+      flags: [2, 23],
       kappaCovBps: [2, 25],
       maxLiabWeightBps: [2, 27],
       oracleBits: [2, 29],
@@ -78,6 +98,7 @@ test('live Asset and HookSlot packing match the Solidity struct packing', () => 
       target: [0, 0],
       flags: [0, 20],
       lastCreditAt: [0, 24],
+      creditBookCode: [0, 28],
     },
   });
 });
@@ -341,8 +362,8 @@ describe('versioned readers', () => {
       lane: 5,
       mode: 1,
       quoteUnit: 1,
-      refBandBps: 150,
     });
+    expect(decodeLegOracle(slot2, 5).refBandBps).toBe(150);
     await expect(readOracleConfig(providerWith(2, v5), POOL, TOKEN)).rejects.toThrow(
       'unsupported storageVersion',
     );
@@ -383,14 +404,24 @@ describe('layout v5', () => {
     expect([leg.primary.ttlSecs, leg.ref.ttlSecs]).toEqual([3600, 600]);
   });
 
-  test('Asset slot 2 carries the leg oracle wiring', () => {
-    const slot2 = `0x${((((4n << 12n) | 150n) << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
-    expect(decodeLegOracle(slot2 as `0x${string}`)).toEqual({
+  test('Asset slot 2 carries the leg oracle wiring: v5 at byte 29 + refBandBps, v10 at byte 27 + flags code', () => {
+    const v5 = `0x${((((4n << 12n) | 150n) << 240n) | (BigInt(0x40 | 7) << 232n)).toString(16).padStart(64, '0')}`;
+    expect(decodeLegOracle(v5 as `0x${string}`, 5)).toEqual({
       lane: 7,
       internal: true,
       uoa: false,
       refBandBps: 150,
     });
+    // v10: oracleBits at byte 27, the depeg code in flags 12..15 (byte 23), covBits above.
+    const v10 = `0x${((0xdeadbeefn << 224n) | (BigInt(0x80 | 7) << 216n) | (BigInt((3 << 12) | 0xb0) << 184n)).toString(16).padStart(64, '0')}`;
+    expect(decodeLegOracle(v10 as `0x${string}`, 10)).toEqual({
+      lane: 7,
+      internal: false,
+      uoa: true,
+      refBandBps: 750,
+    });
+    // the same word through the v5 struct reads covBits' low byte as the lane: the launch bug
+    expect(decodeLegOracle(v10 as `0x${string}`, 5).lane).not.toBe(7);
   });
 });
 
@@ -459,7 +490,8 @@ describe('P8 mark store, wire 3 (storageVersion 12)', () => {
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
     const slots = new Map<bigint, string>([
-      [mappingBase(TOKEN, POOL_STORAGE_V10.unlisted) + 2n, pad((BigInt(7) << 232n).toString(16))],
+      // v12 packing: oracleBits (lane 7) at byte 27
+      [mappingBase(TOKEN, POOL_STORAGE_V10.unlisted) + 2n, pad((BigInt(7) << 216n).toString(16))],
       [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, pad('cc'.repeat(20))],
       [p8TierSlot(1, 7), P[1]],
       [p8TierSlot(2, 7), R[1]],
@@ -721,6 +753,30 @@ describe('layout v10', () => {
     ['0x2a07706473244BC757E10F2a9E86fB532828afe3', 164n],
     ['0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7', 169n],
   ] as const;
+  /** `Asset` slot 2 in the v12 packing (byte offsets of `POOL_STRUCTS.Asset`): index 1e18,
+   *  minDisp 1000, curve 1, minFee 1000, vega 701, cap 0xffff, 6 decimals, flags `0xb0 | KNEE_BIT |
+   *  depeg code 3`, maxLiabWeight 100, oracleBits lane 1, covBits (c_min 80%, t 1.005, flat 5%,
+   *  c_max 1.20, κ⁻ 1536, κ⁺ 640). */
+  const at8 = (v: bigint, byte: number) => v << BigInt(8 * byte);
+  const USDT_COV = 40n | (10n << 6n) | (1n << 12n) | (3n << 15n) | (38n << 20n) | (33n << 26n);
+  const USDT_FLAGS = 0xb0n | 2n | (3n << 12n);
+  const USDT_SLOT2 = `0x${(
+    at8(10n ** 18n, 0) |
+    at8(1000n, 9) |
+    at8(1n, 13) |
+    at8(1000n, 15) |
+    at8(701n, 17) |
+    at8(0xffffn, 19) |
+    at8(6n, 21) |
+    at8(USDT_FLAGS, 23) |
+    at8(100n, 25) |
+    at8(1n, 27) |
+    at8(USDT_COV, 28)
+  )
+    .toString(16)
+    .padStart(64, '0')}`;
+  /** `kneeBits`: c_k 84% | κ₂ 640 (code 33). */
+  const USDT_KNEE = 42n | (33n << 6n);
   const SLOTS = new Map<bigint, string>([
     [86n, '0x0000000000000000000000a42a07706473244bc757e10f2a9e86fb532828afe3'],
     [94n, '0x00000000000000000000009003a6a84cd762d9707a21605b548aaab891562aab'],
@@ -744,7 +800,8 @@ describe('layout v10', () => {
     // USDT0's record: Asset 0..3 (3 = kneeBits), Custody (+4), ClassHead (+5: USD, famRow)
     [144n, '0x000000000000000000000274a48a7800000000000000000000000246139ca800'],
     [145n, '0x000000000000000000000000a4ad4f68d0b91cfd19687c881e50f3a00242828c'],
-    [146n, '0x0096010000006400b00006ffff02bd03e80001000003e8000de0b6b3a7640000'],
+    [146n, USDT_SLOT2],
+    [147n, `0x${USDT_KNEE.toString(16).padStart(64, '0')}`],
     [148n, '0x0000000000000000000000000000000000000000000000000000000000000001'],
     [149n, '0x00000000000000000000000000000000000000fa050014000000000000000001'],
   ]);
@@ -777,12 +834,42 @@ describe('layout v10', () => {
     const usdt = LEGS[1][0];
     expect(layoutOf(12)).toBe(10);
     expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
-    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({
+    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
+  });
+
+  test('a v12 asset end-to-end: oracle, cov and knee bits off their v12 lanes', async () => {
+    const usdt = LEGS[1][0];
+    expect(decodeLegOracle(USDT_SLOT2 as `0x${string}`, 10)).toEqual({
       lane: 1,
-      mode: 0,
-      quoteUnit: 0,
-      refBandBps: 150,
+      internal: false,
+      uoa: false,
+      refBandBps: 750,
     });
+    expect(await readLegCov(at(12), POOL, usdt)).toEqual({
+      cMinBps: 8000,
+      targetBps: 10_050,
+      flatBps: 500,
+      cMaxBps: 12_000,
+      kappaNegBps: 1536,
+      kappaPosBps: 640,
+      kneeCovBps: 8400,
+      kappaKneeBps: 640,
+      flags: Number(USDT_FLAGS),
+    });
+    // KNEE_BIT off: the knee word is not read
+    const noKnee = new Map(SLOTS);
+    noKnee.set(146n, `0x${(BigInt(USDT_SLOT2) & ~at8(2n, 23)).toString(16).padStart(64, '0')}`);
+    expect(await readLegCov(at(12, noKnee), POOL, usdt)).toMatchObject({
+      kneeCovBps: 0,
+      kappaKneeBps: 0,
+      flags: Number(USDT_FLAGS) & ~2,
+    });
+    // the v5 struct has no law terms
+    await expect(readLegCov(at(5), POOL, usdt)).rejects.toThrow('no covBits');
+    // the pre-fix reader (v5 packing, byte 29) would have read a covBits byte as the lane
+    expect(decodeLegOracle(USDT_SLOT2 as `0x${string}`, 5).lane).toBe(
+      Number((USDT_COV >> 8n) & 63n),
+    );
   });
 
   test('slots match dex-evm Pool storageLayout and PoolConstantsLib (pinned by hand)', () => {
@@ -867,12 +954,7 @@ describe('layout v10', () => {
 
   test('records: Asset slot 2, Custody +4, ClassHead +5 with famRow', async () => {
     const usdt = LEGS[1][0];
-    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({
-      lane: 1,
-      mode: 0,
-      quoteUnit: 0,
-      refBandBps: 150,
-    });
+    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
     expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
     const head = await readClassHead(at(12), POOL, usdt);
     expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });

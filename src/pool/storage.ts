@@ -3,7 +3,8 @@
  *
  * SSoT: `IPool.PoolStorage` @ slot 0 (`Pool.sol`). The slot tables and in-struct packing come from
  * solc's own `storageLayout`; they are the only place either number appears, and every decoder
- * reads them. `POOL_STRUCTS.Asset` is the live `Asset` layout, shared by every served version.
+ * reads them. `POOL_STRUCTS.Asset` is the v2 pool's `Asset` layout (storage version 12),
+ * `POOL_STRUCTS.AssetV5` the v1 fleet's (5..9): `assetStructOf(layout)` picks one.
  * `PoolStorage` slots are picked by `Pool.storageVersion()` (`readStorageVersion`): v5
  * (`layout.v5.generated.ts`: no mark in the pool; the impl's `MarkStore`; storage versions 5..9) and
  * v10 (`layout.v10.generated.ts`, storage version 12: leg records and curves in the area behind
@@ -39,6 +40,7 @@ import { MARK_STORE_ABI } from '../abis/MarkStore.js';
 import { MARK_STORE_ABI_V2 } from '../abis/MarkStore.v2.js';
 import { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
 import type { Assert, FieldsMatch, OracleConfigFields } from '../abis/structs.generated.js';
+import { type CovTerms, type KneeTerms, decodeCovBits, decodeKneeBits } from './cov.js';
 import { POOL_STRUCTS } from './layout.generated.js';
 import { MARK_WORD_V4 } from './layout.v4.generated.js';
 import { MARK_STORE_V5, POOL_STORAGE_V5 } from './layout.v5.generated.js';
@@ -140,6 +142,8 @@ export interface HookSlot {
 
 /** `PoolConstantsLib.CLASS_ROWS_BIT`: the leg has a peg family or a risk row (store-owned flag). */
 export const CLASS_ROWS_BIT = 1 << 7;
+/** `PoolConstantsLib.KNEE_BIT`: the leg carries a knee (`Asset.kneeBits`, κ₂ > 0); derived. */
+export const KNEE_BIT = 1 << 1;
 /** `PoolConstantsLib.MAX_FAMILY`: highest peg-family id and row key (0 = the leg's default row). */
 export const MAX_FAMILY = 4;
 
@@ -174,7 +178,7 @@ export interface RiskConfig {
   kappaCovBps: number;
 }
 
-/** `IPool.OracleConfig` as a layout-v5 pool stores it, in `Asset` slot 2. */
+/** `IPool.OracleConfig` as a pool stores it, in `Asset` slot 2 (`oracleBits`). */
 export interface OracleConfig {
   /** Store lane (< 64) carrying the leg's P and R tiers. */
   lane: number;
@@ -182,9 +186,18 @@ export interface OracleConfig {
   mode: number;
   /** 0 = ANCHOR_UNIT, 1 = UNIT_OF_ACCOUNT (the pool divides by the base's own mark). */
   quoteUnit: number;
-  /** Depeg band vs the lane's R tier, bps. 0 = disarmed. */
-  refBandBps: number;
 }
+
+/** The `Asset` struct packing a layout reads: v10 (storage version 12) moved κ and the depeg band
+ *  out of the struct (`covBits`, `flags` 12..15), so `oracleBits` sits at byte 27, not 29. */
+export function assetStructOf(
+  layout: 5 | 10,
+): typeof POOL_STRUCTS.Asset | typeof POOL_STRUCTS.AssetV5 {
+  return layout === 10 ? POOL_STRUCTS.Asset : POOL_STRUCTS.AssetV5;
+}
+
+/** `PoolConstantsLib.DEPEG_STEP_BPS`: a v10 leg's depeg band is `flags >> 12` codes of this. */
+export const DEPEG_STEP_BPS = 250;
 
 export type _OracleConfigMatchesAbi = Assert<FieldsMatch<OracleConfig, OracleConfigFields>>;
 
@@ -428,22 +441,46 @@ function decodeCurve(words: bigint[]): QuarticCurve | null {
   return { m, boundaries, dispRef, flags, segs };
 }
 
-/** A leg's oracle config, off its `Asset` slot-2 word (v5 and v10 alike). */
+/** A leg's oracle config, off its `Asset` slot-2 word through the layout's struct packing. */
 export async function readOracleConfig(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
 ): Promise<OracleConfig> {
-  const key = await resolveTokenStorageKey(provider, pool, token);
+  const [layout, key] = await Promise.all([
+    readStorageVersion(provider, pool).then(layoutOf),
+    resolveTokenStorageKey(provider, pool, token),
+  ]);
   const leg = decodeLegOracle(
     await getStorageAt(provider, pool, (await assetSlot(provider, pool, key)) + 2n),
+    layout,
   );
-  return {
-    lane: leg.lane,
-    mode: leg.internal ? 1 : 0,
-    quoteUnit: leg.uoa ? 1 : 0,
-    refBandBps: leg.refBandBps,
-  };
+  return { lane: leg.lane, mode: leg.internal ? 1 : 0, quoteUnit: leg.uoa ? 1 : 0 };
+}
+
+/** A v2 leg's coverage law off its record: `covBits` (slot 2) and `kneeBits` (slot 3), decoded to
+ *  bps as `getRiskConfig` reports them. The knee is read only while `flags` carries `KNEE_BIT`
+ *  (`PoolConstantsLib`, bit 1); otherwise it reads as none. Throws on a v1 pool: its κ is the
+ *  `kappaCovBps` struct field and it has no law terms. */
+export async function readLegCov(
+  provider: Eip1193Provider,
+  pool: Address,
+  token: Address,
+): Promise<CovTerms & KneeTerms & { flags: number }> {
+  const [layout, key] = await Promise.all([
+    readStorageVersion(provider, pool).then(layoutOf),
+    resolveTokenStorageKey(provider, pool, token),
+  ]);
+  if (layout !== 10) throw new Error(`readLegCov: layout ${layout} has no covBits`);
+  const base = await assetSlot(provider, pool, key);
+  const f = POOL_STRUCTS.Asset;
+  const [slot2, slot3] = await Promise.all([
+    getStorageAt(provider, pool, base + BigInt(f.covBits[0])),
+    getStorageAt(provider, pool, base + BigInt(f.kneeBits[0])),
+  ]);
+  const flags = u16At(slot2, f.flags[1]);
+  const knee = flags & KNEE_BIT ? decodeKneeBits(u16At(slot3, f.kneeBits[1])) : decodeKneeBits(0);
+  return { ...decodeCovBits(u32At(slot2, f.covBits[1])), ...knee, flags };
 }
 
 /** `PoolConstantsLib.SWAP_GATE_SLOTS`: the open-addressed `swapGate` table (v10), pinned by
@@ -577,20 +614,29 @@ export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } 
   };
 }
 
-/** A leg's oracle wiring off its `Asset` slot-2 word. */
-export function decodeLegOracle(slot2: Hex): {
+/** A leg's oracle wiring off its `Asset` slot-2 word, through the layout's struct packing
+ *  (`assetStructOf`). `refBandBps` is the depeg band in bps: the v5 struct field's low 12 bits, or
+ *  on v10 the `flags` 12..15 code times `DEPEG_STEP_BPS` (`MarkWordLib.depegBps`). */
+export function decodeLegOracle(
+  slot2: Hex,
+  layout: 5 | 10,
+): {
   lane: number;
   internal: boolean;
   uoa: boolean;
   refBandBps: number;
 } {
-  const f = POOL_STRUCTS.Asset;
+  const f = assetStructOf(layout);
   const b = u8At(slot2, f.oracleBits[1]);
+  const refBandBps =
+    layout === 10
+      ? (u16At(slot2, f.flags[1]) >>> 12) * DEPEG_STEP_BPS
+      : u16At(slot2, POOL_STRUCTS.AssetV5.refBandBps[1]) & 0xfff; // 12..15 = depeg code
   return {
     lane: b & MARK_STORE_V10.LANE_MASK,
     internal: (b & MARK_STORE_V10.INTERNAL_BIT) !== 0,
     uoa: (b & MARK_STORE_V10.UOA_BIT) !== 0,
-    refBandBps: u16At(slot2, f.refBandBps[1]) & 0xfff, // 12..15 = depeg code
+    refBandBps,
   };
 }
 
@@ -736,7 +782,7 @@ export async function readMarks(
     assetSlot(provider, pool, key).then((a) => getStorageAt(provider, pool, a + 2n)),
     getStorageAt(provider, pool, IMPL_SLOT),
   ]);
-  const leg = decodeLegOracle(slot2);
+  const leg = decodeLegOracle(slot2, layoutOf(storageVersion));
   const impl = addressAt(implWord, 0);
   const cls = await readP8Classes(provider, impl, wire);
   const [pw, rw] = await Promise.all([

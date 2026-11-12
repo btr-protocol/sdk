@@ -33,6 +33,7 @@ export const OpType = {
   BACKFILL_LEGS: 12,
   UPDATE_POOL_ADMIN: 13,
   UPDATE_CLASS_RISK: 14,
+  UPDATE_SWAP_GATE: 15,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 
@@ -59,6 +60,7 @@ export const Role = {
   RISK_STEWARD: 4,
   GUARDIAN: 5,
   GUARDIAN_REVOKE: 6,
+  FLASH_BORROWER: 7,
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
@@ -77,13 +79,12 @@ export const ENABLE_MASK = 2160;
 export const FEED_HALT_BIT = 1;
 export const FLASH_ENABLED_BIT = 64;
 export const GATE_MASK = 1536;
-export const HALT_ANCHOR_BIT = 4;
 export const HALT_BIT = 1;
-export const HALT_MASK = 5;
+export const HALT_MASK = 1;
 export const HALT_SETTABLE_MASK = 1;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 65533;
+export const KNOWN_FLAGS_MASK = 65531;
 export const LIABILITY_SWAP_ENABLED_BIT = 32;
 export const PEGGED_BIT = 8;
 export const SWAP_ENABLED_BIT = 16;
@@ -101,10 +102,8 @@ export const MIN_KAPPA_COV_BPS = 50;
 export const MIN_KAPPA_COV_BPS_PEGGED = 10;
 export const ORACLE_MODE_EXTERNAL = 0;
 export const ORACLE_MODE_INTERNAL = 1;
-export const PEG_CAP_BPS = 15000;
 export const QUOTE_UNIT_ANCHOR = 0;
 export const QUOTE_UNIT_UOA = 1;
-export const VOL_CAP_BPS = 20000;
 
 // Staleness (PricingLib).
 export const MAX_STALE_GRACE_SECS = 3;
@@ -112,8 +111,8 @@ export const STALE_Z = 472;
 
 // `AccessControl.perms` lanes (ConstantsLib). Bits 0-15 are the leg gate bits themselves (DEPOSIT_GATED, SWAP_GATED).
 export const LANE_ARB_OP = 4096;
+export const LANE_FLASH_BORROWER = 8192;
 export const PERM_GUARDIAN = 131072;
-export const PERM_KEEPER = 65536;
 export const PERM_RISK_STEWARD = 262144;
 
 /** Packed `ConstantsLib` timelock schedules, seconds per `Tier`. */

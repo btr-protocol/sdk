@@ -22,10 +22,10 @@ const row = {
   decimals: 6n,
   deadSeedPow10: 3n,
   flags: 7n,
-  kappaCovBps: 1500n,
   maxLiabWeightBps: 0n,
   oracleBits: 0n,
-  refBandBps: 0n,
+  covBits: 0x8660_8c28n,
+  kneeBits: 0n,
 };
 const encoded = encodeAbiParameters(getAssetOutputs, [row]) as Hex;
 
@@ -36,12 +36,12 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says', () =>
       functionName: 'getAsset',
       data: encoded,
     });
-    expect(typeof raw.kappaCovBps).toBe('bigint');
+    expect(typeof raw.maxLiabWeightBps).toBe('bigint');
   });
 
   test('every small field becomes a number; the 96/128-bit books stay bigint', () => {
     const a = toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: encoded }));
-    expect(a.kappaCovBps).toBe(1500);
+    expect(a.covBits).toBe(0x8660_8c28);
     expect(a.maxLiabWeightBps).toBe(0);
     expect(a.flags).toBe(7);
     expect(a.decimals).toBe(6);
@@ -51,16 +51,16 @@ describe('toAsset — a decoded getAsset tuple is shaped as `Asset` says', () =>
   });
 
   test('a field the ABI did not carry is NaN, never 0', () => {
-    const { kappaCovBps: _drop, ...stale } = row;
+    const { covBits: _drop, ...stale } = row;
     const a = toAsset(stale);
-    expect(Number.isNaN(a.kappaCovBps)).toBe(true);
+    expect(Number.isNaN(a.covBits)).toBe(true);
     expect(toAsset({ ...row, flags: null }).flags).toBeNaN();
   });
 
   test('getAsset returns the shaped row', async () => {
     const provider = { request: async () => encoded } as never;
     const a = await getAsset(provider, row.anchor as Hex, row.anchor as Hex);
-    expect(a.kappaCovBps).toBe(1500);
+    expect(a.covBits).toBe(0x8660_8c28);
   });
 });
 
