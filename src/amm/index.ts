@@ -15,6 +15,7 @@ export type {
   DepthLevel,
   DepthCurve,
   CurveWire,
+  LegAddrs,
   NamedPoolWire,
   RouteRequestWire,
   QuoteRouteWire,
