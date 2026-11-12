@@ -40,26 +40,25 @@ interface Fixture {
 const fx = FIXTURE as unknown as Fixture;
 
 /**
- * Serves the dumped words as if they were `curves[CURVE_ID]`. The base slot is taken from the
- * FIRST slot `readCurve` asks for, so this fixes the packing under test without also re-asserting
- * the mapping slot arithmetic (which `storage-layout.test.ts` owns).
+ * Serves the dumped words as the curve's SSTORE2 blob, the layout a v5 pool reads (`curvePointer`,
+ * one `eth_getCode`: a STOP byte, then the words). The packing under test is the same
+ * `NUQuarticLib.set` packing on every layout; only the storage carrier differs, and the retired v2
+ * storage-mapped curve is gone.
  */
-function wordProvider(words: string[] = fx.words): Eip1193Provider & { reads: bigint[] } {
-  const reads: bigint[] = [];
-  let base: bigint | null = null;
+function wordProvider(words: string[] = fx.words): Eip1193Provider & { codes: number } {
+  const counter = { codes: 0 };
+  const blob = `0x00${words.map((w) => w.slice(2)).join('')}` as Hex;
   return {
-    reads,
-    request: async ({ method, params }: { method: string; params?: unknown[] }) => {
-      // A v2 pool: the storage-mapped curve these words were dumped from (v5 reads a blob).
-      if (method === 'eth_call') return `0x${'2'.padStart(64, '0')}` as Hex;
-      if (method !== 'eth_getStorageAt') throw new Error(`unexpected ${method}`);
-      const slot = BigInt((params as [Address, Hex, string])[1]);
-      reads.push(slot);
-      if (base === null) base = slot;
-      const i = Number(slot - base);
-      return (words[i] ?? `0x${'0'.repeat(64)}`) as Hex;
+    get codes() {
+      return counter.codes;
     },
-  } as Eip1193Provider & { reads: bigint[] };
+    request: async ({ method }: { method: string; params?: unknown[] }) => {
+      if (method === 'eth_call') return `0x${'5'.padStart(64, '0')}` as Hex;
+      if (method !== 'eth_getCode') throw new Error(`unexpected ${method}`);
+      counter.codes += 1;
+      return blob;
+    },
+  } as Eip1193Provider & { codes: number };
 }
 
 const read = () => readCurve(wordProvider(), POOL, CURVE_ID);
@@ -103,17 +102,15 @@ describe('readCurve decodes the words NUQuarticLib.set actually wrote', () => {
     expect(`${evalQ(c, 10_000)}`).toBe(`${last - shift}`);
   });
 
-  test('one speculative sweep of header + the fixed 28-slot block - one round trip, no more', async () => {
+  test('one eth_getCode reads the whole curve blob - one round trip, no more', async () => {
     const p = wordProvider();
     const c = (await readCurve(p, POOL, CURVE_ID)) as NonNullable<
       Awaited<ReturnType<typeof readCurve>>
     >;
-    // eth_getStorageAt cannot ride Multicall3 aggregate3 (raw storage, no view getter by
-    // policy), so batching means ONE coalesced JSON-RPC batch: header + the whole fixed
-    // uint256[28] segment block fetched speculatively - never a second dependent round trip.
-    expect(p.reads.length).toBe(1 + CURVE_SEG_SLOTS);
-    // Only the live 2m words are decoded; the speculative tail is ignored.
+    expect(p.codes).toBe(1);
+    // Only the live 2m words are decoded; the words past them are ignored.
     expect(c.m).toBeGreaterThan(0);
+    expect(CURVE_SEG_SLOTS).toBe(28);
   });
 
   test('an unset curve (header 0) reads as null, not as an m=0 curve', async () => {

@@ -1,59 +1,12 @@
-// `PoolStorage` layout v2 (`Pool.storageVersion() == 2`) ONLY: slots and `PoolStorage` offsets
-// here are wrong on v3+ (see `layout.v{3,4,5}.generated.ts`). `POOL_STRUCTS.Asset` and
-// `HookSlot` are the live layouts shared by every version; `OracleConfig` is v2..v4 storage
-// (slot 5 is reserved from v5, where the wiring sits in `Asset` slot 2).
-
-/** Absolute slots of every layout-v2 `IPool.PoolStorage` field, mappings included. */
-export const POOL_STORAGE = {
-  baseToken: 0n,
-  initialized: 0n,
-  protoSharePct: 0n,
-  flashFeePbps: 0n,
-  flowCooldownSecs: 0n,
-  solvencyArmed: 0n,
-  wnative: 1n,
-  treasury: 2n,
-  factory: 3n,
-  assets: 4n,
-  oracleConfigs: 5n,
-  curves: 6n,
-  protocolFees: 7n,
-  assetHooks: 8n,
-  invested: 9n,
-  lpTokens: 10n,
-  poolAdmin: 11n,
-  legs: 13n,
-  lastGoodCWad: 14n,
-} as const;
-
-/** `PoolStorage` members that are mappings: pinned by slot only; a mapping has no byte offset. */
-export const POOL_MAPPINGS = [
-  'assets',
-  'oracleConfigs',
-  'curves',
-  'protocolFees',
-  'assetHooks',
-  'invested',
-  'lpTokens',
-] as const;
+// The live struct layouts shared by every served `Pool.storageVersion()` (5..9 and 12): `Asset`
+// and `HookSlot`. The v2 `PoolStorage` slots, mappings and `OracleConfig` were the retired layouts
+// v2..v4 (storage versions 2..4) and are gone; the v5 and v10 slot tables are in their own files.
 
 /**
  * In-struct field position as `[slot, byteOffset]`, LSB-aligned exactly as solc packs it.
  * `slot` is relative to the struct's own base (the mapping-entry base for a mapping value).
  */
 export const POOL_STRUCTS = {
-  PoolStorage: {
-    baseToken: [0, 0],
-    initialized: [0, 20],
-    protoSharePct: [0, 21],
-    flashFeePbps: [0, 22],
-    flowCooldownSecs: [0, 24],
-    solvencyArmed: [0, 26],
-    wnative: [1, 0],
-    treasury: [2, 0],
-    factory: [3, 0],
-    poolAdmin: [11, 0],
-  },
   Asset: {
     reserves: [0, 0],
     liabilities: [0, 16],
@@ -72,15 +25,6 @@ export const POOL_STRUCTS = {
     maxLiabWeightBps: [2, 27],
     oracleBits: [2, 29],
     refBandBps: [2, 30],
-  },
-  OracleConfig: {
-    feedId: [0, 0],
-    primary: [1, 0],
-    mode: [1, 20],
-    quoteUnit: [1, 21],
-    refBandBps: [1, 22],
-    refFeedId: [2, 0],
-    refPrimary: [3, 0],
   },
   HookSlot: {
     target: [0, 0],
