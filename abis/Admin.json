@@ -69,11 +69,6 @@
             "name": "quoteUnit",
             "type": "uint8",
             "internalType": "uint8"
-          },
-          {
-            "name": "refBandBps",
-            "type": "uint16",
-            "internalType": "uint16"
           }
         ]
       },
@@ -99,6 +94,41 @@
           },
           {
             "name": "maxLiabWeightBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covMinBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covTargetBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covFlatBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kappaPosBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kneeCovBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kappaKneeBps",
             "type": "uint16",
             "internalType": "uint16"
           }
@@ -304,24 +334,6 @@
   },
   {
     "type": "function",
-    "name": "executeBackfillLegs",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "legs",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "executeSweep",
     "inputs": [
       {
@@ -461,6 +473,19 @@
   },
   {
     "type": "function",
+    "name": "executeUpdateSwapGate",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeUpdateTreasury",
     "inputs": [
       {
@@ -478,6 +503,30 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "guardianHaltAt",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "leg",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48",
+        "internalType": "uint48"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -504,7 +553,7 @@
   },
   {
     "type": "function",
-    "name": "narrowRefBand",
+    "name": "haltReasons",
     "inputs": [
       {
         "name": "pool",
@@ -512,18 +561,53 @@
         "internalType": "address"
       },
       {
-        "name": "token",
+        "name": "leg",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "refBandBps",
-        "type": "uint16",
-        "internalType": "uint16"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "reasons",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "firstHaltAt",
+        "type": "uint48",
+        "internalType": "uint48"
+      },
+      {
+        "name": "lastRaiseAt",
+        "type": "uint48",
+        "internalType": "uint48"
+      },
+      {
+        "name": "lastOracleRaiseAt",
+        "type": "uint48",
+        "internalType": "uint48"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "listingDelay",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48",
+        "internalType": "uint48"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -615,6 +699,24 @@
         "name": "minDispersionPbps",
         "type": "uint32",
         "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "removeSwapGate",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "remaining",
+        "type": "address[]",
+        "internalType": "address[]"
       }
     ],
     "outputs": [],
@@ -778,6 +880,25 @@
   },
   {
     "type": "function",
+    "name": "sealedAt",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48",
+        "internalType": "uint48"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "setAssetParamsBounded",
     "inputs": [
       {
@@ -911,6 +1032,41 @@
           },
           {
             "name": "maxLiabWeightBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covMinBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covTargetBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covFlatBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kappaPosBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kneeCovBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "kappaKneeBps",
             "type": "uint16",
             "internalType": "uint16"
           }
@@ -1335,12 +1491,6 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "uint8"
-      },
-      {
-        "name": "flashFeePbps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
       }
     ],
     "anonymous": false
@@ -1360,6 +1510,68 @@
         "type": "uint16",
         "indexed": false,
         "internalType": "uint16"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "HaltCleared",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "leg",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "reason",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "HaltRaised",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "leg",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "reason",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1423,56 +1635,6 @@
   },
   {
     "type": "event",
-    "name": "QueuedRefBandClamped",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "id",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "refBandBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "RefBandUpdated",
-    "inputs": [
-      {
-        "name": "pool",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "refBandBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "RiskConfigUpdated",
     "inputs": [
       {
@@ -1489,6 +1651,18 @@
       },
       {
         "name": "flags",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "covMinBps",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "covMaxBps",
         "type": "uint16",
         "indexed": false,
         "internalType": "uint16"
@@ -1842,29 +2016,5 @@
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "function",
-    "name": "guardianHaltAt",
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pool",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "leg",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "internalType": "uint48",
-        "name": "",
-        "type": "uint48"
-      }
-    ],
-    "stateMutability": "view"
   }
 ]

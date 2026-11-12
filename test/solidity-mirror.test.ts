@@ -17,7 +17,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as M from '../src/abis/solidity.generated';
 import { MARK_WORD_V4 } from '../src/pool/layout.v4.generated';
-import { CLASS_ROWS_BIT, MAX_FAMILY, SWAP_GATE_SLOTS, decodeClassRisk } from '../src/pool/storage';
+import {
+  CLASS_ROWS_BIT,
+  DEPEG_STEP_BPS,
+  KNEE_BIT,
+  MAX_FAMILY,
+  SWAP_GATE_SLOTS,
+  decodeClassRisk,
+} from '../src/pool/storage';
 
 const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
@@ -155,7 +162,6 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     // bits, so they are derived here too rather than copied.
     for (const k of [
       'HALT_BIT',
-      'HALT_ANCHOR_BIT',
       'HALT_MASK',
       'HALT_SETTABLE_MASK',
       'SWAP_ENABLED_BIT',
@@ -189,20 +195,18 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
     const c = poolConsts();
     expect(c.get('CLASS_ROWS_BIT')).toBe(CLASS_ROWS_BIT);
     expect(c.get('MAX_FAMILY')).toBe(MAX_FAMILY);
-    // ClassRiskLib.pack: kappa | band << BAND_SHIFT | fee << FEE_SHIFT, widths from the masks.
-    expect([c.get('CLASS_BAND_SHIFT'), c.get('CLASS_FEE_SHIFT')]).toEqual([14, 23]);
-    const row = 10_000n | (500n << 14n) | (10_000n << 23n);
-    expect(decodeClassRisk(row)).toEqual({
-      kappaCovBps: 10_000,
-      refBandBps: 500,
-      minFeePbps: 10_000,
-    });
+    // ClassRiskLib.pack: kappa | fee << FEE_SHIFT, widths from the masks (the band left the row).
+    expect(c.get('CLASS_FEE_SHIFT')).toBe(14);
+    const row = 10_000n | (10_000n << 14n);
+    expect(decodeClassRisk(row)).toEqual({ kappaCovBps: 10_000, minFeePbps: 10_000 });
+    expect(c.get('KNEE_BIT')).toBe(KNEE_BIT);
+    expect(c.get('DEPEG_STEP_BPS')).toBe(DEPEG_STEP_BPS);
     expect(M.KNOWN_FLAGS_MASK & CLASS_ROWS_BIT).toBe(CLASS_ROWS_BIT);
   });
 
   test('perms lanes match shared ConstantsLib.sol', () => {
     const c = constants(src(join(SHARED, 'evm', 'src', 'ConstantsLib.sol')));
-    for (const k of ['PERM_KEEPER', 'PERM_GUARDIAN', 'PERM_RISK_STEWARD'] as const) {
+    for (const k of ['PERM_GUARDIAN', 'PERM_RISK_STEWARD'] as const) {
       expect([k, c.get(k)]).toEqual([k, M[k]]);
     }
   });

@@ -45,17 +45,16 @@ export interface Asset {
   depositCapCode: number;
   decimals: number;
   deadSeedPow10: number;
-  /** Halt/enable bits. Was `RiskConfig.flags` in the deleted `riskConfigs` mapping. */
+  /** Halt/enable bits; 12..15 = the depeg code (`DEPEG_STEP_BPS` each). */
   flags: number;
-  /** κ (bps): convex coverage-wall strength. Every listed leg carries 50 ≤ κ ≤ BPS.
-   *  Was `RiskConfig.kappaCovBps`. */
-  kappaCovBps: number;
   /** Per-leg ceiling on this leg's share of the pool claim book (bps of B). 0 = disabled (default). */
   maxLiabWeightBps: number;
   /** Oracle wiring: store lane 0..5 | INTERNAL 6 | UOA 7 (`decodeLegOracle`). */
   oracleBits: number;
-  /** Depeg band vs the lane's R tier, bps (low 12 bits; 12..15 = depeg code). 0 = disarmed. */
-  refBandBps: number;
+  /** Coverage-law terms, raw (`decodeCovBits`); `getRiskConfig` reports them in bps. */
+  covBits: number;
+  /** The negative barrier's knee, raw (`decodeKneeBits`); read only behind `KNEE_BIT` in `flags`. */
+  kneeBits: number;
 }
 
 /** Fails the typecheck if `Asset` and the ABI's struct stop agreeing on field names. */
@@ -167,6 +166,8 @@ export type {
   OracleConfig,
   RiskConfig,
 } from './storage.js';
+export type { CovTerms, KneeTerms } from './cov.js';
+export { decodeCovBits, decodeKneeBits, kappaBps } from './cov.js';
 export {
   MARK_WORD_V4,
   POOL_STRUCTS,
@@ -192,6 +193,10 @@ export {
   curvePointer,
   readCurve,
   readOracleConfig,
+  readLegCov,
+  assetStructOf,
+  DEPEG_STEP_BPS,
+  KNEE_BIT,
   getStorageAt,
   POOL_AREA_V10,
   POOL_STORAGE_V10,
