@@ -687,6 +687,18 @@ export interface WireMeta {
   decimalsOf: (sym: string) => number;
 }
 
+/** The 0x addresses a flat /quote names, from the same source as the pool wire (`WireMeta.addressOf`
+ *  for the leg token and the base; the pool's own `addr`). Each must be servable (not absent, not
+ *  zero): the back answers 422 otherwise. */
+export interface LegAddrs {
+  /** The pool (`NamedPool.addr`). */
+  pool: string;
+  /** The leg token (`meta.addressOf(leg.token)`). */
+  token: string;
+  /** The base token (`meta.addressOf(state.base)`). */
+  base: string;
+}
+
 interface QuoteRequestWire {
   curve: CurveWire;
   min_dispersion_pbps: number;
@@ -705,6 +717,11 @@ interface QuoteRequestWire {
   /** The pool's address (0x hex, as the pool wire). The back reads flags, base flags, min liquidity
    *  and layout from chain by it; a missing or zero address is a 422. */
   addr: string;
+  /** The leg token's address (`SpokeWire.address`): the back reads `getAsset(token)` from chain by
+   *  it. A missing or zero address is a 422. */
+  address: string;
+  /** The base token's address (`NamedPoolWire.base_address`). A missing or zero address is a 422. */
+  base_address: string;
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
@@ -792,7 +809,8 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
  * absent from the first cut of this wire and every spoke→base sell quoted a zero coverage toll
  * the chain still charged, so there is deliberately nothing to omit.
  *
- * `poolAddress` is the leg's pool address, REQUIRED: the back prices the pool from chain by it.
+ * `addrs` (pool, leg token, base token) is REQUIRED: the back reads the pool and both tokens from
+ * chain by them. Callers take them from the same source as the pool wire (see {@link LegAddrs}).
  */
 export function legToQuoteBody(
   leg: PoolLeg,
@@ -800,7 +818,7 @@ export function legToQuoteBody(
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
-  poolAddress: string,
+  addrs: LegAddrs,
   counterpartyClass?: ClassWire,
 ): QuoteRequestWire {
   return {
@@ -816,7 +834,9 @@ export function legToQuoteBody(
     sigma_pbps: leg.sigma,
     selling,
     counterparty,
-    addr: poolAddress,
+    addr: addrs.pool,
+    address: addrs.token,
+    base_address: addrs.base,
     confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
@@ -840,21 +860,28 @@ const depegWire = (leg: PoolLeg) => ({
   ...baseDepegWire(leg),
 });
 
-/** Single-leg exact-in quote over POST /v1/quote. `counterparty` and `poolAddress`: see
- *  {@link legToQuoteBody}. */
+/** Single-leg exact-in quote over POST /v1/quote. `counterparty` and `addrs`: see
+ *  {@link legToQuoteBody}. Refuses a missing or zero address before the call (a 422 otherwise). */
 export function quoteLegAsync(
   leg: PoolLeg,
   amountInTok: number,
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
-  poolAddress: string,
+  addrs: LegAddrs,
   base?: string,
 ): Promise<QuoteResponseWire> {
+  for (const [name, a] of [
+    ['pool', addrs.pool],
+    ['leg token', addrs.token],
+    ['base token', addrs.base],
+  ] as const) {
+    if (!servableAddr(a)) throw new Error(`quoteLegAsync: ${name} has no servable address`);
+  }
   return post<QuoteResponseWire>(
     backendBase(base),
     '/quote',
-    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty, poolAddress),
+    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty, addrs),
   );
 }
 
