@@ -138,4 +138,5 @@ export const POOL_SCOPED_OPS: readonly OpType[] = [
   OpType.UPDATE_TREASURY,
   OpType.UPDATE_FEES,
   OpType.UPDATE_POOL_ADMIN,
+  OpType.UPDATE_SWAP_GATE,
 ];
