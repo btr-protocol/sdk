@@ -170,6 +170,7 @@ export type { CovTerms, KneeTerms } from './cov.js';
 export { decodeCovBits, decodeKneeBits, kappaBps } from './cov.js';
 export {
   MARK_WORD_V4,
+  MARK_WORD_WIRE2,
   POOL_STRUCTS,
   decodeCustody,
   decodeMarkWord,

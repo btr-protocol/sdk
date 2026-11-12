@@ -42,12 +42,12 @@ import { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js
 import type { Assert, FieldsMatch, OracleConfigFields } from '../abis/structs.generated.js';
 import { type CovTerms, type KneeTerms, decodeCovBits, decodeKneeBits } from './cov.js';
 import { POOL_STRUCTS } from './layout.generated.js';
-import { MARK_WORD_V4 } from './layout.v4.generated.js';
+import { MARK_WORD_V4, MARK_WORD_WIRE2 } from './layout.v4.generated.js';
 import { MARK_STORE_V5, POOL_STORAGE_V5 } from './layout.v5.generated.js';
 import { MARK_STORE_V10, POOL_AREA_V10, POOL_STORAGE_V10 } from './layout.v10.generated.js';
 
 export { POOL_STRUCTS } from './layout.generated.js';
-export { MARK_WORD_V4 } from './layout.v4.generated.js';
+export { MARK_WORD_V4, MARK_WORD_WIRE2 } from './layout.v4.generated.js';
 export { MARK_STORE_V5, POOL_MAPPINGS_V5, POOL_STORAGE_V5 } from './layout.v5.generated.js';
 export {
   MARK_STORE_V10,
@@ -581,11 +581,34 @@ export function laneFloat(f: number): bigint {
   return e >= 16n ? mant << (e - 16n) : mant >> (16n - e);
 }
 
-/** A P8 store word (`MARK_WORD_V4`) as its two feeds. The mirror rides on `primary`; `ref` carries
- *  no σ nor maxDev (the pool never reads them) and is all 0 while the band is disarmed. */
-export function decodeMarkWord(word: Hex): { primary: MarkWord; ref: MarkWord } {
+/** A leg / store word as its feeds. Wire 3 (`MARK_WORD_V4`, dex-evm 1bfe04ed, core
+ *  `decode_mark_word`): one feed, the depeg band at `DEPEG_SHIFT` in `DEPEG_STEP_BPS` codes, `ref`
+ *  null. Wire 2 (`MARK_WORD_WIRE2`, the v1 fleet): the mirror rides on `primary`; `ref` carries no
+ *  σ nor maxDev (the pool never reads them) and is all 0 while the band is disarmed. */
+export function decodeMarkWord(
+  word: Hex,
+  wire: 2 | 3 = 3,
+): { primary: MarkWord; ref: MarkWord | null } {
   const w = BigInt(word);
-  const m = MARK_WORD_V4;
+  if (wire === 3) {
+    const m = MARK_WORD_V4;
+    return {
+      primary: {
+        mark1e18: laneFloat(field(w, 0, 32)),
+        obs: field(w, m.OBS_SHIFT, 32),
+        sigmaPbps: field(w, m.SIGMA_SHIFT, 27),
+        confidenceBps: field(w, m.CONF_SHIFT, 16),
+        ttlSecs: field(w, m.TTL_SHIFT, 16),
+        maxDevBps: field(w, m.MAX_DEV_SHIFT, 11),
+        halted: field(w, m.HALT_SHIFT, 1) === 1,
+        internal: field(w, m.INTERNAL_SHIFT, 1) === 1,
+        uoa: field(w, m.UOA_SHIFT, 1) === 1,
+        refBandBps: field(w, m.DEPEG_SHIFT, 4) * DEPEG_STEP_BPS,
+      },
+      ref: null,
+    };
+  }
+  const m = MARK_WORD_WIRE2;
   return {
     primary: {
       mark1e18: laneFloat(field(w, 0, 32)),
@@ -641,12 +664,13 @@ export function decodeLegOracle(
 }
 
 /** A store word as a pool prices it for one leg: σ floored at the lane's minSigma, the leg's own
- *  config in the mirror fields. Byte-identical to dex-evm `MarkWordLib.compose`. */
+ *  config in the mirror fields (`MarkWordLib.compose`; core `decode_store_word`). */
 export function decodeStoreWord(
   word: Hex,
   leg: { internal: boolean; uoa: boolean; refBandBps: number },
-): { primary: MarkWord; ref: MarkWord } {
-  const out = decodeMarkWord(word);
+  wire: 2 | 3 = 3,
+): { primary: MarkWord; ref: MarkWord | null } {
+  const out = decodeMarkWord(word, wire);
   const floor = Number(BigInt(word) >> BigInt(MARK_STORE_V10.MIN_SIGMA_SHIFT));
   out.primary.sigmaPbps = Math.max(out.primary.sigmaPbps, floor);
   out.primary.internal = leg.internal;
@@ -671,7 +695,7 @@ export type P8Classes = { laneCls: bigint; clsA: bigint; clsB: bigint };
 const CLASSES_SELECTOR = '0x31e77853';
 const P8_STORE_ID = {
   2: keccak256(new TextEncoder().encode('btr.markstore.p8')),
-  3: keccak256(new TextEncoder().encode('btr.markstore.p8.v3')),
+  3: keccak256(new TextEncoder().encode('btr.markstore.p8.v4')),
 } as const;
 
 /** The P8 class table off a `classes()` return; `null` for any other store id, including the
@@ -699,29 +723,33 @@ export function p8Sigma(s8: number, floor: number): number {
   return s8 === 0 ? floor : Math.max(floor, (16 | (s8 & 15)) * 2 ** ((s8 >> 4) + 2));
 }
 
-/** Tier `t` (1 = P, 2 = R) word slot of `lane` in a P8 store: 4 lanes per word. */
+/** Word slot of `lane` in a P8 store, 4 lanes per word (core `p8::word_slot`). Wire 3 has ONE
+ *  tier at `MS + (lane >> 2)`; wire 2 keeps tier `t` (1 = P, 2 = R) at `MS + (t - 1) << 4 | g`. */
 export function p8TierSlot(tier: 1 | 2, lane: number, wire: 2 | 3 = 3): bigint {
-  return (
-    (wire === 2 ? MARK_STORE_V5 : MARK_STORE_V10).MS + (BigInt(tier - 1) << 4n) + BigInt(lane >> 2)
-  );
+  if (wire === 3) {
+    if (tier !== 1) throw new Error('wire 3 P8 store has no R tier');
+    return MARK_STORE_V10.MS + BigInt(lane >> 2);
+  }
+  return MARK_STORE_V5.MS + (BigInt(tier - 1) << 4n) + BigInt(lane >> 2);
 }
 
-/** `lane`'s store word from its P8 tier words: `Pool.fallback`'s decode plus the class minSigma at
+/** `lane`'s store word from its P8 word(s): `Pool.fallback`'s decode plus the class minSigma at
  *  `MIN_SIGMA_SHIFT` (the D2b field), so `decodeStoreWord` reads it unchanged. Byte-identical to
  *  core `p8::store_word`. Lane at 56j: mant u24 | e6 24 | age u12 30 | σ8 42 | st u6 50 (62 halted,
- *  63 dark); clock u32 at 224. Wire 3: clock and age count 250 ms ticks mod 2^32, so the decode
- *  needs `nowSecs` (the chain's `block.timestamp`). Wire 2: both count seconds, `nowSecs` unused. */
+ *  63 dark); clock u32 at 224. Wire 3 (1bfe04ed): ONE tier word, `rw` ignored; clock and age
+ *  count 250 ms ticks mod 2^32, so the decode needs `nowSecs` (the chain's `block.timestamp`).
+ *  Wire 2 (v1 fleet): P and R tier words, both clocks in seconds, `nowSecs` unused. */
 export function p8StoreWord(
   pw: Hex,
-  rw: Hex,
+  rw: Hex | null,
   lane: number,
   c: P8Classes,
   nowSecs: number,
   wire: 2 | 3 = 3,
 ): Hex {
   const sh = BigInt(56 * (lane & 3));
-  const [P, R] = [BigInt(pw), BigInt(rw)];
-  const [p, r] = [(P >> sh) & ((1n << 56n) - 1n), (R >> sh) & ((1n << 56n) - 1n)];
+  const P = BigInt(pw);
+  const p = (P >> sh) & ((1n << 56n) - 1n);
   const M30 = 0x3fffffffn;
   const nt = BigInt(nowSecs) * 4n;
   if ((p & M30) === 0n && p >> 50n < 62n) return `0x${'0'.repeat(64)}`;
@@ -738,16 +766,23 @@ export function p8StoreWord(
     const f = ((v & 0xffffffn) | ((v & 0x3f000000n) << 1n)) + 0x21000000n;
     return (obs << 32n) | (live ? f | (BigInt(p8Conf(Number(st))) << cs) : 0n);
   };
-  const w =
+  let w =
     tier(p, P, 91n) |
-    (tier(r, R, 64n) << 135n) |
     (BigInt(p8Sigma(Number((p >> 42n) & 0xffn), floor)) << 64n) |
     (BigInt(ttl) << 107n) |
-    (BigInt(ttl) << 215n) |
     (BigInt(maxDev) << 123n) |
     (BigInt(p >> 50n === 62n) << 134n) |
-    (BigInt(r >> 50n === 62n) << 231n) |
     (BigInt(floor) << BigInt(MARK_STORE_V10.MIN_SIGMA_SHIFT));
+  if (wire === 2) {
+    if (rw === null) throw new Error('wire 2 P8 store word needs the R tier word');
+    const R = BigInt(rw);
+    const r = (R >> sh) & ((1n << 56n) - 1n);
+    const m = MARK_WORD_WIRE2;
+    w |=
+      (tier(r, R, 64n) << BigInt(m.REF_SHIFT)) |
+      (BigInt(ttl) << BigInt(m.REF_TTL_SHIFT)) |
+      (BigInt(r >> 50n === 62n) << BigInt(m.REF_HALT_SHIFT));
+  }
   return `0x${w.toString(16).padStart(64, '0')}`;
 }
 
@@ -767,14 +802,15 @@ async function readP8Classes(
   return c;
 }
 
-/** A leg's two feeds as its pool prices them, off the impl's P8 store. The wire follows the
- *  storage version (`wireOf`), so an unsupported version throws before any slot is read. */
+/** A leg's feed(s) as its pool prices them, off the impl's P8 store. The wire follows the storage
+ *  version (`wireOf`), so an unsupported version throws before any slot is read. Wire 3 reads the
+ *  one lane word (core `replica` reads it the same way); wire 2 reads both tier words. */
 export async function readMarks(
   provider: Eip1193Provider,
   pool: Address,
   token: Address,
   nowSecs = Math.floor(Date.now() / 1000),
-): Promise<{ primary: MarkWord; ref: MarkWord }> {
+): Promise<{ primary: MarkWord; ref: MarkWord | null }> {
   const storageVersion = await readStorageVersion(provider, pool);
   const wire = wireOf(storageVersion);
   const key = await resolveTokenStorageKey(provider, pool, token);
@@ -787,7 +823,7 @@ export async function readMarks(
   const cls = await readP8Classes(provider, impl, wire);
   const [pw, rw] = await Promise.all([
     getStorageAt(provider, impl, p8TierSlot(1, leg.lane, wire)),
-    getStorageAt(provider, impl, p8TierSlot(2, leg.lane, wire)),
+    wire === 2 ? getStorageAt(provider, impl, p8TierSlot(2, leg.lane, wire)) : null,
   ]);
-  return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls, nowSecs, wire), leg);
+  return decodeStoreWord(p8StoreWord(pw, rw, leg.lane, cls, nowSecs, wire), leg, wire);
 }
