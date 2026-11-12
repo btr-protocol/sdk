@@ -122,7 +122,7 @@ describe('depeg wire', () => {
   });
 
   test('legs carry the same three fields', () => {
-    const b = legToQuoteBody(banded().legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(banded().legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(b.ref_band_bps).toBe((4 << 12) | 50);
     expect(b.internal).toBe(true);
     expect(b.base_mark).toBe('0x6f05b59d3b20000');
@@ -130,7 +130,7 @@ describe('depeg wire', () => {
   });
 
   test('unknown base mark goes out null (no base check), bands default 0', () => {
-    const b = legToQuoteBody(state(HUB).legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(state(HUB).legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(b).toMatchObject({
       ref_band_bps: 0,
       internal: false,
@@ -143,11 +143,13 @@ describe('depeg wire', () => {
   test('a UOA leg sends its USD mark (twap·baseMark) as peg_mark', () => {
     const s = banded();
     Object.assign(s.legs.USDT, { uoa: true, twap: 2 });
-    const b = legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(b.peg_mark).toBe('0xde0b6b3a7640000'); // 2 · 0.5 = 1.0 USD
     expect(poolStateToWire('p', '0xpool', s, meta, 6).spokes[0].peg_mark).toBe(b.peg_mark);
     Object.assign(s.legs.USDT, { baseMark: undefined });
-    expect(legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12).peg_mark).toBeNull();
+    expect(
+      legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, '0xpool').peg_mark,
+    ).toBeNull();
   });
 });
 
@@ -155,7 +157,7 @@ describe('legToQuoteBody', () => {
   const leg = state(HUB).legs.USDT;
 
   test('a sell carries the hub as the delivering endpoint', () => {
-    const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6), 12);
+    const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6), '0xpool');
     expect(b.selling).toBe(true);
     expect(b.counterparty).toEqual({
       reserves: '0x2e90edd000',
@@ -166,7 +168,7 @@ describe('legToQuoteBody', () => {
   });
 
   test('an interior hop carries a blank endpoint: never `cOut`, never tolled', () => {
-    const b = legToQuoteBody(leg, 1_000, true, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(leg, 1_000, true, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(b.counterparty).toEqual({
       reserves: '0x0',
       liabilities: '0x0',
@@ -178,35 +180,36 @@ describe('legToQuoteBody', () => {
   // The server prices a flat buy in the SPOKE scale, so the base amount is re-denominated to
   // `leg.decimals` whatever scale the caller held it in (`decimalsIn` is a sell-only input).
   test('a buy scales amount_in to the spoke decimals (6 base -> 18 spoke)', () => {
-    const b = legToQuoteBody(leg, 1_000, false, 6, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(leg, 1_000, false, 6, INTERIOR_ENDPOINT, '0xpool');
     expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 18n);
     expect(b.selling).toBe(false);
   });
 
   test('a buy scales amount_in to the spoke decimals (18 base -> 6 spoke)', () => {
     const l6 = buildLeg('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
-    const b = legToQuoteBody(l6, 2.5, false, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(l6, 2.5, false, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(BigInt(b.amount_in)).toBe(2_500_000n);
   });
 
   test('same decimals: a buy is unchanged', () => {
-    const b = legToQuoteBody(leg, 1_000, false, 18, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(leg, 1_000, false, 18, INTERIOR_ENDPOINT, '0xpool');
     expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 18n);
   });
 
   test('a sell still scales by decimalsIn', () => {
-    const b = legToQuoteBody(leg, 1_000, true, 6, INTERIOR_ENDPOINT, 12);
+    const b = legToQuoteBody(leg, 1_000, true, 6, INTERIOR_ENDPOINT, '0xpool');
     expect(BigInt(b.amount_in)).toBe(1_000n * 10n ** 6n);
   });
 
   test('unknown confidence goes out null, never a fail-open zero', () => {
-    const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6), 12);
+    const b = legToQuoteBody(leg, 1_000, true, 18, hubEndpointWire(HUB, 6), '0xpool');
     expect(b.confidence_bps).toBeNull();
   });
 
-  test('sends the pool storage_version verbatim (v1 = 7, v2 = 12)', () => {
-    expect(legToQuoteBody(leg, 1_000, true, 18, INTERIOR_ENDPOINT, 7).storage_version).toBe(7);
-    expect(legToQuoteBody(leg, 1_000, true, 18, INTERIOR_ENDPOINT, 12).storage_version).toBe(12);
+  test('sends the pool address as addr, the back reads the pool from chain by it', () => {
+    expect(legToQuoteBody(leg, 1_000, true, 18, INTERIOR_ENDPOINT, '0xPoolAddr').addr).toBe(
+      '0xPoolAddr',
+    );
   });
 });
 

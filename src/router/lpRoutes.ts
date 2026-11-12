@@ -5,14 +5,7 @@
 // stay local (no pricing law in them). rankDeposit/rankRedeem keep their names and are
 // async now: callers pass backend wire meta (addresses/decimals) for the request build.
 
-import {
-  type NamedPoolWire,
-  type QuoteRouteWire,
-  type WireMeta,
-  poolStateToWire,
-  type routeAsync,
-  servableAddr,
-} from '../amm/aimm.js';
+import type { QuoteRouteWire, WireMeta, routeAsync } from '../amm/aimm.js';
 import {
   type BackendConvertOpts,
   type LiabLeg,
@@ -48,15 +41,13 @@ const needBackend = (opts: LpRouteOpts): LpBackend => {
   return opts.backend;
 };
 
-/** The conversion opts for one holder pool. Null when the pool has no servable address (the back
- *  reads an address-less pool as HALTED), so no route may run through it. */
+/** The conversion opts for one holder pool. Null when the pool carries no address: no route runs
+ *  through it. A zero address is refused by `backendConvert` (a backend-error on that route). */
 const convertFor = (
   holder: NamedPool,
   b: LpBackend,
-): (LpBackend & { poolAddress: string }) | null => {
-  const poolAddress = servableAddr(holder.addr);
-  return poolAddress ? { ...b, poolAddress } : null;
-};
+): (LpBackend & { poolAddress: string }) | null =>
+  holder.addr ? { ...b, poolAddress: holder.addr } : null;
 
 function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | null {
   const s = pool.state;
@@ -187,17 +178,6 @@ export const toRawHex = (amountTok: number, dec: number): string => {
   if (amountTok > Number.MAX_SAFE_INTEGER) throw new Error('toRawHex: amount exceeds 2^53');
   return `0x${toUnits(amountTok, dec).toString(16)}`;
 };
-
-/** The pools the back may route through. An address-less pool is left off: the back would read it
- *  HALTED, and no route can name a pool that is not on the wire. */
-function wiresOf(pools: NamedPool[], b: LpBackend): NamedPoolWire[] {
-  return pools.flatMap((p) => {
-    const addr = servableAddr(p.addr);
-    return addr
-      ? [poolStateToWire(p.tag, addr, p.state, b.meta, b.meta.decimalsOf(p.state.base))]
-      : [];
-  });
-}
 
 export function wirePlanToSwap(
   pools: NamedPool[],

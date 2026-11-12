@@ -95,6 +95,20 @@ describe('backend aliases + guards', () => {
     });
     await expect(convert(100)).rejects.toThrow(/unknown leg/);
   });
+
+  test('backendConvert refuses a zero or absent pool address before any wire call', async () => {
+    const state = { base: 'USDC', legs: {} };
+    const meta = { addressOf: () => null, decimalsOf: () => 6 };
+    for (const poolAddress of [`0x${'0'.repeat(40)}`, '']) {
+      const convert = backendConvert(state, 'AUDF', 'NZDF', {
+        meta,
+        baseDecimals: 6,
+        backendBase: 'https://q.example/v1',
+        poolAddress,
+      });
+      await expect(convert(100)).rejects.toThrow(/no servable address/);
+    }
+  });
 });
 
 describe('outage vs no-liquidity', () => {

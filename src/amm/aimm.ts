@@ -432,7 +432,7 @@ interface EndpointWire {
 }
 export interface NamedPoolWire {
   tag: string;
-  addr?: string | null;
+  addr: string;
   base: string;
   base_address?: string | null;
   base_reserves?: string | null;
@@ -702,9 +702,9 @@ interface QuoteRequestWire {
   /** The swap's OTHER endpoint (see {@link EndpointWire}): the hub on a direct spoke↔base leg,
    *  {@link INTERIOR_ENDPOINT} for a hop whose far token is interior to a longer path. */
   counterparty: EndpointWire;
-  /** The pool's on-chain `Pool.storageVersion()` (v1 = 7, v2 = 12). The back refuses a body without
-   *  it (422), so a leg whose version is unknown cannot be quoted. */
-  storage_version: number;
+  /** The pool's address (0x hex, as the pool wire). The back reads flags, base flags, min liquidity
+   *  and layout from chain by it; a missing or zero address is a 422. */
+  addr: string;
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
@@ -792,8 +792,7 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
  * absent from the first cut of this wire and every spoke→base sell quoted a zero coverage toll
  * the chain still charged, so there is deliberately nothing to omit.
  *
- * `storageVersion` is the pool's `Pool.storageVersion()` (`GET /v1/pools/{tag}/params`), REQUIRED:
- * the back answers 422 to a body without it, so there is no default to fall back on.
+ * `poolAddress` is the leg's pool address, REQUIRED: the back prices the pool from chain by it.
  */
 export function legToQuoteBody(
   leg: PoolLeg,
@@ -801,7 +800,7 @@ export function legToQuoteBody(
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
-  storageVersion: number,
+  poolAddress: string,
   counterpartyClass?: ClassWire,
 ): QuoteRequestWire {
   return {
@@ -817,7 +816,7 @@ export function legToQuoteBody(
     sigma_pbps: leg.sigma,
     selling,
     counterparty,
-    storage_version: storageVersion,
+    addr: poolAddress,
     confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
@@ -841,7 +840,7 @@ const depegWire = (leg: PoolLeg) => ({
   ...baseDepegWire(leg),
 });
 
-/** Single-leg exact-in quote over POST /v1/quote. `counterparty` and `storageVersion`: see
+/** Single-leg exact-in quote over POST /v1/quote. `counterparty` and `poolAddress`: see
  *  {@link legToQuoteBody}. */
 export function quoteLegAsync(
   leg: PoolLeg,
@@ -849,13 +848,13 @@ export function quoteLegAsync(
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
-  storageVersion: number,
+  poolAddress: string,
   base?: string,
 ): Promise<QuoteResponseWire> {
   return post<QuoteResponseWire>(
     backendBase(base),
     '/quote',
-    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty, storageVersion),
+    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty, poolAddress),
   );
 }
 
@@ -953,7 +952,7 @@ export function poolStateToWire(
   const hub = state.hub ? hubEndpointWire(state.hub, hubDecimals) : null;
   return {
     tag,
-    addr: addr ?? null,
+    addr,
     base: state.base,
     base_address: meta.addressOf(state.base),
     base_reserves: hub?.reserves ?? (hubLeg ? toU128Hex(hubLeg.baseRes * 10 ** hubDecimals) : null),
