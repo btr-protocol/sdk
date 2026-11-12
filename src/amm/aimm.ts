@@ -702,6 +702,9 @@ interface QuoteRequestWire {
   /** The swap's OTHER endpoint (see {@link EndpointWire}): the hub on a direct spoke↔base leg,
    *  {@link INTERIOR_ENDPOINT} for a hop whose far token is interior to a longer path. */
   counterparty: EndpointWire;
+  /** The pool's on-chain `Pool.storageVersion()` (v1 = 7, v2 = 12). The back refuses a body without
+   *  it (422), so a leg whose version is unknown cannot be quoted. */
+  storage_version: number;
   confidence_bps: number | null;
   stale_excess: number;
   proto_share_pct: number;
@@ -788,6 +791,9 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
  * {@link hubEndpointWire}, a cross's interior hop passes {@link INTERIOR_ENDPOINT}. It was
  * absent from the first cut of this wire and every spoke→base sell quoted a zero coverage toll
  * the chain still charged, so there is deliberately nothing to omit.
+ *
+ * `storageVersion` is the pool's `Pool.storageVersion()` (`GET /v1/pools/{tag}/params`), REQUIRED:
+ * the back answers 422 to a body without it, so there is no default to fall back on.
  */
 export function legToQuoteBody(
   leg: PoolLeg,
@@ -795,6 +801,7 @@ export function legToQuoteBody(
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
+  storageVersion: number,
   counterpartyClass?: ClassWire,
 ): QuoteRequestWire {
   return {
@@ -810,6 +817,7 @@ export function legToQuoteBody(
     sigma_pbps: leg.sigma,
     selling,
     counterparty,
+    storage_version: storageVersion,
     confidence_bps: leg.confidence ?? null,
     stale_excess: leg.staleExcess ?? 0,
     proto_share_pct: Math.round(leg.profile.protoFeeBps / 100),
@@ -833,19 +841,21 @@ const depegWire = (leg: PoolLeg) => ({
   ...baseDepegWire(leg),
 });
 
-/** Single-leg exact-in quote over POST /v1/quote. `counterparty`: see {@link legToQuoteBody}. */
+/** Single-leg exact-in quote over POST /v1/quote. `counterparty` and `storageVersion`: see
+ *  {@link legToQuoteBody}. */
 export function quoteLegAsync(
   leg: PoolLeg,
   amountInTok: number,
   selling: boolean,
   decimalsIn: number,
   counterparty: EndpointWire,
+  storageVersion: number,
   base?: string,
 ): Promise<QuoteResponseWire> {
   return post<QuoteResponseWire>(
     backendBase(base),
     '/quote',
-    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty),
+    legToQuoteBody(leg, amountInTok, selling, decimalsIn, counterparty, storageVersion),
   );
 }
 
