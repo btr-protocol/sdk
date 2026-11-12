@@ -2,7 +2,7 @@
  * Unit tests for PoolStorage slot packing (no RPC). Mirrors Solidity tight packing:
  * LSB-aligned fields within a 32-byte word.
  */
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { buildCurve } from '../amm/aimm';
 import { keccak256 } from '../eth/index';
@@ -276,10 +276,17 @@ describe('versioned readers', () => {
       },
     }) as unknown as Eip1193Provider;
 
-  test('lastGoodCWad: slot 0 tail at 1e-9 WAD on v5 and v10; a never-observed rate reads 0', async () => {
-    // slot 0 = lastGoodCWad9 (970_000_000) << 216 | an armed, initialized base
-    const slot0 = word(((970_000_000n << 216n) | (1n << 208n) | (1n << 160n) | 0xbbn).toString(16));
-    for (const v of [5, 12]) {
+  test('lastGoodCWad: slot 0 uint40 at 1e-9 WAD, bit 216 on v5 and bit 192 on v10; never observed reads 0', async () => {
+    // v5 slot 0 = lastGoodCWad9 (970_000_000) << 216 | solvencyArmed << 208 | initialized | base
+    const v5 = word(((970_000_000n << 216n) | (1n << 208n) | (1n << 160n) | 0xbbn).toString(16));
+    // v10 slot 0 = lastGoodCWad9 << 192 | flowCooldownSecs (60) << 176 | protoSharePct | initialized | base
+    const v10 = word(
+      ((970_000_000n << 192n) | (60n << 176n) | (10n << 168n) | (1n << 160n) | 0xbbn).toString(16),
+    );
+    for (const [v, slot0] of [
+      [5, v5],
+      [12, v10],
+    ] as const) {
       expect(await readSolvencyState(providerWith(v, new Map([[0n, slot0]])), POOL)).toEqual({
         lastGoodCWad: 970n * 10n ** 15n,
       });
@@ -287,9 +294,42 @@ describe('versioned readers', () => {
         lastGoodCWad: 0n,
       });
     }
-    await expect(readSolvencyState(providerWith(4, new Map([[0n, slot0]])), POOL)).rejects.toThrow(
+    // the other layout's offset mis-reads: v10 shift on the v5 word sees the armed bit, not the rate
+    expect(await readSolvencyState(providerWith(12, new Map([[0n, v5]])), POOL)).not.toEqual({
+      lastGoodCWad: 970n * 10n ** 15n,
+    });
+    await expect(readSolvencyState(providerWith(4, new Map([[0n, v5]])), POOL)).rejects.toThrow(
       'unsupported storageVersion',
     );
+  });
+
+  test('storageVersion is re-read after 30s, so an impl upgrade at the same address is seen', async () => {
+    const pool = `0x${'77'.repeat(20)}` as const;
+    let version = 5;
+    let calls = 0;
+    const provider = {
+      request: async ({ method }: { method: string }) => {
+        if (method !== 'eth_call') return word('0');
+        calls++;
+        return word(version.toString(16));
+      },
+    } as unknown as Eip1193Provider;
+    const now = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await readSolvencyState(provider, pool);
+      await readSolvencyState(provider, pool);
+      expect(calls).toBe(1);
+      version = 12;
+      clock.mockReturnValue(now + 29_000);
+      await readSolvencyState(provider, pool);
+      expect(calls).toBe(1);
+      clock.mockReturnValue(now + 30_000);
+      await readSolvencyState(provider, pool);
+      expect(calls).toBe(2);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test('readOracleConfig: off Asset slot 2 on v5; retired versions throw', async () => {
@@ -701,12 +741,12 @@ describe('layout v10', () => {
     [136n, '0x0000000000000000fffffffffffffffffffcabfaf5a3397300000000677af407'],
     [137n, '0x000000033bd7a03f00000009b386e0aa0000002a09f322e3000000321f8e3371'],
     [138n, '0x0000000000000000fffffffffffffffffffda2eef260ee770000000b5172b0c3'],
-    // USDT0's record: Asset 0..2, Custody (+3), ClassHead (+4: USD, famRow pack(20, 20, 500))
+    // USDT0's record: Asset 0..3 (3 = kneeBits), Custody (+4), ClassHead (+5: USD, famRow)
     [144n, '0x000000000000000000000274a48a7800000000000000000000000246139ca800'],
     [145n, '0x000000000000000000000000a4ad4f68d0b91cfd19687c881e50f3a00242828c'],
     [146n, '0x0096010000006400b00006ffff02bd03e80001000003e8000de0b6b3a7640000'],
-    [147n, '0x0000000000000000000000000000000000000000000000000000000000000001'],
-    [148n, '0x00000000000000000000000000000000000000fa050014000000000000000001'],
+    [148n, '0x0000000000000000000000000000000000000000000000000000000000000001'],
+    [149n, '0x00000000000000000000000000000000000000fa050014000000000000000001'],
   ]);
   const V5_BLOB =
     '0x000003e813880000000000000000000000000000000000001f4017700fa007d0050000003081a26359ffffffa8b0421a00000000746a528800ffffff8b95ad7800000000000000000000000000000000000000000000000000fffffff4ae8d4f36000000033bd7a037fffffff64c791f560000002a09f322e3ffffffcde071cc8f0000000000000000fffffffffffffffffffda2eef260ee34ffffffff98850bfa000000019debd01cfffffffd931e47d60000001eb880721cfffffff10b3abaf90000000000000000fffffffffffffffffffcabfaf5a339730000000000000000000000019debd01d000000026ce1b82a0000001eb880721c0000000ef4c545070000000000000000fffffffffffffffffffcabfaf5a3397300000000677af407000000033bd7a03f00000009b386e0aa0000002a09f322e3000000321f8e33710000000000000000fffffffffffffffffffda2eef260ee770000000b5172b0c3';
@@ -751,7 +791,10 @@ describe('layout v10', () => {
     expect([POOL_STORAGE_V10.legIndex, POOL_STORAGE_V10.curveIndex]).toEqual([83n, 115n]);
     expect(POOL_AREA_V10.AREA_BASE).toBe(128n);
     expect(POOL_AREA_V10.IMPL_COPY).toBe(127n);
-    expect([POOL_AREA_V10.RECORD_CUSTODY, POOL_AREA_V10.RECORD_CLASS_HEAD]).toEqual([3n, 4n]);
+    expect([POOL_AREA_V10.RECORD_CUSTODY, POOL_AREA_V10.RECORD_CLASS_HEAD]).toEqual([4n, 5n]);
+    expect(POOL_AREA_V10.RECORD_SLOTS).toBe(6n);
+    expect(POOL_AREA_V10.RECORD_KNEE).toBe(3n);
+    expect('flashFeePbps' in POOL_STORAGE_V10 || 'solvencyArmed' in POOL_STORAGE_V10).toBe(false);
     expect([POOL_AREA_V10.LEG_MAX, POOL_AREA_V10.CURVE_MAX]).toEqual([24, 48]);
     expect(POOL_STORAGE_V10.legIndex + BigInt(POOL_AREA_V10.LEG_INDEX_SLOTS)).toBe(
       POOL_STORAGE_V10.curveIndex,
@@ -822,7 +865,7 @@ describe('layout v10', () => {
     expect(await readCurve(at(12), POOL, 2)).toBeNull();
   });
 
-  test('records: Asset slot 2, Custody +3, ClassHead +4 with famRow', async () => {
+  test('records: Asset slot 2, Custody +4, ClassHead +5 with famRow', async () => {
     const usdt = LEGS[1][0];
     expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({
       lane: 1,
@@ -833,12 +876,12 @@ describe('layout v10', () => {
     expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
     const head = await readClassHead(at(12), POOL, usdt);
     expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });
-    expect(decodeClassHead(BigInt(SLOTS.get(148n)!))).toEqual(head);
-    // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +4
+    expect(decodeClassHead(BigInt(SLOTS.get(149n)!))).toEqual(head);
+    // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +5
     const t = `0x${'11'.repeat(20)}` as const;
     const u = mappingBase(t, 4n);
     const slots = new Map(SLOTS);
-    slots.set(u + 4n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
+    slots.set(u + 5n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
     expect(await readClassHead(at(12, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
   });
 });

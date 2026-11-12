@@ -1,9 +1,11 @@
-// `PoolStorage` layout v10 (`Pool.storageVersion() == 10`, fresh fleets only): solc
+// `PoolStorage` layout v10 (`Pool.storageVersion() == 12`, the v2 pool, fresh fleets only): solc
 // `storageLayout` of dex-evm `out/Pool.sol/Pool.json` (`forge inspect src/Pool.sol:Pool
-// storage-layout`, release/pool-v2-rc2 83773c0) plus the area constants of
-// `PoolConstantsLib.sol`. A listed leg's `Asset` is no mapping entry: it is a 5-slot record in the
-// area (slot 128 up) found through `legIndex` (`recordSlot`), with `Custody` at +3 and `ClassHead`
-// (`family u8 | row u64 | famRow u64`) at +4. Curves are area words found through `curveIndex`
+// storage-layout`, dex-evm main 1bfe04ed) plus the area constants of `PoolConstantsLib.sol`. No
+// generator script: regenerate by hand from that artifact; `storage.test.ts` pins the slots and
+// diffs them against a sibling `dex-evm/out` build. A listed leg's `Asset` is no mapping entry: it
+// is a 6-slot record in the area (slot 128 up) found through `legIndex` (`recordSlot`): `Asset`
+// (0..3, 3 = `kneeBits`), `Custody` at +4 and `ClassHead` (`family u8 | row u64 | famRow u64 |
+// expAt u32 | expHw u88`) at +5. Curves are area words found through `curveIndex`
 // (`curveSlot`), no SSTORE2 code. Slot 4 (`unlisted`) holds only never-listed tokens; slots 5, 6, 7,
 // 11 and 16 are reserved. `storage.test.ts` restates it by hand.
 
@@ -12,9 +14,7 @@ export const POOL_STORAGE_V10 = {
   baseToken: 0n,
   initialized: 0n,
   protoSharePct: 0n,
-  flashFeePbps: 0n,
   flowCooldownSecs: 0n,
-  solvencyArmed: 0n,
   lastGoodCWad9: 0n,
   wnative: 1n,
   treasury: 2n,
@@ -50,10 +50,11 @@ export const POOL_MAPPINGS_V10 = [
 export const POOL_AREA_V10 = {
   /** First area slot (page 1); records and curve blobs are bump-allocated from here. */
   AREA_BASE: 128n,
-  /** Record = `Asset` (0..2) | `Custody` (+3) | `ClassHead` (+4). */
-  RECORD_SLOTS: 5n,
-  RECORD_CUSTODY: 3n,
-  RECORD_CLASS_HEAD: 4n,
+  /** Record = `Asset` (0..3) | `Custody` (+4) | `ClassHead` (+5). */
+  RECORD_SLOTS: 6n,
+  RECORD_KNEE: 3n,
+  RECORD_CUSTODY: 4n,
+  RECORD_CLASS_HEAD: 5n,
   /** `legIndex` words: entry `uint160(token) | recordSlot << 160`, probe from `uint160 % 32`. */
   LEG_INDEX_SLOTS: 32,
   LEG_MAX: 24,
@@ -71,7 +72,7 @@ export const POOL_AREA_V10 = {
 } as const;
 
 /**
- * Wire 3 `MarkStore` (`storageVersion() == 10`) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
+ * Wire 3 `MarkStore` (`storageVersion() == 12`) in the Pool impl account (`PoolFactory.implementation()`, equally a proxy's
  * ERC-1967 impl slot): words at `MS + o`, `o` a u8. Lane `l` at `MS + l` holds both tiers in the
  * `MARK_WORD_V4` layout with the lane's σ floor at `MIN_SIGMA_SHIFT` in place of the mirror bits.
  * `Asset.oracleBits` = lane 0..5 | INTERNAL 6 | UOA 7. `AUTH` (0x20) holds each tier's
