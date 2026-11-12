@@ -52,6 +52,7 @@ export {
   quoteLegAsync,
   quoteFromWire,
   poolStateToWire,
+  servableAddr,
 } from './aimm.js';
 export type {
   NamedPool,

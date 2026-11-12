@@ -925,6 +925,11 @@ export function quoteFromWire(
   };
 }
 
+/** A pool's address as the back may price it, or null when there is none: absent, or the zero
+ *  address an undeployed pool carries. Such a pool is not servable (the back reads it HALTED). */
+export const servableAddr = (addr: string | undefined): string | null =>
+  addr && !/^0x0{40}$/i.test(addr) ? addr : null;
+
 /**
  * PoolState → NamedPoolWire for /route|depth.
  *
@@ -933,10 +938,13 @@ export function quoteFromWire(
  * pool that reports only `base_reserves` has its sells dropped rather than under-quoted.
  * `state.hub` is the source; `baseRes` (a per-leg copy of the same balance) is the fallback for
  * the reserves alone.
+ *
+ * `addr` is the pool's on-chain address and REQUIRED: the back's served mode refreshes the pool's
+ * flags and layout from chain by it, and a pool without one reads as HALTED.
  */
 export function poolStateToWire(
   tag: string,
-  addr: string | undefined,
+  addr: string,
   state: PoolState,
   meta: WireMeta,
   hubDecimals: number,

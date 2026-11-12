@@ -11,6 +11,7 @@ import {
   type WireMeta,
   poolStateToWire,
   type routeAsync,
+  servableAddr,
 } from '../amm/aimm.js';
 import {
   type BackendConvertOpts,
@@ -35,12 +36,26 @@ export interface LpRouteOpts {
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
-  backend?: BackendConvertOpts & { meta: WireMeta };
+  backend?: LpBackend;
 }
 
-const needBackend = (opts: LpRouteOpts): BackendConvertOpts & { meta: WireMeta } => {
+/** Backend settings shared by every route. The pool address is per pool, so each conversion takes it
+ *  from its holder (`convertFor`), never from here. */
+export type LpBackend = Omit<BackendConvertOpts, 'poolAddress'> & { meta: WireMeta };
+
+const needBackend = (opts: LpRouteOpts): LpBackend => {
   if (!opts.backend) throw new Error('lpRoutes: backend SSOT required (no TS pricer)');
   return opts.backend;
+};
+
+/** The conversion opts for one holder pool. Null when the pool has no servable address (the back
+ *  reads an address-less pool as HALTED), so no route may run through it. */
+const convertFor = (
+  holder: NamedPool,
+  b: LpBackend,
+): (LpBackend & { poolAddress: string }) | null => {
+  const poolAddress = servableAddr(holder.addr);
+  return poolAddress ? { ...b, poolAddress } : null;
 };
 
 function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | null {
@@ -173,10 +188,15 @@ export const toRawHex = (amountTok: number, dec: number): string => {
   return `0x${toUnits(amountTok, dec).toString(16)}`;
 };
 
-function wiresOf(pools: NamedPool[], b: BackendConvertOpts & { meta: WireMeta }): NamedPoolWire[] {
-  return pools.map((p) =>
-    poolStateToWire(p.tag, p.addr, p.state, b.meta, b.meta.decimalsOf(p.state.base)),
-  );
+/** The pools the back may route through. An address-less pool is left off: the back would read it
+ *  HALTED, and no route can name a pool that is not on the wire. */
+function wiresOf(pools: NamedPool[], b: LpBackend): NamedPoolWire[] {
+  return pools.flatMap((p) => {
+    const addr = servableAddr(p.addr);
+    return addr
+      ? [poolStateToWire(p.tag, addr, p.state, b.meta, b.meta.decimalsOf(p.state.base))]
+      : [];
+  });
 }
 
 export function wirePlanToSwap(
@@ -247,6 +267,8 @@ async function transferMint(
   const slip = opts.slippageFrac;
   const holder = poolHolding(pools, xToken, targetSym);
   if (!holder) return null;
+  const bk = convertFor(holder, b);
+  if (!bk) return null;
   const inLeg = liabLeg(holder, xToken, opts);
   const outLeg = liabLeg(holder, targetSym, opts);
   if (!inLeg || !outLeg) return null;
@@ -297,7 +319,7 @@ async function transferMint(
       outLeg,
       faceIn,
       c,
-      backendConvert(holder.state, xToken, targetSym, b),
+      backendConvert(holder.state, xToken, targetSym, bk),
     );
   } catch {
     return unfeasible(shell, 'backend-error');
@@ -377,13 +399,15 @@ async function crossExit(
   const fromLeg = liabLeg(holder, targetSym, opts);
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
+  const bk = convertFor(holder, b);
+  if (!bk) return null;
 
   // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   const fair = withdrawValue * c;
-  const convert = backendConvert(holder.state, targetSym, outToken, b);
+  const convert = backendConvert(holder.state, targetSym, outToken, bk);
   let q: Awaited<ReturnType<typeof convert>>;
   try {
     q = await convert(fair);
@@ -434,6 +458,8 @@ async function transferExit(
   const fromLeg = liabLeg(holder, targetSym, opts);
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
+  const bk = convertFor(holder, b);
+  if (!bk) return null;
 
   const shell: RouteShell = {
     id: 'transfer-exit',
@@ -478,7 +504,7 @@ async function transferExit(
       toLeg,
       lpFaceIn,
       c,
-      backendConvert(holder.state, targetSym, outToken, b),
+      backendConvert(holder.state, targetSym, outToken, bk),
     );
   } catch {
     return unfeasible(shell, 'backend-error');

@@ -91,6 +91,7 @@ describe('backend aliases + guards', () => {
       meta: { addressOf: () => null, decimalsOf: () => 6 },
       baseDecimals: 6,
       backendBase: 'https://q.example/v1',
+      poolAddress: '0xPoolAddr',
     });
     await expect(convert(100)).rejects.toThrow(/unknown leg/);
   });
@@ -111,6 +112,7 @@ describe('outage vs no-liquidity', () => {
     const pools = [
       {
         tag: 'core',
+        addr: '0xcore',
         state: {
           base: 'USDC',
           legs: {

@@ -16,6 +16,7 @@ function pool(
 ): NamedPool {
   return {
     tag,
+    addr: `0x${tag}`,
     state: {
       base: 'USDC',
       legs: {
@@ -167,6 +168,12 @@ describe('rankDeposit (routes A / B)', () => {
     });
     expect(routes.find((r) => r.id === 'deposit-first')?.reason).toBe('flag-disabled');
     expect(best).toBeNull();
+  });
+
+  test('an address-less holder carries no liability route (served mode would read it HALTED)', async () => {
+    const pools = [{ ...healthyPool(), addr: undefined }];
+    const { routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, BE);
+    expect(routes.map((r) => r.id)).not.toContain('deposit-first');
   });
 });
 

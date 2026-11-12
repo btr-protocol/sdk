@@ -8,6 +8,7 @@ import {
   legToQuoteBody,
   poolStateToWire,
   quoteFromWire,
+  servableAddr,
 } from './aimm';
 import { STABLE_PROFILE } from './profiles';
 
@@ -66,8 +67,19 @@ describe('hubEndpointWire decimals', () => {
 });
 
 describe('poolStateToWire', () => {
+  test('publishes the pool address as addr: served mode prices the pool from chain by it', () => {
+    expect(poolStateToWire('p', '0xPoolAddr', state(HUB), meta, 6).addr).toBe('0xPoolAddr');
+  });
+
+  test('an absent or zero address is not servable: the pool has no address to publish', () => {
+    expect(servableAddr(undefined)).toBeNull();
+    expect(servableAddr('')).toBeNull();
+    expect(servableAddr(`0x${'0'.repeat(40)}`)).toBeNull();
+    expect(servableAddr('0xPoolAddr')).toBe('0xPoolAddr');
+  });
+
   test('publishes the WHOLE hub endpoint, not just its balance', () => {
-    const w = poolStateToWire('p', undefined, state(HUB), meta, 6);
+    const w = poolStateToWire('p', '0xpool', state(HUB), meta, 6);
     expect(w.base_reserves).toBe('0x2e90edd000');
     expect(w.base_liabilities).toBe('0x3a35294400');
     expect(w.base_vega_bps).toBe(10_000);
@@ -75,7 +87,7 @@ describe('poolStateToWire', () => {
   });
 
   test('no hub book leaves every endpoint field null, so the backend drops the leg', () => {
-    const w = poolStateToWire('p', undefined, state(undefined), meta, 6);
+    const w = poolStateToWire('p', '0xpool', state(undefined), meta, 6);
     expect(w.base_liabilities).toBeNull();
     expect(w.base_vega_bps).toBeNull();
     expect(w.base_kappa_cov_bps).toBeNull();
@@ -84,7 +96,7 @@ describe('poolStateToWire', () => {
   });
 
   test('unknown confidence goes out null, never a fail-open zero', () => {
-    const w = poolStateToWire('p', undefined, state(HUB), meta, 6);
+    const w = poolStateToWire('p', '0xpool', state(HUB), meta, 6);
     expect(w.spokes[0].confidence_bps).toBeNull();
   });
 });
@@ -102,7 +114,7 @@ describe('depeg wire', () => {
   };
 
   test('pools and spokes carry ref_band_bps + base_mark + base_ref_band_bps', () => {
-    const w = poolStateToWire('p', undefined, banded(), meta, 6);
+    const w = poolStateToWire('p', '0xpool', banded(), meta, 6);
     expect(w.spokes[0].ref_band_bps).toBe((4 << 12) | 50);
     expect(w.spokes[0].internal).toBe(true);
     expect(w.base_mark).toBe('0x6f05b59d3b20000');
@@ -133,7 +145,7 @@ describe('depeg wire', () => {
     Object.assign(s.legs.USDT, { uoa: true, twap: 2 });
     const b = legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12);
     expect(b.peg_mark).toBe('0xde0b6b3a7640000'); // 2 · 0.5 = 1.0 USD
-    expect(poolStateToWire('p', undefined, s, meta, 6).spokes[0].peg_mark).toBe(b.peg_mark);
+    expect(poolStateToWire('p', '0xpool', s, meta, 6).spokes[0].peg_mark).toBe(b.peg_mark);
     Object.assign(s.legs.USDT, { baseMark: undefined });
     expect(legToQuoteBody(s.legs.USDT, 1_000, true, 18, INTERIOR_ENDPOINT, 12).peg_mark).toBeNull();
   });
