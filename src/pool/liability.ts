@@ -28,6 +28,7 @@ import {
   poolStateToWire,
   quoteFromWire,
   quotePathAsync,
+  servableAddr,
 } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 
@@ -230,12 +231,17 @@ export function backendConvert(
   const decIn = dec(tokenIn);
   const decOut = dec(tokenOut);
   return async (fairIn: number): Promise<Quote | null> => {
+    // Refused before the wire: an absent or zero address would be priced as HALTED.
+    const addr = servableAddr(opts.poolAddress);
+    if (addr === null) {
+      throw new Error(`backendConvert: pool ${state.base} has no servable address`);
+    }
     if (decIn === undefined || decOut === undefined || tokenIn === tokenOut) {
       throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${state.base}`);
     }
     const w = await quotePathAsync(
       {
-        pool: poolStateToWire('pool', opts.poolAddress, state, opts.meta, opts.baseDecimals),
+        pool: poolStateToWire('pool', addr, state, opts.meta, opts.baseDecimals),
         token_in: tokenIn,
         token_out: tokenOut,
         amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
