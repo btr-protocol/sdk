@@ -322,7 +322,8 @@ const DEFAULT_DEADLINE_S = 600;
 export const MAX_DEADLINE_S = 1_800;
 /** Largest |chain time − device clock| {@link syncChainClock} accepts. A wider gap is a wrong
  *  device clock or a lying RPC; either way the deadline it would anchor is not known. */
-export const MAX_CLOCK_SKEW_S = 120;
+import { MAX_CLOCK_SKEW_S } from '../utils/constants';
+export { MAX_CLOCK_SKEW_S };
 /** Chain time minus this device's clock, seconds, from the last {@link syncChainClock}. */
 let chainSkewS = 0;
 

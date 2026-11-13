@@ -9,6 +9,10 @@
 export const BPS_PRECISION = 10_000n;
 export const PRECISION_1E18 = 10n ** 18n;
 export const MS_PER_DAY = 86_400_000;
+/** How far a device clock may sit from chain time before a send is refused (the chain-clock check in
+ *  `pool/index.ts`), and how far a head's timestamp may run ahead of the device clock before it is not
+ *  trusted (the front's pinned quorum reads). One bound, here, so the two cannot drift apart. */
+export const MAX_CLOCK_SKEW_S = 120;
 
 // Time helpers: single source for "now" timestamps.
 export const nowMs = (): number => Date.now();
