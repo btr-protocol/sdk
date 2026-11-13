@@ -20,6 +20,7 @@ function pool(
     addr: `0x${tag}`,
     state: {
       base: 'USDC',
+      solvencyOk: true,
       exitTollWad: 0n,
       legs: {
         AUDF: buildLeg(
@@ -128,6 +129,8 @@ function installStub() {
         cov_toll: '0x0',
         proto_fee: '0x0',
         lp_fee: '0x0',
+        debit_toll: '0x0',
+        credit_toll: '0x0',
       }),
     };
   };
@@ -199,6 +202,8 @@ describe('crossExit degenerate quotes', () => {
           cov_toll: '0x0',
           proto_fee: '0x0',
           lp_fee: '0x0',
+          debit_toll: '0x0',
+          credit_toll: '0x0',
         }),
       };
     };
@@ -237,8 +242,9 @@ describe('crossExit walls mirror the chain with a C toll', () => {
   test('above c_min passes and pays out net of toll; past it is walled', async () => {
     const ok = await at(100_000);
     expect(ok?.feasible).toBe(true);
-    // Float claim/mark composition may lose one raw unit before the integer C-toll ceil.
-    expect(Math.abs((ok?.out ?? 0) - 90_000)).toBeLessThanOrEqual(1.01e-6);
+    // Raw-unit floors toward the pool: never above 90k, a few raw units under it.
+    expect(ok?.out).toBeLessThanOrEqual(90_000);
+    expect(90_000 - (ok?.out ?? 0)).toBeLessThanOrEqual(5e-6);
     const bad = await at(120_000);
     expect(bad?.feasible).toBe(false);
     expect(bad?.reason).toBe('coverage-wall');
@@ -292,13 +298,19 @@ describe('unknown exit toll: every LP exit route is pending', () => {
       p.state.exitTollWad = tw;
       return {
         same: (await rankRedeem([p], 'NZDF', 'NZDF', 100_000, BE)).best,
-        transfer: (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
-          (r) => r.id === 'transfer-exit',
-        ),
+        // The transfer's exit leg pays the POST-move toll, read through the resolver.
+        transfer: (
+          await rankRedeem([p], 'NZDF', 'AUDF', 100_000, {
+            ...BE,
+            postMoveExitTollWad: async () => tw,
+          })
+        ).routes.find((r) => r.id === 'transfer-exit'),
       };
     };
     const z = await at(0n);
     const t = await at(10n ** 17n);
+    expect(z.transfer?.feasible).toBe(true);
+    expect(t.transfer?.feasible).toBe(true);
     expect(t.same?.out).toBeCloseTo((z.same?.out ?? 0) * 0.9, 6);
     expect(t.transfer?.out).toBeCloseTo((z.transfer?.out ?? 0) * 0.9, 6);
   });
@@ -544,6 +556,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     tag,
     state: {
       base: 'USDC',
+      solvencyOk: true,
       exitTollWad: 0n,
       legs,
       hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
@@ -585,7 +598,7 @@ describe('same-asset direct paths', () => {
     const ok = await rankRedeem([healthyPool()], 'AUDF', 'AUDF', 5_000, BE);
     expect(ok.routes.length).toBe(1);
     expect(ok.best?.steps[0].kind).toBe('withdraw');
-    expect(ok.best?.steps[0].amountOut).toBe(5_000);
+    expect(ok.best?.steps[0].amountOut).toBe(4_999.999998); // 5_000 floored toward the pool
     const cut = await rankRedeem([pool('core', { audfRes: 500_000 })], 'AUDF', 'AUDF', 5_000, BE);
     expect(cut.best?.out).toBeGreaterThan(0);
     expect(cut.best?.out).toBeLessThan(5_000);
@@ -613,7 +626,7 @@ describe('missing liability liquidity / single-pool scope edges', () => {
 
 describe('capacity clamp boundary', () => {
   test('maxRedeem exactly equal to the burned face passes the gate on both sides', async () => {
-    const cap: LpRouteOpts = { ...BE, maxRedeem: () => 5_000 };
+    const cap: LpRouteOpts = { ...BE, maxRedeem: () => 5_000, postMoveExitTollWad: async () => 0n };
     const dep = await rankDeposit([healthyPool()], 'AUDF', 'NZDF', 5_000, cap);
     expect(dep.routes.find((r) => r.id === 'deposit-first')?.feasible).toBe(true);
     const red = await rankRedeem([healthyPool()], 'NZDF', 'AUDF', 5_000, cap);
@@ -632,7 +645,7 @@ describe('market-mint sizing and liability-index conversion', () => {
     expect(indexed.best?.steps[0].kind).toBe('withdrawTo');
     expect(indexed.best?.steps[0].amountIn).toBeCloseTo(5_000, 6);
     // 5k shares @ idx 1.2 = 6k face in, identity backend quotes it straight through.
-    expect(indexed.best?.out).toBeCloseTo(6_000, 6);
+    expect(indexed.best?.out).toBeCloseTo(6_000, 5);
   });
 });
 
@@ -642,7 +655,7 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
   test('same-asset exit pays min(c_leg, C): a covered leg in a short pool is capped at C', async () => {
     // hub 1.6M/2M, legs 1M/1M: C = 3.6M / 4M = 0.9. AUDF itself is fully covered.
     const r = await rankRedeem([pool('core', { hubRes: 1_600_000 })], 'AUDF', 'AUDF', 5_000, BE);
-    expect(r.best?.out).toBeCloseTo(4_500, 6);
+    expect(r.best?.out).toBeCloseTo(4_500, 5);
   });
 
   test('same-asset exit on a short leg in a whole pool is bounded by the leg, not taxed twice', async () => {
@@ -654,7 +667,7 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
       5_000,
       BE,
     );
-    expect(r.best?.out).toBeCloseTo(2_500, 6);
+    expect(r.best?.out).toBeCloseTo(2_500, 5);
   });
 
   test('cross exit converts face · C and never haircuts the destination leg', async () => {
@@ -663,7 +676,7 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
     // C = (1.6 + 1 + 0.5) / 4 = 0.775
     const r = await rankRedeem(pools, 'AUDF', 'NZDF', 5_000, BE);
     const cross = r.routes.find((x) => x.id === 'cross-exit');
-    expect(cross?.out).toBeCloseTo(5_000 * 0.775, 6);
+    expect(cross?.out).toBeCloseTo(5_000 * 0.775, 5);
   });
 
   test('a mark the pool cannot price leaves no rate: mints and cross exits refuse, same-asset stays open', async () => {
@@ -677,7 +690,7 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
     // Degraded same-asset: min(c_leg, C_lower), C_lower = min(C_usable, dark c_k = 0.6).
     const short = [pool('core', { audfMark: 0, audfRes: 600_000 })];
     const same = await rankRedeem(short, 'NZDF', 'NZDF', 5_000, BE);
-    expect(same.best?.out).toBeCloseTo(3_000, 6);
+    expect(same.best?.out).toBeCloseTo(3_000, 5);
   });
 
   test('a deposit mints face amt / C', async () => {
@@ -708,6 +721,8 @@ describe('crossExit exit toll + keeper floor', () => {
           cov_toll: '0x0',
           proto_fee: '0x0',
           lp_fee: '0x0',
+          debit_toll: '0x0',
+          credit_toll: '0x0',
           c_toll: `0x${(out / 20n).toString(16)}`,
         }),
       };
@@ -726,7 +741,8 @@ describe('crossExit exit toll + keeper floor', () => {
     const r = await run();
     expect(seen?.claim?.toll_wad).toBe(`0x${(5n * 10n ** 16n).toString(16)}`);
     expect(r?.feasible).toBe(true);
-    expect(r?.out).toBeCloseTo(95_000, 6);
+    expect(r?.out).toBeCloseTo(95_000, 5);
+    expect(r?.out).toBeLessThanOrEqual(95_000);
   });
   test('out leg below out + minLiquidity is unfeasible', async () => {
     const mk = (min: number) => (p: NamedPool) => {
@@ -747,13 +763,16 @@ describe('same-asset settlement boundaries', () => {
       ...BE,
       liquidityIndexWad: () => 2e18,
     });
-    expect(result.best?.out).toBeCloseTo(180, 6);
+    expect(result.best?.out).toBeCloseTo(180, 5);
+    expect(result.best?.out).toBeLessThanOrEqual(180);
   });
   test('sub-wei toll rounds up and zero payout refuses', async () => {
     const p = healthyPool();
     p.state.exitTollWad = 1n;
     expect((await rankRedeem([p], 'AUDF', 'AUDF', 0.000001, BE)).best).toBeNull();
-    expect((await rankRedeem([p], 'AUDF', 'AUDF', 0.000002, BE)).best?.out).toBe(0.000001);
+    // Chain: 4 − ceil(4·1/WAD) = 3 units. The quote floors the float gross by two units first
+    // (`floorRaw`), then takes the same ceil'd toll: 1 unit, never above the chain.
+    expect((await rankRedeem([p], 'AUDF', 'AUDF', 0.000004, BE)).best?.out).toBe(0.000001);
   });
   test('same-asset keeper floor and over-burn refuse', async () => {
     const p = healthyPool();

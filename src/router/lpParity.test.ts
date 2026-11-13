@@ -93,6 +93,8 @@ function build(ph: Phase): NamedPool {
         kneeBits: 0,
         minLiquidity: human(base.minLiquidity, base.decimals),
       },
+      // Every recorded phase settled cross exits at the live rate (cWad re-derives from the books).
+      solvencyOk: true,
       exitTollWad: BigInt(ph.exitTollWad),
     },
   };

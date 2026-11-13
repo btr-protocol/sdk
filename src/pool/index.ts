@@ -10,6 +10,7 @@ import type {
   FieldsMatch,
   SwapQuoteFields,
 } from '../abis/structs.generated.js';
+import type { PoolState } from '../amm/aimm.js';
 import { decodeErrorResult, decodeFn, encodeFn } from '../eth/abi';
 import { ContractRevertError } from '../eth/contract';
 import { estimateCallGas } from '../eth/gas';
@@ -141,6 +142,40 @@ export async function getPoolSolvency(
     data: result,
   });
   return { cWad, ok, exitTollWad };
+}
+
+/** `PoolState` carrying both `poolSolvencyWad` words the LP exit quotes need: `solvencyOk` (the
+ *  `ok` word) and `exitTollWad` (the toll word, the settlement toll only while `ok`). */
+export function withPoolSolvency<S extends PoolState>(
+  state: S,
+  sol: { ok: boolean; exitTollWad: bigint },
+): S {
+  return { ...state, solvencyOk: sol.ok, exitTollWad: sol.exitTollWad };
+}
+
+/** `Pool.previewWithdraw(tk, lp)`: the same-asset payout for `lp` raw LP shares, in raw `tk` units,
+ *  net of the settlement C toll (`exitCap`'s sweep). Fits `LpRouteOpts.previewWithdraw`. */
+export async function getPreviewWithdraw(
+  provider: Eip1193Provider,
+  poolAddress: Address,
+  tokenAddress: Address,
+  lp: bigint,
+): Promise<{ amountOut: bigint; haircut: bigint }> {
+  const data = encodeFn({
+    abi: POOL_ABI,
+    functionName: 'previewWithdraw',
+    args: [tokenAddress, lp],
+  });
+  const result = (await provider.request({
+    method: 'eth_call',
+    params: [{ to: poolAddress, data }, 'latest'],
+  })) as Hex;
+  const [amountOut, haircut] = decodeFn<[bigint, bigint]>({
+    abi: POOL_ABI,
+    functionName: 'previewWithdraw',
+    data: result,
+  });
+  return { amountOut, haircut };
 }
 
 /**

@@ -5,7 +5,7 @@
 // stay local (no pricing law in them). rankDeposit/rankRedeem keep their names and are
 // async now: callers pass backend wire meta (addresses/decimals) for the request build.
 
-import { type QuoteRouteWire, type WireMeta, type routeAsync } from '../amm/aimm.js';
+import type { PoolState, QuoteRouteWire, WireMeta, routeAsync } from '../amm/aimm.js';
 import {
   type LiabLeg,
   WAD,
@@ -34,6 +34,28 @@ export interface LpRouteOpts {
   liquidityIndexWad?: (symbol: string) => number;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
   backend?: LpBackend;
+  /** `Pool.previewWithdraw(tk, lp)` (`PoolLiquidityLib.previewWithdraw`): the same-asset payout in
+   *  raw token units, net of the settlement toll off `exitCap`'s lower-pass sweep. `lpShares` is the
+   *  LP share amount being redeemed (display units). Null = unread. Without it a same-asset exit
+   *  prices only off a live (`solvencyOk`) `poolSolvencyWad` toll; with it the quote is capped by it,
+   *  and a degraded pool (a dark leg) quotes off it alone. See `getPreviewWithdraw`. */
+  previewWithdraw?: (pool: NamedPool, symbol: string, lpShares: number) => Promise<bigint | null>;
+  /** The C toll (WAD) the transfer-exit's second call (`withdraw`) pays: `exitCap`'s sweep over the
+   *  books AFTER the `swapLiability` claim move (both legs' claims and the exposure high-water
+   *  changed), e.g. from a simulated batch. Pool state cannot price it (exposure heads, record
+   *  spreads), and the entry word understates it, so without this transfer-exit is `toll-pending`. */
+  postMoveExitTollWad?: (ctx: PostMoveTollCtx) => Promise<bigint | null>;
+}
+
+export interface PostMoveTollCtx {
+  pool: NamedPool;
+  /** The holder's books after the claim move (indicative, float). */
+  postState: PoolState;
+  tokenIn: string;
+  tokenOut: string;
+  lpAmountIn: number;
+  /** LP shares of `tokenOut` the move credits: the second call's `lpAmount`. */
+  lpAmountOut: number;
 }
 
 /** Backend settings shared by every route. The pool address is per pool, so each conversion takes it
@@ -392,9 +414,19 @@ async function crossExit(
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
 
+  // Chain `ok` (second `poolSolvencyWad` word): degraded, `creditRate` settles at C's lower bound
+  // with the lower-pass toll, neither of which the state's C or toll word carries. Unknown = pending.
+  const solv = solvencyGate(holder.state);
+  if (solv) return unfeasible(CROSS_DEAD, solv);
   // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
+  // `creditRate(false)`'s toll, the third `poolSolvencyWad` word while `ok`. Absent = params not
+  // loaded: unknown, never 0 (a 0 overstates the payout and minOut reverts).
+  const tw = holder.state.exitTollWad;
+  if (tw == null) return unfeasible(CROSS_DEAD, 'toll-pending');
+  // Chain: toll capped at the payout, so a toll >= 100% leaves nothing and the exit reverts.
+  if (tw >= BigInt(WAD)) return unfeasible(CROSS_DEAD, 'toll-exceeds-payout');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
   if (!(withdrawValue > 0) || withdrawValue > fromLeg.liabilities)
     return unfeasible(CROSS_DEAD, 'insufficient-liability');
@@ -409,23 +441,29 @@ async function crossExit(
   if (!q || !(q.amountOut > 0)) {
     return unfeasible(CROSS_DEAD, 'no-route');
   }
+  // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
+  // of the payout after the C toll (`_quoteWithdrawCross` `PoolLiquidityLib.sol:541-543`). A back
+  // that omits it has not priced it: fail closed, never a zero debit (a wall saturates it to the
+  // whole payout).
+  if (q.debitToll === undefined) return unfeasible(CROSS_DEAD, 'toll-pending');
   // Lemma B mark cap, and NO output-leg haircut: the claim was settled at C on the way in.
   const markCap = fair * q.markPrice;
   const gross = q.amountOut > markCap ? markCap : q.amountOut;
   if (!(gross > 0)) return unfeasible(CROSS_DEAD, 'no-route');
-  // `_quoteWithdrawCross`: the C toll (capped at the output) stays in the output leg's reserves,
-  // so only `out = gross - toll` is debited. The backend computes it from `claim.toll_wad`
-  // (`Quote.cToll`); without one, derive it from the state's `exitTollWad` at the gross.
-  const tw = holder.state.exitTollWad;
-  // Absent = params not loaded: unknown, never 0 (a 0 overstates the payout and minOut reverts).
-  if (tw == null) return unfeasible(CROSS_DEAD, 'toll-pending');
-  // Chain: toll capped at the payout, so a toll >= 100% leaves nothing and the exit reverts.
-  if (tw >= BigInt(WAD)) return unfeasible(CROSS_DEAD, 'toll-exceeds-payout');
-  const toll = Math.min(q.cToll ?? gross - sameAssetNet(gross, tw, toLeg.decimals), gross);
-  // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
-  // of the payout after the C toll; a wall saturates it to the whole payout (`ZeroValue`).
-  const debit = q.debitToll ?? 0;
-  const out = gross - toll > debit ? gross - toll - debit : 0;
+  // `_quoteWithdrawCross`: `amt = q.amountOut − _cToll(q.amountOut, toll) − debit` (`:538-543`), the
+  // C toll (capped at the output) staying in the output leg's reserves. The backend computes it from
+  // `claim.toll_wad` (`Quote.cToll`); without one, `_cToll` off the state's word at the gross. In raw
+  // units, every rounding toward the pool: gross floored, tolls ceiled.
+  const d = toLeg.decimals;
+  if (d === undefined) return unfeasible(CROSS_DEAD, 'toll-pending');
+  const rGross = floorRaw(gross, d);
+  const rCalc = cToll(rGross, tw);
+  const rToll = q.cToll === undefined ? rCalc : minBig(maxBig(ceilRaw(q.cToll, d), rCalc), rGross);
+  const rDebit = ceilRaw(q.debitToll, d);
+  const rOut = rGross - rToll > rDebit ? rGross - rToll - rDebit : 0n;
+  const toll = Number(rToll) / 10 ** d;
+  const debit = q.debitToll;
+  const out = rawToOut(rOut, d);
   if (!(out > 0)) return unfeasible(CROSS_DEAD, debit > 0 ? 'coverage-wall' : 'no-route');
   // `_applyWithdraw`: reserves fall by `out`; liabilities rise by the route fee's LP credit and the
   // treasury face (route proto fee + the toll's proto slice), each `fee*WAD/g` (g = lastGoodC = c,
@@ -472,13 +510,46 @@ async function crossExit(
   return seasonGate(shell, targetSym, lpFaceIn, opts);
 }
 
-/** `_quoteWithdrawSame` payout net of the C toll: `fee = ceil(amt * tw / WAD)` (`_cToll`), tw < WAD. */
+/** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `getPoolSolvency`):
+ *  null when live; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark leg). */
+function solvencyGate(state: PoolState): 'toll-pending' | 'feed-unavailable' | null {
+  if (state.solvencyOk === undefined || state.solvencyOk === null) return 'toll-pending';
+  return state.solvencyOk ? null : 'feed-unavailable';
+}
+
+const WAD_N = 10n ** 18n;
+/** Relative margin over f64 composition (a few ulps of the state's float books), toward the pool. */
+const SLACK = 1 - 2 ** -46;
+const minBig = (a: bigint, b: bigint): bigint => (a < b ? a : b);
+const maxBig = (a: bigint, b: bigint): bigint => (a > b ? a : b);
+/** A float payout in raw units, never above the chain's integer floor: shaved by {@link SLACK},
+ *  truncated, then one unit off. */
+function floorRaw(v: number, d: number): bigint {
+  const r = toUnits(v * SLACK, d);
+  return r > 0n ? r - 1n : 0n;
+}
+/** A float charge in raw units, never below the chain's: grossed up by {@link SLACK}, plus a unit. */
+const ceilRaw = (v: number, d: number): bigint => (v > 0 ? toUnits(v / SLACK, d) + 1n : 0n);
+/** Raw payout back to display units such that `toUnits(out, d) <= raw`. Below 1e15 the quotient
+ *  round-trips `toUnits`' 16 significant digits exactly; above, f64 can round up, so shave. */
+function rawToOut(raw: bigint, d: number): number {
+  if (raw <= 0n) return 0;
+  const v = Number(raw) / 10 ** d;
+  return raw < 10n ** 15n ? v : v * SLACK;
+}
+/** `PoolLiquidityLib._cToll`: `ceil(amt * tw / WAD)`, capped at `amt`. */
+function cToll(amt: bigint, tw: bigint): bigint {
+  const f = (amt * tw + WAD_N - 1n) / WAD_N;
+  return f > amt ? amt : f;
+}
+
+/** `_quoteWithdrawSame` payout net of the C toll: `amt − _cToll(amt, tw)` (`PoolLiquidityLib.sol:
+ *  497-498, 510`), tw < WAD; `amt = floor(withdrawValue·mu/WAD)`, the gross floored in raw units. */
 function sameAssetNet(gross: number, tw: bigint, decimals?: number): number {
-  // A base-only caller without wire metadata remains indicative at float precision.
-  if (decimals === undefined) return tw > 0n ? gross * (1 - Number(tw) / WAD) : gross;
-  const raw = toUnits(gross, decimals);
-  const fee = (raw * tw + 10n ** 18n - 1n) / 10n ** 18n;
-  return Number(raw > fee ? raw - fee : 0n) / 10 ** decimals;
+  // A base-only caller without wire metadata remains indicative at float precision, shaved.
+  if (decimals === undefined) return gross * (1 - Number(tw) / WAD) * SLACK;
+  const raw = floorRaw(gross, decimals);
+  return rawToOut(raw - cToll(raw, tw), decimals);
 }
 
 async function transferExit(
@@ -531,10 +602,13 @@ async function transferExit(
   if (flagged) return flagged;
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
   if (!gated.feasible) return gated;
-  // The same-asset leg of this route pays the C toll (`_quoteWithdrawSame`): unknown = pending.
-  const tw = holder.state.exitTollWad;
-  if (tw == null) return unfeasible(shell, 'toll-pending');
-  if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
+  // `swapLiability` settles at `creditRate`: degraded = C's lower bound, which the state cannot
+  // price. Unknown `ok` = pending.
+  const solv = solvencyGate(holder.state);
+  if (solv) return unfeasible(shell, solv);
+  // The second call's C toll is `exitCap`'s sweep AFTER the claim move, never the entry word
+  // (the move reshapes the exposure the toll prices; the entry word can understate it).
+  if (!opts.postMoveExitTollWad) return unfeasible(shell, 'toll-pending');
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
 
@@ -571,8 +645,23 @@ async function transferExit(
   changeFace(outToken, q.liabOut + q.lpFeeCredit + q.protoFeeCredit);
   const postC = poolSolvency(postState);
   if (postC === null) return unfeasible(shell, 'feed-unavailable');
-  // C-exposure can change after a claim move; refresh the rate and toll together for the exit.
-  // The retained entry snapshot is indicative until the caller runs previewWithdraw.
+  // `_quoteWithdrawSame` on the post-move books: `exitCap` re-sweeps (`PoolLiquidityLib.sol:495`),
+  // so rate and toll both come from the post-move state.
+  let tw: bigint | null;
+  try {
+    tw = await opts.postMoveExitTollWad({
+      pool: holder,
+      postState,
+      tokenIn: targetSym,
+      tokenOut: outToken,
+      lpAmountIn: lpFaceIn,
+      lpAmountOut: q.lpAmountOut,
+    });
+  } catch {
+    return unfeasible(shell, 'backend-error');
+  }
+  if (tw == null || tw < 0n) return unfeasible(shell, 'toll-pending');
+  if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
   const exitOut = sameAssetNet(
     exitValue(q.liabOut, legCoverage(toLeg.reserves, outLiab), postC),
     tw,
@@ -624,10 +713,6 @@ export async function rankRedeem(
     };
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
-    const tw = holder.state.exitTollWad;
-    if (tw == null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
-    if (tw >= BigInt(WAD))
-      return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
     const slip = opts.slippageFrac;
     // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
     // the hatch stays open. Net of the C toll (`_quoteWithdrawSame`).
@@ -635,11 +720,34 @@ export async function rankRedeem(
     const face = (lpFaceIn * (leg.indexWad ?? WAD)) / WAD;
     if (!(face > 0) || face > leg.liabilities)
       return { best: null, routes: [unfeasible(gated, 'insufficient-liability')] };
-    const actual = sameAssetNet(
-      exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap),
-      tw,
-      leg.decimals,
-    );
+    const gross = exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap);
+    // Settlement toll = `exitCap`'s lower-pass sweep (`PoolSolvencyLib.capBounds(.., lower=true)`).
+    // `poolSolvencyWad`'s word equals it only while `ok` (every mark usable); degraded it reads 0
+    // while the exit still pays the usable legs' toll. So: the state word only when live, and the
+    // chain's own `previewWithdraw` (same sweep, `PoolLiquidityLib.sol:723-740`) caps it when read.
+    const tw = holder.state.exitTollWad;
+    let actual: number | null = null;
+    if (holder.state.solvencyOk === true && tw != null) {
+      if (tw >= BigInt(WAD))
+        return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
+      actual = sameAssetNet(gross, tw, leg.decimals);
+    }
+    if (opts.previewWithdraw && leg.decimals !== undefined) {
+      let raw: bigint | null = null;
+      try {
+        raw = await opts.previewWithdraw(holder, targetSym, lpFaceIn);
+      } catch {
+        raw = null;
+      }
+      if (raw != null) {
+        // The lower of the two: either alone can run ahead of settlement (the preview arms no band
+        // guard; the state model is float books).
+        const pv = rawToOut(raw, leg.decimals);
+        const model = actual ?? rawToOut(floorRaw(gross, leg.decimals), leg.decimals);
+        actual = Math.min(pv, model);
+      }
+    }
+    if (actual === null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
     if (leg.reserves < actual + (leg.minLiquidity ?? 0))
       return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
