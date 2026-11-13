@@ -45,6 +45,8 @@ describe('depositMin plumbing', () => {
     const sent: string[] = [];
     const provider = {
       request: async ({ method, params }: { method: string; params?: unknown[] }) => {
+        if (method === 'eth_accounts') return [USER];
+        if (method === 'eth_estimateGas') return '0xf4240';
         if (method === 'eth_sendTransaction') sent.push((params?.[0] as { data: string }).data);
         return '0xhash';
       },

@@ -14,18 +14,24 @@ const POOL = '0x0000000000000000000000000000000000000010' as Address;
 const USER = '0x00000000000000000000000000000000000000aa' as Address;
 const TOKEN = '0x0000000000000000000000000000000000000001' as Address;
 
-/** A wallet on chain 56 that records every method it is asked for. */
-function wallet() {
+/** A wallet on chain 56 that records every method it is asked for, and every tx it is sent. */
+function wallet(estimate = 780_023n) {
   const seen: string[] = [];
+  const sent: { gas?: string }[] = [];
   const provider = {
-    request: ({ method }: { method: string; params?: unknown[] }): Promise<unknown> => {
+    request: ({ method, params }: { method: string; params?: unknown[] }): Promise<unknown> => {
       seen.push(method);
       if (method === 'eth_chainId') return Promise.resolve('0x38');
-      if (method === 'eth_sendTransaction') return Promise.resolve('0xhash' as Hex);
+      if (method === 'eth_accounts') return Promise.resolve([USER]);
+      if (method === 'eth_estimateGas') return Promise.resolve(`0x${estimate.toString(16)}`);
+      if (method === 'eth_sendTransaction') {
+        sent.push(params?.[0] as { gas?: string });
+        return Promise.resolve('0xhash' as Hex);
+      }
       throw new Error(`unexpected ${method}`);
     },
   } as unknown as Eip1193Provider;
-  return { provider, seen };
+  return { provider, seen, sent };
 }
 
 const swapParams = (expectedChainId?: number) => ({
@@ -42,7 +48,7 @@ describe('wallet-path writers bind the chain when asked', () => {
   test('swap sends on the expected chain', async () => {
     const { provider, seen } = wallet();
     await expect(swap(provider, POOL, swapParams(56))).resolves.toBe('0xhash');
-    expect(seen).toEqual(['eth_chainId', 'eth_sendTransaction']);
+    expect(seen).toEqual(['eth_chainId', 'eth_accounts', 'eth_estimateGas', 'eth_sendTransaction']);
   });
 
   test('swap refuses another chain before anything is sent', async () => {
@@ -54,7 +60,25 @@ describe('wallet-path writers bind the chain when asked', () => {
   test('swap without expectedChainId sends unchecked, as before', async () => {
     const { provider, seen } = wallet();
     await expect(swap(provider, POOL, swapParams())).resolves.toBe('0xhash');
-    expect(seen).toEqual(['eth_sendTransaction']);
+    expect(seen).toEqual(['eth_accounts', 'eth_estimateGas', 'eth_sendTransaction']);
+  });
+
+  test('pool txs carry the estimate × 1.25 as their gas limit, not the bare estimate', async () => {
+    const { provider, sent } = wallet(780_023n);
+    await swap(provider, POOL, swapParams());
+    await deposit(provider, POOL, { token: TOKEN, amount: 1n });
+    await withdraw(provider, POOL, { token: TOKEN, lpAmount: 1n, minAmountOut: 1n });
+    expect(sent.map((t) => t.gas)).toEqual(['0xee0b5', '0xee0b5', '0xee0b5']); // 975,029
+  });
+
+  test('a pool tx refuses to send with no account connected', async () => {
+    const provider = {
+      request: ({ method }: { method: string }) =>
+        method === 'eth_accounts' ? Promise.resolve([]) : Promise.reject(new Error(method)),
+    } as unknown as Eip1193Provider;
+    await expect(deposit(provider, POOL, { token: TOKEN, amount: 1n })).rejects.toThrow(
+      /No account connected/,
+    );
   });
 
   test('deposit and withdraw refuse another chain before anything is sent', async () => {

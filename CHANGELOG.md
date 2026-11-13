@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Pool `swap` / `deposit` / `withdraw` send with gas LIMIT = `eth_estimateGas` × 1.25, capped at
+  16 777 216 (`gasWithBuffer`, exported from `./eth`). The wallet used to estimate on its own with
+  no margin: a pool v2 call read one block later can need more gas, and the out-of-gas revert still
+  bills the limit. The estimate runs from the connected account.
 - `chainQuote` / `chainRoute`: callers can now cap a spread-mode server tolerance with an absolute
   `maxTolPbps` (default 10 000 pbps, 1%; validated to 100..999_000). The policy bound used to scale
   `pct` by the uint16 spread-field maximum, so `pct: 50` on a 459 pbps quote authorized 32 767 pbps

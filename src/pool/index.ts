@@ -11,8 +11,9 @@ import type {
   SwapQuoteFields,
 } from '../abis/structs.generated.js';
 import { decodeFn, encodeFn } from '../eth/abi';
+import { gasWithBuffer } from '../eth/gas';
 import { multicallStrict } from '../eth/multicall';
-import { getChainId } from '../eth/rpc';
+import { estimateGas, getAccounts, getChainId } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { toAsset } from './asset.js';
 
@@ -412,6 +413,25 @@ async function checkExpectedChain(
   }
 }
 
+/** Send a pool call with its gas LIMIT = estimate × buffer (`gasWithBuffer`). The wallet would
+ *  otherwise estimate on its own, with no margin: a pool call read one block later can need more
+ *  gas than the estimate, and the revert still bills the limit. The estimate runs from the
+ *  connected account, the sender the wallet will use. */
+async function sendPoolCall(
+  provider: Eip1193Provider,
+  to: Address,
+  data: Hex,
+  value: Hex,
+): Promise<Hex> {
+  const [from] = await getAccounts(provider);
+  if (!from) throw new Error('No account connected');
+  const gas = gasWithBuffer(await estimateGas(provider, { from, to, data, value }));
+  return (await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{ to, data, value, gas: `0x${gas.toString(16)}` }],
+  })) as Hex;
+}
+
 /**
  * Execute a swap transaction
  * NB: Caller must approve tokenIn to poolAddress before calling
@@ -435,17 +455,7 @@ export async function swap(
     ],
   });
 
-  // Send transaction (provider must support eth_sendTransaction)
-  return (await provider.request({
-    method: 'eth_sendTransaction',
-    params: [
-      {
-        to: poolAddress,
-        data: calldata,
-        value: txValue(params.tokenIn, params.amountIn),
-      },
-    ],
-  })) as Hex;
+  return sendPoolCall(provider, poolAddress, calldata, txValue(params.tokenIn, params.amountIn));
 }
 
 /**
@@ -466,16 +476,7 @@ export async function deposit(
     args: [params.token, params.amount, params.minLpOut],
   });
 
-  return (await provider.request({
-    method: 'eth_sendTransaction',
-    params: [
-      {
-        to: poolAddress,
-        data: calldata,
-        value: txValue(params.token, params.amount),
-      },
-    ],
-  })) as Hex;
+  return sendPoolCall(provider, poolAddress, calldata, txValue(params.token, params.amount));
 }
 
 export { minLpOut } from './slippage';
@@ -540,16 +541,7 @@ export async function withdraw(
     args: [params.token, params.lpAmount, params.minAmountOut, sendDeadline(params.deadline)],
   });
 
-  return (await provider.request({
-    method: 'eth_sendTransaction',
-    params: [
-      {
-        to: poolAddress,
-        data: calldata,
-        value: '0x0',
-      },
-    ],
-  })) as Hex;
+  return sendPoolCall(provider, poolAddress, calldata, '0x0');
 }
 
 /** Same guard for the quote tuple; `routeHops`/`hopAmounts`/`hopPrices` are ABI fields too. */
