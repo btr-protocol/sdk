@@ -184,10 +184,10 @@ describe('F3: same-asset toll is the settlement (lower-pass) toll', () => {
     return p;
   };
 
-  test('degraded pool: the 0 toll word is not used; pending without a preview', async () => {
+  test('degraded pool: the 0 toll word is not used without a preview', async () => {
     const [r] = await route(dark(), 'AUDF', 'AUDF', 10_000);
     expect(r.feasible).toBe(false);
-    expect(r.reason).toBe('toll-pending');
+    expect(r.reason).toBe('feed-unavailable');
   });
 
   test('ok word not loaded: pending even with a toll word', async () => {
@@ -197,7 +197,7 @@ describe('F3: same-asset toll is the settlement (lower-pass) toll', () => {
     expect(r.reason).toBe('toll-pending');
   });
 
-  test('degraded pool with previewWithdraw: quotes the preview (lower-pass toll)', async () => {
+  test('degraded pool with previewWithdraw: refuses before reading the preview', async () => {
     const calls: [string, number][] = [];
     const [r] = await route(dark(), 'AUDF', 'AUDF', 10_000, {
       ...BE,
@@ -207,9 +207,10 @@ describe('F3: same-asset toll is the settlement (lower-pass) toll', () => {
         return 9_800_000_000n;
       },
     });
-    expect(calls).toEqual([['AUDF', 10_000]]);
-    expect(r.feasible).toBe(true);
-    expect(r.out).toBe(9_800);
+    expect(calls).toEqual([]);
+    expect(r.feasible).toBe(false);
+    expect(r.reason).toBe('feed-unavailable');
+    expect(r.out).toBe(0);
   });
 
   test('a live pool takes the lower of the state toll and the preview', async () => {
@@ -475,11 +476,59 @@ describe('stale solvency words: refused, not priced', () => {
       (x) => x.id === 'cross-exit',
     );
     expect(cross?.reason).toBe('toll-stale');
-    // A fresh chain preview still prices the in-kind exit.
+    // A lagging replica preview cannot override stale solvency words.
     const pv = await route(old.p, 'AUDF', 'AUDF', 1_000, {
       ...old.opts,
       previewWithdraw: async () => 990_000_000n,
     });
-    expect(pv[0].out).toBe(990);
+    expect(pv[0].feasible).toBe(false);
+    expect(pv[0].reason).toBe('toll-stale');
+    expect(pv[0].out).toBe(0);
+  });
+});
+
+describe('same-asset previews obey the shared solvency gate', () => {
+  test.each(['toll', 'solvency'] as const)(
+    '%s pending refuses a non-null preview',
+    async (word) => {
+      const p = pool();
+      if (word === 'toll') p.state.exitTollWad = null;
+      else p.state.solvencyOk = null;
+      let calls = 0;
+      const plan = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
+        ...BE,
+        previewWithdraw: async () => {
+          calls++;
+          return 990_000_000n;
+        },
+      });
+      expect(plan.best).toBeNull();
+      expect(plan.routes[0].feasible).toBe(false);
+      expect(plan.routes[0].reason).toBe('toll-pending');
+      expect(plan.routes[0].out).toBe(0);
+      expect(calls).toBe(0);
+    },
+  );
+
+  test('fresh at the caller age bound retains the lower preview quote', async () => {
+    const p = pool();
+    p.state.exitTollWad = 10n ** 16n;
+    p.state.solvencyAtMs = 1_000;
+    const opts = {
+      ...BE,
+      now: () => 1_100,
+      maxTollAgeMs: 100,
+      previewWithdraw: async () => 980_000_000n,
+    };
+    const fresh = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, opts);
+    expect(fresh.best?.out).toBe(980);
+    expect(fresh.best?.minOut).toBe(980 * (1 - BE.slippageFrac));
+    const stale = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
+      ...opts,
+      now: () => 1_101,
+    });
+    expect(stale.best).toBeNull();
+    expect(stale.routes[0].reason).toBe('toll-stale');
+    expect(stale.routes[0].out).toBe(0);
   });
 });

@@ -788,9 +788,14 @@ export async function rankRedeem(
     };
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
+    const solv = solvencyGate(holder.state, opts);
+    if (solv) return { best: null, routes: [unfeasible(gated, solv)] };
+    const tw = holder.state.exitTollWad;
+    if (tw == null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
+    if (tw >= BigInt(WAD))
+      return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
     const slip = opts.slippageFrac;
-    // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
-    // the hatch stays open. Net of the C toll (`_quoteWithdrawSame`).
+    // `exitMu`: in-kind at `min(c_leg, cap)`, net of the C toll (`_quoteWithdrawSame`).
     const cap = poolExitCap(holder.state);
     const face = (lpFaceIn * (leg.indexWad ?? WAD)) / WAD;
     if (!(face > 0) || face > leg.liabilities)
@@ -808,21 +813,12 @@ export async function rankRedeem(
             cap,
             d,
           );
-    // Settlement toll = `exitCap`'s lower-pass sweep (`PoolSolvencyLib.capBounds(.., lower=true)`).
-    // `poolSolvencyWad`'s word equals it only while `ok` (every mark usable); degraded it reads 0
-    // while the exit still pays the usable legs' toll. So: the state word only when live, and the
-    // chain's own `previewWithdraw` (same sweep, `PoolLiquidityLib.sol:723-740`) caps it when read.
-    const tw = holder.state.exitTollWad;
-    let actual: number | null = null;
-    const stale = tollStale(holder.state, opts);
-    if (holder.state.solvencyOk === true && tw != null && !stale) {
-      if (tw >= BigInt(WAD))
-        return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
-      actual =
-        grossRaw === null || d === undefined
-          ? sameAssetNetF(gross, tw)
-          : sameAssetNetRaw(grossRaw, tw, d);
-    }
+    // Only live, fresh solvency words price this exit. A replica preview may cap the model,
+    // but cannot establish that the settlement toll is available or current.
+    let actual =
+      grossRaw === null || d === undefined
+        ? sameAssetNetF(gross, tw)
+        : sameAssetNetRaw(grossRaw, tw, d);
     if (opts.previewWithdraw && leg.decimals !== undefined) {
       let raw: bigint | null = null;
       try {
@@ -834,12 +830,9 @@ export async function rankRedeem(
         // The lower of the two: either alone can run ahead of settlement (the preview arms no band
         // guard; the state model is float books).
         const pv = rawToOut(raw, leg.decimals);
-        const model = actual ?? rawToOut(grossRaw ?? floorRaw(gross, leg.decimals), leg.decimals);
-        actual = Math.min(pv, model);
+        actual = Math.min(pv, actual);
       }
     }
-    if (actual === null)
-      return { best: null, routes: [unfeasible(gated, stale ? 'toll-stale' : 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
     if (leg.reserves < actual + (leg.minLiquidity ?? 0))
       return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
