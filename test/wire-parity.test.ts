@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 // No TS pricer remains, so parity is wire-level: hex codec round-trips, guards fail closed,
 // and malformed/outage wires never masquerade as no-liquidity.
 import { routeAsync } from '../src/amm/aimm.js';
-import { backendConvert } from '../src/pool/liability.js';
+import { backendConvert } from '../src/pool/liabilityQuote.js';
 import { hexToF64, rankDeposit, toRawHex, wirePlanToSwap } from '../src/router/lpRoutes.js';
 
 describe('wire codec', () => {

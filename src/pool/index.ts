@@ -122,6 +122,24 @@ export async function getAsset(
   return toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: result }));
 }
 
+/** Pool rate and exit toll from one sweep; `exitTollWad` is raw WAD, including a real zero. */
+export async function getPoolSolvency(
+  provider: Eip1193Provider,
+  poolAddress: Address,
+): Promise<{ cWad: bigint; ok: boolean; exitTollWad: bigint }> {
+  const data = encodeFn({ abi: POOL_ABI, functionName: 'poolSolvencyWad' });
+  const result = (await provider.request({
+    method: 'eth_call',
+    params: [{ to: poolAddress, data }, 'latest'],
+  })) as Hex;
+  const [cWad, ok, exitTollWad] = decodeFn<[bigint, boolean, bigint]>({
+    abi: POOL_ABI,
+    functionName: 'poolSolvencyWad',
+    data: result,
+  });
+  return { cWad, ok, exitTollWad };
+}
+
 /**
  * Fetch coverage ratio for an asset
  */
@@ -144,10 +162,7 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
-export type {
-  LiabLeg,
-  SwapLiabilityQuote,
-} from './liability.js';
+export type { LiabLeg, SwapLiabilityQuote } from './liability.js';
 export {
   WAD as WAD_F,
   exitCap,
@@ -156,16 +171,13 @@ export {
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
+} from './liability.js';
+export {
   quoteSwapLiabilityAsync,
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
-} from './liability.js';
-export type {
-  Custody,
-  HookSlot,
-  OracleConfig,
-  RiskConfig,
-} from './storage.js';
+} from './liabilityQuote.js';
+export type { Custody, HookSlot, OracleConfig, RiskConfig } from './storage.js';
 export type { CovTerms, KneeTerms } from './cov.js';
 export { decodeCovBits, decodeKneeBits, kappaBps } from './cov.js';
 export {

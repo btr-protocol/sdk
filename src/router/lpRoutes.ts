@@ -5,18 +5,22 @@
 // stay local (no pricing law in them). rankDeposit/rankRedeem keep their names and are
 // async now: callers pass backend wire meta (addresses/decimals) for the request build.
 
-import type { QuoteRouteWire, WireMeta, routeAsync } from '../amm/aimm.js';
+import { type QuoteRouteWire, type WireMeta, type routeAsync } from '../amm/aimm.js';
 import {
-  type BackendConvertOpts,
   type LiabLeg,
   WAD,
-  backendConvert,
+  covWallsF,
   exitValue,
+  feeCredit,
   legCoverage,
   poolExitCap,
   poolSolvency,
-  quoteSwapLiabilityCoreAsync,
 } from '../pool/liability.js';
+import {
+  type BackendConvertOpts,
+  backendConvert,
+  quoteSwapLiabilityCoreAsync,
+} from '../pool/liabilityQuote.js';
 import { toUnits } from '../utils/format.js';
 import type { NamedPool, SwapPlan } from './route.js';
 import { assertSlip, poolHolding } from './route.js';
@@ -59,6 +63,9 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       reserves: s.hub.res,
       liabilities: s.hub.liab,
       indexWad,
+      covBits: s.hub.covBits,
+      minLiquidity: s.hub.minLiquidity,
+      decimals: opts.backend?.baseDecimals,
     };
   }
   const leg = s.legs[symbol];
@@ -68,6 +75,9 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     reserves: leg.res,
     liabilities: leg.liab,
     indexWad,
+    covBits: leg.covBits,
+    minLiquidity: leg.minLiquidity,
+    decimals: leg.decimals,
   };
 }
 
@@ -299,7 +309,7 @@ async function transferMint(
       outLeg,
       faceIn,
       c,
-      backendConvert(holder.state, xToken, targetSym, bk),
+      backendConvert(holder.state, xToken, targetSym, bk, 'credit'),
     );
   } catch {
     return unfeasible(shell, 'backend-error');
@@ -376,21 +386,23 @@ async function crossExit(
   const slip = opts.slippageFrac;
   const holder = poolHolding(pools, targetSym, outToken);
   if (!holder) return null;
+  const bk = convertFor(holder, b);
+  if (!bk) return null;
   const fromLeg = liabLeg(holder, targetSym, opts);
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
-  const bk = convertFor(holder, b);
-  if (!bk) return null;
 
   // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
+  if (!(withdrawValue > 0) || withdrawValue > fromLeg.liabilities)
+    return unfeasible(CROSS_DEAD, 'insufficient-liability');
   const fair = withdrawValue * c;
-  const convert = backendConvert(holder.state, targetSym, outToken, bk);
+  const convert = backendConvert(holder.state, targetSym, outToken, bk, 'exit');
   let q: Awaited<ReturnType<typeof convert>>;
   try {
-    q = await convert(fair);
+    q = await convert(fair, c);
   } catch {
     return unfeasible(CROSS_DEAD, 'backend-error');
   }
@@ -399,8 +411,44 @@ async function crossExit(
   }
   // Lemma B mark cap, and NO output-leg haircut: the claim was settled at C on the way in.
   const markCap = fair * q.markPrice;
-  const out = q.amountOut > markCap ? markCap : q.amountOut;
-  if (!(out > 0)) return unfeasible(CROSS_DEAD, 'no-route');
+  const gross = q.amountOut > markCap ? markCap : q.amountOut;
+  if (!(gross > 0)) return unfeasible(CROSS_DEAD, 'no-route');
+  // `_quoteWithdrawCross`: the C toll (capped at the output) stays in the output leg's reserves,
+  // so only `out = gross - toll` is debited. The backend computes it from `claim.toll_wad`
+  // (`Quote.cToll`); without one, derive it from the state's `exitTollWad` at the gross.
+  const tw = holder.state.exitTollWad;
+  // Absent = params not loaded: unknown, never 0 (a 0 overstates the payout and minOut reverts).
+  if (tw == null) return unfeasible(CROSS_DEAD, 'toll-pending');
+  // Chain: toll capped at the payout, so a toll >= 100% leaves nothing and the exit reverts.
+  if (tw >= BigInt(WAD)) return unfeasible(CROSS_DEAD, 'toll-exceeds-payout');
+  const toll = Math.min(q.cToll ?? gross - sameAssetNet(gross, tw, toLeg.decimals), gross);
+  // The from-leg's claim debit (`CovLib.debitToll`, Φ⁺ at constant reserves, scaled 1/C) comes out
+  // of the payout after the C toll; a wall saturates it to the whole payout (`ZeroValue`).
+  const debit = q.debitToll ?? 0;
+  const out = gross - toll > debit ? gross - toll - debit : 0;
+  if (!(out > 0)) return unfeasible(CROSS_DEAD, debit > 0 ? 'coverage-wall' : 'no-route');
+  // `_applyWithdraw`: reserves fall by `out`; liabilities rise by the route fee's LP credit and the
+  // treasury face (route proto fee + the toll's proto slice), each `fee*WAD/g` (g = lastGoodC = c,
+  // stamped by `mintRate`) and dropped to 0 when it exceeds the book (`_credit`). Same inputs as
+  // the chain, so the floor check accepts iff the chain does.
+  const stampedC = Math.floor(c * 1e9) / 1e9;
+  const lpCredit = feeCredit((q.grossOut * q.lpFeeBps) / 1e4, toLeg.liabilities, stampedC);
+  const protoFee =
+    (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (holder.state.protoSharePct ?? 0)) / 100;
+  const face = feeCredit(protoFee, toLeg.liabilities + lpCredit, stampedC);
+  if (
+    covWallsF(
+      toLeg.covBits ?? 0,
+      toLeg.reserves,
+      toLeg.liabilities,
+      toLeg.reserves - out,
+      toLeg.liabilities + lpCredit + face,
+    )
+  )
+    return unfeasible(CROSS_DEAD, 'coverage-wall');
+  // `withdrawTo` reverts `InsufficientAmount` when the out leg would fall under its keeper floor.
+  if (toLeg.reserves < out + (toLeg.minLiquidity ?? 0))
+    return unfeasible(CROSS_DEAD, 'min-liquidity');
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -424,6 +472,15 @@ async function crossExit(
   return seasonGate(shell, targetSym, lpFaceIn, opts);
 }
 
+/** `_quoteWithdrawSame` payout net of the C toll: `fee = ceil(amt * tw / WAD)` (`_cToll`), tw < WAD. */
+function sameAssetNet(gross: number, tw: bigint, decimals?: number): number {
+  // A base-only caller without wire metadata remains indicative at float precision.
+  if (decimals === undefined) return tw > 0n ? gross * (1 - Number(tw) / WAD) : gross;
+  const raw = toUnits(gross, decimals);
+  const fee = (raw * tw + 10n ** 18n - 1n) / 10n ** 18n;
+  return Number(raw > fee ? raw - fee : 0n) / 10 ** decimals;
+}
+
 async function transferExit(
   pools: NamedPool[],
   targetSym: string,
@@ -435,11 +492,11 @@ async function transferExit(
   const slip = opts.slippageFrac;
   const holder = poolHolding(pools, targetSym, outToken);
   if (!holder) return null;
+  const bk = convertFor(holder, b);
+  if (!bk) return null;
   const fromLeg = liabLeg(holder, targetSym, opts);
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
-  const bk = convertFor(holder, b);
-  if (!bk) return null;
 
   const shell: RouteShell = {
     id: 'transfer-exit',
@@ -474,6 +531,10 @@ async function transferExit(
   if (flagged) return flagged;
   const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
   if (!gated.feasible) return gated;
+  // The same-asset leg of this route pays the C toll (`_quoteWithdrawSame`): unknown = pending.
+  const tw = holder.state.exitTollWad;
+  if (tw == null) return unfeasible(shell, 'toll-pending');
+  if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
   const c = poolSolvency(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
 
@@ -484,19 +545,42 @@ async function transferExit(
       toLeg,
       lpFaceIn,
       c,
-      backendConvert(holder.state, targetSym, outToken, bk),
+      backendConvert(holder.state, targetSym, outToken, bk, 'credit'),
     );
   } catch {
     return unfeasible(shell, 'backend-error');
   }
   if (!q) return unfeasible(shell, 'no-route');
 
-  // Same-asset exit of the credited face: `min(c_leg, C)` on the destination leg AFTER the credit.
-  const exitOut = exitValue(
-    q.liabOut,
-    legCoverage(toLeg.reserves, toLeg.liabilities + q.liabOut),
-    c,
+  // The next call sweeps again: the conversion reduced the claim book and booked route fees.
+  const postState = {
+    ...holder.state,
+    hub: holder.state.hub && { ...holder.state.hub },
+    legs: { ...holder.state.legs },
+  };
+  const changeFace = (symbol: string, delta: number) => {
+    if (symbol === postState.base && postState.hub) postState.hub.liab += delta;
+    else
+      postState.legs[symbol] = {
+        ...postState.legs[symbol],
+        liab: postState.legs[symbol].liab + delta,
+      };
+  };
+  const outLiab = toLeg.liabilities + q.liabOut + q.lpFeeCredit + q.protoFeeCredit;
+  changeFace(targetSym, -q.liabIn);
+  changeFace(outToken, q.liabOut + q.lpFeeCredit + q.protoFeeCredit);
+  const postC = poolSolvency(postState);
+  if (postC === null) return unfeasible(shell, 'feed-unavailable');
+  // C-exposure can change after a claim move; refresh the rate and toll together for the exit.
+  // The retained entry snapshot is indicative until the caller runs previewWithdraw.
+  const exitOut = sameAssetNet(
+    exitValue(q.liabOut, legCoverage(toLeg.reserves, outLiab), postC),
+    tw,
+    toLeg.decimals,
   );
+  if (!(exitOut > 0)) return unfeasible(shell, 'no-route');
+  if (toLeg.reserves < exitOut + (toLeg.minLiquidity ?? 0))
+    return unfeasible(shell, 'min-liquidity');
   shell.steps[0].amountOut = q.lpAmountOut;
   shell.steps[0].minOut = q.lpAmountOut * (1 - slip);
   shell.steps[1].amountIn = q.lpAmountOut;
@@ -505,7 +589,7 @@ async function transferExit(
   return { ...shell, out: exitOut, minOut: shell.steps[1].minOut, feasible: true };
 }
 
-/** Redeem lpFaceIn (FACE units) of targetSym LP, ending in outToken tokens. */
+/** Redeem lpFaceIn (LP share units) of targetSym LP, ending in outToken tokens. */
 export async function rankRedeem(
   pools: NamedPool[],
   targetSym: string,
@@ -540,12 +624,25 @@ export async function rankRedeem(
     };
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
+    const tw = holder.state.exitTollWad;
+    if (tw == null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
+    if (tw >= BigInt(WAD))
+      return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
     const slip = opts.slippageFrac;
     // `exitMu`: in-kind at `min(c_leg, cap)`; a dark mark degrades the cap to C's lower bound and
-    // the hatch stays open. The C-exposure exit toll is not modelled: the caller's slippage and
-    // `previewWithdraw` cover it.
+    // the hatch stays open. Net of the C toll (`_quoteWithdrawSame`).
     const cap = poolExitCap(holder.state);
-    const actual = exitValue(lpFaceIn, legCoverage(leg.reserves, leg.liabilities), cap);
+    const face = (lpFaceIn * (leg.indexWad ?? WAD)) / WAD;
+    if (!(face > 0) || face > leg.liabilities)
+      return { best: null, routes: [unfeasible(gated, 'insufficient-liability')] };
+    const actual = sameAssetNet(
+      exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap),
+      tw,
+      leg.decimals,
+    );
+    if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
+    if (leg.reserves < actual + (leg.minLiquidity ?? 0))
+      return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;
