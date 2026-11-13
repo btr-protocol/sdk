@@ -1,5 +1,9 @@
 /** Chain-scoped deployment ABIs. Build-head exports are separate decode/build surfaces. */
 import lock from '../../abis.lock.json';
+import accessControlV1 from '../../abis/generations/pool-v1-s7/AccessControl.json';
+import adminV1 from '../../abis/generations/pool-v1-s7/Admin.json';
+import poolV1 from '../../abis/generations/pool-v1-s7/Pool.json';
+import poolFactoryV1 from '../../abis/generations/pool-v1-s7/PoolFactory.json';
 import accessControl from '../../abis/generations/pool-v2-s12/AccessControl.json';
 import admin from '../../abis/generations/pool-v2-s12/Admin.json';
 import pool from '../../abis/generations/pool-v2-s12/Pool.json';
@@ -20,6 +24,14 @@ for (const [name, abi] of Object.entries(bundled)) {
   if (abiHash(abi) !== chains['143'].pins[name])
     throw new Error(`fetchAbi: deployed ${name} misses its chain/generation pin`);
 }
+/** The retired v1 generation, still bundled so chain 143 can read a v1 Pool on the exit path. */
+const V1 = 'pool-v1-s7';
+const bundledV1: Record<string, Abi> = {
+  Pool: poolV1 as Abi,
+  Admin: adminV1 as Abi,
+  PoolFactory: poolFactoryV1 as Abi,
+  AccessControl: accessControlV1 as Abi,
+};
 export type AbiWithMeta = {
   abi: Abi;
   /** The generation the back stamped in `x-btr-abi-generation`; null when the header is absent (an older back). */
@@ -34,7 +46,7 @@ function context(chainId: number, generation?: string): string {
   const pinned = chains[String(chainId)];
   const selected = generation ?? pinned?.generation;
   if (!selected) throw new Error('ABI generation required for an unpinned chain');
-  if (pinned && selected !== pinned.generation)
+  if (pinned && selected !== pinned.generation && selected !== V1)
     throw new Error('ABI generation differs from chain pin');
   return selected;
 }
@@ -71,6 +83,8 @@ async function load(
   if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error('invalid ABI name');
   if (chainId === 143 && selected === 'pool-v2-s12' && bundled[canonical])
     return { abi: bundled[canonical], generation: selected, chainId };
+  if (chainId === 143 && selected === V1 && bundledV1[canonical])
+    return { abi: bundledV1[canonical], generation: selected, chainId };
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
   if (cached) return cached;
@@ -83,7 +97,7 @@ async function load(
     throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
-  const pin = chains[String(chainId)]?.pins[canonical];
+  const pin = selected === V1 ? undefined : chains[String(chainId)]?.pins[canonical];
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
   const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
   if (generation !== null) hot.set(key, meta);

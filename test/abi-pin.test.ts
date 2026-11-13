@@ -20,7 +20,7 @@ const readAbi = (p: string): unknown[] => {
 };
 const POOL_ABI = readAbi(join(repo, 'abis', 'Pool.json'));
 // The backend's served copy lives in the sibling checkout; CI has none, so those checks skip.
-const backAbis = join(repo, '..', 'back', 'abis/generations/pool-v1-s7');
+const backAbis = join(repo, '..', 'back', 'abis/generations/pool-v2-s12');
 const hasBack = existsSync(join(backAbis, 'Pool.json'));
 
 // ── the hash itself ──────────────────────────────────────────────────────────
@@ -101,17 +101,14 @@ describe('PoolFactory parity is pinned across repos', () => {
   });
 });
 
-// The backend serves its own copy of each ABI. PoolFactory must equal the lock. Pool may differ
-// from the lock ONLY until the v2 cutover: back serves the live v1 Pool (dex-evm 7ade4b9), the
-// SDK pins v2; BACK_POOL_V1 is the explicit pair, delete it (and the branch) at cutover.
-const BACK_POOL_V1 = '0x1423b5f6f98d0d09980ea1bf92b25430d0190aa418d90c27175148d12f51be39';
+// The backend serves its own copy of each ABI; both must equal the lock.
 describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
   const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).chains['143'].pins;
   test('back/abis/PoolFactory.json hashes to the lock', () => {
     expect(abiHash(readAbi(join(backAbis, 'PoolFactory.json')))).toBe(lock.PoolFactory);
   });
-  test('back/abis/Pool.json is the pinned v1 or the lock (post-cutover)', () => {
-    expect([BACK_POOL_V1, lock.Pool]).toContain(abiHash(readAbi(join(backAbis, 'Pool.json'))));
+  test('back/abis/Pool.json hashes to the lock', () => {
+    expect(abiHash(readAbi(join(backAbis, 'Pool.json')))).toBe(lock.Pool);
   });
 });
 
@@ -128,9 +125,36 @@ describe('fetchAbi serves the pinned guardian ABIs from the bundle', () => {
     try {
       const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
       resetFetchAbiCacheForTest();
-      expect(await fetchAbi('PoolFactory')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/PoolFactory.json')));
-      expect(await fetchAbi('accesscontrol')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/AccessControl.json')));
-      expect(await fetchAbi('pool')).toEqual(readAbi(join(repo, 'abis/generations/pool-v1-s7/Pool.json')));
+      expect(await fetchAbi('PoolFactory')).toEqual(
+        readAbi(join(repo, 'abis/generations/pool-v2-s12/PoolFactory.json')),
+      );
+      expect(await fetchAbi('accesscontrol')).toEqual(
+        readAbi(join(repo, 'abis/generations/pool-v2-s12/AccessControl.json')),
+      );
+      expect(await fetchAbi('pool')).toEqual(
+        readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json')),
+      );
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+});
+
+describe('fetchAbi serves the retired v1 generation on request', () => {
+  test('chain 143 pool-v1-s7 resolves to the bundled v1 files, default stays v2', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error('fetchAbi went to the wire for a bundled ABI');
+    }) as unknown as typeof fetch;
+    try {
+      const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
+      resetFetchAbiCacheForTest();
+      const v1 = readAbi(join(repo, 'abis/generations/pool-v1-s7/Pool.json'));
+      const v2 = readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json'));
+      expect(await fetchAbi('Pool', 143, 'pool-v1-s7')).toEqual(v1);
+      expect(await fetchAbi('Pool', 143)).toEqual(v2);
+      expect(abiHash(v1)).not.toBe(abiHash(v2));
+      await expect(fetchAbi('Pool', 143, 'pool-v0')).rejects.toThrow('differs from chain pin');
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -191,7 +215,9 @@ describe('fetch-abis refuses what it cannot pin', () => {
     const server = Bun.serve({
       port: 0,
       fetch: () =>
-        new Response(JSON.stringify(hostile), { headers: { 'content-type': 'application/json', 'x-btr-abi-generation': 'build-head' } }),
+        new Response(JSON.stringify(hostile), {
+          headers: { 'content-type': 'application/json', 'x-btr-abi-generation': 'build-head' },
+        }),
     });
     try {
       const r = await runScript(makeSandbox(), { BTR_API_URL: `http://127.0.0.1:${server.port}` });
