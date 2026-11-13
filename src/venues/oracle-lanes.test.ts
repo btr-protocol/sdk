@@ -18,14 +18,18 @@ describe('oracle lane maps', () => {
   test('wire 9 lanes carry their deploy-record index and feed id', () => {
     const feeds = oracleLaneMap(143, V2_FACTORY)?.feeds ?? {};
     expect(feeds.WETH?.globalIndex).toBe(4);
-    expect(feeds.WETH?.feedId).toBe('0x0000000000000000000000000000000000000000000000000616a96484500000');
+    expect(feeds.WETH?.feedId).toBe(
+      '0x0000000000000000000000000000000000000000000000000616a96484500000',
+    );
     expect(feeds['USDC-USD']?.ref).toBe(true);
     expect(oracleFeedName('WETH')).toBe('WETH-USDC');
     expect(oracleFeedName('USDC-USD')).toBe('USDC-USD');
   });
 
   test('wire 9 lane indices are unique and fit one 64-lane mask', () => {
-    const gis = Object.values(oracleLaneMap(143, V2_FACTORY)?.feeds ?? {}).map((f) => f.globalIndex);
+    const gis = Object.values(oracleLaneMap(143, V2_FACTORY)?.feeds ?? {}).map(
+      (f) => f.globalIndex,
+    );
     expect(new Set(gis).size).toBe(gis.length);
     expect(Math.max(...gis)).toBeLessThan(64);
   });
