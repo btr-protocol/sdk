@@ -1,9 +1,9 @@
 /** Chain-scoped deployment ABIs. Build-head exports are separate decode/build surfaces. */
 import lock from '../../abis.lock.json';
-import accessControl from '../../abis/generations/pool-v1-s7/AccessControl.json';
-import admin from '../../abis/generations/pool-v1-s7/Admin.json';
-import pool from '../../abis/generations/pool-v1-s7/Pool.json';
-import poolFactory from '../../abis/generations/pool-v1-s7/PoolFactory.json';
+import accessControl from '../../abis/generations/pool-v2-s12/AccessControl.json';
+import admin from '../../abis/generations/pool-v2-s12/Admin.json';
+import pool from '../../abis/generations/pool-v2-s12/Pool.json';
+import poolFactory from '../../abis/generations/pool-v2-s12/PoolFactory.json';
 import { getApiRoot } from '../api.js';
 import type { Abi } from '../eth/abi.js';
 import { abiHash } from './hash.js';
@@ -69,7 +69,7 @@ async function load(
       (n) => n.toLowerCase() === name.toLowerCase(),
     ) ?? name;
   if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error('invalid ABI name');
-  if (chainId === 143 && selected === 'pool-v1-s7' && bundled[canonical])
+  if (chainId === 143 && selected === 'pool-v2-s12' && bundled[canonical])
     return { abi: bundled[canonical], generation: selected, chainId };
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
