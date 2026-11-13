@@ -40,7 +40,7 @@ describe('depositMin plumbing', () => {
     expect(sel(plain[0].data)).not.toBe(sel(floored[0].data));
     expect(floored[0].data.length).toBeGreaterThan(plain[0].data.length);
   });
-  test('pool.deposit sends depositMin with a floor', async () => {
+  test('pool.deposit sends depositMin with a floor and refuses none or zero', async () => {
     const sent: string[] = [];
     const provider = {
       request: async ({ method, params }: { method: string; params?: unknown[] }) => {
@@ -49,8 +49,13 @@ describe('depositMin plumbing', () => {
       },
     };
     await deposit(provider as never, POOL, { token: TOK, amount: 5n, minLpOut: 4n });
-    await deposit(provider as never, POOL, { token: TOK, amount: 5n });
-    expect(sent[0].length).toBeGreaterThan(sent[1].length);
+    expect(sent.length).toBe(1);
+    for (const bad of [undefined, 0n]) {
+      await expect(
+        deposit(provider as never, POOL, { token: TOK, amount: 5n, minLpOut: bad as never }),
+      ).rejects.toThrow(/positive share floor/);
+    }
+    expect(sent.length).toBe(1);
   });
 });
 

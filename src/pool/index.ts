@@ -382,8 +382,8 @@ interface SwapParams {
 interface DepositParams {
   token: Address;
   amount: bigint;
-  /** `Pool.depositMin` share floor; absent sends plain `deposit` (no floor). */
-  minLpOut?: bigint;
+  /** `Pool.depositMin` share floor. Required and positive: a plain `deposit` mints at any price. */
+  minLpOut: bigint;
   /** Refuse to send unless the endpoint reports THIS chain. Optional: absent, no check. */
   expectedChainId?: number;
 }
@@ -458,14 +458,13 @@ export async function deposit(
   params: DepositParams,
 ): Promise<Hex> {
   await checkExpectedChain(provider, params.expectedChainId);
-  const calldata =
-    params.minLpOut === undefined
-      ? encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [params.token, params.amount] })
-      : encodeFn({
-          abi: POOL_ABI,
-          functionName: 'depositMin',
-          args: [params.token, params.amount, params.minLpOut],
-        });
+  if (typeof params.minLpOut !== 'bigint' || params.minLpOut <= 0n)
+    throw new Error('deposit: minLpOut must be a positive share floor');
+  const calldata = encodeFn({
+    abi: POOL_ABI,
+    functionName: 'depositMin',
+    args: [params.token, params.amount, params.minLpOut],
+  });
 
   return (await provider.request({
     method: 'eth_sendTransaction',
