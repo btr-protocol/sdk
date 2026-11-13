@@ -33,6 +33,10 @@
       "types": "./src/governance/index.ts",
       "default": "./src/governance/index.ts"
     },
+    "./eth/gas": {
+      "types": "./src/eth/gas.ts",
+      "default": "./src/eth/gas.ts"
+    },
     "./eth/wallets": {
       "types": "./src/eth/wallets.ts",
       "default": "./src/eth/wallets.ts"
