@@ -7,6 +7,7 @@ import {
   render as renderRpcs,
   rpcsFromChains,
   sharedOperators,
+  shortQuorums,
   unionRpcs,
 } from '../scripts/gen-rpcs';
 import { servedChainIds } from '../scripts/gen-venues';
@@ -324,4 +325,19 @@ test('sharedOperators flags a pair of one operator; picks skip a repeated operat
   expect(sharedOperators({ 1: [a, c] }, [{ chainId: 1 }])).toEqual([]);
   const rows = [a, b, c].map((url) => ({ url, browser: true }));
   expect(rpcsFromChains({ rpc: { '1': rows } })[1]).toEqual([c, a]); // publicnode is trusted, so ranks first
+});
+
+// Chains with fewer than QUORUM_TOP endpoints are named in the generated file, never silently absent.
+test('the generated file names every chain whose quorum is short', () => {
+  const file = JSON.parse(readFileSync(SIBLING, 'utf8')) as Chains;
+  const short = shortQuorums(rpcsFromChains(file, QUORUM_TOP), Object.keys(file.rpc).map(Number));
+  const generated = readFileSync(
+    join(import.meta.dir, '..', 'src', 'eth', 'rpcs.generated.ts'),
+    'utf8',
+  );
+  if (short.length) {
+    expect(generated).toContain(short.map(({ chainId, n }) => `${chainId} (${n})`).join(', '));
+  } else {
+    expect(generated).toContain(`Every served chain has ${QUORUM_TOP} quorum endpoints.`);
+  }
 });
