@@ -68,7 +68,7 @@ test('wrong generation and content fail closed and never enter cache', async () 
   await expect(fetchAbi('Flash', 143)).rejects.toThrow('pin');
   await expect(fetchAbi('Flash', 143)).rejects.toThrow('pin');
   expect(calls).toBe(3);
-  await expect(fetchAbi('Pool', 143, 'pool-v1-s7')).rejects.toThrow('pin');
+  await expect(fetchAbi('Pool', 143, 'pool-v0')).rejects.toThrow('pin');
   await expect(fetchAbi('Pool', -1)).rejects.toThrow('chain');
   await expect(fetchAbi('Pool', 56)).rejects.toThrow('generation required');
 });
