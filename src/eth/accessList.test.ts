@@ -399,4 +399,48 @@ describe('route lists', () => {
       Date.now = real;
     }
   });
+
+  test('a failed refresh does not extend a stale list: the 60 s TTL holds', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const real = Date.now;
+    const t0 = real();
+    try {
+      Date.now = () => t0 + 30_000;
+      const down = mock({}); // every call fails
+      await prefetchAccessList(down.p, preview, { ...rt, force: true });
+      expect(
+        (await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).accessList,
+      ).toEqual(LIST); // still served at 30 s
+      Date.now = () => t0 + 61_000;
+      await prefetchAccessList(down.p, preview, { ...rt, force: true });
+      expect(await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).toBe(click);
+    } finally {
+      Date.now = real;
+    }
+  });
+
+  test("a click whose own plain estimate is under half the preview's does not take the route list", async () => {
+    await prefetchAccessList(mock(good(100_000, 50_000)).p, preview, rt);
+    const cheap = mock({
+      eth_createAccessList: () => new Promise(() => {}),
+      eth_estimateGas: est(30_000, 15_000),
+    });
+    expect(await withAccessList(cheap.p, click, { ...opts, timeoutMs: 80 })).toBe(click);
+    clearAccessListCache(); // forget the click's plain estimate
+    const alike = mock({
+      eth_createAccessList: () => new Promise(() => {}),
+      eth_estimateGas: est(60_000, 30_000),
+    });
+    expect((await withAccessList(alike.p, click, { ...opts, timeoutMs: 80 })).accessList).toEqual(
+      LIST,
+    );
+  });
+
+  test('an explicit route is the key: a huge amount does not change it; the heuristic fallback would', () => {
+    const huge = { ...preview, data: mk(A, 2n ** 100n, 1_800_000_000n) };
+    const r = [A.toLowerCase()];
+    expect(routeKey(143, preview, r)).toBe(routeKey(143, huge, r));
+    expect(routeKey(143, preview)).not.toBe(routeKey(143, huge)); // the amount reads as an address
+    expect(routeKey(143, preview, r)).not.toBe(routeKey(143, preview, [B]));
+  });
 });

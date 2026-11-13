@@ -122,6 +122,9 @@ function bounded(list: AccessListEntry[], gasWith: bigint, gasWithout: bigint, d
 }
 
 const CACHE_MAX = 64;
+const PLAIN_TTL_MS = 10_000;
+/** Plain estimates the exact lookup has resolved, per exact call: read by the route fallback. */
+const plains = new Map<string, { at: number; gas: bigint }>();
 type Entry = { at: number; ttl: number; list: Promise<AccessListEntry[] | null> };
 const cache = new Map<string, Entry>();
 const keyOf = (chainId: number, tx: AccessListTx) =>
@@ -130,6 +133,7 @@ const keyOf = (chainId: number, tx: AccessListTx) =>
 /** Test hook: forget every cached lookup. */
 export function clearAccessListCache(): void {
   cache.clear();
+  plains.clear();
 }
 
 /** Forget the cached list of one call (its send failed or reverted): the next send re-plans. */
@@ -191,7 +195,11 @@ async function lookup(
   const call = callOf(tx);
   const [list, gasWithout] = await Promise.all([
     listFor(p, tx, opts.chainId),
-    estimateGas(p, call),
+    estimateGas(p, call).then((g) => {
+      plains.set(keyOf(opts.chainId, tx), { at: Date.now(), gas: g });
+      if (plains.size > CACHE_MAX) plains.delete(plains.keys().next().value as string);
+      return g;
+    }),
   ]);
   if (!list) return null;
   let gasWith = await estimateGas(p, { ...call, accessList: list });
@@ -282,7 +290,14 @@ export function warmAccessList(provider: Eip1193Provider, tx: AccessListTx, chai
 
 const ROUTE_TTL_MS = 60_000;
 const ROUTE_THROTTLE_MS = 15_000;
-type Route = { at: number; tried: number; list: AccessListEntry[] | null };
+type Route = {
+  /** When the list was last CONFIRMED by a successful refresh; a failed refresh never moves it. */
+  at: number;
+  tried: number;
+  list: AccessListEntry[] | null;
+  /** The preview's plain gas estimate, the basis of the 25% listing-fee bound. */
+  plain: bigint;
+};
 const routes = new Map<string, Route>();
 
 /** The address-shaped words of calldata, in order: tokens, pools, spenders, recipients. A word
@@ -300,16 +315,19 @@ export function routeArgsOf(data: string | undefined): string[] {
   return out;
 }
 
-/** Cache key of a route: chain, caller, target, selector and the address words of the calldata
- *  (plus any extra route args the caller names). Never the amounts, deadline or floors. */
-export const routeKey = (chainId: number, tx: AccessListTx, extra: readonly string[] = []) =>
-  [chainId, tx.from, tx.to, (tx.data ?? '').slice(0, 10), ...routeArgsOf(tx.data), '#', ...extra]
+/** Cache key of a route: chain, caller, target, selector, and the route-defining addresses. The
+ *  caller passes them (`route`: tokens, pool, spender, recipient: the front builders know them);
+ *  without, the address-shaped words of the calldata are the fallback. Never the amounts, deadline
+ *  or floors: an amount past 2^96 would enter the heuristic, which is why callers name the route. */
+export const routeKey = (chainId: number, tx: AccessListTx, route?: readonly string[]) =>
+  [chainId, tx.from, tx.to, (tx.data ?? '').slice(0, 10), ...(route ?? routeArgsOf(tx.data))]
     .map(String)
     .join('|')
     .toLowerCase();
 
 export interface PrefetchOptions {
   chainId: number;
+  /** Route-defining addresses (see `routeKey`); absent: derived from the calldata. */
   route?: readonly string[];
   /** Bypass the 15 s throttle (the state just changed: an approve mined). */
   force?: boolean;
@@ -320,7 +338,11 @@ export interface PrefetchOptions {
  * Fetch and keep the list for a PREVIEW call (final-shaped calldata, placeholder deadline/floors)
  * under its route key. At most 2 relay requests (list + plain estimate batched, then the with-list
  * estimate), at most one attempt per key per 15 s unless `force`. A list is kept only when it passes
- * the same tests as an exact plan; a preview that reverts (allowance short, halted leg) REMOVES any
+ * the same tests as an exact plan. Its listing fee is bounded at 25% of the PREVIEW's plain estimate
+ * of that route: a click on a cheaper branch of the route can pay a larger share (never a failure;
+ * and see `withAccessList`: a click whose own plain estimate is under half the preview's skips it).
+ * A refresh that fails (relay error) leaves the previous list and its age untouched, so the 60 s
+ * TTL holds while the relay keeps failing; a preview that reverts (allowance short, halted leg) REMOVES any
  * earlier list for the key: a list from a reverting run is never used. Never throws.
  */
 export async function prefetchAccessList(
@@ -334,10 +356,12 @@ export async function prefetchAccessList(
     const prev = routes.get(key);
     const now = Date.now();
     if (prev && !opts.force && now - prev.tried < ROUTE_THROTTLE_MS) return;
+    const fresh = !!prev && now - prev.at < ROUTE_TTL_MS;
     const entry: Route = {
-      at: now,
+      at: prev?.at ?? 0, // carried: advanced only by a successful refresh
       tried: now,
-      list: prev && now - prev.at < ROUTE_TTL_MS ? prev.list : null,
+      list: fresh ? prev.list : null,
+      plain: prev?.plain ?? 0n,
     };
     routes.set(key, entry);
     if (routes.size > CACHE_MAX) routes.delete(routes.keys().next().value as string);
@@ -358,6 +382,7 @@ export async function prefetchAccessList(
       bounded(list, gasWith, gasWithout, preview.data) &&
       gasWith + (gasWith * m) / 100n < gasWithout;
     entry.list = worth ? list : null;
+    entry.plain = gasWithout;
     entry.at = Date.now();
   } catch {
     /* a failed prefetch leaves the click to its own lookup */
@@ -367,6 +392,11 @@ export async function prefetchAccessList(
 function routeList(tx: AccessListTx, opts: AccessListOptions): AccessListEntry[] | undefined {
   const r = routes.get(routeKey(opts.chainId, tx, opts.route));
   if (!r?.list || Date.now() - r.at >= ROUTE_TTL_MS) return undefined;
+  // The click's own plain estimate, when it resolved first: under half the preview's means a
+  // cheaper branch of the route, where the listing fee would be a large share. Skip then.
+  const own = plains.get(keyOf(opts.chainId, tx));
+  if (own && Date.now() - own.at < PLAIN_TTL_MS && r.plain > 0n && own.gas * 2n < r.plain)
+    return undefined;
   return r.list.map((e) => ({ address: e.address, storageKeys: [...e.storageKeys] }));
 }
 
