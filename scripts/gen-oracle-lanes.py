@@ -130,6 +130,9 @@ for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
         d = rec["feeds"].get(leg)
         if d is None or d["globalIndex"] != ln["gi"] or d["feedId"].lower() != feed_id:
             raise SystemExit(f"{os.path.basename(path)}: lane {leg} disagrees with {os.path.basename(rec_path)}")
+        # expBias 0 is the wire-3 decode itself (p8.ts markF: mantissa << (exp - 16), absolute) and the v2
+        # record carries no bias. It is per record, not verified on chain: MarkStoreP8 exposes no per-lane
+        # exponent view (classes() is a packed class table, not a bias).
         feeds[leg] = {"globalIndex": ln["gi"], "expBias": 0, "cls": ln["class"], "ref": True if ln.get("ref") else None,
                       "feed": ln["feed"], "tickerId": str(ticker), "feedId": feed_id}
     if set(feeds) != set(rec["feeds"]):
@@ -137,6 +140,8 @@ for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
     gis = [f["globalIndex"] for f in feeds.values()]
     if len(set(gis)) != len(gis) or min(gis) < 0 or max(gis) >= V9_LANES_PER_SLOT:
         raise SystemExit(f"{os.path.basename(path)}: lane indices must be unique and below {V9_LANES_PER_SLOT}")
+    if len({f["tickerId"] for f in feeds.values()}) != len(feeds) or len({f["feedId"] for f in feeds.values()}) != len(feeds):
+        raise SystemExit(f"{os.path.basename(path)}: ticker ids and feed ids must each be unique")
     maps.append(map_ts("v9", {"chainId": lanes_rec["chainId"], "feeds": feeds}, rec["verifierP"], V9_LANES_PER_SLOT,
                        "BTR ExternalOracleV4", "primary"))
 
