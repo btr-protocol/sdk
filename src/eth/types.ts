@@ -24,6 +24,12 @@ export interface Eip1193Provider {
 // Transactions
 // ─────────────────────────────────────────────────────────────
 
+/** EIP-2930 entry: an address and the storage slots of it the tx will touch. */
+export interface AccessListEntry {
+  address: Address;
+  storageKeys: Hex[];
+}
+
 export interface TransactionRequest {
   from: Address;
   to?: Address;
@@ -35,6 +41,7 @@ export interface TransactionRequest {
   maxPriorityFeePerGas?: Hex;
   nonce?: Hex;
   chainId?: Hex;
+  accessList?: AccessListEntry[];
 }
 
 export interface TransactionReceipt {

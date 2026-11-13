@@ -21,6 +21,7 @@ export type {
   Hash,
   Eip1193Provider,
   TransactionRequest,
+  AccessListEntry,
   TransactionReceipt,
   Log,
   TypedDataDomain,
@@ -116,6 +117,15 @@ export {
   onAccountsChanged,
   onChainChanged,
 } from './rpc';
+
+export type { AccessListOptions, AccessListPlan, AccessListTx } from './accessList';
+export {
+  withAccessList,
+  planAccessList,
+  parseAccessList,
+  MAX_ACCESS_LIST_ADDRESSES,
+  MAX_ACCESS_LIST_KEYS,
+} from './accessList';
 
 // Transport (resilient HTTP JSON-RPC: timeout/retry/failover/batch, typed errors)
 export type { TransportOpts } from './transport';
