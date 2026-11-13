@@ -281,6 +281,10 @@ export interface PoolState {
   /** Second poolSolvencyWad return word (`ok`: every armed mark usable); null/absent = not loaded.
    *  LP exits fail closed (pending) without it. Set both with `withPoolSolvency`. */
   solvencyOk?: boolean | null;
+  /** When the two words above were read (ms epoch, `withPoolSolvency` stamps it). LP exits refuse a
+   *  toll older than `LpRouteOpts.maxTollAgeMs` (`toll-stale`): the toll moves with the books, and a
+   *  stale low word overquotes. Absent = the caller owns freshness (a hand-built state). */
+  solvencyAtMs?: number | null;
   protoSharePct?: number;
 }
 

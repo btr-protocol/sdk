@@ -11,13 +11,14 @@ import {
   quotePathAsync,
   servableAddr,
 } from '../amm/aimm.js';
+import { toUnits } from '../utils/format.js';
 import {
   type LiabLeg,
   type SwapLiabilityQuote,
   WAD,
   covWallsF,
-  idxOf,
   feeCredit,
+  idxOf,
   poolSolvency,
 } from './liability.js';
 
@@ -137,11 +138,19 @@ function claimWire(
   }
   return {
     credit,
-    face: `0x${BigInt(Math.round((fairIn / poolC) * 10 ** decIn)).toString(16)}`,
-    c_wad: `0x${BigInt(Math.round(poolC * 1e18)).toString(16)}`,
+    // Chain floors `withdrawValue` and `fairValue` (`PoolLiquidityLib.sol:434,528`): both words
+    // round toward the pool, never up (a rounded-up face prices a claim the burn does not carry).
+    face: `0x${floorUnits(fairIn / poolC, decIn).toString(16)}`,
+    c_wad: `0x${floorUnits(poolC, 18).toString(16)}`,
     // An exit always names its toll; an unloaded one (absent/null) is unknown, never 0.
     ...(exit ? { toll_wad: `0x${exitToll(tollWad, tokenIn, tokenOut).toString(16)}` } : {}),
   };
+}
+
+/** `floor(v · 10^d)`, shaved a few ulps so an f64 product that rounded up across an integer never
+ *  lands above the exact floor (an exact integer can come out one unit under: toward the pool). */
+function floorUnits(v: number, d: number): bigint {
+  return toUnits(v * (1 - 2 ** -46), d);
 }
 
 function exitToll(tollWad: bigint | null | undefined, tokenIn: string, tokenOut: string): bigint {
@@ -202,7 +211,8 @@ export function backendConvert(
         pool: poolStateToWire('pool', addr, state, opts.meta, opts.baseDecimals),
         token_in: tokenIn,
         token_out: tokenOut,
-        amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
+        // A claim's `fairValue` is floored on chain (`:528`); a plain swap keeps its nearest unit.
+        amount_in: `0x${(claim ? floorUnits(fairIn, decIn) : BigInt(Math.round(fairIn * 10 ** decIn))).toString(16)}`,
         ...(claim ? { claim } : {}),
       },
       opts.backendBase,

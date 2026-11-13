@@ -45,7 +45,16 @@ export interface LpRouteOpts {
    *  changed), e.g. from a simulated batch. Pool state cannot price it (exposure heads, record
    *  spreads), and the entry word understates it, so without this transfer-exit is `toll-pending`. */
   postMoveExitTollWad?: (ctx: PostMoveTollCtx) => Promise<bigint | null>;
+  /** Max age (ms) of the state's `poolSolvencyWad` words (`solvencyAtMs`) an exit prices off;
+   *  older = `toll-stale` (default {@link MAX_TOLL_AGE_MS}). The toll tracks the books and a stale
+   *  low word overquotes; a fresh `previewWithdraw` still prices a same-asset exit. */
+  maxTollAgeMs?: number;
+  /** Clock for the age check (ms epoch); default `Date.now`. */
+  now?: () => number;
 }
+
+/** Default freshness of the solvency words: a few blocks on any served chain. */
+export const MAX_TOLL_AGE_MS = 30_000;
 
 export interface PostMoveTollCtx {
   pool: NamedPool;
@@ -416,7 +425,7 @@ async function crossExit(
 
   // Chain `ok` (second `poolSolvencyWad` word): degraded, `creditRate` settles at C's lower bound
   // with the lower-pass toll, neither of which the state's C or toll word carries. Unknown = pending.
-  const solv = solvencyGate(holder.state);
+  const solv = solvencyGate(holder.state, opts);
   if (solv) return unfeasible(CROSS_DEAD, solv);
   // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
   const c = poolSolvency(holder.state);
@@ -427,7 +436,13 @@ async function crossExit(
   if (tw == null) return unfeasible(CROSS_DEAD, 'toll-pending');
   // Chain: toll capped at the payout, so a toll >= 100% leaves nothing and the exit reverts.
   if (tw >= BigInt(WAD)) return unfeasible(CROSS_DEAD, 'toll-exceeds-payout');
-  const withdrawValue = (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD;
+  // `withdrawValue = floor(lp · index / WAD)` (`PoolLiquidityLib.sol:434`): floored in raw units
+  // when the leg carries decimals, so the claim face sent to the back is never above the chain's.
+  const dFrom = fromLeg.decimals;
+  const withdrawValue =
+    dFrom === undefined
+      ? (lpFaceIn * (fromLeg.indexWad ?? WAD)) / WAD
+      : rawToOut(exitFaceRaw(lpFaceIn, fromLeg.indexWad ?? WAD, dFrom), dFrom);
   if (!(withdrawValue > 0) || withdrawValue > fromLeg.liabilities)
     return unfeasible(CROSS_DEAD, 'insufficient-liability');
   const fair = withdrawValue * c;
@@ -512,9 +527,21 @@ async function crossExit(
 
 /** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `getPoolSolvency`):
  *  null when live; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark leg). */
-function solvencyGate(state: PoolState): 'toll-pending' | 'feed-unavailable' | null {
+function solvencyGate(
+  state: PoolState,
+  opts: LpRouteOpts,
+): 'toll-pending' | 'toll-stale' | 'feed-unavailable' | null {
   if (state.solvencyOk === undefined || state.solvencyOk === null) return 'toll-pending';
-  return state.solvencyOk ? null : 'feed-unavailable';
+  if (!state.solvencyOk) return 'feed-unavailable';
+  return tollStale(state, opts) ? 'toll-stale' : null;
+}
+
+/** The solvency words were stamped and are older than the caller's bound (or the clock is unusable). */
+function tollStale(state: PoolState, opts: LpRouteOpts): boolean {
+  const at = state.solvencyAtMs;
+  if (at === undefined || at === null) return false;
+  const age = (opts.now ?? Date.now)() - at;
+  return !(Number.isFinite(age) && age <= (opts.maxTollAgeMs ?? MAX_TOLL_AGE_MS));
 }
 
 const WAD_N = 10n ** 18n;
@@ -544,12 +571,45 @@ function cToll(amt: bigint, tw: bigint): bigint {
 }
 
 /** `_quoteWithdrawSame` payout net of the C toll: `amt − _cToll(amt, tw)` (`PoolLiquidityLib.sol:
- *  497-498, 510`), tw < WAD; `amt = floor(withdrawValue·mu/WAD)`, the gross floored in raw units. */
-function sameAssetNet(gross: number, tw: bigint, decimals?: number): number {
-  // A base-only caller without wire metadata remains indicative at float precision, shaved.
-  if (decimals === undefined) return gross * (1 - Number(tw) / WAD) * SLACK;
-  const raw = floorRaw(gross, decimals);
-  return rawToOut(raw - cToll(raw, tw), decimals);
+ *  497-498, 510`), tw < WAD. Indicative float only: a caller without wire decimals cannot floor. */
+function sameAssetNetF(gross: number, tw: bigint): number {
+  return gross * (1 - Number(tw) / WAD) * SLACK;
+}
+
+/** `withdraw`'s claim face in raw units, `floor(lp · index / WAD)` (`PoolLiquidityLib.sol:434`),
+ *  LP shares at the underlying's decimals (`LPToken.decimals`). The f64 index is shaved by an ulp,
+ *  so the face never lands above the chain's integer one (an exact index can lose one raw unit). */
+export function exitFaceRaw(lpShares: number, indexWad: number, d: number): bigint {
+  const lp = toUnits(lpShares, d);
+  // An f64 index sits within half an ulp of the chain's uint; one ulp off covers it.
+  const ulp = 2 ** (Math.floor(Math.log2(indexWad)) - 52);
+  const idx = BigInt(Math.floor(indexWad)) - BigInt(Math.ceil(ulp));
+  return (lp * idx) / WAD_N;
+}
+
+/** `_quoteWithdrawSame` gross in raw units: `floor(face · exitMu(R, L, cap) / WAD)`, `exitMu =
+ *  min(floor(R·WAD/L), cap)` (`PoolLiquidityLib.sol:118-126, 497-498`). The float books round toward
+ *  the pool (R floored, L ceiled, cap shaved), so `mu` is never above the chain's; with `mu ≫ 1`
+ *  a float face would overquote by up to `mu` raw units per unit of face fraction. */
+export function sameAssetGrossRaw(
+  faceRaw: bigint,
+  reserves: number,
+  liabilities: number,
+  cap: number,
+  d: number,
+): bigint {
+  if (!(cap > 0) || faceRaw <= 0n) return 0n;
+  const capWad = Number.isFinite(cap) ? BigInt(Math.floor(cap * SLACK * 1e18)) : null;
+  const L = liabilities > 0 ? ceilRaw(liabilities, d) : 0n;
+  const cLeg = L > 0n ? (floorRaw(reserves, d) * WAD_N) / L : null;
+  const mu = cLeg === null ? capWad : capWad === null ? cLeg : minBig(cLeg, capWad);
+  if (mu === null) return 0n;
+  return (faceRaw * mu) / WAD_N;
+}
+
+/** Raw same-asset payout net of the C toll, back in display units (`toUnits(out) <= chain`). */
+function sameAssetNetRaw(amt: bigint, tw: bigint, d: number): number {
+  return rawToOut(amt - cToll(amt, tw), d);
 }
 
 async function transferExit(
@@ -604,7 +664,7 @@ async function transferExit(
   if (!gated.feasible) return gated;
   // `swapLiability` settles at `creditRate`: degraded = C's lower bound, which the state cannot
   // price. Unknown `ok` = pending.
-  const solv = solvencyGate(holder.state);
+  const solv = solvencyGate(holder.state, opts);
   if (solv) return unfeasible(shell, solv);
   // The second call's C toll is `exitCap`'s sweep AFTER the claim move, never the entry word
   // (the move reshapes the exposure the toll prices; the entry word can understate it).
@@ -662,17 +722,32 @@ async function transferExit(
   }
   if (tw == null || tw < 0n) return unfeasible(shell, 'toll-pending');
   if (tw >= BigInt(WAD)) return unfeasible(shell, 'toll-exceeds-payout');
-  const exitOut = sameAssetNet(
-    exitValue(q.liabOut, legCoverage(toLeg.reserves, outLiab), postC),
-    tw,
-    toLeg.decimals,
-  );
+  // The second call burns the minted shares (`lpWithdraw`, floored), not the float face: the face is
+  // re-floored off them and `mu` (up to `c_leg ≫ 1`) multiplies whole raw units only.
+  const dOut = toLeg.decimals;
+  const exitOut =
+    dOut === undefined
+      ? sameAssetNetF(exitValue(q.liabOut, legCoverage(toLeg.reserves, outLiab), postC), tw)
+      : sameAssetNetRaw(
+          sameAssetGrossRaw(
+            exitFaceRaw(rawToOut(floorRaw(q.lpAmountOut, dOut), dOut), toLeg.indexWad ?? WAD, dOut),
+            toLeg.reserves,
+            outLiab,
+            postC,
+            dOut,
+          ),
+          tw,
+          dOut,
+        );
   if (!(exitOut > 0)) return unfeasible(shell, 'no-route');
   if (toLeg.reserves < exitOut + (toLeg.minLiquidity ?? 0))
     return unfeasible(shell, 'min-liquidity');
+  // The tail burns what the exit was priced on: the floored share count (raw-exact when decimals).
+  const lpWithdraw =
+    dOut === undefined ? q.lpAmountOut : rawToOut(floorRaw(q.lpAmountOut, dOut), dOut);
   shell.steps[0].amountOut = q.lpAmountOut;
   shell.steps[0].minOut = q.lpAmountOut * (1 - slip);
-  shell.steps[1].amountIn = q.lpAmountOut;
+  shell.steps[1].amountIn = lpWithdraw;
   shell.steps[1].amountOut = exitOut;
   shell.steps[1].minOut = exitOut * (1 - slip);
   return { ...shell, out: exitOut, minOut: shell.steps[1].minOut, feasible: true };
@@ -721,16 +796,32 @@ export async function rankRedeem(
     if (!(face > 0) || face > leg.liabilities)
       return { best: null, routes: [unfeasible(gated, 'insufficient-liability')] };
     const gross = exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap);
+    // With wire decimals the chain's integer law: face floored off the raw shares, then `mu`.
+    const d = leg.decimals;
+    const grossRaw =
+      d === undefined
+        ? null
+        : sameAssetGrossRaw(
+            exitFaceRaw(lpFaceIn, leg.indexWad ?? WAD, d),
+            leg.reserves,
+            leg.liabilities,
+            cap,
+            d,
+          );
     // Settlement toll = `exitCap`'s lower-pass sweep (`PoolSolvencyLib.capBounds(.., lower=true)`).
     // `poolSolvencyWad`'s word equals it only while `ok` (every mark usable); degraded it reads 0
     // while the exit still pays the usable legs' toll. So: the state word only when live, and the
     // chain's own `previewWithdraw` (same sweep, `PoolLiquidityLib.sol:723-740`) caps it when read.
     const tw = holder.state.exitTollWad;
     let actual: number | null = null;
-    if (holder.state.solvencyOk === true && tw != null) {
+    const stale = tollStale(holder.state, opts);
+    if (holder.state.solvencyOk === true && tw != null && !stale) {
       if (tw >= BigInt(WAD))
         return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
-      actual = sameAssetNet(gross, tw, leg.decimals);
+      actual =
+        grossRaw === null || d === undefined
+          ? sameAssetNetF(gross, tw)
+          : sameAssetNetRaw(grossRaw, tw, d);
     }
     if (opts.previewWithdraw && leg.decimals !== undefined) {
       let raw: bigint | null = null;
@@ -743,11 +834,12 @@ export async function rankRedeem(
         // The lower of the two: either alone can run ahead of settlement (the preview arms no band
         // guard; the state model is float books).
         const pv = rawToOut(raw, leg.decimals);
-        const model = actual ?? rawToOut(floorRaw(gross, leg.decimals), leg.decimals);
+        const model = actual ?? rawToOut(grossRaw ?? floorRaw(gross, leg.decimals), leg.decimals);
         actual = Math.min(pv, model);
       }
     }
-    if (actual === null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
+    if (actual === null)
+      return { best: null, routes: [unfeasible(gated, stale ? 'toll-stale' : 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
     if (leg.reserves < actual + (leg.minLiquidity ?? 0))
       return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };

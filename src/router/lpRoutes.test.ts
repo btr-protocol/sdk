@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { buildLeg } from '../amm/aimm.js';
+import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
 import { covDebitToll } from '../pool/covLaw';
-import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { type BuildOpts, buildDepositCalls, buildRedeemCalls } from './index';
 import { type LpRouteOpts, rankDeposit, rankRedeem } from './lpRoutes';
 import type { NamedPool } from './route.js';
@@ -311,8 +311,10 @@ describe('unknown exit toll: every LP exit route is pending', () => {
     const t = await at(10n ** 17n);
     expect(z.transfer?.feasible).toBe(true);
     expect(t.transfer?.feasible).toBe(true);
-    expect(t.same?.out).toBeCloseTo((z.same?.out ?? 0) * 0.9, 6);
-    expect(t.transfer?.out).toBeCloseTo((z.transfer?.out ?? 0) * 0.9, 6);
+    // Raw-unit law: within a few raw units of the 10% cut, never above it.
+    expect(t.same?.out).toBeCloseTo((z.same?.out ?? 0) * 0.9, 5);
+    expect(t.same?.out ?? 0).toBeLessThanOrEqual((z.same?.out ?? 0) * 0.9);
+    expect(t.transfer?.out).toBeCloseTo((z.transfer?.out ?? 0) * 0.9, 5);
   });
 });
 
@@ -383,7 +385,10 @@ describe('crossExit claim law: the from-leg debit', () => {
     const r = await exit({ res: 1_200_000, liab: 1_000_000 }, 100_000);
     expect(r?.feasible).toBe(true);
     expect(seen?.claim?.credit).toBe(false);
-    expect(BigInt(seen?.claim?.face ?? '0x0')).toBe(100_000n * 10n ** 6n);
+    // Floored toward the pool (`withdrawValue`, `fairValue`): never above the burned face.
+    const sentFace = BigInt(seen?.claim?.face ?? '0x0');
+    expect(sentFace).toBeLessThanOrEqual(100_000n * 10n ** 6n);
+    expect(sentFace).toBeGreaterThanOrEqual(100_000n * 10n ** 6n - 3n);
     const c = 1.05; // pool rate: (2M + 1M + 1.2M) / (2M + 1M + 1M)
     const debit = expectDebit(1_200_000, 1_000_000, 100_000, c);
     expect(debit).toBeGreaterThan(10_000);
