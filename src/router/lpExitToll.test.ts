@@ -22,6 +22,8 @@ function pool(o?: { audfRes?: number; audfLiab?: number; nzdfMark?: number }): N
     state: {
       base: 'USDC',
       solvencyOk: true,
+      // Read now: fresh against the default clock and age bound (an unstamped word is stale).
+      solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: {
         AUDF: leg('AUDF', o?.audfRes ?? 1_000_000, o?.audfLiab ?? 1_000_000),
@@ -344,6 +346,7 @@ function richPool(o: { res: number; liab: number }): NamedPool {
     state: {
       base: 'USDC',
       solvencyOk: true,
+      solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
       hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0 },
@@ -530,5 +533,99 @@ describe('same-asset previews obey the shared solvency gate', () => {
     expect(stale.best).toBeNull();
     expect(stale.routes[0].reason).toBe('toll-stale');
     expect(stale.routes[0].out).toBe(0);
+  });
+});
+
+describe('transfer-exit obeys the shared solvency gate', () => {
+  // A post-move toll source is wired, so only the solvency words can hold the route back.
+  const T: LpRouteOpts = { ...BE, postMoveExitTollWad: async () => 0n };
+  const pick = async (p: NamedPool, id: string, opts: LpRouteOpts = T) =>
+    (await route(p, 'NZDF', 'AUDF', 10_000, opts)).find((x) => x.id === id);
+
+  test('fresh and live: transfer and cross priced', async () => {
+    stub({ tolls: ALL });
+    expect((await pick(pool(), 'transfer-exit'))?.feasible).toBe(true);
+    expect((await pick(pool(), 'cross-exit'))?.feasible).toBe(true);
+  });
+
+  test.each([undefined, null])(
+    'ok word %p (not loaded): transfer pending with a post-move toll, cross pending',
+    async (ok) => {
+      stub({ tolls: ALL });
+      const p = pool();
+      p.state.solvencyOk = ok;
+      for (const id of ['transfer-exit', 'cross-exit']) {
+        const r = await pick(p, id);
+        expect(r?.feasible).toBe(false);
+        expect(r?.reason).toBe('toll-pending');
+        expect(r?.out).toBe(0);
+      }
+    },
+  );
+
+  test('degraded (ok = false, marks priced): transfer refuses', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    p.state.solvencyOk = false;
+    const r = await pick(p, 'transfer-exit');
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('feed-unavailable');
+    expect(r?.out).toBe(0);
+  });
+
+  test('stale words: transfer refuses with a post-move toll', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    p.state.solvencyAtMs = 1_000_000;
+    const r = await pick(p, 'transfer-exit', { ...T, now: () => 1_031_000 });
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('toll-stale');
+    expect(r?.out).toBe(0);
+  });
+});
+
+describe('solvency freshness fails closed', () => {
+  test.each([
+    ['unstamped', undefined],
+    ['null stamp', null],
+    ['future stamp', 1_000_001],
+  ] as const)('%s: same-asset, cross and transfer are toll-stale', async (_name, at) => {
+    stub({ tolls: ALL });
+    const p = pool();
+    p.state.solvencyAtMs = at;
+    const opts: LpRouteOpts = {
+      ...BE,
+      now: () => 1_000_000,
+      postMoveExitTollWad: async () => 0n,
+      previewWithdraw: async () => 990_000_000n,
+    };
+    expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].reason).toBe('toll-stale');
+    const rs = await route(p, 'NZDF', 'AUDF', 1_000, opts);
+    for (const id of ['cross-exit', 'transfer-exit']) {
+      const r = rs.find((x) => x.id === id);
+      expect(r?.feasible).toBe(false);
+      expect(r?.reason).toBe('toll-stale');
+    }
+    // Stamped exactly now (age 0) is fresh.
+    p.state.solvencyAtMs = 1_000_000;
+    expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].feasible).toBe(true);
+  });
+});
+
+describe('same-asset preview can only lower the model quote', () => {
+  test('a preview above the state model never raises the payout', async () => {
+    const p = pool();
+    p.state.exitTollWad = 10n ** 16n; // 1%: the model pays <= 9,900 of 10k
+    const model = (await route(p, 'AUDF', 'AUDF', 10_000))[0];
+    expect(model.feasible).toBe(true);
+    expect(model.out).toBeLessThanOrEqual(9_900);
+    // A lagging replica preview at the full 10k gross (no toll).
+    const [r] = await route(p, 'AUDF', 'AUDF', 10_000, {
+      ...BE,
+      previewWithdraw: async () => 10_000_000_000n,
+    });
+    expect(r.feasible).toBe(true);
+    expect(r.out).toBe(model.out);
+    expect(r.out).toBeLessThan(10_000);
   });
 });

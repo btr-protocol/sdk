@@ -136,11 +136,12 @@ export async function getPoolSolvency(
   poolAddress: Address,
 ): Promise<{ cWad: bigint; ok: boolean; exitTollWad: bigint | null; observedAtMs: number }> {
   const data = encodeFn({ abi: POOL_ABI, functionName: 'poolSolvencyWad' });
+  // Stamped BEFORE the call: the words are at least this old, so the round trip counts as age.
+  const observedAtMs = Date.now();
   const result = (await provider.request({
     method: 'eth_call',
     params: [{ to: poolAddress, data }, 'latest'],
   })) as Hex;
-  const observedAtMs = Date.now();
   const [cWad, ok, exitTollWad] = decodeFn<[bigint, boolean, bigint]>({
     abi: POOL_ABI,
     functionName: 'poolSolvencyWad',

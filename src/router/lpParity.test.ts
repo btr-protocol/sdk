@@ -95,6 +95,7 @@ function build(ph: Phase): NamedPool {
       },
       // Every recorded phase settled cross exits at the live rate (cWad re-derives from the books).
       solvencyOk: true,
+      solvencyAtMs: Date.now(),
       exitTollWad: BigInt(ph.exitTollWad),
     },
   };

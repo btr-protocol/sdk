@@ -36,9 +36,10 @@ export interface LpRouteOpts {
   backend?: LpBackend;
   /** `Pool.previewWithdraw(tk, lp)` (`PoolLiquidityLib.previewWithdraw`): the same-asset payout in
    *  raw token units, net of the settlement toll off `exitCap`'s lower-pass sweep. `lpShares` is the
-   *  LP share amount being redeemed (display units). Null = unread. Without it a same-asset exit
-   *  prices only off a live (`solvencyOk`) `poolSolvencyWad` toll; with it the quote is capped by it,
-   *  and a degraded pool (a dark leg) quotes off it alone. See `getPreviewWithdraw`. */
+   *  LP share amount being redeemed (display units). Null = unread. A same-asset exit prices only
+   *  off a live (`solvencyOk`), fresh `poolSolvencyWad` toll; the preview can only lower that quote,
+   *  never raise it or stand in for it. A degraded pool (a dark leg) is `feed-unavailable` before
+   *  the preview is read. See `getPreviewWithdraw`. */
   previewWithdraw?: (pool: NamedPool, symbol: string, lpShares: number) => Promise<bigint | null>;
   /** The C toll (WAD) the transfer-exit's second call (`withdraw`) pays: `exitCap`'s sweep over the
    *  books AFTER the `swapLiability` claim move (both legs' claims and the exposure high-water
@@ -46,8 +47,9 @@ export interface LpRouteOpts {
    *  spreads), and the entry word understates it, so without this transfer-exit is `toll-pending`. */
   postMoveExitTollWad?: (ctx: PostMoveTollCtx) => Promise<bigint | null>;
   /** Max age (ms) of the state's `poolSolvencyWad` words (`solvencyAtMs`) an exit prices off;
-   *  older = `toll-stale` (default {@link MAX_TOLL_AGE_MS}). The toll tracks the books and a stale
-   *  low word overquotes; a fresh `previewWithdraw` still prices a same-asset exit. */
+   *  older, unstamped or future-stamped = `toll-stale` (default {@link MAX_TOLL_AGE_MS}). The toll
+   *  tracks the books and a stale low word overquotes; `previewWithdraw` does not rescue a stale
+   *  word (the exit is refused before the preview is read). */
   maxTollAgeMs?: number;
   /** Clock for the age check (ms epoch); default `Date.now`. */
   now?: () => number;
@@ -526,7 +528,8 @@ async function crossExit(
 }
 
 /** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `getPoolSolvency`):
- *  null when live; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark leg). */
+ *  null when live and fresh; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark
+ *  leg); `toll-stale` when the words are not provably fresh ({@link tollStale}). */
 function solvencyGate(
   state: PoolState,
   opts: LpRouteOpts,
@@ -536,12 +539,13 @@ function solvencyGate(
   return tollStale(state, opts) ? 'toll-stale' : null;
 }
 
-/** The solvency words were stamped and are older than the caller's bound (or the clock is unusable). */
+/** The solvency words are unstamped, stamped in the future, older than the caller's bound, or the
+ *  clock is unusable: freshness unproven fails closed. */
 function tollStale(state: PoolState, opts: LpRouteOpts): boolean {
   const at = state.solvencyAtMs;
-  if (at === undefined || at === null) return false;
+  if (at === undefined || at === null) return true;
   const age = (opts.now ?? Date.now)() - at;
-  return !(Number.isFinite(age) && age <= (opts.maxTollAgeMs ?? MAX_TOLL_AGE_MS));
+  return !(Number.isFinite(age) && age >= 0 && age <= (opts.maxTollAgeMs ?? MAX_TOLL_AGE_MS));
 }
 
 const WAD_N = 10n ** 18n;

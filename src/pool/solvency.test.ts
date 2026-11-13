@@ -24,6 +24,24 @@ test.each([0n, 10n ** 17n])(
   },
 );
 
+test('observedAtMs is stamped before the call: the round trip counts as age', async () => {
+  const real = Date.now;
+  let clock = 1_000;
+  Date.now = () => clock;
+  try {
+    const slow = {
+      request: async () => {
+        clock = 6_000; // a 5s round trip
+        return `0x${word(10n ** 18n)}${word(1n)}${word(0n)}`;
+      },
+    } as Eip1193Provider;
+    const s = await getPoolSolvency(slow, pool);
+    expect(s.observedAtMs).toBe(1_000);
+  } finally {
+    Date.now = real;
+  }
+});
+
 test('degraded sweep: the toll word is unknown (null), never a 0 settlement toll', async () => {
   const s = await getPoolSolvency(solvencyProvider(false, 0n), pool);
   expect(s.ok).toBe(false);

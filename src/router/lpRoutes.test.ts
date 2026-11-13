@@ -21,6 +21,7 @@ function pool(
     state: {
       base: 'USDC',
       solvencyOk: true,
+      solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: {
         AUDF: buildLeg(
@@ -562,6 +563,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     state: {
       base: 'USDC',
       solvencyOk: true,
+      solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs,
       hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
