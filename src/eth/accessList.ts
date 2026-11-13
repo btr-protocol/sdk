@@ -36,6 +36,10 @@ export interface AccessListOptions {
   /** A second, independent endpoint. A REDUCED `gas` is returned only when its with-list estimate is
    *  within 15% of the first; the higher of the two is used. Absent or disagreeing: list only. */
   confirm?: Eip1193Provider;
+  /** The route-defining args of the call (tokens, pool, side; never amounts, deadline or floors).
+   *  When the exact plan is not ready within `timeoutMs`, the list prefetched for this route (see
+   *  `prefetchAccessList`) is attached instead, list only, never with a `gas`. */
+  route?: readonly string[];
 }
 
 export const MAX_ACCESS_LIST_ADDRESSES = 64;
@@ -107,6 +111,16 @@ function intrinsicGas(data: Hex): bigint {
   return g;
 }
 
+/** The relay's figures are plausible: the with-list estimate over its floor, the list's own cost
+ *  (2,400 per address, 1,900 per key) at most a quarter of the plain estimate. */
+function bounded(list: AccessListEntry[], gasWith: bigint, gasWithout: bigint, data: Hex): boolean {
+  const keys = list.reduce((n, e) => n + e.storageKeys.length, 0);
+  const cost = ENTRY_ADDR_GAS * BigInt(list.length) + ENTRY_KEY_GAS * BigInt(keys);
+  return (
+    gasWith >= (gasWithout * 40n) / 100n && gasWith >= intrinsicGas(data) && cost * 4n <= gasWithout
+  );
+}
+
 const CACHE_MAX = 64;
 type Entry = { at: number; ttl: number; list: Promise<AccessListEntry[] | null> };
 const cache = new Map<string, Entry>();
@@ -119,8 +133,13 @@ export function clearAccessListCache(): void {
 }
 
 /** Forget the cached list of one call (its send failed or reverted): the next send re-plans. */
-export function dropAccessListPlan(tx: AccessListTx, chainId: number): void {
+export function dropAccessListPlan(
+  tx: AccessListTx,
+  chainId: number,
+  route?: readonly string[],
+): void {
   cache.delete(keyOf(chainId, tx));
+  routes.delete(routeKey(chainId, tx, route));
 }
 
 const callOf = (tx: AccessListTx): Partial<TransactionRequest> => {
@@ -178,11 +197,7 @@ async function lookup(
   let gasWith = await estimateGas(p, { ...call, accessList: list });
 
   // The relay supplied all three figures: bound each.
-  const floor = (a: bigint) => a >= (gasWithout * 40n) / 100n && a >= intrinsicGas(tx.data as Hex);
-  const listCost =
-    ENTRY_ADDR_GAS * BigInt(list.length) +
-    ENTRY_KEY_GAS * BigInt(list.reduce((n, e) => n + e.storageKeys.length, 0));
-  if (!floor(gasWith) || listCost * 4n > gasWithout) return null;
+  if (!bounded(list, gasWith, gasWithout, tx.data as Hex)) return null;
 
   let confirmed = false;
   if (opts.confirm && opts.confirm !== p) {
@@ -210,38 +225,46 @@ async function lookup(
   };
 }
 
-/** The plan when the list is cheaper, else null. Never throws. The list is cached briefly; gas is
- *  re-estimated on every call. A tx that already has a `gas` is left alone. */
-export async function planAccessList(
+type Planned = { plan: AccessListPlan | null; unknown: boolean };
+
+/** The exact-call plan when the list is cheaper, else null; `unknown` when the lookup did not
+ *  finish in time or failed (as opposed to deciding "not worth it"). Never throws. The list is
+ *  cached briefly; gas is re-estimated on every call. A tx that already has a `gas` is left alone. */
+async function planState(
   provider: Eip1193Provider,
   tx: AccessListTx,
   opts: AccessListOptions,
-): Promise<AccessListPlan | null> {
+): Promise<Planned> {
   try {
-    if (tx.gas !== undefined || !tx.to || !tx.data || tx.data === '0x') return null;
-    const run = lookup(provider, tx, opts, marginOf(opts)).catch(() => null);
+    if (tx.gas !== undefined || !tx.to || !tx.data || tx.data === '0x')
+      return { plan: null, unknown: false };
+    const run = lookup(provider, tx, opts, marginOf(opts));
+    run.catch(() => {});
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<typeof TIMED_OUT>((r) => {
       timer = setTimeout(() => r(TIMED_OUT), clampInt(opts.timeoutMs, 50, 5000, 2000));
     });
     try {
       const r = await Promise.race([run, late]);
-      return r === TIMED_OUT ? null : r;
+      return r === TIMED_OUT ? { plan: null, unknown: true } : { plan: r, unknown: false };
     } finally {
       clearTimeout(timer);
     }
   } catch {
-    return null;
+    return { plan: null, unknown: true };
   }
 }
 
-/** Warm the cached list for `tx` (a review screen reached): the later send then waits for gas
- *  estimates only. Fire and forget; never throws. */
-export function prefetchAccessList(
+export async function planAccessList(
   provider: Eip1193Provider,
   tx: AccessListTx,
-  chainId: number,
-): void {
+  opts: AccessListOptions,
+): Promise<AccessListPlan | null> {
+  return (await planState(provider, tx, opts)).plan;
+}
+
+/** Warm the exact-call list cache for `tx` (calldata final, send imminent). Fire and forget. */
+export function warmAccessList(provider: Eip1193Provider, tx: AccessListTx, chainId: number): void {
   void getChainIdMemo(provider)
     .then((c) =>
       c === chainId && !tx.gas && tx.to && tx.data && tx.data !== '0x'
@@ -251,18 +274,124 @@ export function prefetchAccessList(
     .catch(() => {});
 }
 
+// ── Route lists ─────────────────────────────────────────────────────────────
+// The touched accounts and slots of a call depend on WHO calls WHAT on WHICH route, not on the
+// amount, the deadline or the floors (measured: deposit and withdraw return the identical list for
+// 1, 2 and 5 USDC and for different deadlines). So the list is fetched when the preview renders,
+// under a route key, and a click whose exact plan is not ready yet attaches it, list only.
+
+const ROUTE_TTL_MS = 60_000;
+const ROUTE_THROTTLE_MS = 15_000;
+type Route = { at: number; tried: number; list: AccessListEntry[] | null };
+const routes = new Map<string, Route>();
+
+/** The address-shaped words of calldata, in order: tokens, pools, spenders, recipients. A word
+ *  counts when it is >= 2^96 and < 2^160, which no amount, deadline, floor, offset or length of
+ *  this protocol reaches (a max-uint approval is 2^256-1, above the range). The preview and the
+ *  click build their calldata with the same builder, so both derive the same route here. */
+export function routeArgsOf(data: string | undefined): string[] {
+  const out: string[] = [];
+  const body = (data ?? '').slice(10);
+  for (let i = 0; i + 64 <= body.length; i += 64) {
+    const w = body.slice(i, i + 64);
+    if (/^0{24}[0-9a-fA-F]{40}$/.test(w) && !/^0{40}/.test(w))
+      out.push(`0x${w.slice(24).toLowerCase()}`);
+  }
+  return out;
+}
+
+/** Cache key of a route: chain, caller, target, selector and the address words of the calldata
+ *  (plus any extra route args the caller names). Never the amounts, deadline or floors. */
+export const routeKey = (chainId: number, tx: AccessListTx, extra: readonly string[] = []) =>
+  [chainId, tx.from, tx.to, (tx.data ?? '').slice(0, 10), ...routeArgsOf(tx.data), '#', ...extra]
+    .map(String)
+    .join('|')
+    .toLowerCase();
+
+export interface PrefetchOptions {
+  chainId: number;
+  route?: readonly string[];
+  /** Bypass the 15 s throttle (the state just changed: an approve mined). */
+  force?: boolean;
+  marginPct?: number;
+}
+
 /**
- * `tx` with `accessList` (and, unless `setGas: false` and only with a confirmed plan, a `gas` limit
- * of min(with-list estimate + margin, plain estimate)) when that is cheaper than without; otherwise
- * `tx` itself. `provider` is the read endpoint, not necessarily the wallet.
+ * Fetch and keep the list for a PREVIEW call (final-shaped calldata, placeholder deadline/floors)
+ * under its route key. At most 2 relay requests (list + plain estimate batched, then the with-list
+ * estimate), at most one attempt per key per 15 s unless `force`. A list is kept only when it passes
+ * the same tests as an exact plan; a preview that reverts (allowance short, halted leg) REMOVES any
+ * earlier list for the key: a list from a reverting run is never used. Never throws.
+ */
+export async function prefetchAccessList(
+  provider: Eip1193Provider,
+  preview: AccessListTx,
+  opts: PrefetchOptions,
+): Promise<void> {
+  try {
+    if (preview.gas !== undefined || !preview.to || !preview.data || preview.data === '0x') return;
+    const key = routeKey(opts.chainId, preview, opts.route);
+    const prev = routes.get(key);
+    const now = Date.now();
+    if (prev && !opts.force && now - prev.tried < ROUTE_THROTTLE_MS) return;
+    const entry: Route = {
+      at: now,
+      tried: now,
+      list: prev && now - prev.at < ROUTE_TTL_MS ? prev.list : null,
+    };
+    routes.set(key, entry);
+    if (routes.size > CACHE_MAX) routes.delete(routes.keys().next().value as string);
+    if ((await getChainIdMemo(provider)) !== opts.chainId) return void (entry.list = null);
+    const call = callOf(preview);
+    const [created, gasWithout] = await Promise.all([
+      provider.request({
+        method: 'eth_createAccessList',
+        params: [{ ...call, gas: LIST_CALL_GAS }, 'latest'],
+      }) as Promise<{ accessList?: unknown; error?: unknown } | null>,
+      estimateGas(provider, call),
+    ]);
+    const list = !created || created.error ? undefined : parseAccessList(created.accessList);
+    if (!list) return void (entry.list = null);
+    const gasWith = await estimateGas(provider, { ...call, accessList: list });
+    const m = marginOf(opts);
+    const worth =
+      bounded(list, gasWith, gasWithout, preview.data) &&
+      gasWith + (gasWith * m) / 100n < gasWithout;
+    entry.list = worth ? list : null;
+    entry.at = Date.now();
+  } catch {
+    /* a failed prefetch leaves the click to its own lookup */
+  }
+}
+
+function routeList(tx: AccessListTx, opts: AccessListOptions): AccessListEntry[] | undefined {
+  const r = routes.get(routeKey(opts.chainId, tx, opts.route));
+  if (!r?.list || Date.now() - r.at >= ROUTE_TTL_MS) return undefined;
+  return r.list.map((e) => ({ address: e.address, storageKeys: [...e.storageKeys] }));
+}
+
+/** Test hook. */
+export function clearRouteCache(): void {
+  routes.clear();
+}
+
+/**
+ * `tx` with `accessList` when that is cheaper than without; otherwise `tx` itself. Reduced `gas`
+ * (min of with-list estimate + margin and the 60% floor logic) only from a CONFIRMED exact plan and
+ * unless `setGas: false`. When the exact plan is not ready in time (or failed) and `opts.route` has a
+ * fresh prefetched list, that list is attached with NO `gas`. `provider` is the read endpoint, not
+ * necessarily the wallet.
  */
 export async function withAccessList<T extends AccessListTx>(
   provider: Eip1193Provider,
   tx: T,
   opts: AccessListOptions,
 ): Promise<T & Pick<TransactionRequest, 'accessList' | 'gas'>> {
-  const plan = await planAccessList(provider, tx, opts);
-  if (!plan) return tx;
+  const { plan, unknown } = await planState(provider, tx, opts);
+  if (!plan) {
+    const list = unknown ? routeList(tx, opts) : undefined;
+    return list ? { ...tx, accessList: list } : tx;
+  }
   const out: T & Pick<TransactionRequest, 'accessList' | 'gas'> = {
     ...tx,
     accessList: plan.accessList,

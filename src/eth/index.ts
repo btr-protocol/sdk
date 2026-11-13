@@ -119,11 +119,19 @@ export {
   onChainChanged,
 } from './rpc';
 
-export type { AccessListOptions, AccessListPlan, AccessListTx } from './accessList';
+export type {
+  AccessListOptions,
+  PrefetchOptions,
+  AccessListPlan,
+  AccessListTx,
+} from './accessList';
 export {
   withAccessList,
   planAccessList,
   prefetchAccessList,
+  routeKey,
+  routeArgsOf,
+  warmAccessList,
   dropAccessListPlan,
   parseAccessList,
   MAX_ACCESS_LIST_ADDRESSES,

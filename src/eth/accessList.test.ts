@@ -3,8 +3,12 @@ import {
   MAX_ACCESS_LIST_ADDRESSES,
   MAX_ACCESS_LIST_KEYS,
   clearAccessListCache,
+  clearRouteCache,
   dropAccessListPlan,
   parseAccessList,
+  prefetchAccessList,
+  routeArgsOf,
+  routeKey,
   withAccessList,
 } from './accessList';
 import { forgetChainId } from './rpc';
@@ -40,7 +44,10 @@ const good = (without = 100_000, withList = 50_000) => ({
 });
 const opts = { chainId: 143 };
 
-beforeEach(clearAccessListCache);
+beforeEach(() => {
+  clearAccessListCache();
+  clearRouteCache();
+});
 
 describe('withAccessList', () => {
   test('confirmed: list + gas = min(with + 30%, plain)', async () => {
@@ -274,5 +281,122 @@ describe('parseAccessList', () => {
     const out = parseAccessList(dup);
     expect(out).toHaveLength(1);
     expect(out?.[0].storageKeys).toHaveLength(2);
+  });
+});
+
+describe('route lists', () => {
+  const word = (n: bigint) => n.toString(16).padStart(64, '0');
+  const addr = (a: string) => a.slice(2).toLowerCase().padStart(64, '0');
+  /** selector + token + amount + deadline, as a builder would emit it */
+  const mk = (token: string, amount: bigint, deadline: bigint) =>
+    `0xdeadbeef${addr(token)}${word(amount)}${word(deadline)}` as `0x${string}`;
+  const preview = { ...tx, data: mk(A, 1_000_000n, 1_800_000_000n) };
+  const click = { ...tx, data: mk(A, 2_000_000n, 1_800_000_777n) }; // other amount and deadline
+  const stuck = () => ({
+    eth_createAccessList: () => new Promise(() => {}),
+    eth_estimateGas: est(100_000, 50_000),
+  });
+  const count = (calls: { method: string }[], m: string) =>
+    calls.filter((c) => c.method === m).length;
+  const rt = { chainId: 143 };
+
+  test('route args are the address-shaped words only', () => {
+    expect(routeArgsOf(preview.data)).toEqual([A]);
+    expect(routeArgsOf(`0xaabbccdd${word(2n ** 256n - 1n)}${word(1n)}`)).toEqual([]);
+  });
+
+  test('a click whose exact plan is late attaches the prefetched list, list only, never gas', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const out = await withAccessList(mock(stuck()).p, click, {
+      ...opts,
+      timeoutMs: 60,
+      confirm: mock(good()).p,
+    });
+    expect(out.accessList).toEqual(LIST);
+    expect(out.gas).toBeUndefined();
+  });
+
+  test('the exact plan wins when it is ready', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const out = await withAccessList(mock(good(100_000, 40_000)).p, click, {
+      ...opts,
+      confirm: mock(good(100_000, 40_000)).p,
+    });
+    expect(BigInt(out.gas as string)).toBe(60_000n);
+  });
+
+  test('an exact plan that says "not worth it" is not overridden by the route list', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    expect(await withAccessList(mock(good(100_000, 99_000)).p, click, opts)).toBe(click);
+  });
+
+  test('a preview that failed the worth test is not attached', async () => {
+    await prefetchAccessList(mock(good(100_000, 99_000)).p, preview, rt);
+    expect(await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).toBe(click);
+  });
+
+  test('a reverting preview is never kept, and removes an earlier list', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const reverting = mock({
+      eth_createAccessList: () => ({ accessList: LIST, error: 'execution reverted' }),
+      eth_estimateGas: est(100_000, 50_000),
+    });
+    await prefetchAccessList(reverting.p, preview, { ...rt, force: true });
+    expect(await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).toBe(click);
+  });
+
+  test('approve then action: a preview made while the allowance is short caches nothing; the forced post-approve one does', async () => {
+    const short = mock({
+      eth_createAccessList: () => ({ accessList: LIST, error: 'execution reverted' }),
+      eth_estimateGas: est(100_000, 50_000),
+    });
+    await prefetchAccessList(short.p, preview, rt);
+    expect(await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).toBe(click);
+    await prefetchAccessList(mock(good()).p, preview, { ...rt, force: true }); // approve mined
+    expect(
+      (await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).accessList,
+    ).toEqual(LIST);
+  });
+
+  test('throttle: one attempt per key per 15 s unless forced; at most 2 relay requests', async () => {
+    const m = mock(good());
+    await prefetchAccessList(m.p, preview, rt);
+    await prefetchAccessList(m.p, click, rt); // same route, other amount: throttled
+    expect(count(m.calls, 'eth_createAccessList')).toBe(1);
+    expect(count(m.calls, 'eth_estimateGas')).toBe(2);
+    await prefetchAccessList(m.p, preview, { ...rt, force: true });
+    expect(count(m.calls, 'eth_createAccessList')).toBe(2);
+  });
+
+  test('keys separate by account, chain, target, token and selector; amounts and deadlines do not matter', () => {
+    const k = (t: object, c = 143) => routeKey(c, { ...preview, ...t });
+    expect(k({})).toBe(k({ data: click.data }));
+    expect(k({})).not.toBe(k({ from: B }));
+    expect(k({})).not.toBe(k({ to: B }));
+    expect(k({})).not.toBe(k({}, 1));
+    expect(k({})).not.toBe(k({ data: mk(B, 1_000_000n, 1_800_000_000n) }));
+    expect(k({})).not.toBe(
+      k({ data: preview.data.replace('deadbeef', 'cafebabe') as `0x${string}` }),
+    );
+  });
+
+  test('a route list for another account or chain is not attached', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const other = { ...click, from: B };
+    expect(await withAccessList(mock(stuck()).p, other, { ...opts, timeoutMs: 60 })).toBe(other);
+    expect(
+      await withAccessList(mock(stuck(), { id: 1 }).p, click, { chainId: 1, timeoutMs: 60 }),
+    ).toBe(click);
+  });
+
+  test('expires after 60 s', async () => {
+    await prefetchAccessList(mock(good()).p, preview, rt);
+    const real = Date.now;
+    Date.now = () => real() + 61_000;
+    try {
+      expect(await withAccessList(mock(stuck()).p, click, { ...opts, timeoutMs: 60 })).toBe(click);
+    } finally {
+      Date.now = real;
+    }
   });
 });
