@@ -268,8 +268,11 @@ export async function withAccessList<T extends AccessListTx>(
     accessList: plan.accessList,
   };
   if (opts.setGas !== false && plan.confirmed) {
+    // Never below 60% of the plain estimate, however low the estimates claim to be; the plan's
+    // margin check already guarantees the result is under the plain estimate.
     const limit = plan.gasWith + (plan.gasWith * marginOf(opts)) / 100n;
-    out.gas = hex(limit < plan.gasWithout ? limit : plan.gasWithout);
+    const floor = (plan.gasWithout * 60n) / 100n;
+    out.gas = hex(limit > floor ? limit : floor);
   }
   return out;
 }

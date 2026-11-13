@@ -232,6 +232,15 @@ describe('withAccessList', () => {
     ).toHaveLength(3);
   });
 
+  test('a reduced limit is never below 60% of the plain estimate', async () => {
+    // with-list 40,000 x 1.3 = 52,000 < 60,000 = 60% of 100,000
+    const out = await withAccessList(mock(good(100_000, 40_000)).p, tx, {
+      ...opts,
+      confirm: mock(good(100_000, 40_000)).p,
+    });
+    expect(BigInt(out.gas as string)).toBe(60_000n);
+  });
+
   test('the returned list is a copy', async () => {
     const { p } = mock(good());
     const a = await withAccessList(p, tx, opts);

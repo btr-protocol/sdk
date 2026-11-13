@@ -199,7 +199,15 @@ export async function signTransaction(
   const q0 = (v: Hex | bigint | number | undefined) => q(v, 0n);
 
   // EIP-2930 list as RLP: [[address, [key, ...]], ...]; empty stays 0xc0.
-  const accessListRlp = (tx.accessList ?? []).map((e) => [e.address, e.storageKeys]);
+  const accessListRlp = (tx.accessList ?? []).map((e) => {
+    const hexBytes = (h: unknown, n: number) =>
+      typeof h === 'string' && new RegExp(`^0x[0-9a-fA-F]{${n * 2}}$`).test(h);
+    if (!hexBytes(e?.address, 20))
+      throw new Error(`access list: address is not 20 bytes: ${String(e?.address)}`);
+    if (!Array.isArray(e.storageKeys) || !e.storageKeys.every((k) => hexBytes(k, 32)))
+      throw new Error(`access list: every storage key must be 32 bytes (address ${e.address})`);
+    return [e.address, e.storageKeys];
+  });
 
   // EIP-1559 (Type 2)
   if (tx.maxFeePerGas && tx.maxPriorityFeePerGas) {

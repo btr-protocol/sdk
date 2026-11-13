@@ -1,6 +1,12 @@
 // Signed bytes with an access list, against `cast mktx` (Foundry 1.9.0, an implementation
 // independent of this repo): key 0x..01 (the well-known test key), chain 143, nonce 5, gas 100000,
-// to 0x22..22, value 7, data f(uint256)(1), and the two-entry list below.
+// to 0x22..22, value 7, data f(uint256)(1), and the two-entry list below. Commands (K = that key,
+// AL = [{address 0xab..ab, storageKeys [0xcd..cd]}, {address 0x11..11, storageKeys []}]):
+//   type 2 + list   cast mktx --private-key $K --chain 143 --nonce 5 --gas-limit 100000 --priority-gas-price 1000000000 --gas-price 2000000000 --value 7 --access-list "$AL" 0x22..22 'f(uint256)' 1
+//   type 2, no list the same without --access-list
+//   type 1          cast mktx --private-key $K --chain 143 --nonce 5 --gas-limit 100000 --legacy --gas-price 2000000000 --value 7 --access-list "$AL" 0x22..22 'f(uint256)' 1
+//   legacy, no list cast mktx --private-key $K --chain 143 --nonce 5 --gas-limit 100000 --legacy --gas-price 2000000000 --value 7 0x22..22 'f(uint256)' 1
+// (the EIP-155 spec vector for legacy is also pinned in test/tx-vectors.test.ts)
 import { describe, expect, test } from 'bun:test';
 import { signTransaction } from './client';
 import type { Eip1193Provider, Hex } from './types';
@@ -37,5 +43,26 @@ describe('signTransaction with an access list', () => {
   test('legacy price with a list is type 1 (EIP-2930)', async () => {
     const gasPrice = '0x77359400' as Hex;
     expect(await signTransaction(provider, { ...base, gasPrice, accessList: LIST }, KEY)).toBe(T1);
+  });
+  test('legacy without a list is byte-identical to the pre-existing encoding', async () => {
+    const gasPrice = '0x77359400' as Hex;
+    expect(await signTransaction(provider, { ...base, gasPrice }, KEY)).toBe(
+      '0xf88a058477359400830186a094222222222222222222222222222222222222222207a4b3de648b0000000000000000000000000000000000000000000000000000000000000001820141a00f5414ca324687b3cd7506a634eea90281311f73e65371277f6c96521af398cfa05be2b0ad4e720940b4c3e5506efcf7a654fc3e233299020d35285b7fd799e03b',
+    );
+  });
+  test('a malformed list is never signed', async () => {
+    const bad = [
+      [{ address: '0x1234' as Hex, storageKeys: [] as Hex[] }],
+      [{ address: LIST[0].address, storageKeys: ['0x12' as Hex] }],
+      [{ address: LIST[0].address, storageKeys: 'x' as unknown as Hex[] }],
+    ];
+    for (const accessList of bad) {
+      await expect(
+        signTransaction(provider, { ...base, ...fees, accessList }, KEY),
+      ).rejects.toThrow(/access list/);
+      await expect(
+        signTransaction(provider, { ...base, gasPrice: '0x1' as Hex, accessList }, KEY),
+      ).rejects.toThrow(/access list/);
+    }
   });
 });
