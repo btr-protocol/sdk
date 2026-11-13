@@ -6,6 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../abis/Pool.js';
+import { getSelector } from '../eth/abi.js';
 import { Contract } from '../eth/contract.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
 import { deposit, swap, withdraw } from './index.js';
@@ -17,7 +18,7 @@ const TOKEN = '0x0000000000000000000000000000000000000001' as Address;
 /** A wallet on chain 56 that records every method it is asked for, and every tx it is sent. */
 function wallet(estimate = 780_023n) {
   const seen: string[] = [];
-  const sent: { gas?: string }[] = [];
+  const sent: { from?: string; gas?: string }[] = [];
   const provider = {
     request: ({ method, params }: { method: string; params?: unknown[] }): Promise<unknown> => {
       seen.push(method);
@@ -25,7 +26,7 @@ function wallet(estimate = 780_023n) {
       if (method === 'eth_accounts') return Promise.resolve([USER]);
       if (method === 'eth_estimateGas') return Promise.resolve(`0x${estimate.toString(16)}`);
       if (method === 'eth_sendTransaction') {
-        sent.push(params?.[0] as { gas?: string });
+        sent.push(params?.[0] as { from?: string; gas?: string });
         return Promise.resolve('0xhash' as Hex);
       }
       throw new Error(`unexpected ${method}`);
@@ -101,5 +102,30 @@ describe('wallet-path writers bind the chain when asked', () => {
       /chain mismatch/,
     );
     expect(seen).toEqual(['eth_chainId']);
+  });
+});
+
+describe('pool send: estimate and send share the sender; a revert names the pool error', () => {
+  test('the send carries the same from the estimate ran from', async () => {
+    const { provider, sent } = wallet(780_023n);
+    await deposit(provider, POOL, { token: TOKEN, amount: 1n });
+    expect(sent[0].from).toBe(USER);
+  });
+
+  test('an estimate that reverts with a pool custom error throws the decoded name, and sends nothing', async () => {
+    const expired = getSelector('Expired()');
+    const seen: string[] = [];
+    const provider = {
+      request: async ({ method }: { method: string }) => {
+        seen.push(method);
+        if (method === 'eth_chainId') return '0x38';
+        if (method === 'eth_accounts') return [USER];
+        if (method === 'eth_estimateGas')
+          throw Object.assign(new Error('execution reverted'), { data: expired });
+        throw new Error(`unexpected ${method}`);
+      },
+    } as unknown as Eip1193Provider;
+    await expect(swap(provider, POOL, swapParams())).rejects.toThrow(/pool reverted: Expired/);
+    expect(seen).not.toContain('eth_sendTransaction');
   });
 });

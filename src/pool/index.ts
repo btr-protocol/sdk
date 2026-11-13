@@ -10,10 +10,11 @@ import type {
   FieldsMatch,
   SwapQuoteFields,
 } from '../abis/structs.generated.js';
-import { decodeFn, encodeFn } from '../eth/abi';
+import { decodeErrorResult, decodeFn, encodeFn } from '../eth/abi';
+import { ContractRevertError } from '../eth/contract';
 import { gasWithBuffer } from '../eth/gas';
 import { multicallStrict } from '../eth/multicall';
-import { estimateGas, getAccounts, getChainId } from '../eth/rpc';
+import { estimateGas, getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { toAsset } from './asset.js';
 
@@ -425,11 +426,40 @@ async function sendPoolCall(
 ): Promise<Hex> {
   const [from] = await getAccounts(provider);
   if (!from) throw new Error('No account connected');
-  const gas = gasWithBuffer(await estimateGas(provider, { from, to, data, value }));
+  const tx = { from, to, data, value };
+  let estimate: bigint;
+  try {
+    estimate = await estimateGas(provider, tx);
+  } catch (e) {
+    throw decodePoolRevert(e);
+  }
+  const gas = gasWithBuffer(estimate);
   return (await provider.request({
     method: 'eth_sendTransaction',
-    params: [{ to, data, value, gas: `0x${gas.toString(16)}` }],
+    params: [{ ...tx, gas: `0x${gas.toString(16)}` }],
   })) as Hex;
+}
+
+/** An estimate that reverted names the pool's own custom error (`ThresholdViolation(...)`), the
+ *  way `Contract` does, instead of an opaque "execution reverted". Anything else passes through. */
+function decodePoolRevert(e: unknown): unknown {
+  const data = rpcErrorData(e);
+  if (!data) return e;
+  let d: ReturnType<typeof decodeErrorResult>;
+  try {
+    d = decodeErrorResult(POOL_ABI, data);
+  } catch {
+    return e; // clipped revert data: the revert is still the answer, keep the transport's error
+  }
+  if (!d) return e;
+  const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
+  return new ContractRevertError(
+    d.name,
+    d.args,
+    `pool reverted: ${d.name}${args}`,
+    undefined,
+    data,
+  );
 }
 
 /**

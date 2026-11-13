@@ -5,7 +5,7 @@
  * and withdraws read the clock and the marks, so one block later the same call can need more
  * gas: the inner call's 63/64 cap then runs out and the tx reverts out-of-gas while still
  * billing the whole limit (Monad bills the limit). A fixed buffer over the estimate covers that
- * drift; the cap keeps a runaway estimate from turning into an oversized limit.
+ * drift; the cap bounds the buffer, never the estimate itself.
  *
  * Ceiling division, so the buffered value never lands below `estimate × factor`.
  */
@@ -17,6 +17,12 @@ export function gasWithBuffer(
   factor: number = GAS_BUFFER_FACTOR,
   cap: bigint = GAS_LIMIT_CAP,
 ): bigint {
+  if (!Number.isFinite(factor) || factor < 1) {
+    throw new RangeError(`gas buffer factor must be finite and >= 1, got ${factor}`);
+  }
+  if (estimate > cap) {
+    throw new RangeError(`gas estimate ${estimate} exceeds the cap ${cap}`);
+  }
   const bps = BigInt(Math.round(factor * 10_000));
   const buffered = (estimate * bps + 9_999n) / 10_000n;
   return buffered < cap ? buffered : cap;
