@@ -289,8 +289,8 @@ describe('chain resolution refuses to guess', () => {
     expect(deployedChainIds()).toContain(MONAD);
     const byTag = Object.fromEntries(staticVenuePools(MONAD).map((p) => [p.tag, p]));
     expect(Object.keys(byTag).sort()).toEqual(['btr-core']);
-    expect(byTag['btr-core']!.tokens).toHaveLength(11);
-    expect(chainVenue(MONAD).refFeeds).toContain('WMON-USDC');
+    expect(byTag['btr-core']!.tokens).toHaveLength(13);
+    expect(chainVenue(MONAD).refFeeds).toEqual([]); // pool-v2 has no reference tier
   });
 
   test('the hub USDC is roster index 0 of every core and resolves to its USDC-USD reference', () => {

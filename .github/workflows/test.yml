@@ -47,7 +47,7 @@ jobs:
             g -C "../$n" checkout -q "$sha"
           }
           sib back abis 22e7ac1a6527ebbe3191c0d5a2ed9196f2e1ed60
-          sib dex-evm src abi deployments 1262d40dd565d4cd1dc3a75e48253a4bae92b94a
+          sib dex-evm src abi deployments 3cf36fae81945f59ccd46aba2360432b6a04f5f9
           sib shared evm/src 1f2d4fc4b75658543ea33dc8abb571245a7cab11
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
