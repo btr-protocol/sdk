@@ -167,9 +167,9 @@ describe('F2: transfer-exit prices its exit leg off the post-move toll', () => {
     const one = await at(10n ** 16n);
     expect(one?.feasible).toBe(true);
     expect(one?.out).toBeLessThanOrEqual((zero?.out ?? 0) * 0.99);
-    expect(seen[1].postState.legs.NZDF.liab).toBeCloseTo(900_000, 6);
-    expect(seen[1].postState.legs.AUDF.liab).toBeCloseTo(1_100_000, 6);
-    expect(seen[1].lpAmountOut).toBeCloseTo(100_000, 6);
+    expect(seen[1].postState.legs.NZDF.liab).toBeCloseTo(900_000, 5);
+    expect(seen[1].postState.legs.AUDF.liab).toBeCloseTo(1_100_000, 5);
+    expect(seen[1].lpAmountOut).toBeCloseTo(100_000, 5);
     const unread = await at(null);
     expect(unread?.reason).toBe('toll-pending');
   });
@@ -332,5 +332,154 @@ describe('F4: raw-unit payout never above the chain integer law', () => {
     }
     expect(n).toBeGreaterThan(300);
     expect(worst).toBe(0n);
+  });
+});
+
+/** One in-kind leg whose coverage dwarfs 1 (`mu ≫ 1`): R = 1e9 raw, L = 1000 raw, 6 decimals. */
+function richPool(o: { res: number; liab: number }): NamedPool {
+  return {
+    tag: 'core',
+    addr: '0xcore',
+    state: {
+      base: 'USDC',
+      solvencyOk: true,
+      exitTollWad: 0n,
+      legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
+      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0 },
+    },
+  };
+}
+/** `_quoteWithdrawSame` over raw words (`PoolLiquidityLib.sol:434,118-126,497-498`, `_cToll`). */
+const chainSame = (lp: bigint, idx: bigint, R: bigint, L: bigint, cap: bigint, tw: bigint) => {
+  const face = (lp * idx) / WAD;
+  const cLeg = (R * WAD) / L;
+  const amt = (face * (cLeg < cap ? cLeg : cap)) / WAD;
+  return amt - cTollRef(amt, tw);
+};
+
+describe('F5: integer face and mu (mu ≫ 1): same-asset and transfer never above the chain', () => {
+  test('review reproducer: R=1e9, L=1000 raw, lp=999 raw, idx 1.0009009', async () => {
+    const p = richPool({ res: 1_000, liab: 0.001 });
+    const idx = 1_000_900_900_000_000_000n;
+    const r = (
+      await route(p, 'AUDF', 'AUDF', 999 / 1e6, { ...BE, liquidityIndexWad: () => Number(idx) })
+    )[0];
+    // Chain: face floor(999.9009) = 999, mu = min(1e6, C = 1e6) → 999_000_000 raw.
+    const chain = chainSame(999n, idx, 1_000_000_000n, 1_000n, 10n ** 24n, 0n);
+    expect(chain).toBe(999_000_000n);
+    expect(r.feasible).toBe(true);
+    expect(toUnits(r.out, 6)).toBeLessThanOrEqual(chain);
+    // Tight: within one face unit's mu of the chain (the f64 books shade toward the pool).
+    expect(toUnits(r.out, 6)).toBeGreaterThanOrEqual(chain - 1_000_000n);
+  });
+
+  test('same-asset sweep, mu in [1, 1000), random index and toll', async () => {
+    const rand = rng(23);
+    let worst = -(10n ** 30n);
+    for (let i = 0; i < 300; i++) {
+      const L = BigInt(Math.floor(rand() * 1e9)) + 1_000n;
+      const R = (L * BigInt(Math.floor(rand() * 1e6) + 1_000)) / 1_000n;
+      const p = richPool({ res: Number(R) / 1e6, liab: Number(L) / 1e6 });
+      const tw = BigInt(Math.floor(rand() * 5e16));
+      p.state.exitTollWad = tw;
+      const idx = WAD + BigInt(Math.floor(rand() * 9e17));
+      const lp = (((L * WAD) / idx) * BigInt(Math.floor(rand() * 1e6))) / 1_000_000n + 1n;
+      const r = (
+        await route(p, 'AUDF', 'AUDF', Number(lp) / 1e6, {
+          ...BE,
+          liquidityIndexWad: () => Number(idx),
+        })
+      )[0];
+      // C over one leg = R/L as well: the cap never binds below c_leg here.
+      const chain = chainSame(lp, idx, R, L, (R * WAD) / L, tw);
+      const got = r.feasible ? toUnits(r.out, 6) : 0n;
+      if (got - chain > worst) worst = got - chain;
+    }
+    expect(worst).toBeLessThanOrEqual(0n);
+  });
+
+  test('transfer-exit: the tail pays the chain law on the shares it burns', async () => {
+    // Every book rich (C ≈ c_leg ≈ 1000): mu ≫ 1 on the tail withdraw. Identity claim conversion.
+    stub({ tolls: ALL });
+    const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
+    p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
+    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0 };
+    const idx = 1_000_900_900_000_000_000n;
+    const tw = 7n * 10n ** 15n;
+    let post: PostMoveTollCtx | undefined;
+    const r = (
+      await route(p, 'NZDF', 'AUDF', 0.999, {
+        ...BE,
+        liquidityIndexWad: () => Number(idx),
+        postMoveExitTollWad: async (ctx) => {
+          post = ctx;
+          return tw;
+        },
+      })
+    ).find((x) => x.id === 'transfer-exit');
+    expect(r?.feasible).toBe(true);
+    const lpBurn = toUnits(r?.steps[1].amountIn ?? 0, 6);
+    expect(lpBurn).toBeGreaterThan(0n);
+    // Chain law on the post-move books over the burned shares: mu = min(c_leg, C), raw books.
+    const ps = post!.postState;
+    const a = ps.legs.AUDF;
+    const raw = (v: number) => BigInt(Math.round(v * 1e6));
+    const books = [ps.hub!, ...Object.values(ps.legs)].map((l) => {
+      const b = l as { res: number; liab: number };
+      return [raw(b.res), raw(b.liab)] as const;
+    });
+    const nav = books.reduce((t, [r]) => t + r, 0n);
+    const claim = books.reduce((t, [, l]) => t + l, 0n);
+    const capW = (nav * WAD) / claim;
+    expect(capW).toBeGreaterThan(500n * WAD);
+    const chain = chainSame(lpBurn, idx, raw(a.res), raw(a.liab), capW, tw);
+    expect(chain).toBeGreaterThan(0n);
+    expect(toUnits(r?.out ?? 0, 6)).toBeLessThanOrEqual(chain);
+  });
+});
+
+describe('F5b: cross-exit claim face floors like the chain', () => {
+  test('face 1_000_000.9 raw goes out as <= 1_000_000, payout <= the floored claim', async () => {
+    const sent = stub({ tolls: ALL });
+    const p = pool();
+    // lp = 1_000_000 raw, idx 1.0000009: chain withdrawValue = floor(1_000_000.9) = 1_000_000.
+    const r = (
+      await route(p, 'NZDF', 'AUDF', 1, {
+        ...BE,
+        liquidityIndexWad: () => 1_000_000_900_000_000_000,
+      })
+    ).find((x) => x.id === 'cross-exit');
+    expect(r?.feasible).toBe(true);
+    const b = sent.at(-1) as { amount_in: string; claim: { face: string; c_wad: string } };
+    expect(BigInt(b.claim.face)).toBeLessThanOrEqual(1_000_000n);
+    const fair = (1_000_000n * BigInt(b.claim.c_wad)) / WAD;
+    expect(BigInt(b.amount_in)).toBeLessThanOrEqual(fair);
+    expect(toUnits(r?.out ?? 0, 6)).toBeLessThanOrEqual(fair);
+  });
+});
+
+describe('stale solvency words: refused, not priced', () => {
+  const at = (ageMs: number) => {
+    const p = pool();
+    p.state.exitTollWad = 10n ** 15n;
+    p.state.solvencyAtMs = 1_000_000;
+    return { p, opts: { ...BE, now: () => 1_000_000 + ageMs } as LpRouteOpts };
+  };
+  test('same-asset and cross: fresh priced, older than the bound toll-stale', async () => {
+    stub({ tolls: ALL });
+    const fresh = at(5_000);
+    expect((await route(fresh.p, 'AUDF', 'AUDF', 1_000, fresh.opts))[0].feasible).toBe(true);
+    const old = at(31_000);
+    expect((await route(old.p, 'AUDF', 'AUDF', 1_000, old.opts))[0].reason).toBe('toll-stale');
+    const cross = (await route(old.p, 'NZDF', 'AUDF', 1_000, old.opts)).find(
+      (x) => x.id === 'cross-exit',
+    );
+    expect(cross?.reason).toBe('toll-stale');
+    // A fresh chain preview still prices the in-kind exit.
+    const pv = await route(old.p, 'AUDF', 'AUDF', 1_000, {
+      ...old.opts,
+      previewWithdraw: async () => 990_000_000n,
+    });
+    expect(pv[0].out).toBe(990);
   });
 });

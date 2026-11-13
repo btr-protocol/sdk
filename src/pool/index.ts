@@ -18,6 +18,7 @@ import { multicallStrict } from '../eth/multicall';
 import { getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { MAX_CLOCK_SKEW_S } from '../utils/constants';
+import { toUnits } from '../utils/format.js';
 import { toAsset } from './asset.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -126,35 +127,46 @@ export async function getAsset(
   return toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: result }));
 }
 
-/** Pool rate and exit toll from one sweep; `exitTollWad` is raw WAD, including a real zero. */
+/** Pool rate and exit toll from one sweep. `exitTollWad` is raw WAD (a real zero included) and is the
+ *  settlement toll only while `ok`; degraded (`ok = false`) the sweep's word reads 0 while the exit
+ *  charges the lower-pass toll, so it is returned as null (unknown), never as a 0 toll.
+ *  `observedAtMs` stamps the read for {@link withPoolSolvency}'s freshness check. */
 export async function getPoolSolvency(
   provider: Eip1193Provider,
   poolAddress: Address,
-): Promise<{ cWad: bigint; ok: boolean; exitTollWad: bigint }> {
+): Promise<{ cWad: bigint; ok: boolean; exitTollWad: bigint | null; observedAtMs: number }> {
   const data = encodeFn({ abi: POOL_ABI, functionName: 'poolSolvencyWad' });
   const result = (await provider.request({
     method: 'eth_call',
     params: [{ to: poolAddress, data }, 'latest'],
   })) as Hex;
+  const observedAtMs = Date.now();
   const [cWad, ok, exitTollWad] = decodeFn<[bigint, boolean, bigint]>({
     abi: POOL_ABI,
     functionName: 'poolSolvencyWad',
     data: result,
   });
-  return { cWad, ok, exitTollWad };
+  return { cWad, ok, exitTollWad: ok ? exitTollWad : null, observedAtMs };
 }
 
 /** `PoolState` carrying both `poolSolvencyWad` words the LP exit quotes need: `solvencyOk` (the
- *  `ok` word) and `exitTollWad` (the toll word, the settlement toll only while `ok`). */
+ *  `ok` word) and `exitTollWad` (the toll word, the settlement toll only while `ok`), stamped with
+ *  the read time (`solvencyAtMs`; `sol.observedAtMs`, else now). */
 export function withPoolSolvency<S extends PoolState>(
   state: S,
-  sol: { ok: boolean; exitTollWad: bigint },
+  sol: { ok: boolean; exitTollWad: bigint | null; observedAtMs?: number },
 ): S {
-  return { ...state, solvencyOk: sol.ok, exitTollWad: sol.exitTollWad };
+  return {
+    ...state,
+    solvencyOk: sol.ok,
+    exitTollWad: sol.ok ? sol.exitTollWad : null,
+    solvencyAtMs: sol.observedAtMs ?? Date.now(),
+  };
 }
 
-/** `Pool.previewWithdraw(tk, lp)`: the same-asset payout for `lp` raw LP shares, in raw `tk` units,
- *  net of the settlement C toll (`exitCap`'s sweep). Fits `LpRouteOpts.previewWithdraw`. */
+/** `Pool.previewWithdraw(tk, lp)`: the same-asset payout for `lp` RAW LP shares, in raw `tk` units,
+ *  net of the settlement C toll (`exitCap`'s sweep). Raw in, raw out: wire it into
+ *  `LpRouteOpts.previewWithdraw` (display shares) through {@link previewWithdrawFor}. */
 export async function getPreviewWithdraw(
   provider: Eip1193Provider,
   poolAddress: Address,
@@ -176,6 +188,27 @@ export async function getPreviewWithdraw(
     data: result,
   });
   return { amountOut, haircut };
+}
+
+/** The `LpRouteOpts.previewWithdraw` callback over {@link getPreviewWithdraw}: display LP shares to
+ *  raw at the underlying's decimals (`LPToken.decimals` mirrors it), floored as the burn encodes
+ *  them, then the raw preview. `resolve` names the token address and decimals of a pool's symbol;
+ *  null (unknown leg, no pool address) or a failed call leaves the preview unread (null). */
+export function previewWithdrawFor(
+  provider: Eip1193Provider,
+  resolve: (symbol: string, pool: { addr?: string }) => { token: Address; decimals: number } | null,
+): (pool: { addr?: string }, symbol: string, lpShares: number) => Promise<bigint | null> {
+  return async (pool, symbol, lpShares) => {
+    const r = resolve(symbol, pool);
+    if (!r || !pool.addr) return null;
+    const lp = toUnits(lpShares, r.decimals);
+    if (lp <= 0n) return null;
+    try {
+      return (await getPreviewWithdraw(provider, pool.addr as Address, r.token, lp)).amountOut;
+    } catch {
+      return null;
+    }
+  };
 }
 
 /**
