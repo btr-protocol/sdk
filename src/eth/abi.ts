@@ -216,7 +216,9 @@ const processList = (
 ) => {
   let head = '';
   let tail = '';
-  let offset = items.length * 32;
+  // Dynamic items reserve one offset word; static composites are inline and
+  // occupy their full encoded width, including nested tuples/fixed arrays.
+  let offset = items.reduce((size, item) => size + (item.t ? 32 : item.h.length / 2), 0);
   const result = { h: '', t: '' };
 
   // If dynamic array, prefix with length. Static arrays don't include length.
