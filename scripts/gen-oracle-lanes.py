@@ -107,6 +107,8 @@ for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
 # NXR signer symbol, `ticker_id` is the lane's ticker. Its id is `bytes32(uint256(ticker_id))`, and
 # that is asserted against the deploy record's own feedId and globalIndex. Nothing here reads the
 # venue record: the v1 record carries different ids for the same assets.
+# One 64-bit lane mask per wire-9 segment: a lane index must fit it.
+V9_LANES_PER_SLOT = 64
 for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
     lanes_rec = load(path)
     if lanes_rec.get("wire") != 9:
@@ -132,7 +134,10 @@ for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
                       "feed": ln["feed"], "tickerId": str(ticker), "feedId": feed_id}
     if set(feeds) != set(rec["feeds"]):
         raise SystemExit(f"{os.path.basename(path)}: lane legs and deploy feeds differ")
-    maps.append(map_ts("v9", {"chainId": lanes_rec["chainId"], "feeds": feeds}, rec["verifierP"], 64,
+    gis = [f["globalIndex"] for f in feeds.values()]
+    if len(set(gis)) != len(gis) or min(gis) < 0 or max(gis) >= V9_LANES_PER_SLOT:
+        raise SystemExit(f"{os.path.basename(path)}: lane indices must be unique and below {V9_LANES_PER_SLOT}")
+    maps.append(map_ts("v9", {"chainId": lanes_rec["chainId"], "feeds": feeds}, rec["verifierP"], V9_LANES_PER_SLOT,
                        "BTR ExternalOracleV4", "primary"))
 
 # An unmatched filter would quietly rewrite the file with fewer chains than the operator asked for.
