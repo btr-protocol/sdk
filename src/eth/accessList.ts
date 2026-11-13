@@ -42,6 +42,9 @@ export const MAX_ACCESS_LIST_ADDRESSES = 64;
 export const MAX_ACCESS_LIST_KEYS = 512;
 const LIST_TTL_MS = 20_000;
 const FAIL_TTL_MS = 3_000;
+/** The relay serves `eth_createAccessList` only for a call that carries `gas` (<= 30M) and exactly
+ *  two params; 5M covers the heaviest call measured (a 935k deposit) with room. */
+const LIST_CALL_GAS: Hex = '0x4c4b40';
 const ENTRY_ADDR_GAS = 2400n;
 const ENTRY_KEY_GAS = 1900n;
 
@@ -138,7 +141,10 @@ function listFor(
     at: Date.now(),
     ttl: LIST_TTL_MS,
     list: (
-      p.request({ method: 'eth_createAccessList', params: [callOf(tx), 'latest'] }) as Promise<{
+      p.request({
+        method: 'eth_createAccessList',
+        params: [{ ...callOf(tx), gas: LIST_CALL_GAS }, 'latest'],
+      }) as Promise<{
         accessList?: unknown;
         error?: unknown;
       } | null>

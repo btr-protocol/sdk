@@ -220,6 +220,18 @@ describe('withAccessList', () => {
     expect(calls.slice(n).some((c) => c.method === 'eth_estimateGas')).toBe(false);
   });
 
+  test('createAccessList carries gas and exactly two params; one lookup makes at most 3 relay calls', async () => {
+    const { p, calls } = mock(good());
+    await withAccessList(p, tx, { ...opts, confirm: mock(good()).p });
+    const create = calls.filter((c) => c.method === 'eth_createAccessList');
+    expect(create).toHaveLength(1);
+    expect(create[0].params).toHaveLength(2);
+    expect(BigInt((create[0].params[0] as { gas: string }).gas)).toBeLessThanOrEqual(30_000_000n);
+    expect(
+      calls.filter((c) => ['eth_createAccessList', 'eth_estimateGas'].includes(c.method)),
+    ).toHaveLength(3);
+  });
+
   test('the returned list is a copy', async () => {
     const { p } = mock(good());
     const a = await withAccessList(p, tx, opts);
