@@ -1,9 +1,3 @@
-import {
-  backendConvert,
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
-  quoteSwapLiabilityCoreAsync,
-} from './liabilityQuote';
 import { describe, expect, test } from 'bun:test';
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import { type PoolState, buildLeg } from '../amm/aimm.js';
@@ -19,6 +13,12 @@ import {
   minLpAmountOut,
   poolSolvency,
 } from './liability';
+import {
+  backendConvert,
+  quoteSwapLiabilityAsync,
+  quoteSwapLiabilityCore,
+  quoteSwapLiabilityCoreAsync,
+} from './liabilityQuote';
 
 const legOf = (symbol: string, reserves: number, liabilities: number) => ({
   symbol,
