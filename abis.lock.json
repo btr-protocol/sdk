@@ -18,15 +18,15 @@
   },
   "chains": {
     "143": {
-      "generation": "pool-v1-s7",
+      "generation": "pool-v2-s12",
       "pins": {
-        "Admin": "0x267d3725dd5ffa59f45df48f749c3ddc3f169ed01983f6a0ae552bb926926e8e",
+        "Admin": "0xd2d9781f40d7d158fd206c9b5ad61547ed3c5dc3a592b7bf2b566aff55344d21",
         "LPToken": "0x2af271e015aeec368ae2a9e61efb3b84bc72c01f9594bc9f940d21b80849960c",
-        "AccessControl": "0x9146809c3666b9ab3ec7382ae4b4e3ca3cbcb967fb193ce7f26aded1bc6fc06f",
-        "Pool": "0xc9c0ccf4caef6f79e1f970946fd87073a9e86b21300bfe84169fb46c6125e0ab",
-        "PoolFactory": "0x290c81c3031c481ba7e31b8a35a8df975923818b2ded4de3fc98a7cc45ae9a50",
-        "Flash": "0x3418b3d67e46225d15554e2519afc1733b6c0b6fec9264363a5929f4f86cd7c5",
-        "MarkStore": "0x6a4e96053eff0171e257a762ab2e79f9ccb07a06149caac9338e4f6231a44e50"
+        "AccessControl": "0x44113180bf658a5b0bd6c6faee183c57a571a9f204651e89e568c574ec7c8449",
+        "Pool": "0x77ff814c546c551e051a42520518f1a3c50327e519ab27acf669018b06229bad",
+        "PoolFactory": "0x9954ea291ce8bb92024b22d16eb079aabb789bc49b7706ff8d2256470193f31e",
+        "Flash": "0x685d689c173537f768e39f8f65cb5374226322e7d388f6ca2fd330c1a7c6c442",
+        "MarkStore": "0x1b95f400bd455c13d35be502977f1bb01d11cf1b3a9b66e5146bc4ef1ceb91ec"
       }
     }
   }
