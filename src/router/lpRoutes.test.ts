@@ -304,6 +304,7 @@ describe('buildDepositCalls', () => {
         targetToken: TOK_T,
         lpAmountIn: 999n,
         minLpAmountOut: 900n,
+        minLpOut: 990n,
       },
       opts,
     );
@@ -324,6 +325,7 @@ describe('buildDepositCalls', () => {
         targetToken: TOK_T,
         lpAmountIn: 999n,
         minLpAmountOut: 900n,
+        minLpOut: 990n,
       },
       { ...opts, needsApproval: () => false },
     );

@@ -22,7 +22,7 @@ describe('depositMin plumbing', () => {
   const TOK = `0x${'22'.repeat(20)}` as `0x${string}`;
   const USER = `0x${'44'.repeat(20)}` as `0x${string}`;
   const sel = (d: string) => d.slice(0, 10);
-  test('a floor selects depositMin, none keeps deposit', () => {
+  test('buildDepositCalls encodes depositMin with the floor', () => {
     const t = {
       mode: 'transfer' as const,
       token: TOK,
@@ -31,14 +31,15 @@ describe('depositMin plumbing', () => {
       lpAmountIn: 1n,
       minLpAmountOut: 1n,
     };
-    const plain = buildDepositCalls(POOL, t, { recipient: USER, needsApproval: () => false });
     const floored = buildDepositCalls(
       POOL,
       { ...t, minLpOut: 990n },
       { recipient: USER, needsApproval: () => false },
     );
-    expect(sel(plain[0].data)).not.toBe(sel(floored[0].data));
-    expect(floored[0].data.length).toBeGreaterThan(plain[0].data.length);
+    expect(floored[0].data.length).toBe(2 + 2 * (4 + 32 * 3));
+    expect(() =>
+      buildDepositCalls(POOL, { ...t, minLpOut: 0n }, { recipient: USER, needsApproval: () => false }),
+    ).toThrow(/positive/);
   });
   test('pool.deposit sends depositMin with a floor and refuses none or zero', async () => {
     const sent: string[] = [];
@@ -108,6 +109,7 @@ describe('LP builders refuse a zero floor', () => {
       token: T,
       amount: 1n,
       targetToken: T,
+      minLpOut: 1n,
       lpAmountIn: 1n,
     };
     expect(() => buildDepositCalls(P, { ...mint, minLpAmountOut: 0n }, opts)).toThrow(/positive/);
@@ -172,6 +174,7 @@ describe('sendDeadline', () => {
       targetToken: TOK,
       lpAmountIn: 1n,
       minLpAmountOut: 1n,
+      minLpOut: 1n,
     };
     expect(() =>
       buildDepositCalls(POOL, t, {

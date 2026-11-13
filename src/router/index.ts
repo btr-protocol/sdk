@@ -604,21 +604,14 @@ interface TransferMintArgs {
   /** Shares the deposit mints for THIS sender (post-dead-seed estimate: amt·WAD/idx − dead). */
   lpAmountIn: bigint;
   minLpAmountOut: bigint;
-  /** `Pool.depositMin` floor on the shares minted; absent sends plain `deposit` (unfloored). */
-  minLpOut?: bigint;
+  /** `Pool.depositMin` floor on the shares minted; required, a zero floor is refused. */
+  minLpOut: bigint;
 }
 
 /** `depositMin(token, amount, minLpOut)`. A zero or missing floor guards nothing: refused. */
 export function depositCallData(token: Address, amount: bigint, minLpOut: bigint): Hex {
   if (!(minLpOut > 0n)) throw new Error(`minLpOut must be a positive floor, got ${minLpOut}`);
   return encodeFn({ abi: POOL_ABI, functionName: 'depositMin', args: [token, amount, minLpOut] });
-}
-
-/** Plain `deposit(token, amount)`: mints at whatever the pool prices, NO share floor. Kept only for
- *  `buildDepositCalls` callers that pass no `minLpOut` (the front's deposit-first route, whose
- *  liability swap carries `minLpAmountOut`); new code must use {@link depositCallData}. */
-export function depositCallDataUnfloored(token: Address, amount: bigint): Hex {
-  return encodeFn({ abi: POOL_ABI, functionName: 'deposit', args: [token, amount] });
 }
 
 /** An LP floor of zero (or less) guards nothing: a bad quote value parsed to 0 would send the
@@ -647,10 +640,7 @@ export function buildDepositCalls(
     ...approval,
     {
       to: pool,
-      data:
-        args.minLpOut === undefined
-          ? depositCallDataUnfloored(args.token, args.amount)
-          : depositCallData(args.token, args.amount, args.minLpOut),
+      data: depositCallData(args.token, args.amount, args.minLpOut),
       value: 0n,
     },
     {
