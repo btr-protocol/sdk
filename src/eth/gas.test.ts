@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { GAS_LIMIT_CAP, gasWithBuffer } from './gas.js';
+import { GAS_LIMIT_CAP, estimateCallGas, gasWithBuffer } from './gas.js';
+import type { Eip1193Provider } from './types.js';
 
 describe('gasWithBuffer', () => {
   test('a 1.25 buffer over the estimate, rounded up', () => {
@@ -33,5 +34,20 @@ describe('gasWithBuffer', () => {
   test('factor and cap are overridable', () => {
     expect(gasWithBuffer(100n, 1.5)).toBe(150n);
     expect(gasWithBuffer(100n, 2, 150n)).toBe(150n);
+  });
+});
+
+describe('estimateCallGas', () => {
+  test('the estimate, buffered by 1.25 from the given sender', async () => {
+    const seen: unknown[] = [];
+    const p = {
+      request: async ({ params }: { params: unknown[] }) => {
+        seen.push(params[0]);
+        return '0xbe6f7'; // 780,023
+      },
+    } as unknown as Eip1193Provider;
+    const to = `0x${'22'.repeat(20)}` as `0x${string}`;
+    expect(await estimateCallGas(p, { from: to, to, data: '0x' })).toBe(975_029n);
+    expect(seen).toEqual([{ from: to, to, data: '0x' }]);
   });
 });

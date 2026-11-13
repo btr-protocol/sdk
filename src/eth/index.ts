@@ -95,7 +95,7 @@ export {
 export { ERC20_ABI } from './erc20';
 
 // Gas limit with the drift buffer (estimate × factor, capped)
-export { GAS_BUFFER_FACTOR, GAS_LIMIT_CAP, gasWithBuffer } from './gas';
+export { GAS_BUFFER_FACTOR, GAS_LIMIT_CAP, estimateCallGas, gasWithBuffer } from './gas';
 
 // RPC
 export {

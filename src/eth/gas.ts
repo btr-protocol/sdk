@@ -1,3 +1,6 @@
+import { estimateGas } from './rpc';
+import type { Eip1193Provider, TransactionRequest } from './types';
+
 /**
  * Gas LIMIT for a state-changing call, built from its `eth_estimateGas` result.
  *
@@ -26,4 +29,14 @@ export function gasWithBuffer(
   const bps = BigInt(Math.round(factor * 10_000));
   const buffered = (estimate * bps + 9_999n) / 10_000n;
   return buffered < cap ? buffered : cap;
+}
+
+/** `eth_estimateGas` for `tx`, then {@link gasWithBuffer}: the limit a send should carry. The
+ *  revert of a failed estimate is thrown as the transport raised it; callers decode it. */
+export async function estimateCallGas(
+  provider: Eip1193Provider,
+  tx: Partial<TransactionRequest>,
+  factor: number = GAS_BUFFER_FACTOR,
+): Promise<bigint> {
+  return gasWithBuffer(await estimateGas(provider, tx), factor);
 }

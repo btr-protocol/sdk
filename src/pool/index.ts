@@ -12,9 +12,9 @@ import type {
 } from '../abis/structs.generated.js';
 import { decodeErrorResult, decodeFn, encodeFn } from '../eth/abi';
 import { ContractRevertError } from '../eth/contract';
-import { gasWithBuffer } from '../eth/gas';
+import { estimateCallGas } from '../eth/gas';
 import { multicallStrict } from '../eth/multicall';
-import { estimateGas, getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
+import { getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { toAsset } from './asset.js';
 
@@ -427,13 +427,12 @@ async function sendPoolCall(
   const [from] = await getAccounts(provider);
   if (!from) throw new Error('No account connected');
   const tx = { from, to, data, value };
-  let estimate: bigint;
+  let gas: bigint;
   try {
-    estimate = await estimateGas(provider, tx);
+    gas = await estimateCallGas(provider, tx);
   } catch (e) {
     throw decodePoolRevert(e);
   }
-  const gas = gasWithBuffer(estimate);
   return (await provider.request({
     method: 'eth_sendTransaction',
     params: [{ ...tx, gas: `0x${gas.toString(16)}` }],
