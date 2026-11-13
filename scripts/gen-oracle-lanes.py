@@ -2,7 +2,8 @@
 """Regenerate src/venues/oracle-lanes.generated.ts from the dex-evm lane records.
 
 Inputs (SoT): dex-evm/deployments/<slug>.manifest.json (`oracle.wire`, asset classes) plus that
-chain's mark-store record <chainId>.deploy.json. Run from sdk/: python3 scripts/gen-oracle-lanes.py
+chain's mark-store record <chainId>.deploy.json. Pool v2 (wire 9) fleets have no manifest: their
+lane list is `<chainId>-v2.lanes.json` and the verifier is `<chainId>-v2.deploy.json` `verifierP`. Run from sdk/: python3 scripts/gen-oracle-lanes.py
 
 THE CHAIN LIST IS DATA, NOT A CONSTANT IN THIS FILE. The output is rewritten whole, so a hard-coded
 default list is a script that silently DELETES every chain it does not happen to name. A bare run
@@ -36,6 +37,12 @@ def feeds_ts(d):
     for sym, f in sorted(d["feeds"].items(), key=lambda kv: kv[1]["globalIndex"]):
         ref = ", ref: true" if f.get("ref") else ""
         key = sym if sym.isidentifier() else f"'{sym}'"
+        if f.get("feedId"):  # wire 9 rows carry their own id: one property per line (formatter-stable)
+            rows.append(
+                f"      {key}: {{\n        globalIndex: {f['globalIndex']},\n        expBias: {f['expBias']},"
+                f"\n        cls: '{f['cls']}',\n        feedId: '{f['feedId']}',{chr(10) + '        ref: true,' if f.get('ref') else ''}\n      }},"
+            )
+            continue
         rows.append(
             f"      {key}: {{ globalIndex: {f['globalIndex']}, expBias: {f['expBias']}, cls: '{f['cls']}'{ref} }},"
         )
@@ -58,6 +65,7 @@ def map_ts(wire, lanes, addr, per_slot, domain, role):
 
 want = set(sys.argv[1:])
 seen = set()
+seen9 = set()
 
 maps = []
 # Wire 8 (MarkStoreP8, 4 lanes per tier word): the chain's `<chainId>.deploy.json` carries `feeds`
@@ -90,16 +98,49 @@ for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
             raise SystemExit(f"{os.path.basename(rec_path)}: live oracle but no {key}")
         maps.append(map_ts("v8", lanes, rec[key], 4, "BTR ExternalOracleV4", role))
 
+# Wire 9 (MarkStoreP8 wire 3, Pool v2 storageVersion 12): one signed push carries one 64-bit lane
+# mask per segment, so a lane's index in the push IS its globalIndex (`lanesPerSlot` 64, no slot
+# split). The mark exponent is absolute (`expBias` 0). The store signs under `verifierP`, which on
+# v2 is the PoolFactory: the address the front must read the store from. Lane symbols come from the
+# record's `feeds` (the same asset symbols wire 8 uses, so `oracleFeedName` yields the venue's feed
+# names); the lane list's `feed` column is a different naming and is not used as a key. Class comes
+# from the lane list's `leg` (the asset) column.
+for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
+    lanes_rec = load(path)
+    if lanes_rec.get("wire") != 9:
+        continue
+    chain = str(lanes_rec["chainId"])
+    if chain in retired or (want and chain not in want):
+        continue
+    rec_path = path[: -len(".lanes.json")] + ".deploy.json"
+    rec = load(rec_path)
+    if int(rec.get("verifierP") or "0x0", 16) == 0:
+        raise SystemExit(f"{os.path.basename(rec_path)}: wire-9 lanes but no verifierP")
+    if chain in seen9:
+        raise SystemExit(f"two wire-9 lane records declare chainId {chain}")
+    seen9.add(chain)
+    cls_by_leg = {ln["leg"]: ln["class"] for ln in lanes_rec["lanes"]}
+    ref_legs = {ln["leg"] for ln in lanes_rec["lanes"] if ln.get("ref")}
+    feeds = {}
+    for sym, f in rec["feeds"].items():
+        if sym not in cls_by_leg:
+            raise SystemExit(f"{os.path.basename(rec_path)}: feed {sym} has no lane class in {os.path.basename(path)}")
+        feeds[sym] = {"globalIndex": f["globalIndex"], "expBias": 0, "cls": cls_by_leg[sym],
+                      "ref": True if sym in ref_legs else None, "feedId": f["feedId"]}
+    maps.append(map_ts("v9", {"chainId": lanes_rec["chainId"], "feeds": feeds}, rec["verifierP"], 64,
+                       "BTR ExternalOracleV4", "primary"))
+
 # An unmatched filter would quietly rewrite the file with fewer chains than the operator asked for.
-if want - seen:
-    raise SystemExit(f"no live wire-8 record in {DEX} for chain(s) {', '.join(sorted(want - seen))}")
+if want - seen - seen9:
+    raise SystemExit(f"no live wire-8 or wire-9 record in {DEX} for chain(s) {', '.join(sorted(want - seen - seen9))}")
 if not maps:
     raise SystemExit(f"no live wire-8 records in {DEX} - refusing to write an empty map table")
 
 body = "\n".join(maps)
 
 out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
-// GENERATED from dex-evm/deployments (<slug>.manifest.json + <chainId>.deploy.json) - never hand-edited.
+// GENERATED from dex-evm/deployments (<slug>.manifest.json + <chainId>.deploy.json, and
+// <chainId>-v2.lanes.json + <chainId>-v2.deploy.json for Pool v2) - never hand-edited.
 // Regenerate: sdk/scripts/gen-oracle-lanes.py - it emits EVERY deployed chain, so a bare run is
 // always the whole table; an optional chain-id argument only filters it for inspection.
 //
@@ -107,16 +148,17 @@ out = f"""// Oracle lane maps for the packed-slot push oracles, per chain.
 // `expBias` is 0 on wire 8: the lane exponent is absolute.
 // Lane symbol -> on-chain feed name: `<SYM>-USDC` for every spoke, `USDC-USD` for the reference.
 //
-// A chain appears TWICE, once per tier verifyingContract (`role`): the primary every pool leg
-// reads, and the reference that prices non-base spokes. Generations overlap during a cutover, so
-// more than one map can be live at a time - always join on the ADDRESS, never on the wire tag.
+// A wire-8 chain appears TWICE, once per tier verifyingContract (`role`): the primary every pool leg
+// reads, and the reference that prices non-base spokes. A wire-9 (Pool v2) chain has one primary map,
+// its PoolFactory. Generations overlap during a cutover, so more than one map can be live at a time -
+// always join on the ADDRESS, never on the wire tag.
 
-import type {{ Address }} from '../eth/types.js';
+import type {{ Address, Hex }} from '../eth/types.js';
 
 /** Wire generation. The tag is the BLOB version byte, not the contract's name:
  *  ExternalOracleV3 speaks wire 'v3' (blob version 4), ExternalOracleV4 'v5', ExternalOracleV5 'v6',
- *  MarkStoreP8 'v8'. */
-export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8';
+ *  MarkStoreP8 'v8', and Pool v2's MarkStoreP8 wire 3 'v9' (storageVersion 12). */
+export type OracleWire = 'v2' | 'v3' | 'v5' | 'v6' | 'v8' | 'v9';
 
 /** Which of a generation's two deployed instances a map addresses. */
 export type OracleRole = 'primary' | 'reference';
@@ -130,6 +172,9 @@ export interface OracleLaneFeed {{
   cls: string;
   /** Reference feed (USDC-USD denominator), not a spoke. */
   ref?: boolean;
+  /** The feed's id as this generation's own deploy record names it. Present on wire 9 only: the
+   *  venue record's id for the same name can differ (CBBTC), so a lane binds on this when set. */
+  feedId?: Hex;
 }}
 
 export interface OracleLaneMap {{
