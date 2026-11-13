@@ -32,9 +32,13 @@ export interface OracleLaneFeed {
   cls: string;
   /** Reference feed (USDC-USD denominator), not a spoke. */
   ref?: boolean;
-  /** The feed's id as this generation's own deploy record names it. Present on wire 9 only: the
-   *  venue record's id for the same name can differ (CBBTC), so a lane binds on this when set. */
+  /** Wire 9 only: `bytes32(uint256(tickerId))`, the id the signers sign under. Wire 8 has no id
+   *  here: its lanes resolve through the venue record. */
   feedId?: Hex;
+  /** Wire 9 only: the NXR signer symbol for this lane (`MON-USDC`). The lane itself is keyed by its asset. */
+  feed?: string;
+  /** Wire 9 only: the lane's ticker id, decimal. */
+  tickerId?: string;
 }
 
 export interface OracleLaneMap {
@@ -99,6 +103,8 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
         globalIndex: 0,
         expBias: 0,
         cls: 'stable',
+        feed: 'USDC-USD',
+        tickerId: '452687840255410176',
         feedId: '0x0000000000000000000000000000000000000000000000000648453138900000',
         ref: true,
       },
@@ -106,72 +112,96 @@ export const ORACLE_LANE_MAPS: readonly OracleLaneMap[] = [
         globalIndex: 1,
         expBias: 0,
         cls: 'alt',
+        feed: 'MON-USDC',
+        tickerId: '457965716382941184',
         feedId: '0x000000000000000000000000000000000000000000000000065b056484500000',
       },
       CBBTC: {
         globalIndex: 2,
         expBias: 0,
         cls: 'major',
+        feed: 'BTC-USDC',
+        tickerId: '436635190804086784',
         feedId: '0x000000000000000000000000000000000000000000000000060f3d6484500000',
       },
       WBTC: {
         globalIndex: 3,
         expBias: 0,
         cls: 'major',
+        feed: 'WBTC-USDC',
+        tickerId: '453457718709059584',
         feedId: '0x000000000000000000000000000000000000000000000000064b016484500000',
       },
       WETH: {
         globalIndex: 4,
         expBias: 0,
         cls: 'major',
+        feed: 'ETH-USDC',
+        tickerId: '438724262896861184',
         feedId: '0x0000000000000000000000000000000000000000000000000616a96484500000',
       },
       XAUT0: {
         globalIndex: 5,
         expBias: 0,
         cls: 'gold',
+        feed: 'XAUT-USDC',
+        tickerId: '454557230336835584',
         feedId: '0x000000000000000000000000000000000000000000000000064ee96484500000',
       },
       MUSD: {
         globalIndex: 6,
         expBias: 0,
         cls: 'stable',
+        feed: 'MUSD-USDC',
+        tickerId: '458845325685161984',
         feedId: '0x000000000000000000000000000000000000000000000000065e256484500000',
       },
       AUSD: {
         globalIndex: 7,
         expBias: 0,
         cls: 'stable',
+        feed: 'AUSD-USDC',
+        tickerId: '432896851269648384',
         feedId: '0x0000000000000000000000000000000000000000000000000601f56484500000',
       },
       GHO: {
         globalIndex: 8,
         expBias: 0,
         cls: 'stable',
+        feed: 'GHO-USDC',
+        tickerId: '432566997781315584',
         feedId: '0x0000000000000000000000000000000000000000000000000600c96484500000',
       },
       USDT0: {
         globalIndex: 9,
         expBias: 0,
         cls: 'stable',
+        feed: 'USDT-USDC',
+        tickerId: '451698500104617984',
         feedId: '0x0000000000000000000000000000000000000000000000000644c16484500000',
       },
       USDE: {
         globalIndex: 10,
         expBias: 0,
         cls: 'stable',
+        feed: 'USDE-USDC',
+        tickerId: '438284458245750784',
         feedId: '0x0000000000000000000000000000000000000000000000000615196484500000',
       },
       USDAT: {
         globalIndex: 11,
         expBias: 0,
         cls: 'stable',
+        feed: 'USDAT-USDC',
+        tickerId: '459285130336272384',
         feedId: '0x000000000000000000000000000000000000000000000000065fb56484500000',
       },
       SYRUPUSDC: {
         globalIndex: 12,
         expBias: 0,
         cls: 'stable',
+        feed: 'SYRUPUSDC-USDC',
+        tickerId: '458075667545718784',
         feedId: '0x000000000000000000000000000000000000000000000000065b696484500000',
       },
     },

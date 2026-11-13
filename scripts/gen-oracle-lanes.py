@@ -37,11 +37,13 @@ def feeds_ts(d):
     for sym, f in sorted(d["feeds"].items(), key=lambda kv: kv[1]["globalIndex"]):
         ref = ", ref: true" if f.get("ref") else ""
         key = sym if sym.isidentifier() else f"'{sym}'"
-        if f.get("feedId"):  # wire 9 rows carry their own id: one property per line (formatter-stable)
-            rows.append(
-                f"      {key}: {{\n        globalIndex: {f['globalIndex']},\n        expBias: {f['expBias']},"
-                f"\n        cls: '{f['cls']}',\n        feedId: '{f['feedId']}',{chr(10) + '        ref: true,' if f.get('ref') else ''}\n      }},"
-            )
+        if "tickerId" in f:  # wire 9 rows: one property per line (formatter-stable)
+            props = [f"globalIndex: {f['globalIndex']}", f"expBias: {f['expBias']}", f"cls: '{f['cls']}'",
+                     f"feed: '{f['feed']}'", f"tickerId: '{f['tickerId']}'", f"feedId: '{f['feedId']}'"]
+            if f.get("ref"):
+                props.append("ref: true")
+            body = "".join(f"\n        {p}," for p in props)
+            rows.append(f"      {key}: {{{body}\n      }},")
             continue
         rows.append(
             f"      {key}: {{ globalIndex: {f['globalIndex']}, expBias: {f['expBias']}, cls: '{f['cls']}'{ref} }},"
@@ -100,11 +102,11 @@ for path in sorted(glob.glob(os.path.join(DEX, "*.manifest.json"))):
 
 # Wire 9 (MarkStoreP8 wire 3, Pool v2 storageVersion 12): one signed push carries one 64-bit lane
 # mask per segment, so a lane's index in the push IS its globalIndex (`lanesPerSlot` 64, no slot
-# split). The mark exponent is absolute (`expBias` 0). The store signs under `verifierP`, which on
-# v2 is the PoolFactory: the address the front must read the store from. Lane symbols come from the
-# record's `feeds` (the same asset symbols wire 8 uses, so `oracleFeedName` yields the venue's feed
-# names); the lane list's `feed` column is a different naming and is not used as a key. Class comes
-# from the lane list's `leg` (the asset) column.
+# split). The mark exponent is absolute (`expBias` 0). The store signs under `verifierP`, the v2
+# PoolFactory. The lane list is the source of rows: `leg` (the asset) keys the lane, `feed` is the
+# NXR signer symbol, `ticker_id` is the lane's ticker. Its id is `bytes32(uint256(ticker_id))`, and
+# that is asserted against the deploy record's own feedId and globalIndex. Nothing here reads the
+# venue record: the v1 record carries different ids for the same assets.
 for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
     lanes_rec = load(path)
     if lanes_rec.get("wire") != 9:
@@ -119,14 +121,17 @@ for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
     if chain in seen9:
         raise SystemExit(f"two wire-9 lane records declare chainId {chain}")
     seen9.add(chain)
-    cls_by_leg = {ln["leg"]: ln["class"] for ln in lanes_rec["lanes"]}
-    ref_legs = {ln["leg"] for ln in lanes_rec["lanes"] if ln.get("ref")}
     feeds = {}
-    for sym, f in rec["feeds"].items():
-        if sym not in cls_by_leg:
-            raise SystemExit(f"{os.path.basename(rec_path)}: feed {sym} has no lane class in {os.path.basename(path)}")
-        feeds[sym] = {"globalIndex": f["globalIndex"], "expBias": 0, "cls": cls_by_leg[sym],
-                      "ref": True if sym in ref_legs else None, "feedId": f["feedId"]}
+    for ln in sorted(lanes_rec["lanes"], key=lambda x: x["gi"]):
+        leg, ticker = ln["leg"], int(ln["ticker_id"])
+        feed_id = "0x" + format(ticker, "064x")
+        d = rec["feeds"].get(leg)
+        if d is None or d["globalIndex"] != ln["gi"] or d["feedId"].lower() != feed_id:
+            raise SystemExit(f"{os.path.basename(path)}: lane {leg} disagrees with {os.path.basename(rec_path)}")
+        feeds[leg] = {"globalIndex": ln["gi"], "expBias": 0, "cls": ln["class"], "ref": True if ln.get("ref") else None,
+                      "feed": ln["feed"], "tickerId": str(ticker), "feedId": feed_id}
+    if set(feeds) != set(rec["feeds"]):
+        raise SystemExit(f"{os.path.basename(path)}: lane legs and deploy feeds differ")
     maps.append(map_ts("v9", {"chainId": lanes_rec["chainId"], "feeds": feeds}, rec["verifierP"], 64,
                        "BTR ExternalOracleV4", "primary"))
 
@@ -172,9 +177,13 @@ export interface OracleLaneFeed {{
   cls: string;
   /** Reference feed (USDC-USD denominator), not a spoke. */
   ref?: boolean;
-  /** The feed's id as this generation's own deploy record names it. Present on wire 9 only: the
-   *  venue record's id for the same name can differ (CBBTC), so a lane binds on this when set. */
+  /** Wire 9 only: `bytes32(uint256(tickerId))`, the id the signers sign under. Wire 8 has no id
+   *  here: its lanes resolve through the venue record. */
   feedId?: Hex;
+  /** Wire 9 only: the NXR signer symbol for this lane (`MON-USDC`). The lane itself is keyed by its asset. */
+  feed?: string;
+  /** Wire 9 only: the lane's ticker id, decimal. */
+  tickerId?: string;
 }}
 
 export interface OracleLaneMap {{

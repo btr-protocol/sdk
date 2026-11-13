@@ -26,6 +26,34 @@ describe('oracle lane maps', () => {
     expect(oracleFeedName('USDC-USD')).toBe('USDC-USD');
   });
 
+  test('wire 9 lane table: leg, NXR feed, index and ticker id for all 13 legs', () => {
+    // dex-evm lane list (143-v2.lanes.json): the ticker id is what the signers sign under.
+    const table: Array<[string, number, string, string]> = [
+      ['USDC-USD', 0, 'USDC-USD', '452687840255410176'],
+      ['WMON', 1, 'MON-USDC', '457965716382941184'],
+      ['CBBTC', 2, 'BTC-USDC', '436635190804086784'],
+      ['WBTC', 3, 'WBTC-USDC', '453457718709059584'],
+      ['WETH', 4, 'ETH-USDC', '438724262896861184'],
+      ['XAUT0', 5, 'XAUT-USDC', '454557230336835584'],
+      ['MUSD', 6, 'MUSD-USDC', '458845325685161984'],
+      ['AUSD', 7, 'AUSD-USDC', '432896851269648384'],
+      ['GHO', 8, 'GHO-USDC', '432566997781315584'],
+      ['USDT0', 9, 'USDT-USDC', '451698500104617984'],
+      ['USDE', 10, 'USDE-USDC', '438284458245750784'],
+      ['USDAT', 11, 'USDAT-USDC', '459285130336272384'],
+      ['SYRUPUSDC', 12, 'SYRUPUSDC-USDC', '458075667545718784'],
+    ];
+    const feeds = oracleLaneMap(143, V2_FACTORY)?.feeds ?? {};
+    expect(Object.keys(feeds).sort()).toEqual(table.map(([leg]) => leg).sort());
+    for (const [leg, gi, feed, ticker] of table) {
+      expect(feeds[leg]?.globalIndex).toBe(gi);
+      expect(feeds[leg]?.feed).toBe(feed);
+      expect(feeds[leg]?.tickerId).toBe(ticker);
+      // bytes32(uint256(ticker)): the id is derived, never looked up in the venue record.
+      expect(feeds[leg]?.feedId).toBe(`0x${BigInt(ticker).toString(16).padStart(64, '0')}`);
+    }
+  });
+
   test('wire 9 lane indices are unique and fit one 64-lane mask', () => {
     const gis = Object.values(oracleLaneMap(143, V2_FACTORY)?.feeds ?? {}).map(
       (f) => f.globalIndex,
