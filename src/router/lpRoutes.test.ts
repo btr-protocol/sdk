@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { buildLeg } from '../amm/aimm.js';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
+import { covDebitToll } from '../pool/covLaw';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { type BuildOpts, buildDepositCalls, buildRedeemCalls } from './index';
 import { type LpRouteOpts, rankDeposit, rankRedeem } from './lpRoutes';
@@ -19,6 +20,7 @@ function pool(
     addr: `0x${tag}`,
     state: {
       base: 'USDC',
+      exitTollWad: 0n,
       legs: {
         AUDF: buildLeg(
           'AUDF',
@@ -221,6 +223,175 @@ describe('crossExit degenerate quotes', () => {
   });
 });
 
+describe('crossExit walls mirror the chain with a C toll', () => {
+  // c_min 90% (code 45). A 10% toll stays in reserves: 100k out of a 1M/1M leg debits 90k
+  // (R/L = 0.91, clear of c_min); 120k debits 108k (R/L = 0.892, past it).
+  const at = async (amount: number) => {
+    const p = healthyPool();
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, covBits: 45 };
+    p.state.exitTollWad = 10n ** 17n; // 10%, no `c_toll` on the stub wire: derived from state
+    return (await rankRedeem([p], 'NZDF', 'AUDF', amount, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  test('above c_min passes and pays out net of toll; past it is walled', async () => {
+    const ok = await at(100_000);
+    expect(ok?.feasible).toBe(true);
+    // Float claim/mark composition may lose one raw unit before the integer C-toll ceil.
+    expect(Math.abs((ok?.out ?? 0) - 90_000)).toBeLessThanOrEqual(1.01e-6);
+    const bad = await at(120_000);
+    expect(bad?.feasible).toBe(false);
+    expect(bad?.reason).toBe('coverage-wall');
+  });
+});
+
+describe('crossExit exit toll word: unknown vs zero', () => {
+  const cross = async (w: bigint | null | undefined) => {
+    const p = healthyPool();
+    p.state.exitTollWad = w;
+    const r = await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE);
+    return r.routes.find((x) => x.id === 'cross-exit');
+  };
+  test.each([undefined, null])('exitTollWad %p is pending: no number, not quoted', async (w) => {
+    const r = await cross(w);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('toll-pending');
+    expect(r?.out).toBe(0);
+  });
+  test('a real 0n toll pays the gross, never NaN', async () => {
+    const r = await cross(0n);
+    expect(r?.feasible).toBe(true);
+    expect(Number.isFinite(r?.out)).toBe(true);
+    expect(r?.out).toBeGreaterThan(0);
+  });
+  test('a toll above 100% is not fillable (chain caps at payout, exit reverts)', async () => {
+    const r = await cross(2n * 10n ** 18n);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('toll-exceeds-payout');
+  });
+});
+
+describe('unknown exit toll: every LP exit route is pending', () => {
+  test.each([undefined, null])(
+    'exitTollWad %p: transfer-exit and same-asset pending, no best',
+    async (w) => {
+      const p = healthyPool();
+      p.state.exitTollWad = w;
+      const x = await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE);
+      expect(x.best).toBeNull();
+      expect(x.routes.every((r) => !r.feasible && r.reason === 'toll-pending')).toBe(true);
+      expect(x.routes.map((r) => r.id).sort()).toEqual(['cross-exit', 'transfer-exit']);
+      const s = await rankRedeem([p], 'NZDF', 'NZDF', 100_000, BE);
+      expect(s.best).toBeNull();
+      expect(s.routes[0].reason).toBe('toll-pending');
+    },
+  );
+  test('a known toll is netted on the same-asset and transfer exits', async () => {
+    const at = async (tw: bigint) => {
+      const p = healthyPool();
+      p.state.exitTollWad = tw;
+      return {
+        same: (await rankRedeem([p], 'NZDF', 'NZDF', 100_000, BE)).best,
+        transfer: (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
+          (r) => r.id === 'transfer-exit',
+        ),
+      };
+    };
+    const z = await at(0n);
+    const t = await at(10n ** 17n);
+    expect(t.same?.out).toBeCloseTo((z.same?.out ?? 0) * 0.9, 6);
+    expect(t.transfer?.out).toBeCloseTo((z.transfer?.out ?? 0) * 0.9, 6);
+  });
+});
+
+describe('crossExit claim law: the from-leg debit', () => {
+  // Hub-class terms on the from leg (NZDF): c_max 2.35, κ⁺ 14336. The stub is the backend's claim
+  // contract on the uploaded books: `amount_out` = the quote (identity at C), `debit_toll` the
+  // sdk's own bigint port of `CovLib.debitToll` (replayed bit-exact in cov.test.ts).
+  const BITS = (5 | (14 << 6) | (1 << 12) | (26 << 15) | (16 << 20) | (51 << 26)) >>> 0;
+  type Claim = { credit: boolean; face: string; c_wad: string };
+  let seen: { claim?: Claim } | undefined;
+  const install = () => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_url: string, init: { body?: string }) => {
+      const body = JSON.parse(init.body ?? '{}');
+      if (!body.claim.credit) seen = body;
+      const c = body.claim;
+      const sp = (
+        body.pool.spokes as { token: string; reserves: string; liabilities: string }[]
+      ).find((x) => x.token === body.token_in);
+      const face = BigInt(c.face);
+      const fair = (face * BigInt(c.c_wad)) / 10n ** 18n;
+      const debit = covDebitToll(
+        BigInt(BITS),
+        BigInt(sp?.reserves ?? '0x0'),
+        BigInt(sp?.liabilities ?? '0x0'),
+        face,
+        fair,
+        BigInt(c.c_wad),
+      );
+      const hex = (v: bigint) => `0x${v.toString(16)}`;
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: hex(fair),
+          gross_out: hex(fair),
+          avg_price: WAD_HEX,
+          mid_price: WAD_HEX,
+          mark_price: WAD_HEX,
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+          debit_toll: hex(debit),
+        }),
+      };
+    };
+  };
+  const exit = async (o: { res: number; liab: number; audfRes?: number }, face: number) => {
+    install();
+    seen = undefined;
+    const p = pool('core', { nzdfRes: o.res, nzdfLiab: o.liab, audfRes: o.audfRes });
+    p.state.legs.NZDF = { ...p.state.legs.NZDF, covBits: BITS };
+    return (await rankRedeem([p], 'NZDF', 'AUDF', face, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  const expectDebit = (res: number, liab: number, face: number, c: number): number => {
+    const e6 = 10n ** 6n;
+    const cw = BigInt(Math.round(c * 1e18));
+    const f = BigInt(Math.round(face * 1e6));
+    const fair = (f * cw) / 10n ** 18n;
+    return (
+      Number(covDebitToll(BigInt(BITS), BigInt(res) * e6, BigInt(liab) * e6, f, fair, cw)) / 1e6
+    );
+  };
+
+  test('over-covered leg (c = 1.2, burning 10 % of L) pays the debit the swap law never quotes', async () => {
+    const r = await exit({ res: 1_200_000, liab: 1_000_000 }, 100_000);
+    expect(r?.feasible).toBe(true);
+    expect(seen?.claim?.credit).toBe(false);
+    expect(BigInt(seen?.claim?.face ?? '0x0')).toBe(100_000n * 10n ** 6n);
+    const c = 1.05; // pool rate: (2M + 1M + 1.2M) / (2M + 1M + 1M)
+    const debit = expectDebit(1_200_000, 1_000_000, 100_000, c);
+    expect(debit).toBeGreaterThan(10_000);
+    expect(r?.out).toBeCloseTo(100_000 * c - debit, 4);
+  });
+  test('below C = 1 the debit scales up by 1/C', async () => {
+    const r = await exit({ res: 1_200_000, liab: 1_000_000, audfRes: 100_000 }, 100_000);
+    const c = (2_000_000 + 100_000 + 1_200_000) / 4_000_000; // 0.825
+    const debit = expectDebit(1_200_000, 1_000_000, 100_000, c);
+    expect(r?.out).toBeCloseTo(100_000 * c - debit, 4);
+    const unscaled = (debit * c) / 1; // the pre-R7 formula charged t·out/face, (1−C) short
+    expect(debit).toBeGreaterThan(unscaled);
+  });
+  test('at a wall the whole payout is the debit: refused, in-kind exit stays open', async () => {
+    const r = await exit({ res: 2_400_000, liab: 1_000_000 }, 250_000);
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('coverage-wall');
+  });
+});
+
 describe('slippageFrac validation', () => {
   for (const bad of [1, -0.1, Number.NaN]) {
     test(`rejects ${bad}`, async () => {
@@ -373,6 +544,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
     tag,
     state: {
       base: 'USDC',
+      exitTollWad: 0n,
       legs,
       hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
     },
@@ -512,5 +684,85 @@ describe('LP routes settle at pool C, not at a per-leg haircut', () => {
     // hub 2.4M/2M: C = 4.4 / 4 = 1.1, so 5,500 buys 5,000 face.
     const dep = await rankDeposit([pool('core', { hubRes: 2_400_000 })], 'AUDF', 'AUDF', 5_500, BE);
     expect(dep.best?.out).toBeCloseTo(5_000, 6);
+  });
+});
+
+describe('crossExit exit toll + keeper floor', () => {
+  let seen: { claim?: { toll_wad?: string } } | undefined;
+  // identity quote carrying a backend `c_toll` of 5% of the output
+  const install = () => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async (_u: string, init: { body?: string }) => {
+      const b = JSON.parse(init.body ?? '{}');
+      if (b.claim && !b.claim.credit) seen = b;
+      const out = BigInt(b.amount_in);
+      return {
+        ok: true,
+        json: async () => ({
+          amount_out: `0x${out.toString(16)}`,
+          gross_out: `0x${out.toString(16)}`,
+          avg_price: WAD_HEX,
+          mid_price: WAD_HEX,
+          mark_price: WAD_HEX,
+          spread_pbps: 0,
+          cov_toll: '0x0',
+          proto_fee: '0x0',
+          lp_fee: '0x0',
+          c_toll: `0x${(out / 20n).toString(16)}`,
+        }),
+      };
+    };
+  };
+  const run = async (mutate?: (p: NamedPool) => void) => {
+    install();
+    const p = healthyPool();
+    p.state.exitTollWad = 5n * 10n ** 16n;
+    mutate?.(p);
+    return (await rankRedeem([p], 'NZDF', 'AUDF', 100_000, BE)).routes.find(
+      (r) => r.id === 'cross-exit',
+    );
+  };
+  test('sends toll_wad and pays amount_out - c_toll', async () => {
+    const r = await run();
+    expect(seen?.claim?.toll_wad).toBe(`0x${(5n * 10n ** 16n).toString(16)}`);
+    expect(r?.feasible).toBe(true);
+    expect(r?.out).toBeCloseTo(95_000, 6);
+  });
+  test('out leg below out + minLiquidity is unfeasible', async () => {
+    const mk = (min: number) => (p: NamedPool) => {
+      p.state.legs.AUDF = { ...p.state.legs.AUDF, minLiquidity: min };
+    };
+    expect((await run(mk(905_000)))?.feasible).toBe(true);
+    const bad = await run(mk(905_001));
+    expect(bad?.feasible).toBe(false);
+    expect(bad?.reason).toBe('min-liquidity');
+  });
+});
+
+describe('same-asset settlement boundaries', () => {
+  test('burn uses the liquidity index before the toll', async () => {
+    const p = healthyPool();
+    p.state.exitTollWad = 10n ** 17n;
+    const result = await rankRedeem([p], 'AUDF', 'AUDF', 100, {
+      ...BE,
+      liquidityIndexWad: () => 2e18,
+    });
+    expect(result.best?.out).toBeCloseTo(180, 6);
+  });
+  test('sub-wei toll rounds up and zero payout refuses', async () => {
+    const p = healthyPool();
+    p.state.exitTollWad = 1n;
+    expect((await rankRedeem([p], 'AUDF', 'AUDF', 0.000001, BE)).best).toBeNull();
+    expect((await rankRedeem([p], 'AUDF', 'AUDF', 0.000002, BE)).best?.out).toBe(0.000001);
+  });
+  test('same-asset keeper floor and over-burn refuse', async () => {
+    const p = healthyPool();
+    p.state.legs.AUDF.minLiquidity = 999_901;
+    expect((await rankRedeem([p], 'AUDF', 'AUDF', 100, BE)).routes[0]?.reason).toBe(
+      'min-liquidity',
+    );
+    expect((await rankRedeem([p], 'AUDF', 'AUDF', 1_000_001, BE)).routes[0]?.reason).toBe(
+      'insufficient-liability',
+    );
   });
 });

@@ -1,3 +1,9 @@
+import {
+  backendConvert,
+  quoteSwapLiabilityAsync,
+  quoteSwapLiabilityCore,
+  quoteSwapLiabilityCoreAsync,
+} from './liabilityQuote';
 import { describe, expect, test } from 'bun:test';
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import { type PoolState, buildLeg } from '../amm/aimm.js';
@@ -6,16 +12,12 @@ import { type PoolState, buildLeg } from '../amm/aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
-  backendConvert,
   exitCap,
   exitValue,
   legCoverage,
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
-  quoteSwapLiabilityCoreAsync,
 } from './liability';
 
 const legOf = (symbol: string, reserves: number, liabilities: number) => ({
@@ -133,6 +135,37 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
     };
     return convert;
   }
+
+  test('route fees book before the receiver mints at the raised index', async () => {
+    const base = makeConvert(9_900);
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, async (fair) => ({
+      ...(await base(fair)),
+      grossOut: 10_000,
+      lpFeeBps: 100,
+      protoFeeBps: 100,
+    }));
+    expect(q?.lpFeeCredit).toBe(100);
+    expect(q?.protoFeeCredit).toBe(100);
+    expect(q?.indexOutWad).toBe(1.0001e18);
+    expect(q?.lpAmountOut).toBeCloseTo(9_900 / 1.0001, 8);
+  });
+
+  test('the credit wall checks claims before deducting claim tolls', async () => {
+    const base = makeConvert(10);
+    const q = await quoteSwapLiabilityCoreAsync(
+      inLeg,
+      {
+        ...outLeg,
+        reserves: 100,
+        liabilities: 100,
+        covBits: 45,
+      },
+      20,
+      1,
+      async (fair) => ({ ...(await base(fair)), creditToll: 10 }),
+    );
+    expect(q).toBeNull();
+  });
 
   test('balanced legs at mark: no haircuts, conversion passes through unclamped', async () => {
     const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(9_990));

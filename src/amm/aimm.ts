@@ -220,6 +220,9 @@ export interface PoolLeg {
   decimals: number;
   profile: AimmProfile;
   kappaCovBps: number;
+  covBits?: number;
+  kneeBits?: number;
+  minLiquidity?: number;
   confidence?: number;
   staleExcess?: number;
   /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
@@ -260,6 +263,9 @@ interface HubBook {
   liab: number;
   vegaBps: number;
   kappaCovBps: number;
+  covBits?: number;
+  kneeBits?: number;
+  minLiquidity?: number;
 }
 
 export interface PoolState {
@@ -268,6 +274,9 @@ export interface PoolState {
   hub?: HubBook;
   /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
   baseClass?: ClassWire;
+  /** Third poolSolvencyWad return word; null/absent means not loaded. */
+  exitTollWad?: bigint | null;
+  protoSharePct?: number;
 }
 
 export interface Quote {
@@ -286,6 +295,9 @@ export interface Quote {
   /** The delivering leg's gross was clamped at the coverage-wall argmax: `amountOut` is the
    *  flat top of the wall, not a price, so refuse the size rather than display it. */
   saturated?: boolean;
+  debitToll?: number;
+  cToll?: number;
+  creditToll?: number;
   route: string[];
 }
 
@@ -330,7 +342,7 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps: number,
-  feed?: { confidence?: number; staleExcess?: number },
+  feed?: { confidence?: number; staleExcess?: number; covBits?: number; kneeBits?: number },
 ): PoolLeg {
   return {
     token,
@@ -342,6 +354,8 @@ export function buildLeg(
     decimals,
     profile,
     kappaCovBps,
+    covBits: feed?.covBits ?? 0,
+    kneeBits: feed?.kneeBits ?? 0,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
   };
@@ -392,6 +406,8 @@ interface PricingWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
 }
 interface SpokeWire {
   token: string;
@@ -429,6 +445,8 @@ interface EndpointWire {
   liabilities: string;
   vega_bps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
 }
 export interface NamedPoolWire {
   tag: string;
@@ -441,6 +459,8 @@ export interface NamedPoolWire {
   base_liabilities?: string | null;
   base_vega_bps?: number | null;
   base_kappa_cov_bps?: number | null;
+  base_cov_bits?: number | null;
+  base_knee_bits?: number | null;
   /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
    *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
   base_decimals?: number | null;
@@ -705,6 +725,8 @@ interface QuoteRequestWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
   amount_in: string;
   reserves: string;
   liabilities: string;
@@ -743,6 +765,8 @@ export interface PathRequestWire {
   token_out: string;
   /** 0x hex, raw at `token_in`'s decimals. */
   amount_in: string;
+  /** LP claim conversion; amount_in is ignored when present. */
+  claim?: { credit: boolean; face: string; c_wad: string; toll_wad?: string };
 }
 
 /** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
@@ -765,6 +789,9 @@ export interface QuoteResponseWire extends QuoteBaseWire {
   /** Gross clamped at the coverage argmax. Current back no longer sends it (b9b9875 refuses a
    *  gross past the cap instead), so absent reads as unsaturated. */
   saturated?: boolean;
+  debit_toll?: string;
+  c_toll?: string;
+  credit_toll?: string;
 }
 
 /**
@@ -778,6 +805,8 @@ export const INTERIOR_ENDPOINT: EndpointWire = {
   liabilities: '0x0',
   vega_bps: 0,
   kappa_cov_bps: 0,
+  cov_bits: 0,
+  knee_bits: 0,
 };
 
 /**
@@ -792,6 +821,8 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
     liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
+    cov_bits: hub.covBits ?? 0,
+    knee_bits: hub.kneeBits ?? 0,
   };
 }
 
@@ -827,6 +858,8 @@ export function legToQuoteBody(
     vega_bps: leg.profile.vega,
     min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
+    cov_bits: leg.covBits ?? 0,
+    knee_bits: leg.kneeBits ?? 0,
     amount_in: toU128Hex(amountInTok * 10 ** (selling ? decimalsIn : leg.decimals)),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
     liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
@@ -947,6 +980,13 @@ export function quoteFromWire(
     protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
     saturated: w.saturated === true,
+    ...(w.debit_toll !== undefined
+      ? { debitToll: Number(BigInt(w.debit_toll)) / 10 ** wireDecimals }
+      : {}),
+    ...(w.c_toll !== undefined ? { cToll: Number(BigInt(w.c_toll)) / 10 ** wireDecimals } : {}),
+    ...(w.credit_toll !== undefined
+      ? { creditToll: Number(BigInt(w.credit_toll)) / 10 ** wireDecimals }
+      : {}),
     route,
   };
 }
@@ -986,6 +1026,8 @@ export function poolStateToWire(
     base_liabilities: hub?.liabilities ?? null,
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
+    base_cov_bits: hub?.cov_bits ?? null,
+    base_knee_bits: hub?.knee_bits ?? null,
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
     base_class: state.baseClass ?? null,
@@ -998,6 +1040,8 @@ export function poolStateToWire(
         vega_bps: leg.profile.vega,
         min_fee_pbps: leg.profile.minFeePbps,
         kappa_cov_bps: leg.kappaCovBps,
+        cov_bits: leg.covBits ?? 0,
+        knee_bits: leg.kneeBits ?? 0,
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),
       liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),

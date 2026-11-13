@@ -50,6 +50,8 @@ describe('hubEndpointWire', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 });
@@ -166,6 +168,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 
@@ -176,6 +180,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x0',
       vega_bps: 0,
       kappa_cov_bps: 0,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 
