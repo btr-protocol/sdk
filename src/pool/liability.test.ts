@@ -130,6 +130,8 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
         lpFeeBps: 0,
         protoFeeBps: 0,
         covTollBps: 0,
+        debitToll: 0,
+        creditToll: 0,
         route: ['AUDF', 'USDC', 'NZDF'],
       };
     };
@@ -272,6 +274,8 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
     cov_toll: '0x0',
     proto_fee: '0x0',
     lp_fee: '0x0',
+    debit_toll: '0x0',
+    credit_toll: '0x0',
   });
 
   test('balanced pool: spoke cross settles ONCE over POST /v1/quote-path, never clamps', async () => {

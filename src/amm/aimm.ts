@@ -274,8 +274,13 @@ export interface PoolState {
   hub?: HubBook;
   /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
   baseClass?: ClassWire;
-  /** Third poolSolvencyWad return word; null/absent means not loaded. */
+  /** Third poolSolvencyWad return word; null/absent means not loaded. Valid as the settlement
+   *  toll only while `solvencyOk` (a degraded sweep returns 0 here, the chain charges the
+   *  lower-pass toll). */
   exitTollWad?: bigint | null;
+  /** Second poolSolvencyWad return word (`ok`: every armed mark usable); null/absent = not loaded.
+   *  LP exits fail closed (pending) without it. Set both with `withPoolSolvency`. */
+  solvencyOk?: boolean | null;
   protoSharePct?: number;
 }
 

@@ -50,6 +50,13 @@ export async function quoteSwapLiabilityCoreAsync(
 
   const q = await convert(fairIn, poolC);
   if (!q) return null;
+  // Both claim tolls (`swapLiability`: the in-leg debit, the out-leg credit) grow the credited book
+  // the wall check below sizes. A conversion that does not report them has not priced them: fail
+  // closed, never a zero toll that admits a credit the chain's `requireWalls` rejects.
+  if (q.debitToll === undefined || q.creditToll === undefined) {
+    throw new Error('quoteSwapLiabilityCoreAsync: claim conversion without debit_toll/credit_toll');
+  }
+  const { debitToll, creditToll } = q;
   const markCap = fairIn * q.markPrice;
   const markCapBinding = q.amountOut > markCap;
   const conv = markCapBinding ? markCap : q.amountOut;
@@ -63,7 +70,7 @@ export async function quoteSwapLiabilityCoreAsync(
       outLeg.reserves,
       outLeg.liabilities,
       outLeg.reserves,
-      outLeg.liabilities + (conv + (q.debitToll ?? 0) + (q.creditToll ?? 0)) / poolC,
+      outLeg.liabilities + (conv + debitToll + creditToll) / poolC,
     )
   )
     return null;
@@ -100,8 +107,8 @@ export async function quoteSwapLiabilityCoreAsync(
     indexOutWad,
     impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
     haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
-    debitToll: q.debitToll ?? 0,
-    creditToll: q.creditToll ?? 0,
+    debitToll,
+    creditToll,
     convSpreadBps: q.spreadBps / 2,
     convImpactBps: q.priceImpactBps,
     markClampBps:
@@ -132,11 +139,16 @@ function claimWire(
     credit,
     face: `0x${BigInt(Math.round((fairIn / poolC) * 10 ** decIn)).toString(16)}`,
     c_wad: `0x${BigInt(Math.round(poolC * 1e18)).toString(16)}`,
-    // An exit always names its toll: absent/null/0 on the state is "no toll", not the backend default.
-    ...(exit
-      ? { toll_wad: `0x${(tollWad != null && tollWad > 0n ? tollWad : 0n).toString(16)}` }
-      : {}),
+    // An exit always names its toll; an unloaded one (absent/null) is unknown, never 0.
+    ...(exit ? { toll_wad: `0x${exitToll(tollWad, tokenIn, tokenOut).toString(16)}` } : {}),
   };
+}
+
+function exitToll(tollWad: bigint | null | undefined, tokenIn: string, tokenOut: string): bigint {
+  if (tollWad == null || tollWad < 0n) {
+    throw new Error(`backendConvert: exit ${tokenIn}->${tokenOut} needs the pool's exit toll`);
+  }
+  return tollWad;
 }
 
 export interface BackendConvertOpts {
