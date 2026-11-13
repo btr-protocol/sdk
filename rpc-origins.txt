@@ -1,4 +1,5 @@
 https://bsc-dataseed.binance.org
 https://bsc-rpc.publicnode.com
 https://gm.monad.at.htw.tech
+https://monad-mainnet.rpc.sentio.xyz
 https://rpc2.monad.xyz

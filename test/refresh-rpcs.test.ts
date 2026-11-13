@@ -2,10 +2,12 @@ import { expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  QUORUM_TOP,
   renderOrigins,
   render as renderRpcs,
   rpcsFromChains,
   sharedOperators,
+  unionRpcs,
 } from '../scripts/gen-rpcs';
 import { servedChainIds } from '../scripts/gen-venues';
 import { norm, trusted, unusable } from '../scripts/lib/rpcUrl';
@@ -21,7 +23,7 @@ import {
   selectRows,
   urlOf,
 } from '../scripts/refresh-rpcs';
-import { CHAIN_RPCS } from '../src/eth/rpcs.generated';
+import { CHAIN_QUORUM_RPCS, CHAIN_RPCS } from '../src/eth/rpcs.generated';
 import { SERVED_CHAINS } from '../src/venues/deployments.generated';
 import { BTR_CHAINS } from '../src/venues/index.js';
 
@@ -288,15 +290,30 @@ test('served chains: the picks are browser rows taking a 16-call batch', () => {
 
 // Review F3: front sws.toml and the docs service's HTML CSP must allow exactly the quorum RPCs.
 // Both read this one committed file; it drifting from CHAIN_RPCS is a regenerate, not an edit.
-test('rpc-origins.txt = origins of the served chains in CHAIN_RPCS', () => {
+test('rpc-origins.txt = origins of the served chains in CHAIN_RPCS and CHAIN_QUORUM_RPCS', () => {
   const file = readFileSync(join(import.meta.dir, '..', 'rpc-origins.txt'), 'utf8');
-  expect(file).toBe(renderOrigins(CHAIN_RPCS, SERVED_CHAINS));
+  expect(file).toBe(renderOrigins(unionRpcs(CHAIN_RPCS, CHAIN_QUORUM_RPCS), SERVED_CHAINS));
   expect(file.trim().split('\n').length).toBeGreaterThanOrEqual(2 * SERVED_CHAINS.length);
 });
 
 // R4C-6: unanimity over endpoints of one operator has one DNS/operator trust root.
 test('served chains: quorum endpoints have distinct eTLD+1 operators', () => {
   expect(sharedOperators(CHAIN_RPCS, SERVED_CHAINS)).toEqual([]);
+  expect(sharedOperators(CHAIN_QUORUM_RPCS, SERVED_CHAINS)).toEqual([]);
+});
+
+// One endpoint down must not halt the front's reads: the quorum needs two agreeing answers of three.
+// Monad (143) is the chain the front's send path reads through the quorum.
+test('the Monad quorum list has three endpoints (one down still leaves two to agree)', () => {
+  expect((CHAIN_QUORUM_RPCS[143] ?? []).length).toBeGreaterThanOrEqual(3);
+});
+
+test('committed CHAIN_QUORUM_RPCS = chains.json top 3', () => {
+  if (!existsSync(SIBLING)) throw new Error('refresh-rpcs.test.ts needs ../dex-evm/deployments');
+  const expected = rpcsFromChains(JSON.parse(readFileSync(SIBLING, 'utf8')), QUORUM_TOP);
+  const served = servedChainIds(join(SIBLING, '..', '..'));
+  for (const id of Object.keys(expected).map(Number)) if (!served.has(id)) delete expected[id];
+  expect(CHAIN_QUORUM_RPCS).toEqual(expected);
 });
 
 test('sharedOperators flags a pair of one operator; picks skip a repeated operator', () => {
@@ -308,4 +325,3 @@ test('sharedOperators flags a pair of one operator; picks skip a repeated operat
   const rows = [a, b, c].map((url) => ({ url, browser: true }));
   expect(rpcsFromChains({ rpc: { '1': rows } })[1]).toEqual([c, a]); // publicnode is trusted, so ranks first
 });
-

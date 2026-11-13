@@ -14,3 +14,42 @@ export const CHAIN_RPCS: Readonly<Record<number, readonly string[]>> = {
   42161: ['https://arbitrum-one-rpc.publicnode.com', 'https://arb1.arbitrum.io/rpc'],
   43114: ['https://avalanche-c-chain-rpc.publicnode.com', 'https://avax.api.pocket.network'],
 };
+
+/** The quorum's endpoints (`QUORUM_TOP` distinct operators per chain), a superset of the wallet's. */
+export const CHAIN_QUORUM_RPCS: Readonly<Record<number, readonly string[]>> = {
+  1: [
+    'https://ethereum-rpc.publicnode.com',
+    'https://0xrpc.io/eth',
+    'https://eth.api.pocket.network',
+  ],
+  56: ['https://bsc-rpc.publicnode.com', 'https://bsc-dataseed.binance.org'],
+  137: [
+    'https://polygon-bor-rpc.publicnode.com',
+    'https://poly.api.pocket.network',
+    'https://polygon.drpc.org',
+  ],
+  143: [
+    'https://rpc2.monad.xyz',
+    'https://gm.monad.at.htw.tech',
+    'https://monad-mainnet.rpc.sentio.xyz',
+  ],
+  196: ['https://rpc.xlayer.tech', 'https://xlayerrpc.okx.com', 'https://xlayer.drpc.org'],
+  999: ['https://rpc.hyperliquid.xyz/evm'],
+  4663: [
+    'https://robinhood-rpc.publicnode.com',
+    'https://rpc.mainnet.chain.robinhood.com',
+    'https://robinhood.api.pocket.network',
+  ],
+  5042: ['https://arc-rpc.publicnode.com', 'https://rpc.beamrpc.com'],
+  8453: ['https://base-rpc.publicnode.com', 'https://base.api.pocket.network'],
+  42161: [
+    'https://arbitrum-one-rpc.publicnode.com',
+    'https://arb1.arbitrum.io/rpc',
+    'https://arb-one.api.pocket.network',
+  ],
+  43114: [
+    'https://avalanche-c-chain-rpc.publicnode.com',
+    'https://avax.api.pocket.network',
+    'https://avalanche.drpc.org',
+  ],
+};

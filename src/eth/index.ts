@@ -240,3 +240,6 @@ export function keccak256Input(data: Input): `0x${string}` {
   const hash = keccak_256(bytes);
   return `0x${bytesToHex(hash)}`;
 }
+
+// Independent quorum endpoints per chain (three distinct operators; the front's read quorum).
+export { CHAIN_QUORUM_RPCS } from './rpcs.generated';
