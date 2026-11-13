@@ -60,7 +60,7 @@ describe('wallet-path writers bind the chain when asked', () => {
   test('deposit and withdraw refuse another chain before anything is sent', async () => {
     const { provider: p1, seen: s1 } = wallet();
     await expect(
-      deposit(p1, POOL, { token: TOKEN, amount: 1n, expectedChainId: 1 }),
+      deposit(p1, POOL, { token: TOKEN, amount: 1n, minLpOut: 1n, expectedChainId: 1 }),
     ).rejects.toThrow(/chain mismatch/);
     expect(s1).toEqual(['eth_chainId']);
     const { provider: p2, seen: s2 } = wallet();
