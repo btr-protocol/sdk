@@ -101,9 +101,6 @@ export function signDigest(digest: Hex, privateKey: Hex) {
   );
 }
 
-/** EIP-1559/2930 `accessList` when there is none. An RLP LIST, so it encodes 0xc0. */
-const EMPTY_ACCESS_LIST: readonly never[] = [];
-
 /** Serialised nonce allocation per (provider, sender).
  *
  *  `eth_getTransactionCount` is in the transport's DEDUPE set, so two `signTransaction` calls in
@@ -201,6 +198,9 @@ export async function signTransaction(
     v === undefined ? fallback : BigInt(v);
   const q0 = (v: Hex | bigint | number | undefined) => q(v, 0n);
 
+  // EIP-2930 list as RLP: [[address, [key, ...]], ...]; empty stays 0xc0.
+  const accessListRlp = (tx.accessList ?? []).map((e) => [e.address, e.storageKeys]);
+
   // EIP-1559 (Type 2)
   if (tx.maxFeePerGas && tx.maxPriorityFeePerGas) {
     const txData = [
@@ -212,9 +212,9 @@ export async function signTransaction(
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      // accessList: an EMPTY LIST (0xc0), never the empty string (0x80). EIP-1559 signs over a
+      // accessList: a LIST (empty = 0xc0), never the empty string (0x80). EIP-1559 signs over a
       // list here, so `'0x'` produced a different preimage and every signed tx was rejected.
-      EMPTY_ACCESS_LIST,
+      accessListRlp,
     ];
 
     // Hash the transaction
@@ -237,7 +237,7 @@ export async function signTransaction(
       tx.to || '0x',
       q0(tx.value),
       tx.data || '0x',
-      EMPTY_ACCESS_LIST,
+      accessListRlp,
       yParity,
       r,
       s,
@@ -246,8 +246,26 @@ export async function signTransaction(
     return `0x02${bytesToHex(rlpEncode(signedTx))}` as Hex;
   }
 
-  // Legacy (Type 0)
   const gasPrice = tx.gasPrice ?? (await getGasPrice(provider));
+
+  // EIP-2930 (Type 1): a legacy-priced tx that carries a list.
+  if (accessListRlp.length > 0) {
+    const fields = [
+      chainId,
+      q(nonce, 0n),
+      q(gasPrice, 0n),
+      q(gasLimit, 0n),
+      tx.to || '0x',
+      q0(tx.value),
+      tx.data || '0x',
+      accessListRlp,
+    ];
+    const sig = signDigest(keccak256(new Uint8Array([0x01, ...rlpEncode(fields)])), privateKey);
+    const signed = [...fields, BigInt(sig.recovery as number), sig.r, sig.s];
+    return `0x01${bytesToHex(rlpEncode(signed))}` as Hex;
+  }
+
+  // Legacy (Type 0)
 
   const txData = [
     q(nonce, 0n),

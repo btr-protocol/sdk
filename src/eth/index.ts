@@ -99,6 +99,7 @@ export {
   requestAccounts,
   getAccounts,
   getChainId,
+  forgetChainId,
   getGasPrice,
   getBlockNumber,
   pendingNonce,
@@ -122,6 +123,8 @@ export type { AccessListOptions, AccessListPlan, AccessListTx } from './accessLi
 export {
   withAccessList,
   planAccessList,
+  prefetchAccessList,
+  dropAccessListPlan,
   parseAccessList,
   MAX_ACCESS_LIST_ADDRESSES,
   MAX_ACCESS_LIST_KEYS,

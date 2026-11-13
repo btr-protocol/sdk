@@ -31,6 +31,18 @@ export const getChainId = (p: Eip1193Provider) =>
     if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`chainId ${n} exceeds 2^53-1`);
     return Number(n);
   });
+/** Chain id of `p`, remembered for 2 s so a hot path (an access-list lookup per send) does not ask
+ *  twice, and forgotten on `chainChanged` and on a failed read. */
+const chainMemo = new WeakMap<Eip1193Provider, { at: number; id: Promise<number> }>();
+export const forgetChainId = (p: Eip1193Provider) => chainMemo.delete(p);
+export const getChainIdMemo = (p: Eip1193Provider): Promise<number> => {
+  const hit = chainMemo.get(p);
+  if (hit && Date.now() - hit.at < 2000) return hit.id;
+  const id = getChainId(p);
+  chainMemo.set(p, { at: Date.now(), id });
+  id.catch(() => chainMemo.delete(p));
+  return id;
+};
 export const getGasPrice = (p: Eip1193Provider) => cmd<string>(p, 'eth_gasPrice').then(toBig);
 export const getBlockNumber = (p: Eip1193Provider) => cmd<string>(p, 'eth_blockNumber').then(toBig);
 
@@ -206,4 +218,7 @@ export const onAccountsChanged = (p: Eip1193Provider, cb: (accs: Address[]) => v
   sub(p, 'accountsChanged', (accs: unknown) => cb(accs as Address[]));
 
 export const onChainChanged = (p: Eip1193Provider, cb: (id: number) => void) =>
-  sub(p, 'chainChanged', (id: unknown) => cb(typeof id === 'string' ? toInt(id) : (id as number)));
+  sub(p, 'chainChanged', (id: unknown) => {
+    forgetChainId(p);
+    cb(typeof id === 'string' ? toInt(id) : (id as number));
+  });

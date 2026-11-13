@@ -3,23 +3,26 @@ import {
   MAX_ACCESS_LIST_ADDRESSES,
   MAX_ACCESS_LIST_KEYS,
   clearAccessListCache,
+  dropAccessListPlan,
   parseAccessList,
   withAccessList,
 } from './accessList';
+import { forgetChainId } from './rpc';
 import type { Eip1193Provider } from './types';
 
 const A = `0x${'ab'.repeat(20)}` as const;
+const B = `0x${'11'.repeat(20)}` as const;
 const K = `0x${'cd'.repeat(32)}` as const;
 const tx = { from: A, to: A, data: '0x1234' as const };
 const LIST = [{ address: A, storageKeys: [K] }];
 
 type Handler = (params: unknown[]) => unknown;
-function mock(h: Partial<Record<string, Handler>>, chain = 143) {
+function mock(h: Partial<Record<string, Handler>>, chain: { id: number } = { id: 143 }) {
   const calls: { method: string; params: unknown[] }[] = [];
   const p: Eip1193Provider = {
     request: async ({ method, params }: { method: string; params?: unknown[] }) => {
       calls.push({ method, params: params ?? [] });
-      if (method === 'eth_chainId') return `0x${chain.toString(16)}`;
+      if (method === 'eth_chainId') return `0x${chain.id.toString(16)}`;
       const f = h[method];
       if (!f) throw new Error(`unsupported ${method}`);
       return f(params ?? []);
@@ -31,70 +34,105 @@ const est =
   (without: number, withList: number): Handler =>
   (params) =>
     `0x${((params[0] as { accessList?: unknown }).accessList ? withList : without).toString(16)}`;
+const good = (without = 100_000, withList = 50_000) => ({
+  eth_createAccessList: () => ({ accessList: LIST }),
+  eth_estimateGas: est(without, withList),
+});
 const opts = { chainId: 143 };
 
 beforeEach(clearAccessListCache);
 
 describe('withAccessList', () => {
-  test('cheaper: attaches list and a gas limit from the with-list estimate + 20%', async () => {
-    const { p } = mock({
-      eth_createAccessList: () => ({ accessList: LIST, gasUsed: '0x1' }),
-      eth_estimateGas: est(1000, 500),
-    });
-    const out = await withAccessList(p, tx, opts);
+  test('confirmed: list + gas = min(with + 30%, plain)', async () => {
+    const { p } = mock(good());
+    const { p: second } = mock(good(100_000, 52_000));
+    const out = await withAccessList(p, tx, { ...opts, confirm: second });
     expect(out.accessList).toEqual(LIST);
-    expect(BigInt(out.gas as string)).toBe(600n);
+    expect(BigInt(out.gas as string)).toBe(67_600n); // higher estimate 52,000 x 1.3
   });
 
-  test('setGas:false attaches the list only', async () => {
-    const { p } = mock({
-      eth_createAccessList: () => ({ accessList: LIST }),
-      eth_estimateGas: est(1000, 500),
-    });
-    const out = await withAccessList(p, tx, { ...opts, setGas: false });
+  test('no independent reader: list only, never a reduced gas', async () => {
+    const { p } = mock(good());
+    const out = await withAccessList(p, tx, opts);
     expect(out.accessList).toEqual(LIST);
     expect(out.gas).toBeUndefined();
   });
 
-  test('a gas the caller set is kept', async () => {
-    const { p } = mock({
-      eth_createAccessList: () => ({ accessList: LIST }),
-      eth_estimateGas: est(1000, 500),
+  test('independent estimate disagrees by more than 15%, or fails: list only', async () => {
+    for (const second of [mock(good(100_000, 70_000)).p, mock({ eth_chainId: undefined }).p]) {
+      clearAccessListCache();
+      const out = await withAccessList(mock(good()).p, tx, { ...opts, confirm: second });
+      expect(out.accessList).toEqual(LIST);
+      expect(out.gas).toBeUndefined();
+    }
+  });
+
+  test('setGas:false attaches the list only', async () => {
+    const out = await withAccessList(mock(good()).p, tx, {
+      ...opts,
+      setGas: false,
+      confirm: mock(good()).p,
     });
-    expect((await withAccessList(p, { ...tx, gas: '0x99' as const }, opts)).gas).toBe('0x99');
+    expect(out.accessList).toEqual(LIST);
+    expect(out.gas).toBeUndefined();
+  });
+
+  test('a caller-set gas skips the list entirely', async () => {
+    const { p, calls } = mock(good());
+    const t = { ...tx, gas: '0x99' as const };
+    expect(await withAccessList(p, t, opts)).toBe(t);
+    expect(calls.length).toBe(0);
+  });
+
+  test('relay returns a tiny with-list estimate: no plan', async () => {
+    const { p } = mock(good(100_000, 5_000));
+    expect(await withAccessList(p, tx, opts)).toBe(tx);
+  });
+
+  test('below intrinsic gas of the calldata: no plan', async () => {
+    const { p } = mock(good(30_000, 12_000)); // 40% floor is 12,000 but intrinsic is 21,000+
+    expect(await withAccessList(p, tx, opts)).toBe(tx);
+  });
+
+  test('list cost over 25% of the plain estimate: no plan', async () => {
+    const big = Array.from({ length: 20 }, (_, i) => ({
+      address: `0x${i.toString(16).padStart(40, '0')}`,
+      storageKeys: [K],
+    }));
+    // 20 x (2,400 + 1,900) = 86,000 > 25% of 300,000
+    const { p } = mock({
+      eth_createAccessList: () => ({ accessList: big }),
+      eth_estimateGas: est(300_000, 150_000),
+    });
+    expect(await withAccessList(p, tx, opts)).toBe(tx);
   });
 
   test('dearer, or cheaper by less than the margin: unchanged', async () => {
     for (const [without, withList] of [
-      [100, 150],
-      [1000, 900],
+      [100_000, 150_000],
+      [100_000, 90_000],
     ]) {
       clearAccessListCache();
-      const { p } = mock({
-        eth_createAccessList: () => ({ accessList: LIST }),
-        eth_estimateGas: est(without, withList),
-      });
-      expect(await withAccessList(p, tx, opts)).toBe(tx);
+      expect(await withAccessList(mock(good(without, withList)).p, tx, opts)).toBe(tx);
     }
   });
 
+  test('equal-margin boundary: with x 1.3 == plain is refused, one gas less is taken', async () => {
+    expect(await withAccessList(mock(good(65_000, 50_000)).p, tx, opts)).toBe(tx);
+    clearAccessListCache();
+    expect((await withAccessList(mock(good(65_001, 50_000)).p, tx, opts)).accessList).toEqual(LIST);
+  });
+
   test('createAccessList unsupported, erroring or reporting a revert: unchanged', async () => {
-    const a = mock({ eth_estimateGas: est(1000, 500) });
-    expect(await withAccessList(a.p, tx, opts)).toBe(tx);
+    expect(await withAccessList(mock({ eth_estimateGas: est(100_000, 50_000) }).p, tx, opts)).toBe(
+      tx,
+    );
     clearAccessListCache();
     const b = mock({
       eth_createAccessList: () => ({ accessList: LIST, error: 'execution reverted' }),
-      eth_estimateGas: est(1000, 500),
+      eth_estimateGas: est(100_000, 50_000),
     });
     expect(await withAccessList(b.p, tx, opts)).toBe(tx);
-    clearAccessListCache();
-    const c = mock({
-      eth_createAccessList: () => {
-        throw new Error('boom');
-      },
-      eth_estimateGas: est(1000, 500),
-    });
-    expect(await withAccessList(c.p, tx, opts)).toBe(tx);
   });
 
   test('estimate failure: unchanged', async () => {
@@ -105,20 +143,11 @@ describe('withAccessList', () => {
   test('timeout: unchanged, within the deadline', async () => {
     const { p } = mock({
       eth_createAccessList: () => new Promise(() => {}),
-      eth_estimateGas: est(1000, 500),
+      eth_estimateGas: est(100_000, 50_000),
     });
     const t0 = Date.now();
-    expect(await withAccessList(p, tx, { ...opts, timeoutMs: 50 })).toBe(tx);
+    expect(await withAccessList(p, tx, { ...opts, timeoutMs: 1 })).toBe(tx); // clamped to 50
     expect(Date.now() - t0).toBeLessThan(500);
-  });
-
-  test('wrong chain: unchanged and nothing asked', async () => {
-    const { p, calls } = mock(
-      { eth_createAccessList: () => ({ accessList: LIST }), eth_estimateGas: est(1000, 500) },
-      1,
-    );
-    expect(await withAccessList(p, tx, opts)).toBe(tx);
-    expect(calls.some((c) => c.method === 'eth_createAccessList')).toBe(false);
   });
 
   test('malformed results: unchanged', async () => {
@@ -132,7 +161,10 @@ describe('withAccessList', () => {
       { accessList: [null] },
     ]) {
       clearAccessListCache();
-      const { p } = mock({ eth_createAccessList: () => bad, eth_estimateGas: est(1000, 500) });
+      const { p } = mock({
+        eth_createAccessList: () => bad,
+        eth_estimateGas: est(100_000, 50_000),
+      });
       expect(await withAccessList(p, tx, opts)).toBe(tx);
     }
   });
@@ -144,45 +176,82 @@ describe('withAccessList', () => {
     expect(calls.length).toBe(0);
   });
 
-  test('cached: a second call with the same tx does not re-ask', async () => {
-    const { p, calls } = mock({
-      eth_createAccessList: () => ({ accessList: LIST }),
-      eth_estimateGas: est(1000, 500),
-    });
+  test('the list is cached, the gas is not: a second send re-estimates but does not re-ask the list', async () => {
+    const { p, calls } = mock(good());
     await withAccessList(p, tx, opts);
-    const n = calls.length;
-    const again = await withAccessList(p, tx, opts);
-    expect(calls.length).toBe(n);
-    expect(again.accessList).toEqual(LIST);
-    // another calldata is a different lookup
+    const lists = () => calls.filter((c) => c.method === 'eth_createAccessList').length;
+    const gas = () => calls.filter((c) => c.method === 'eth_estimateGas').length;
+    expect([lists(), gas()]).toEqual([1, 2]);
+    await withAccessList(p, tx, opts);
+    expect([lists(), gas()]).toEqual([1, 4]);
     await withAccessList(p, { ...tx, data: '0x5678' as const }, opts);
-    expect(calls.length).toBeGreaterThan(n);
+    expect(lists()).toBe(2);
   });
 
-  test('a failure is cached too (a retry does not re-ask)', async () => {
-    const { p, calls } = mock({ eth_estimateGas: est(1000, 500) });
+  test('a failure is cached only briefly; a dropped plan is re-asked', async () => {
+    const { p, calls } = mock({ eth_estimateGas: est(100_000, 50_000) });
     await withAccessList(p, tx, opts);
+    await withAccessList(p, tx, opts);
+    const n = () => calls.filter((c) => c.method === 'eth_createAccessList').length;
+    expect(n()).toBe(1); // within 3 s: not re-asked
+    dropAccessListPlan(tx, 143);
+    await withAccessList(p, tx, opts);
+    expect(n()).toBe(2);
+  });
+
+  test('keys separate by chain and by account', async () => {
+    const { p, calls } = mock(good());
+    await withAccessList(p, tx, opts);
+    await withAccessList(p, { ...tx, from: B }, opts);
+    expect(calls.filter((c) => c.method === 'eth_createAccessList').length).toBe(2);
+    const other = mock(good(), { id: 1 });
+    expect(await withAccessList(other.p, tx, { chainId: 1 })).not.toBe(tx);
+    expect(other.calls.filter((c) => c.method === 'eth_createAccessList').length).toBe(1);
+  });
+
+  test('chain switch between plan and use: the cached list is not used on the other chain', async () => {
+    const chain = { id: 143 };
+    const { p, calls } = mock(good(), chain);
+    expect((await withAccessList(p, tx, opts)).accessList).toEqual(LIST);
+    chain.id = 1;
+    forgetChainId(p); // what onChainChanged does
     const n = calls.length;
-    await withAccessList(p, tx, opts);
-    expect(calls.length).toBe(n);
+    expect(await withAccessList(p, tx, opts)).toBe(tx);
+    expect(calls.slice(n).some((c) => c.method === 'eth_estimateGas')).toBe(false);
+  });
+
+  test('the returned list is a copy', async () => {
+    const { p } = mock(good());
+    const a = await withAccessList(p, tx, opts);
+    a.accessList?.[0].storageKeys.push(K);
+    const b = await withAccessList(p, tx, opts);
+    expect(b.accessList?.[0].storageKeys).toHaveLength(1);
   });
 });
 
-describe('parseAccessList caps', () => {
+describe('parseAccessList', () => {
   const entry = (i: number, keys = 0) => ({
     address: `0x${i.toString(16).padStart(40, '0')}`,
-    storageKeys: Array.from({ length: keys }, () => K),
+    storageKeys: Array.from({ length: keys }, (_, j) => `0x${j.toString(16).padStart(64, '0')}`),
   });
-  test('addresses', () => {
+  test('addresses cap', () => {
     expect(
-      parseAccessList(Array.from({ length: MAX_ACCESS_LIST_ADDRESSES }, (_, i) => entry(i))),
+      parseAccessList(Array.from({ length: MAX_ACCESS_LIST_ADDRESSES }, (_, i) => entry(i + 1))),
     ).toHaveLength(MAX_ACCESS_LIST_ADDRESSES);
     expect(
-      parseAccessList(Array.from({ length: MAX_ACCESS_LIST_ADDRESSES + 1 }, (_, i) => entry(i))),
+      parseAccessList(
+        Array.from({ length: MAX_ACCESS_LIST_ADDRESSES + 1 }, (_, i) => entry(i + 1)),
+      ),
     ).toBeUndefined();
   });
-  test('storage keys in total', () => {
+  test('storage keys cap in total', () => {
     expect(parseAccessList([entry(1, MAX_ACCESS_LIST_KEYS)])).toBeDefined();
     expect(parseAccessList([entry(1, MAX_ACCESS_LIST_KEYS), entry(2, 1)])).toBeUndefined();
+  });
+  test('duplicates merge before the caps', () => {
+    const dup = Array.from({ length: 200 }, () => entry(1, 2));
+    const out = parseAccessList(dup);
+    expect(out).toHaveLength(1);
+    expect(out?.[0].storageKeys).toHaveLength(2);
   });
 });
