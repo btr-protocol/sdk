@@ -1984,5 +1984,37 @@
     "type": "error",
     "name": "ZeroAddress",
     "inputs": []
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ErrLib.Resource",
+        "name": "resource",
+        "type": "uint8"
+      },
+      {
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      }
+    ],
+    "name": "NotConfigured",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "name": "ThresholdViolation",
+    "type": "error"
   }
 ]
