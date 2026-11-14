@@ -220,8 +220,12 @@ export interface PoolLeg {
   decimals: number;
   profile: AimmProfile;
   kappaCovBps: number;
+  /** `Asset.covBits` / `Asset.kneeBits`, raw. Absent = not read: quoted as 0 on a v1 pool, refused
+   *  (`CovWordMissing`) on a v2 one, where 0 would price no coverage toll and no wall. */
   covBits?: number;
   kneeBits?: number;
+  /** The pool's `storageVersion` (12 = v2) when known; decides what an absent coverage word means. */
+  storageVersion?: number;
   minLiquidity?: number;
   confidence?: number;
   staleExcess?: number;
@@ -265,6 +269,7 @@ interface HubBook {
   kappaCovBps: number;
   covBits?: number;
   kneeBits?: number;
+  storageVersion?: number;
   minLiquidity?: number;
 }
 
@@ -341,6 +346,29 @@ export function computeSkew(res: number, liab: number): number {
   return c < 1 ? Math.trunc(200 * (1 - c)) : -Math.trunc(100 * (c - 1)) || 0;
 }
 
+/** The v2 storage generation (`PoolLayout` 'v2'): its coverage law lives in `covBits`/`kneeBits`. */
+const STORAGE_V2 = 12;
+
+/** A v2 leg's coverage word was not read: there is no honest value to put on the wire. */
+export class CovWordMissing extends Error {
+  constructor(what: string) {
+    super(`${what}: the coverage word was not read for a v2 pool, so it cannot be quoted`);
+    this.name = 'CovWordMissing';
+  }
+}
+
+/** A coverage word for the wire: as read; absent is 0 on a v1 pool (the field does not exist there)
+ *  and unquotable on a v2 one, where 0 is a different law (no toll, no walls). */
+export function covWord(
+  word: number | undefined,
+  storageVersion: number | undefined,
+  what: string,
+) {
+  if (word !== undefined) return word;
+  if (storageVersion === STORAGE_V2) throw new CovWordMissing(what);
+  return 0;
+}
+
 export function buildLeg(
   token: string,
   twap: number,
@@ -351,7 +379,13 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps: number,
-  feed?: { confidence?: number; staleExcess?: number; covBits?: number; kneeBits?: number },
+  feed?: {
+    confidence?: number;
+    staleExcess?: number;
+    covBits?: number;
+    kneeBits?: number;
+    storageVersion?: number;
+  },
 ): PoolLeg {
   return {
     token,
@@ -363,8 +397,9 @@ export function buildLeg(
     decimals,
     profile,
     kappaCovBps,
-    covBits: feed?.covBits ?? 0,
-    kneeBits: feed?.kneeBits ?? 0,
+    covBits: feed?.covBits,
+    kneeBits: feed?.kneeBits,
+    storageVersion: feed?.storageVersion,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
   };
@@ -830,8 +865,8 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
     liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
-    cov_bits: hub.covBits ?? 0,
-    knee_bits: hub.kneeBits ?? 0,
+    cov_bits: covWord(hub.covBits, hub.storageVersion, 'hub covBits'),
+    knee_bits: covWord(hub.kneeBits, hub.storageVersion, 'hub kneeBits'),
   };
 }
 
@@ -867,8 +902,8 @@ export function legToQuoteBody(
     vega_bps: leg.profile.vega,
     min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
-    cov_bits: leg.covBits ?? 0,
-    knee_bits: leg.kneeBits ?? 0,
+    cov_bits: covWord(leg.covBits, leg.storageVersion, `${leg.token} covBits`),
+    knee_bits: covWord(leg.kneeBits, leg.storageVersion, `${leg.token} kneeBits`),
     amount_in: toU128Hex(amountInTok * 10 ** (selling ? decimalsIn : leg.decimals)),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
     liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
@@ -1049,8 +1084,8 @@ export function poolStateToWire(
         vega_bps: leg.profile.vega,
         min_fee_pbps: leg.profile.minFeePbps,
         kappa_cov_bps: leg.kappaCovBps,
-        cov_bits: leg.covBits ?? 0,
-        knee_bits: leg.kneeBits ?? 0,
+        cov_bits: covWord(leg.covBits, leg.storageVersion, `${leg.token} covBits`),
+        knee_bits: covWord(leg.kneeBits, leg.storageVersion, `${leg.token} kneeBits`),
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),
       liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),

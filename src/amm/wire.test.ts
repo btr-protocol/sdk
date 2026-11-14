@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  CovWordMissing,
   INTERIOR_ENDPOINT,
   type PoolState,
   type QuoteResponseWire,
@@ -513,5 +514,35 @@ describe('quoteFromWire: flat quote in SPOKE scale (mixed decimals)', () => {
     expect(quoteFromWire(resp(1_000, 1_000, 18, 1_000), 18, [], 1_000)).toBeNull();
     expect(quoteFromWire(resp(1_000, 1_000, 18, 0.001), 18, [], 1_000)).toBeNull();
     expect(quoteFromWire(resp(1_000, 1_000, 18, 1.5), 18, [], 1_000)).not.toBeNull();
+  });
+});
+
+describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => {
+  const BITS = 34_504_704;
+  const leg = (feed?: Parameters<typeof buildLeg>[9]) =>
+    buildLeg('USDT', 1, 300, 1_000_000, 1_000_000, 200_000, 18, STABLE_PROFILE, 600, feed);
+  const body = (l: ReturnType<typeof leg>) =>
+    legToQuoteBody(l, 1, true, 18, INTERIOR_ENDPOINT, ADDRS);
+
+  test('the words read off the asset row go on the wire as read', () => {
+    const b = body(leg({ covBits: BITS, kneeBits: 3, storageVersion: 12 }));
+    expect([b.cov_bits, b.knee_bits]).toEqual([BITS, 3]);
+    const s = poolStateToWire('p', '0xp', state(), meta, 18);
+    expect(s.spokes[0].pricing.cov_bits).toBe(0); // the fixture leg carries none: v1 reading
+  });
+  test('v1 (or unknown generation): an absent word is 0, as before', () => {
+    expect(body(leg()).cov_bits).toBe(0);
+    expect(body(leg({ storageVersion: 7 })).knee_bits).toBe(0);
+  });
+  test('v2: an absent word is unquotable, never a 0 that prices no toll and no walls', () => {
+    expect(() => body(leg({ storageVersion: 12 }))).toThrow(CovWordMissing);
+    expect(() => body(leg({ covBits: BITS, storageVersion: 12 }))).toThrow(CovWordMissing);
+    const v2 = state();
+    v2.legs.USDT = leg({ storageVersion: 12 });
+    expect(() => poolStateToWire('p', '0xp', v2, meta, 18)).toThrow(CovWordMissing);
+    expect(() => hubEndpointWire({ ...HUB, storageVersion: 12 }, 6)).toThrow(CovWordMissing);
+    expect(
+      hubEndpointWire({ ...HUB, covBits: BITS, kneeBits: 0, storageVersion: 12 }, 6).cov_bits,
+    ).toBe(BITS);
   });
 });

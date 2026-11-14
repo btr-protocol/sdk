@@ -12,6 +12,7 @@ import {
   changeFace,
   rankRedeem,
 } from './lpRoutes';
+import { solvencyGate } from './lpRoutes.js';
 import type { NamedPool } from './route.js';
 
 const SIG = sigmaSeed('stable');
@@ -509,20 +510,20 @@ describe('stale solvency words: refused, not priced', () => {
       (x) => x.id === 'cross-exit',
     );
     expect(cross?.reason).toBe('toll-stale');
-    // A lagging replica preview cannot override stale solvency words.
+    // The same-asset exit is never closed by stale words: the chain's preview prices it (no model),
+    // and with no preview read it is unpriced under the gate's own reason. Cross stays refused.
     const pv = await route(old.p, 'AUDF', 'AUDF', 1_000, {
       ...old.opts,
       previewWithdraw: async () => 990_000_000n,
     });
-    expect(pv[0].feasible).toBe(false);
-    expect(pv[0].reason).toBe('toll-stale');
-    expect(pv[0].out).toBe(0);
+    expect(pv[0].feasible).toBe(true);
+    expect(pv[0].out).toBe(990);
   });
 });
 
 describe('same-asset previews obey the shared solvency gate', () => {
   test.each(['toll', 'solvency'] as const)(
-    '%s pending refuses a non-null preview',
+    '%s pending: no model, the preview alone prices the exit',
     async (word) => {
       const p = pool();
       if (word === 'toll') p.state.exitTollWad = null;
@@ -535,11 +536,13 @@ describe('same-asset previews obey the shared solvency gate', () => {
           return 990_000_000n;
         },
       });
-      expect(plan.best).toBeNull();
-      expect(plan.routes[0].feasible).toBe(false);
-      expect(plan.routes[0].reason).toBe('toll-pending');
-      expect(plan.routes[0].out).toBe(0);
-      expect(calls).toBe(0);
+      expect(plan.routes[0].feasible).toBe(true);
+      expect(plan.best?.out).toBe(990);
+      expect(calls).toBe(1);
+      // ...and with the preview unread there is no price, under the gate's own reason.
+      const unread = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, { ...BE });
+      expect(unread.best).toBeNull();
+      expect(unread.routes[0].reason).toBe('toll-pending');
     },
   );
 
@@ -560,9 +563,16 @@ describe('same-asset previews obey the shared solvency gate', () => {
       ...opts,
       now: () => 1_101,
     });
-    expect(stale.best).toBeNull();
-    expect(stale.routes[0].reason).toBe('toll-stale');
-    expect(stale.routes[0].out).toBe(0);
+    // Stale words close nothing: the preview prices the exit, the model is not consulted.
+    expect(stale.best?.out).toBe(980);
+    const noPreview = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
+      ...opts,
+      now: () => 1_101,
+      previewWithdraw: undefined,
+    });
+    expect(noPreview.best).toBeNull();
+    expect(noPreview.routes[0].reason).toBe('toll-stale');
+    expect(noPreview.routes[0].out).toBe(0);
   });
 });
 
@@ -618,27 +628,34 @@ describe('solvency freshness fails closed', () => {
   test.each([
     ['unstamped', undefined],
     ['null stamp', null],
-  ] as const)('%s: same-asset, cross and transfer are toll-stale', async (_name, at) => {
-    stub({ tolls: ALL });
-    const p = pool();
-    p.state.solvencyAtMs = at;
-    const opts: LpRouteOpts = {
-      ...BE,
-      now: () => 1_000_000,
-      postMoveExitTollWad: async () => 0n,
-      previewWithdraw: async () => 990_000_000n,
-    };
-    expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].reason).toBe('toll-stale');
-    const rs = await route(p, 'NZDF', 'AUDF', 1_000, opts);
-    for (const id of ['cross-exit', 'transfer-exit']) {
-      const r = rs.find((x) => x.id === id);
-      expect(r?.feasible).toBe(false);
-      expect(r?.reason).toBe('toll-stale');
-    }
-    // Stamped exactly now (age 0) is fresh.
-    p.state.solvencyAtMs = 1_000_000;
-    expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].feasible).toBe(true);
-  });
+  ] as const)(
+    '%s: cross and transfer are toll-stale; same-asset is priced by the preview',
+    async (_name, at) => {
+      stub({ tolls: ALL });
+      const p = pool();
+      p.state.solvencyAtMs = at;
+      const opts: LpRouteOpts = {
+        ...BE,
+        now: () => 1_000_000,
+        postMoveExitTollWad: async () => 0n,
+        previewWithdraw: async () => 990_000_000n,
+      };
+      // Same-asset: priced by the preview (the exit stays open); with none read, toll-stale.
+      expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].feasible).toBe(true);
+      expect(
+        (await route(p, 'AUDF', 'AUDF', 1_000, { ...opts, previewWithdraw: undefined }))[0].reason,
+      ).toBe('toll-stale');
+      const rs = await route(p, 'NZDF', 'AUDF', 1_000, opts);
+      for (const id of ['cross-exit', 'transfer-exit']) {
+        const r = rs.find((x) => x.id === id);
+        expect(r?.feasible).toBe(false);
+        expect(r?.reason).toBe('toll-stale');
+      }
+      // Stamped exactly now (age 0) is fresh.
+      p.state.solvencyAtMs = 1_000_000;
+      expect((await route(p, 'AUDF', 'AUDF', 1_000, opts))[0].feasible).toBe(true);
+    },
+  );
 });
 
 describe('same-asset preview can only lower the model quote', () => {
@@ -752,5 +769,25 @@ describe('changeFace: a missing book is refused, never conjured from undefined',
     expect(changeFace(p.state, 'GHOST', 1)).toBe(false);
     expect(Object.keys(p.state.legs).join()).toBe(before);
     expect(Object.keys(p.state.legs)).not.toContain('GHOST');
+  });
+});
+
+describe('solvencyGate: the one gate the ranker and the send both run', () => {
+  const T = 1_000_000;
+  const o = { ...BE, now: () => T } as LpRouteOpts;
+  const at = (over: Partial<NamedPool['state']>) => {
+    const p = pool();
+    p.state.exitTollWad = 10n ** 15n;
+    p.state.solvencyAtMs = T;
+    Object.assign(p.state, over);
+    return solvencyGate(p.state, o);
+  };
+  test('fresh and live: open', () => expect(at({})).toBeNull());
+  test('a fresh stamp does not make a degraded pool pass', () =>
+    expect(at({ solvencyOk: false })).toBe('feed-unavailable'));
+  test('unread words, an old stamp and a far-future stamp each name their reason', () => {
+    expect(at({ solvencyOk: null })).toBe('toll-pending');
+    expect(at({ solvencyAtMs: T - 60_000 })).toBe('toll-stale');
+    expect(at({ solvencyAtMs: T + 60_000 })).toBe('toll-clock');
   });
 });

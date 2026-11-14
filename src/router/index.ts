@@ -755,6 +755,7 @@ export {
   wirePlanToSwap,
   rankDeposit,
   rankRedeem,
+  solvencyGate,
   tollStaleReason,
 } from './lpRoutes.js';
 

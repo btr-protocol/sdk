@@ -63,7 +63,7 @@ function y1(pole: bigint, neg: boolean, r1: bigint, l1: bigint): { y: bigint; wa
   return { y: y === 0n ? 1n : y, wall: false };
 }
 
-export interface CovBook {
+interface CovBook {
   /** `Asset.covBits`. */
   covBits: bigint;
   /** `Asset.kneeBits` (0 when the leg has no knee). */

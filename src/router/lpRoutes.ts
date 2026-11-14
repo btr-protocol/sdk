@@ -532,7 +532,7 @@ async function crossExit(
 /** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `getPoolSolvency`):
  *  null when live and fresh; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark
  *  leg); `toll-stale` when the words are not provably fresh ({@link tollStale}). */
-function solvencyGate(
+export function solvencyGate(
   state: PoolState,
   opts: LpRouteOpts,
 ): 'toll-pending' | 'toll-stale' | 'toll-clock' | 'feed-unavailable' | null {
@@ -818,25 +818,24 @@ export async function rankRedeem(
     const gated = seasonGate(shell, targetSym, lpFaceIn, opts);
     if (!gated.feasible) return { best: null, routes: [gated] };
     const solv = solvencyGate(holder.state, opts);
-    // A degraded pool (a dark leg) cannot be priced off the state's toll word, but a same-asset exit
-    // is never blocked: the chain's own `previewWithdraw` (the lower-pass toll it will charge) prices it.
-    const degraded = solv === 'feed-unavailable';
-    if (solv && !degraded) return { best: null, routes: [unfeasible(gated, solv)] };
+    // A same-asset exit is never blocked by the solvency words: with the toll pending, stale, off the
+    // chain clock or the pool degraded (a dark leg), the state cannot price it, and the chain's own
+    // `previewWithdraw` (the toll it will charge) does. Only an unread preview leaves it unpriced.
     const tw = holder.state.exitTollWad;
-    if (!degraded && tw == null) return { best: null, routes: [unfeasible(gated, 'toll-pending')] };
-    if (!degraded && tw != null && tw >= BigInt(WAD))
+    const modelless = solv !== null || tw == null;
+    if (!modelless && tw != null && tw >= BigInt(WAD))
       return { best: null, routes: [unfeasible(gated, 'toll-exceeds-payout')] };
     const slip = opts.slippageFrac;
     // `exitMu`: in-kind at `min(c_leg, cap)`, net of the C toll (`_quoteWithdrawSame`).
-    const cap = degraded ? 0 : poolExitCap(holder.state);
+    const cap = modelless ? 0 : poolExitCap(holder.state);
     const face = (lpFaceIn * (leg.indexWad ?? WAD)) / WAD;
     if (!(face > 0) || face > leg.liabilities)
       return { best: null, routes: [unfeasible(gated, 'insufficient-liability')] };
-    const gross = degraded ? 0 : exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap);
+    const gross = modelless ? 0 : exitValue(face, legCoverage(leg.reserves, leg.liabilities), cap);
     // With wire decimals the chain's integer law: face floored off the raw shares, then `mu`.
     const d = leg.decimals;
     const grossRaw =
-      d === undefined || degraded
+      d === undefined || modelless
         ? null
         : sameAssetGrossRaw(
             exitFaceRaw(lpFaceIn, leg.indexWad ?? WAD, d),
@@ -845,9 +844,8 @@ export async function rankRedeem(
             cap,
             d,
           );
-    // Only live, fresh solvency words price this exit. A replica preview may cap the model,
-    // but cannot establish that the settlement toll is available or current.
-    let actual = degraded
+    // Live, fresh solvency words price the model; without them (`modelless`) there is no model.
+    let actual = modelless
       ? Number.POSITIVE_INFINITY
       : grossRaw === null || d === undefined
         ? sameAssetNetF(gross, tw as bigint)
@@ -866,9 +864,10 @@ export async function rankRedeem(
         actual = Math.min(pv, actual);
       }
     }
-    // Degraded and the preview unread: there is no price to show, not a zero one.
+    // No model and the preview unread: there is no price to show, not a zero one. The reason is the
+    // solvency gate's own (pending / stale / clock / feed-unavailable).
     if (!Number.isFinite(actual))
-      return { best: null, routes: [unfeasible(gated, 'feed-unavailable')] };
+      return { best: null, routes: [unfeasible(gated, solv ?? 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
     if (leg.reserves < actual + (leg.minLiquidity ?? 0))
       return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };

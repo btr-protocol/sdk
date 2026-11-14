@@ -112,7 +112,7 @@ export async function quoteSwapLiabilityCoreAsync(
 /** Which law prices the conversion: `swap` the pool's swap law; `exit` a cross withdraw's claim
  *  law (out-leg toll, from-leg debit reported in `Quote.debitToll`); `credit` a liability swap's
  *  (`Quote.amountOut` is the re-credited value after both claim tolls). */
-export type ConvertMode = 'swap' | 'exit' | 'credit';
+type ConvertMode = 'swap' | 'exit' | 'credit';
 
 /** `claim` wire of `PathRequestWire`: the claim face burned is `fairIn / C` (`fairIn = face·C`). */
 function claimWire(
