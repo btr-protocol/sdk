@@ -228,6 +228,8 @@ export interface PoolLeg {
   /** The pool's `storageVersion` (12 = v2) when known; decides what an absent coverage word means. */
   storageVersion?: number;
   minLiquidity?: number;
+  /** Reserves not invested in a hook (`liquidReserves`), human token units like `res`. Absent = unread. */
+  liquidRes?: number;
   confidence?: number;
   staleExcess?: number;
   /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
@@ -272,6 +274,8 @@ interface HubBook {
   kneeBits?: number;
   storageVersion?: number;
   minLiquidity?: number;
+  /** Reserves not invested in a hook (`liquidReserves`), human token units like `res`. */
+  liquidRes?: number;
 }
 
 export interface PoolState {

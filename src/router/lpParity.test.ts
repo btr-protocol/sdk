@@ -75,6 +75,7 @@ function build(ph: Phase): NamedPool {
     legs[l.symbol] = {
       ...leg,
       minLiquidity: human(l.minLiquidity, l.decimals),
+      liquidRes: res,
       ...(l.anchor ? { anchor: l.anchor } : {}),
     };
   }
@@ -93,6 +94,7 @@ function build(ph: Phase): NamedPool {
         covBits: base.covBits,
         kneeBits: 0,
         minLiquidity: human(base.minLiquidity, base.decimals),
+        liquidRes: human(base.reserves, base.decimals),
       },
       // Every recorded phase settled cross exits at the live rate (cWad re-derives from the books).
       solvencyOk: true,

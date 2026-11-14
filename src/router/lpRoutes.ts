@@ -104,6 +104,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       covBits: s.hub.covBits,
       storageVersion: s.hub.storageVersion,
       minLiquidity: s.hub.minLiquidity,
+      liquidRes: s.hub.liquidRes,
       decimals: opts.backend?.baseDecimals,
     };
   }
@@ -117,9 +118,59 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     covBits: leg.covBits,
     storageVersion: leg.storageVersion,
     minLiquidity: leg.minLiquidity,
+    liquidRes: leg.liquidRes,
     decimals: leg.decimals,
   };
 }
+
+/** a >= b up to a relative 1e-12, so a live float value cannot false-refuse by one ulp. */
+const geq = (a: number, b: number): boolean => a >= b - 1e-12 * Math.max(Math.abs(a), Math.abs(b));
+
+/** A leg gate: a hard refusal, or a recall (the leg is invested and only the total book clears). */
+type LiquidGate = { reason: string } | { recall: string } | null;
+
+/** `need` must clear the liquid book. The chain recalls invested funds through the hook before it
+ *  reverts (`PoolHooksLib.sol:95-128`): when the leg is invested and TOTAL reserves clear `need`, the
+ *  route stays feasible and names the leg in `recall`; the on-chain simulation is the binding check
+ *  (the 1e-12 tolerance in {@link geq} is safe only because of it). A liquid figure above total is a
+ *  data mismatch: clamped to `reserves`, it never makes a refused route feasible. */
+function liquidClear(leg: LiabLeg, need: number): LiquidGate {
+  if (leg.liquidRes === undefined) return { reason: 'min-liquidity-unknown' };
+  const liquid = Math.min(leg.liquidRes, leg.reserves);
+  if (geq(liquid, need)) return null;
+  return geq(leg.reserves, need) ? { recall: leg.symbol } : { reason: 'min-liquidity' };
+}
+
+/** `withdraw`/`withdrawTo` keep `R_liq − out ≥ minLiquidity` (`PoolLiquidityLib.sol:465-466`,
+ *  `PoolHooksLib.liquidReserves` = reserves − invested). An unread floor or liquid book is unknown,
+ *  never 0. A cross exit's out leg has `ctx.cWad = 0` (`:403`, set only on the same-asset arm `:502`),
+ *  so `_fence` skips its `x` term there and only this floor applies. */
+function liquidFloor(leg: LiabLeg, out: number): LiquidGate {
+  if (leg.minLiquidity === undefined) return { reason: 'min-liquidity-unknown' };
+  return liquidClear(leg, out + leg.minLiquidity);
+}
+
+/** `_fence` (`PoolLiquidityLib.sol:566-577`) on the leg that burns `face` at rate `c`: the liquid book
+ *  must cover `x = R − (L − face)·c` (`:570-572`). Recall-type only: `x ≤ R` whenever `face ≤ L`
+ *  (checked upstream, `insufficient-liability`) and `c ≥ 0`, so total reserves always clear it. */
+function liquidFence(leg: LiabLeg, face: number, c: number): LiquidGate {
+  if (leg.liquidRes === undefined) return { reason: 'min-liquidity-unknown' };
+  const x = leg.reserves - (leg.liabilities - face) * c;
+  return geq(Math.min(leg.liquidRes, leg.reserves), x) ? null : { recall: leg.symbol };
+}
+
+/** Collects the gates of one route: the first hard refusal, else the legs needing a recall. */
+function gateRecall(...gates: LiquidGate[]): { reason: string } | { recallLegs: string[] } {
+  const recallLegs: string[] = [];
+  for (const g of gates) {
+    if (g && 'reason' in g) return g;
+    if (g && !recallLegs.includes(g.recall)) recallLegs.push(g.recall);
+  }
+  return { recallLegs };
+}
+
+const recallFields = (legs: string[]): { recall?: true; recallLegs?: string[] } =>
+  legs.length ? { recall: true, recallLegs: legs } : {};
 
 interface LpRouteStep {
   kind: 'swap' | 'deposit' | 'withdraw' | 'withdrawTo' | 'swapLiability';
@@ -146,6 +197,11 @@ export interface RankedLpRoute {
   minOut: number;
   hops: number;
   steps: LpRouteStep[];
+  /** Set when a leg is invested and only its total reserves clear the exit gate: the chain recalls
+   *  through the hook. The router cannot see whether the hook can deliver (no pre-outflow flag, a
+   *  paused venue); the on-chain simulation decides. `recallLegs` names the legs. */
+  recall?: true;
+  recallLegs?: string[];
 }
 
 export interface RankedLpPlan {
@@ -156,12 +212,10 @@ export interface RankedLpPlan {
 type RouteShell = Omit<RankedLpRoute, 'feasible' | 'reason'> & { steps: LpRouteStep[] };
 
 /** Single infeasible-shell pipeline: every dead route is built here, never as an inline literal. */
-const unfeasible = (route: RouteShell, reason: string, out = 0): RankedLpRoute => ({
-  ...route,
-  out,
-  feasible: false,
-  reason,
-});
+const unfeasible = (route: RouteShell, reason: string, out = 0): RankedLpRoute => {
+  const { recall: _r, recallLegs: _l, ...rest } = route; // a dead route never carries a recall
+  return { ...rest, out, feasible: false, reason };
+};
 
 const MARKET_DEAD: RouteShell = {
   id: 'market-first',
@@ -205,8 +259,15 @@ const flagGate = (
   return null;
 };
 
-const rankRoutes = (routes: RankedLpRoute[]): RankedLpRoute[] =>
-  [...routes].sort((a, b) => b.out - a.out || a.hops - b.hops || 0);
+/** Output first, then hops. The caller takes `best` with no retry, so a recall route (it may still
+ *  fail at simulation) leads only when it beats the best clean route by more than 10 bps. */
+export const rankRoutes = (routes: RankedLpRoute[]): RankedLpRoute[] => {
+  const s = [...routes].sort((a, b) => b.out - a.out || a.hops - b.hops || 0);
+  const top = s.find((r) => r.feasible);
+  if (!top?.recall) return s;
+  const clean = s.find((r) => r.feasible && !r.recall && r.out >= top.out * (1 - 0.001));
+  return clean ? [clean, ...s.filter((r) => r !== clean)] : s;
+};
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
@@ -512,8 +573,8 @@ async function crossExit(
     return unfeasible(CROSS_DEAD, 'coverage-wall');
   // `withdrawTo` reverts `InsufficientAmount` when the out leg would fall under its keeper floor.
   // Absent is unknown, never 0: a floor that was not read cannot be proven clear.
-  if (toLeg.minLiquidity === undefined) return unfeasible(CROSS_DEAD, 'min-liquidity-unknown');
-  if (toLeg.reserves < out + toLeg.minLiquidity) return unfeasible(CROSS_DEAD, 'min-liquidity');
+  const gate = gateRecall(liquidFloor(toLeg, out), liquidFence(fromLeg, withdrawValue, c));
+  if ('reason' in gate) return unfeasible(CROSS_DEAD, gate.reason);
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -534,7 +595,7 @@ async function crossExit(
       },
     ],
   };
-  return seasonGate(shell, targetSym, lpFaceIn, opts);
+  return seasonGate({ ...shell, ...recallFields(gate.recallLegs) }, targetSym, lpFaceIn, opts);
 }
 
 /** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `withPoolSolvency`):
@@ -778,8 +839,9 @@ async function transferExit(
           dOut,
         );
   if (!(exitOut > 0)) return unfeasible(shell, 'no-route');
-  if (toLeg.minLiquidity === undefined) return unfeasible(shell, 'min-liquidity-unknown');
-  if (toLeg.reserves < exitOut + toLeg.minLiquidity) return unfeasible(shell, 'min-liquidity');
+  const gate = gateRecall(liquidFloor(toLeg, exitOut), liquidFence(fromLeg, q.liabIn, c));
+  if ('reason' in gate) return unfeasible(shell, gate.reason);
+  Object.assign(shell, recallFields(gate.recallLegs));
   // The tail burns what the exit was priced on: the floored share count (raw-exact when decimals).
   const lpWithdraw =
     dOut === undefined ? q.lpAmountOut : rawToOut(floorRaw(q.lpAmountOut, dOut), dOut);
@@ -878,10 +940,14 @@ export async function rankRedeem(
     if (!Number.isFinite(actual))
       return { best: null, routes: [unfeasible(gated, solv ?? 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
-    if (leg.minLiquidity === undefined)
-      return { best: null, routes: [unfeasible(gated, 'min-liquidity-unknown')] };
-    if (leg.reserves < actual + leg.minLiquidity)
-      return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
+    // Fence at the pool rate: a degraded pool's book rate is `lastGoodC`, not in state: skipped.
+    const c = solv === null ? claimRate(holder.state) : null;
+    const gate = gateRecall(
+      liquidFloor(leg, actual),
+      c === null ? null : liquidFence(leg, face, c),
+    );
+    if ('reason' in gate) return { best: null, routes: [unfeasible(gated, gate.reason)] };
+    Object.assign(gated, recallFields(gate.recallLegs));
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;

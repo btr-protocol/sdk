@@ -8,9 +8,11 @@ import { toUnits } from '../utils/format';
 import {
   type LpRouteOpts,
   type PostMoveTollCtx,
+  type RankedLpRoute,
   TOLL_FUTURE_SLACK_MS,
   changeFace,
   rankRedeem,
+  rankRoutes,
 } from './lpRoutes';
 import { solvencyGate } from './lpRoutes.js';
 import type { NamedPool } from './route.js';
@@ -43,6 +45,7 @@ function pool(o?: { audfRes?: number; audfLiab?: number; nzdfMark?: number }): N
         kappaCovBps: 0,
         storageVersion: 7,
         minLiquidity: 0,
+        liquidRes: 2_000_000,
       },
     },
   };
@@ -387,7 +390,15 @@ function richPool(o: { res: number; liab: number }): NamedPool {
       solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
-      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0, storageVersion: 7, minLiquidity: 0 },
+      hub: {
+        res: 0,
+        liab: 0,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        storageVersion: 7,
+        minLiquidity: 0,
+        liquidRes: 0,
+      },
     },
   };
 }
@@ -452,6 +463,7 @@ describe('F5: integer face and mu (mu ≫ 1): same-asset and transfer never abov
       kappaCovBps: 0,
       storageVersion: 7,
       minLiquidity: 0,
+      liquidRes: 2_000_000,
     };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
@@ -743,6 +755,7 @@ describe('transfer-exit: the tail is sized at the post-fee index the second call
       kappaCovBps: 0,
       storageVersion: 7,
       minLiquidity: 0,
+      liquidRes: 2_000_000,
     };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
@@ -899,5 +912,222 @@ describe('an unread minLiquidity is unknown, never 0', () => {
     stub({ tolls: ALL });
     const r = (await route(pool(), 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
     expect(r?.feasible).toBe(true);
+  });
+});
+
+describe('exit gates on liquid reserves, not total', () => {
+  const post = { ...BE, postMoveExitTollWad: async () => 0n };
+  const setLeg = (
+    p: NamedPool,
+    sym: string,
+    patch: Partial<NamedPool['state']['legs'][string]>,
+  ) => {
+    p.state.legs[sym] = { ...p.state.legs[sym], ...patch };
+  };
+  type R = {
+    id: string;
+    feasible: boolean;
+    reason?: string;
+    out: number;
+    recall?: true;
+    recallLegs?: string[];
+  };
+  const find = (rs: unknown[], id: string) => (rs as R[]).find((x) => x.id === id) as R;
+  const IDS = ['cross-exit', 'transfer-exit'];
+  const same = (p: NamedPool) =>
+    rankRedeem([p], 'AUDF', 'AUDF', 1_000, { ...BE, previewWithdraw: async () => 990_000_000n });
+
+  test('invested out leg: liquid fails, total passes => feasible with recall', async () => {
+    stub({ tolls: ALL });
+    const base = await route(pool(), 'NZDF', 'AUDF', 10_000, post);
+    for (const id of IDS) {
+      const { out } = find(base, id);
+      expect(find(base, id).recall).toBeUndefined();
+      const p = pool();
+      setLeg(p, 'AUDF', { liquidRes: out - 0.01 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect(r.recall).toBe(true);
+      expect(r.recallLegs).toEqual(['AUDF']);
+    }
+  });
+  test('invested from leg: fence fails on liquid, passes on total => recall', async () => {
+    stub({ tolls: ALL });
+    // NZDF R = L = 1_000_000, face 10_000, C = 1 => x = 10_000.
+    for (const id of IDS) {
+      const p = pool();
+      setLeg(p, 'NZDF', { liquidRes: 9_999 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect(r.recallLegs).toEqual(['NZDF']);
+      const ok = pool();
+      setLeg(ok, 'NZDF', { liquidRes: 10_000 });
+      expect(find(await route(ok, 'NZDF', 'AUDF', 10_000, post), id).recall).toBeUndefined();
+    }
+  });
+  test('same-asset: invested and liquid fails, total passes => recall', async () => {
+    const p = pool();
+    setLeg(p, 'AUDF', { liquidRes: 500 });
+    const r = await same(p);
+    expect(r.best?.feasible).toBe(true);
+    expect(r.best?.recallLegs).toEqual(['AUDF']);
+  });
+  test('not invested and failing => refused', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 1_000_000 }); // liquid = total
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    const s = await same(p);
+    expect(s.best).toBeNull();
+    expect(s.routes[0].reason).toBe('min-liquidity');
+  });
+  test('failing against total reserves too => refused though invested', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 10 });
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    const s = await same(p);
+    expect(s.routes[0].reason).toBe('min-liquidity');
+  });
+  test('hub as from leg: invested hub fences with recall', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    p.state.hub = { ...(p.state.hub as NonNullable<typeof p.state.hub>), liquidRes: 100 };
+    const r = find(await route(p, 'USDC', 'AUDF', 10_000, post), 'cross-exit');
+    expect(r.feasible).toBe(true);
+    expect(r.recallLegs).toEqual(['USDC']);
+  });
+  test('relative 1e-12 boundary with non-integer values', async () => {
+    stub({ tolls: ALL });
+    const { out } = find(await route(pool(), 'NZDF', 'AUDF', 10_000, post), 'cross-exit');
+    const inside = pool();
+    setLeg(inside, 'AUDF', { liquidRes: out * (1 - 1e-13) });
+    const a = find(await route(inside, 'NZDF', 'AUDF', 10_000, post), 'cross-exit');
+    expect(a.feasible).toBe(true);
+    expect(a.recall).toBeUndefined(); // one ulp-scale shortfall is not a recall
+    const outside = pool();
+    setLeg(outside, 'AUDF', { liquidRes: out * (1 - 1e-9) });
+    expect(find(await route(outside, 'NZDF', 'AUDF', 10_000, post), 'cross-exit').recall).toBe(
+      true,
+    );
+  });
+  test('unread liquid book is unknown on every exit', async () => {
+    stub({ tolls: ALL });
+    for (const sym of ['AUDF', 'NZDF']) {
+      const p = pool();
+      setLeg(p, sym, { liquidRes: undefined });
+      for (const id of IDS) {
+        const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+        expect(r.feasible).toBe(false);
+        expect(r.reason).toBe('min-liquidity-unknown');
+      }
+    }
+    const p = pool();
+    setLeg(p, 'AUDF', { liquidRes: undefined });
+    expect((await same(p)).routes[0].reason).toBe('min-liquidity-unknown');
+  });
+  test('both gates recall at once: two legs named; transfer with both legs invested', async () => {
+    stub({ tolls: ALL });
+    const base = await route(pool(), 'NZDF', 'AUDF', 10_000, post);
+    for (const id of IDS) {
+      const p = pool();
+      setLeg(p, 'AUDF', { liquidRes: find(base, id).out - 0.01 });
+      setLeg(p, 'NZDF', { liquidRes: 9_999 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect([...(r.recallLegs ?? [])].sort()).toEqual(['AUDF', 'NZDF']);
+    }
+  });
+  test('a liquid figure above total is clamped: a refused route stays refused', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 5_000_000 });
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    expect((await same(p)).routes[0].reason).toBe('min-liquidity');
+  });
+  test('same-asset fence is recall-only: R=1e6 L=8e5 face=100, liquid under x', async () => {
+    const mkp = (liquidRes: number) => {
+      const p = pool({ audfRes: 1_000_000, audfLiab: 800_000 });
+      setLeg(p, 'AUDF', { liquidRes });
+      return p;
+    };
+    const ok = await same(mkp(1_000_000));
+    expect(ok.best?.feasible).toBe(true);
+    expect(ok.best?.recall).toBeUndefined();
+    // C = 4e6 / 3.8e6, x = 1e6 - 799_900 * C ~ 158_000; the payout (~100) clears the floor.
+    const r = await same(mkp(100_000));
+    expect(r.best?.feasible).toBe(true);
+    expect(r.best?.recallLegs).toEqual(['AUDF']);
+    // degraded pool: book rate unknown, the fence is skipped (the floor alone passes).
+    const d = mkp(100_000);
+    d.state.solvencyOk = false;
+    const dr = await same(d);
+    expect(dr.best?.recall).toBeUndefined();
+  });
+  test('an unfeasible route never carries recall', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { liquidRes: 9_000 });
+    setLeg(p, 'NZDF', { liquidRes: 9_999 });
+    // transfer: recall set at the gate, then a later refusal (toll over the payout) must drop it.
+    const r = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, postMoveExitTollWad: async () => 0n }),
+      'transfer-exit',
+    );
+    expect(r.feasible).toBe(true);
+    const dead = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, maxRedeem: () => 1 }),
+      'transfer-exit',
+    );
+    expect(dead.feasible).toBe(false);
+    expect(dead.recall).toBeUndefined();
+    expect(dead.recallLegs).toBeUndefined();
+    // cross: the recall is set before `seasonGate` refuses on the cooldown capacity.
+    const deadX = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, maxRedeem: () => 1 }),
+      'cross-exit',
+    );
+    expect(deadX.feasible).toBe(false);
+    expect(deadX.recall).toBeUndefined();
+    expect(deadX.recallLegs).toBeUndefined();
+  });
+});
+
+describe('rankRoutes: recall routes yield to clean ones within 10 bps', () => {
+  const mk = (id: 'cross-exit' | 'transfer-exit', out: number, recall: boolean): RankedLpRoute => ({
+    id,
+    label: id,
+    feasible: true,
+    out,
+    minOut: out,
+    hops: 1,
+    steps: [],
+    ...(recall ? { recall: true as const, recallLegs: ['AUDF'] } : {}),
+  });
+  test('equal, within bucket, beyond bucket', () => {
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 100, false)])[0].id).toBe(
+      'transfer-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 99.91, false)])[0].id).toBe(
+      'transfer-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 99.89, false)])[0].id).toBe(
+      'cross-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, false), mk('transfer-exit', 101, true)])[0].id).toBe(
+      'transfer-exit',
+    );
   });
 });

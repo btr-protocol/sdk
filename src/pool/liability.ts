@@ -42,6 +42,8 @@ export interface LiabLeg {
   storageVersion?: number;
   /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
   minLiquidity?: number;
+  /** Reserves − invested (`PoolHooksLib.liquidReserves`), human token units like `reserves`. Absent = unread. */
+  liquidRes?: number;
 }
 
 /** The leg's coverage word for a wall check: as read; absent is 0 only on a pool KNOWN to be a v1
