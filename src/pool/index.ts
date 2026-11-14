@@ -417,7 +417,10 @@ async function checkExpectedChain(
 /** Send a pool call with its gas LIMIT = estimate × buffer (`gasWithBuffer`). The wallet would
  *  otherwise estimate on its own, with no margin: a pool call read one block later can need more
  *  gas than the estimate, and the revert still bills the limit. The estimate runs from the
- *  connected account, the sender the wallet will use. */
+ *  connected account, the sender the wallet will use. Fails closed: an estimate that errors (revert,
+ *  timeout, node down, estimate above the cap) throws and nothing is sent. The front does not call
+ *  this writer (it sends through its own wallet path, which sends unbuffered on a non-revert
+ *  estimate failure), so the fail-closed rule binds direct sdk callers only. */
 async function sendPoolCall(
   provider: Eip1193Provider,
   to: Address,

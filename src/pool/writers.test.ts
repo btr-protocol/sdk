@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../abis/Pool.js';
-import { getSelector } from '../eth/abi.js';
+import { encodeErrorResult, getSelector } from '../eth/abi.js';
 import { Contract } from '../eth/contract.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
 import { deposit, swap, withdraw } from './index.js';
@@ -127,5 +127,45 @@ describe('pool send: estimate and send share the sender; a revert names the pool
     } as unknown as Eip1193Provider;
     await expect(swap(provider, POOL, swapParams())).rejects.toThrow(/pool reverted: Expired/);
     expect(seen).not.toContain('eth_sendTransaction');
+  });
+});
+
+describe("estimate reverts surface as the pool's own error", () => {
+  const expired = POOL_ABI.find((i) => i.type === 'error' && i.name === 'Expired');
+  const failing = (err: unknown) =>
+    ({
+      request: ({ method }: { method: string }) => {
+        if (method === 'eth_accounts') return Promise.resolve([USER]);
+        if (method === 'eth_estimateGas') return Promise.reject(err);
+        throw new Error(`unexpected ${method}`);
+      },
+    }) as unknown as Eip1193Provider;
+  const dep = { token: TOKEN, amount: 1n, minLpOut: 1n };
+
+  test('known error data decodes to a named ContractRevertError, nothing is sent', async () => {
+    const data = encodeErrorResult(expired as never, []);
+    const e = await deposit(
+      failing(Object.assign(new Error('reverted'), { data })),
+      POOL,
+      dep,
+    ).catch((x) => x);
+    expect(e.errorName).toBe('Expired');
+    expect(e.message).toBe('pool reverted: Expired');
+  });
+
+  test('revert data the ABI does not know keeps the transport error', async () => {
+    const err = Object.assign(new Error('reverted'), { data: '0xdeadbeef' });
+    await expect(deposit(failing(err), POOL, dep)).rejects.toBe(err);
+  });
+
+  test('an error with no revert data passes through (fail closed, nothing sent)', async () => {
+    const err = new Error('rate limited');
+    await expect(deposit(failing(err), POOL, dep)).rejects.toBe(err);
+  });
+
+  test('clipped revert data keeps the transport error', async () => {
+    const err = Object.assign(new Error('reverted'), { data: '0x203d82d8' + 'ab' });
+    const e = await deposit(failing(err), POOL, dep).catch((x) => x);
+    expect(e).toBeInstanceOf(Error);
   });
 });

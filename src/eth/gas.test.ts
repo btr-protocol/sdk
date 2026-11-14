@@ -51,3 +51,16 @@ describe('estimateCallGas', () => {
     expect(seen).toEqual([{ from: to, to, data: '0x' }]);
   });
 });
+
+describe('gasWithBuffer factor precision', () => {
+  test('a 5-decimal factor rounds UP to the next bp, never below estimate x factor', () => {
+    // 1.00001 -> 10,001 bps: 100,000 x 1.0001 = 100,010 (>= the exact 100,001)
+    expect(gasWithBuffer(100_000n, 1.00001)).toBe(100_010n);
+    expect(gasWithBuffer(100_000n, 1.00001) >= 100_001n).toBe(true);
+  });
+
+  test('float noise does not push an exact bp factor up a bp', () => {
+    expect(gasWithBuffer(100_000n, 1.1)).toBe(110_000n);
+    expect(gasWithBuffer(10_000n, 1.0001)).toBe(10_001n);
+  });
+});

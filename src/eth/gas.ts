@@ -10,7 +10,9 @@ import type { Eip1193Provider, TransactionRequest } from './types';
  * billing the whole limit (Monad bills the limit). A fixed buffer over the estimate covers that
  * drift; the cap bounds the buffer, never the estimate itself.
  *
- * Ceiling division, so the buffered value never lands below `estimate × factor`.
+ * Ceiling division on an integer basis-point factor, so the buffered value never lands below
+ * `estimate × factor`: a factor with more than 4 decimals is rounded UP to the next bp (1.00001 ->
+ * 1.0001), never down.
  */
 export const GAS_LIMIT_CAP = 16_777_216n;
 export const GAS_BUFFER_FACTOR = 1.25;
@@ -26,7 +28,8 @@ export function gasWithBuffer(
   if (estimate > cap) {
     throw new RangeError(`gas estimate ${estimate} exceeds the cap ${cap}`);
   }
-  const bps = BigInt(Math.round(factor * 10_000));
+  // toFixed(6) absorbs float noise (1.1 * 10000 = 11000.000000000002) before the ceil.
+  const bps = BigInt(Math.ceil(Number((factor * 10_000).toFixed(6))));
   const buffered = (estimate * bps + 9_999n) / 10_000n;
   return buffered < cap ? buffered : cap;
 }
