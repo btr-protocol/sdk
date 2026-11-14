@@ -138,6 +138,8 @@ for path in sorted(glob.glob(os.path.join(DEX, "*-v2.lanes.json"))):
     if set(feeds) != set(rec["feeds"]):
         raise SystemExit(f"{os.path.basename(path)}: lane legs and deploy feeds differ")
     gis = [f["globalIndex"] for f in feeds.values()]
+    if not gis:
+        raise SystemExit(f"{os.path.basename(path)}: wire-9 lane record lists no lanes")
     if len(set(gis)) != len(gis) or min(gis) < 0 or max(gis) >= V9_LANES_PER_SLOT:
         raise SystemExit(f"{os.path.basename(path)}: lane indices must be unique and below {V9_LANES_PER_SLOT}")
     if len({f["tickerId"] for f in feeds.values()}) != len(feeds) or len({f["feedId"] for f in feeds.values()}) != len(feeds):

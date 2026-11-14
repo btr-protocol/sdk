@@ -22,6 +22,15 @@ describe('oracle lane maps', () => {
       '0x0000000000000000000000000000000000000000000000000616a96484500000',
     );
     expect(feeds['USDC-USD']?.ref).toBe(true);
+    // The v9 feed name is the lane's own `feed` (the NXR signer symbol), not the v8 derivation.
+    expect(feeds.WETH?.feed).toBe('ETH-USDC');
+    expect(feeds['USDC-USD']?.feed).toBe('USDC-USD');
+  });
+
+  test('oracleFeedName is the wire-8 rule only: `<leg>-USDC` into the venue record feedIds', () => {
+    const v8 = oracleLaneMap(143, V1_ORACLE);
+    expect(v8?.wire).toBe('v8');
+    expect(v8?.feeds.WETH).toBeDefined();
     expect(oracleFeedName('WETH')).toBe('WETH-USDC');
     expect(oracleFeedName('USDC-USD')).toBe('USDC-USD');
   });
