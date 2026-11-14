@@ -1,7 +1,7 @@
 // bun test: LP exit quotes never promise more than the chain pays (review of feat/lp-exit-toll).
 // Every case here fails open on 26aaa3f: a missing toll input must leave the route pending.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { buildLeg } from '../amm/aimm.js';
+import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { backendConvert, quoteSwapLiabilityCoreAsync } from '../pool/liabilityQuote';
 import { toUnits } from '../utils/format';
@@ -36,7 +36,7 @@ function pool(o?: { audfRes?: number; audfLiab?: number; nzdfMark?: number }): N
         AUDF: leg('AUDF', o?.audfRes ?? 1_000_000, o?.audfLiab ?? 1_000_000),
         NZDF: leg('NZDF', 1_000_000, 1_000_000, o?.nzdfMark ?? 1),
       },
-      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
     },
   };
 }
@@ -380,7 +380,7 @@ function richPool(o: { res: number; liab: number }): NamedPool {
       solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
-      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0 },
+      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
     },
   };
 }
@@ -438,7 +438,7 @@ describe('F5: integer face and mu (mu ≫ 1): same-asset and transfer never abov
     stub({ tolls: ALL });
     const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
     p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
-    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0 };
+    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
     let post: PostMoveTollCtx | undefined;
@@ -722,7 +722,7 @@ describe('transfer-exit: the tail is sized at the post-fee index the second call
     stub({ tolls: ALL, lpFee: (out) => out / 100n });
     const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
     p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
-    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0 };
+    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
     let post: PostMoveTollCtx | undefined;
@@ -789,5 +789,49 @@ describe('solvencyGate: the one gate the ranker and the send both run', () => {
     expect(at({ solvencyOk: null })).toBe('toll-pending');
     expect(at({ solvencyAtMs: T - 60_000 })).toBe('toll-stale');
     expect(at({ solvencyAtMs: T + 60_000 })).toBe('toll-clock');
+  });
+});
+
+describe('the same-asset exit is priced by the preview it is given', () => {
+  test('stale words, then a different preview: the figure follows the preview passed in', async () => {
+    const p = pool();
+    p.state.solvencyAtMs = 1_000; // far older than the bound against `now`
+    const at = (raw: bigint) =>
+      rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
+        ...BE,
+        now: () => 10_000_000,
+        previewWithdraw: async () => raw,
+      });
+    expect(solvencyGate(p.state, { ...BE, now: () => 10_000_000 })).toBe('toll-stale');
+    const a = await at(990_000_000n);
+    expect(a.best?.out).toBe(990);
+    expect((await at(900_000_000n)).best?.out).toBe(900);
+    // A lagging replica's preview is the chain's own answer for the block it read: the route is
+    // priced by it, and the send floor (minOut) follows it.
+    expect(a.best?.minOut).toBe(990 * (1 - BE.slippageFrac));
+  });
+});
+
+describe('an absent coverage word is not a zero the wall check can use', () => {
+  const unversioned = (): NamedPool => {
+    const p = pool();
+    // A leg of an unknown generation (no storageVersion) carrying no covBits.
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, storageVersion: undefined, covBits: undefined };
+    return p;
+  };
+  test('cross-exit into it is refused, never walled by a 0', async () => {
+    stub({ tolls: ALL });
+    const r = (await route(unversioned(), 'NZDF', 'AUDF', 10_000)).find(
+      (x) => x.id === 'cross-exit',
+    );
+    expect(r?.feasible).toBe(false);
+    expect(r?.reason).toBe('backend-error'); // the wire refuses it (CovWordMissing) before any wall check
+  });
+  test('known v1: the same leg prices as before', async () => {
+    stub({ tolls: ALL });
+    const p = unversioned();
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, storageVersion: 1 };
+    const r = (await route(p, 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
+    expect(r?.feasible).toBe(true);
   });
 });

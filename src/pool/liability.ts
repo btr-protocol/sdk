@@ -37,9 +37,17 @@ export interface LiabLeg {
   decimals?: number;
   /** `Asset.covBits`: the leg's coverage terms (`decodeCovBits`). Absent / 0 = no wall check. */
   covBits?: number;
+  /** The pool's `storageVersion` when known: decides what an absent `covBits` means ({@link covBitsOf}). */
+  storageVersion?: number;
   /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
   minLiquidity?: number;
 }
+
+/** The leg's coverage word for a wall check: as read; absent is 0 only on a pool KNOWN to be below v2
+ *  (the field does not exist there). Absent on v2 or on an unknown generation is null: a 0 there would
+ *  skip the walls the chain enforces, so the caller refuses. */
+export const covBitsOf = (l: { covBits?: number; storageVersion?: number }): number | null =>
+  l.covBits ?? (l.storageVersion !== undefined && l.storageVersion !== 12 ? 0 : null);
 
 export const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
 

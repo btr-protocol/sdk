@@ -2,7 +2,7 @@
 // backend convert stubbed by btr-core's own recorded answer (not the sdk's port). Fixture is generated
 // from the dex-evm recording; do not edit by hand.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { buildLeg } from '../amm/aimm.js';
+import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { poolSolvency } from '../pool/liability.js';
 import vectors from './__fixtures__/lp_parity_vectors.json';
@@ -89,6 +89,7 @@ function build(ph: Phase): NamedPool {
         liab: human(base.liabilities, base.decimals),
         vegaBps: 0,
         kappaCovBps: 0,
+        storageVersion: 1,
         covBits: base.covBits,
         kneeBits: 0,
         minLiquidity: human(base.minLiquidity, base.decimals),

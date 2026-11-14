@@ -9,6 +9,7 @@ import type { PoolState, QuoteRouteWire, WireMeta, routeAsync } from '../amm/aim
 import {
   type LiabLeg,
   WAD,
+  covBitsOf,
   covWallsF,
   exitValue,
   feeCredit,
@@ -36,10 +37,11 @@ export interface LpRouteOpts {
   backend?: LpBackend;
   /** `Pool.previewWithdraw(tk, lp)` (`PoolLiquidityLib.previewWithdraw`): the same-asset payout in
    *  raw token units, net of the settlement toll off `exitCap`'s lower-pass sweep. `lpShares` is the
-   *  LP share amount being redeemed (display units). Null = unread. A same-asset exit prices only
-   *  off a live (`solvencyOk`), fresh `poolSolvencyWad` toll; the preview can only lower that quote,
-   *  never raise it or stand in for it. A degraded pool (a dark leg) is `feed-unavailable` before
-   *  the preview is read. See `getPreviewWithdraw`. */
+   *  LP share amount being redeemed (display units). Null = unread. The same-asset exit is priced by
+   *  the chain's own preview: with live, fresh solvency words it is the lower of the preview and the
+   *  state model; with the words pending, stale, off the chain clock or the pool degraded
+   *  (`feed-unavailable`) the preview alone prices it, and an unread preview leaves it unpriced under
+   *  the gate's reason. Cross and transfer exits never use it. See `getPreviewWithdraw`. */
   previewWithdraw?: (pool: NamedPool, symbol: string, lpShares: number) => Promise<bigint | null>;
   /** The C toll (WAD) the transfer-exit's second call (`withdraw`) pays: `exitCap`'s sweep over the
    *  books AFTER the `swapLiability` claim move (both legs' claims and the exposure high-water
@@ -48,9 +50,9 @@ export interface LpRouteOpts {
   postMoveExitTollWad?: (ctx: PostMoveTollCtx) => Promise<bigint | null>;
   /** Max age (ms) of the state's `poolSolvencyWad` words (`solvencyAtMs`) an exit prices off;
    *  older or unstamped = `toll-stale`, stamped further ahead of `now` than {@link TOLL_FUTURE_SLACK_MS}
-   *  = `toll-clock` (default {@link MAX_TOLL_AGE_MS}). The toll
-   *  tracks the books and a stale low word overquotes; `previewWithdraw` does not rescue a stale
-   *  word (the exit is refused before the preview is read). */
+   *  = `toll-clock` (default {@link MAX_TOLL_AGE_MS}). The toll tracks the books and a stale low word
+   *  overquotes, so cross and transfer exits are refused on it; the same-asset exit drops the model
+   *  and is priced by `previewWithdraw` alone. */
   maxTollAgeMs?: number;
   /** Clock for the age check (ms epoch). Must be CHAIN time (sdk `chainNowMs`): the stamp is a block
    *  header time. Default `Date.now`, right only for a device whose clock is synced to the chain. */
@@ -99,6 +101,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       liabilities: s.hub.liab,
       indexWad,
       covBits: s.hub.covBits,
+      storageVersion: s.hub.storageVersion,
       minLiquidity: s.hub.minLiquidity,
       decimals: opts.backend?.baseDecimals,
     };
@@ -111,6 +114,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     liabilities: leg.liab,
     indexWad,
     covBits: leg.covBits,
+    storageVersion: leg.storageVersion,
     minLiquidity: leg.minLiquidity,
     decimals: leg.decimals,
   };
@@ -493,9 +497,11 @@ async function crossExit(
   const protoFee =
     (q.grossOut * q.protoFeeBps) / 1e4 + (toll * (holder.state.protoSharePct ?? 0)) / 100;
   const face = feeCredit(protoFee, toLeg.liabilities + lpCredit, stampedC);
+  const toBits = covBitsOf(toLeg);
+  if (toBits === null) return unfeasible(CROSS_DEAD, 'toll-pending');
   if (
     covWallsF(
-      toLeg.covBits ?? 0,
+      toBits,
       toLeg.reserves,
       toLeg.liabilities,
       toLeg.reserves - out,

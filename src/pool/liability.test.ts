@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
-import { type PoolState, buildLeg } from '../amm/aimm.js';
+import type { PoolState } from '../amm/aimm.js';
+import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
 // bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
 // PoolSolvencyLib.solvency/previewCap, PoolLiquidityLib.exitMu and swapLiability.
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
+  covBitsOf,
   exitCap,
   exitValue,
   legCoverage,
@@ -23,6 +25,7 @@ const legOf = (symbol: string, reserves: number, liabilities: number) => ({
   symbol,
   reserves,
   liabilities,
+  storageVersion: 1,
 });
 
 // Balanced stable core: USDC hub + two $1 spokes. Small size ⇒ no clamp, negligible impact.
@@ -35,7 +38,7 @@ function balancedState(): PoolState {
       AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
       NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
     },
-    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
   };
 }
 
@@ -44,7 +47,7 @@ describe('the one off-chain replica of pool-level settlement', () => {
   const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
     base: 'USDC',
     legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE, 0) },
-    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0 },
+    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
   });
 
   test('poolSolvency is Σ R·m / Σ L·m, marks in base per token', () => {
@@ -364,7 +367,7 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
         0,
       ),
     },
-    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
   });
 
   const run = async (
@@ -457,8 +460,18 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
   });
 
   test('a null conversion makes the liability quote null, not a throw', async () => {
-    const inLeg = { symbol: 'WMON', reserves: 1_000_000, liabilities: 1_000_000 };
-    const outLeg = { symbol: 'AUDF', reserves: 1_000_000, liabilities: 1_000_000 };
+    const inLeg = {
+      symbol: 'WMON',
+      reserves: 1_000_000,
+      liabilities: 1_000_000,
+      storageVersion: 1,
+    };
+    const outLeg = {
+      symbol: 'AUDF',
+      reserves: 1_000_000,
+      liabilities: 1_000_000,
+      storageVersion: 1,
+    };
     const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 1_000, 1, async () => null);
     expect(q).toBeNull();
   });
@@ -473,5 +486,15 @@ describe('minLpAmountOut (applySlip semantics, rounds DOWN)', () => {
     expect(minLpAmountOut(123n, 0)).toBe(123n);
     expect(() => minLpAmountOut(123n, 1)).toThrow();
     expect(() => minLpAmountOut(123n, Number.NaN)).toThrow();
+  });
+});
+
+describe('covBitsOf: what an absent coverage word means for a wall check', () => {
+  test('as read; 0 only on a known pre-v2 pool; null (refuse) on v2 or an unknown generation', () => {
+    expect(covBitsOf({ covBits: 45 })).toBe(45);
+    expect(covBitsOf({ covBits: 0, storageVersion: 12 })).toBe(0);
+    expect(covBitsOf({ storageVersion: 1 })).toBe(0);
+    expect(covBitsOf({ storageVersion: 12 })).toBeNull();
+    expect(covBitsOf({})).toBeNull();
   });
 });

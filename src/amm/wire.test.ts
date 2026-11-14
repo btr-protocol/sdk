@@ -12,6 +12,7 @@ import {
   quoteLegAsync,
   servableAddr,
 } from './aimm';
+import { buildLegV1 } from './legFixture';
 import { STABLE_PROFILE } from './profiles';
 
 // The wire is LEG-shaped; the chain settles PATHS. Everything here pins the two path quantities
@@ -19,14 +20,14 @@ import { STABLE_PROFILE } from './profiles';
 // `_covToll(cOut, …)`) and the endpoint-max vega (`acc.vegaBps = max(cIn, cOut)`) - because the
 // first cut of this codec dropped both and every spoke->base sell was quoted toll-free.
 
-const HUB = { res: 200_000, liab: 250_000, vegaBps: 10_000, kappaCovBps: 600 };
+const HUB = { res: 200_000, liab: 250_000, vegaBps: 10_000, kappaCovBps: 600, storageVersion: 1 };
 const meta = { addressOf: (s: string): string => `0x${s}`, decimalsOf: (): number => 18 };
 const ADDRS = { pool: '0xpool', token: '0xtoken', base: '0xbase' };
 
 const state = (hub?: PoolState['hub']): PoolState => ({
   base: 'USDC',
   legs: {
-    USDT: buildLeg(
+    USDT: buildLegV1(
       'USDT',
       1,
       300,
@@ -195,7 +196,7 @@ describe('legToQuoteBody', () => {
   });
 
   test('a buy scales amount_in to the spoke decimals (18 base -> 6 spoke)', () => {
-    const l6 = buildLeg('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
+    const l6 = buildLegV1('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
     const b = legToQuoteBody(l6, 2.5, false, 18, INTERIOR_ENDPOINT, ADDRS);
     expect(BigInt(b.amount_in)).toBe(2_500_000n);
   });
@@ -530,9 +531,13 @@ describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => 
     const s = poolStateToWire('p', '0xp', state(), meta, 18);
     expect(s.spokes[0].pricing.cov_bits).toBe(0); // the fixture leg carries none: v1 reading
   });
-  test('v1 (or unknown generation): an absent word is 0, as before', () => {
-    expect(body(leg()).cov_bits).toBe(0);
+  test('v1 known: an absent word is 0, as before', () => {
+    expect(body(leg({ storageVersion: 1 })).cov_bits).toBe(0);
     expect(body(leg({ storageVersion: 7 })).knee_bits).toBe(0);
+  });
+  test('generation unknown: an absent word is unquotable, never a 0 that skips toll and walls', () => {
+    expect(() => body(leg())).toThrow(CovWordMissing);
+    expect(() => hubEndpointWire({ ...HUB, storageVersion: undefined }, 6)).toThrow(CovWordMissing);
   });
   test('v2: an absent word is unquotable, never a 0 that prices no toll and no walls', () => {
     expect(() => body(leg({ storageVersion: 12 }))).toThrow(CovWordMissing);

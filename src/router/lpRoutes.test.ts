@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { buildLeg } from '../amm/aimm.js';
+import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 // bun test: dual-route LP ranking (backend-priced) + EIP-5792 LP batch builders (spec §2).
 import { covDebitToll } from '../pool/covLaw';
@@ -47,7 +47,13 @@ function pool(
           0,
         ),
       },
-      hub: { res: o?.hubRes ?? 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: {
+        res: o?.hubRes ?? 2_000_000,
+        liab: 2_000_000,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        storageVersion: 1,
+      },
     },
   };
 }
@@ -566,7 +572,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
       solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs,
-      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
     },
   };
 }

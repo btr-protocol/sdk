@@ -16,6 +16,7 @@ import {
   type LiabLeg,
   type SwapLiabilityQuote,
   WAD,
+  covBitsOf,
   covWallsF,
   feeCredit,
   idxOf,
@@ -57,9 +58,11 @@ export async function quoteSwapLiabilityCoreAsync(
   const liabOut = conv / poolC;
   // The credited leg's claims grow with no reserve moving: coverage falls, never onto c_min
   // (`PoolLiquidityLib.swapLiability` requireWalls), else the chain reverts.
+  const outBits = covBitsOf(outLeg);
+  if (outBits === null) return null;
   if (
     covWallsF(
-      outLeg.covBits ?? 0,
+      outBits,
       outLeg.reserves,
       outLeg.liabilities,
       outLeg.reserves,

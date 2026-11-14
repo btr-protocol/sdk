@@ -357,15 +357,16 @@ export class CovWordMissing extends Error {
   }
 }
 
-/** A coverage word for the wire: as read; absent is 0 on a v1 pool (the field does not exist there)
- *  and unquotable on a v2 one, where 0 is a different law (no toll, no walls). */
+/** A coverage word for the wire: as read; absent is 0 only on a pool KNOWN to be below v2 (the field
+ *  does not exist there), and unquotable on a v2 or an unknown generation, where 0 is a different law
+ *  (no toll, no walls). */
 export function covWord(
   word: number | undefined,
   storageVersion: number | undefined,
   what: string,
 ) {
   if (word !== undefined) return word;
-  if (storageVersion === STORAGE_V2) throw new CovWordMissing(what);
+  if (storageVersion === undefined || storageVersion === STORAGE_V2) throw new CovWordMissing(what);
   return 0;
 }
 
