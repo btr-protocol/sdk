@@ -16,6 +16,7 @@ import { estimateCallGas } from '../eth/gas';
 import { multicallStrict } from '../eth/multicall';
 import { getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
+import { MAX_CLOCK_SKEW_S } from '../utils/constants';
 import { toAsset } from './asset.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -322,7 +323,6 @@ const DEFAULT_DEADLINE_S = 600;
 export const MAX_DEADLINE_S = 1_800;
 /** Largest |chain time − device clock| {@link syncChainClock} accepts. A wider gap is a wrong
  *  device clock or a lying RPC; either way the deadline it would anchor is not known. */
-import { MAX_CLOCK_SKEW_S } from '../utils/constants';
 export { MAX_CLOCK_SKEW_S };
 /** Chain time minus this device's clock, seconds, from the last {@link syncChainClock}. */
 let chainSkewS = 0;

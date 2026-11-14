@@ -305,7 +305,7 @@ test('served chains: quorum endpoints have distinct eTLD+1 operators', () => {
 
 // One endpoint down must not halt the front's reads: the quorum needs two agreeing answers of three.
 // Monad (143) is the chain the front's send path reads through the quorum.
-test('the Monad quorum list has three endpoints (one down still leaves two to agree)', () => {
+test('the Monad quorum list has three endpoints (the front pins on the two that answer when one is down)', () => {
   expect((CHAIN_QUORUM_RPCS[143] ?? []).length).toBeGreaterThanOrEqual(3);
 });
 
