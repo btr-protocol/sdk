@@ -16,7 +16,6 @@ import {
 import {
   backendConvert,
   quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
 } from './liabilityQuote';
 
@@ -102,12 +101,6 @@ describe('liabilitySwapEnabled (flag bit gate)', () => {
     expect(liabilitySwapEnabled(1 << 5)).toBe(true);
     expect(liabilitySwapEnabled(0b111111)).toBe(true);
     expect(liabilitySwapEnabled(0b011111)).toBe(false);
-  });
-});
-
-describe('quoteSwapLiabilityCore (sync stub)', () => {
-  test('sync entry throws: conversion is backend SSOT, use the Async core', () => {
-    expect(() => quoteSwapLiabilityCore()).toThrow();
   });
 });
 

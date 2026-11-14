@@ -152,7 +152,7 @@ export async function getPoolSolvency(
 
 /** `PoolState` carrying both `poolSolvencyWad` words the LP exit quotes need: `solvencyOk` (the
  *  `ok` word) and `exitTollWad` (the toll word, the settlement toll only while `ok`), stamped with
- *  the read time (`solvencyAtMs`; `sol.observedAtMs`, else now). */
+ *  the read time in CHAIN time (`solvencyAtMs`; `sol.observedAtMs`, else {@link chainNowMs}). */
 export function withPoolSolvency<S extends PoolState>(
   state: S,
   sol: { ok: boolean; exitTollWad: bigint | null; observedAtMs?: number },
@@ -161,7 +161,7 @@ export function withPoolSolvency<S extends PoolState>(
     ...state,
     solvencyOk: sol.ok,
     exitTollWad: sol.ok ? sol.exitTollWad : null,
-    solvencyAtMs: sol.observedAtMs ?? Date.now(),
+    solvencyAtMs: sol.observedAtMs ?? chainNowMs(),
   };
 }
 
@@ -173,7 +173,7 @@ export async function getPreviewWithdraw(
   poolAddress: Address,
   tokenAddress: Address,
   lp: bigint,
-): Promise<{ amountOut: bigint; haircut: bigint }> {
+): Promise<bigint> {
   const data = encodeFn({
     abi: POOL_ABI,
     functionName: 'previewWithdraw',
@@ -183,12 +183,12 @@ export async function getPreviewWithdraw(
     method: 'eth_call',
     params: [{ to: poolAddress, data }, 'latest'],
   })) as Hex;
-  const [amountOut, haircut] = decodeFn<[bigint, bigint]>({
+  const [amountOut] = decodeFn<[bigint, bigint]>({
     abi: POOL_ABI,
     functionName: 'previewWithdraw',
     data: result,
   });
-  return { amountOut, haircut };
+  return amountOut;
 }
 
 /** The `LpRouteOpts.previewWithdraw` callback over {@link getPreviewWithdraw}: display LP shares to
@@ -205,7 +205,7 @@ export function previewWithdrawFor(
     const lp = toUnits(lpShares, r.decimals);
     if (lp <= 0n) return null;
     try {
-      return (await getPreviewWithdraw(provider, pool.addr as Address, r.token, lp)).amountOut;
+      return await getPreviewWithdraw(provider, pool.addr as Address, r.token, lp);
     } catch {
       return null;
     }
@@ -246,7 +246,6 @@ export {
 } from './liability.js';
 export {
   quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
 } from './liabilityQuote.js';
 export type { Custody, HookSlot, OracleConfig, RiskConfig } from './storage.js';
@@ -409,6 +408,9 @@ export { MAX_CLOCK_SKEW_S };
 let chainSkewS = 0;
 
 const chainNowS = (): number => Math.floor(Date.now() / 1000) + chainSkewS;
+/** Chain time in ms (the device clock plus the offset of the last {@link syncChainClock}). The clock
+ *  for comparing against chain stamps such as `solvencyAtMs`. */
+export const chainNowMs = (): number => Date.now() + chainSkewS * 1000;
 
 /**
  * Anchor every deadline to CHAIN time: reads the latest block's timestamp through `provider`

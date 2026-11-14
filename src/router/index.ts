@@ -749,7 +749,14 @@ export {
   aggregatePairDepthAsync,
 } from './depth.js';
 export type { LpRouteOpts, RankedLpRoute, RankedLpPlan } from './lpRoutes.js';
-export { hexToF64, toRawHex, wirePlanToSwap, rankDeposit, rankRedeem } from './lpRoutes.js';
+export {
+  hexToF64,
+  toRawHex,
+  wirePlanToSwap,
+  rankDeposit,
+  rankRedeem,
+  tollStaleReason,
+} from './lpRoutes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ON-CHAIN ROUTER

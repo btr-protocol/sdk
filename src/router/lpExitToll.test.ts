@@ -5,7 +5,13 @@ import { buildLeg } from '../amm/aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { backendConvert, quoteSwapLiabilityCoreAsync } from '../pool/liabilityQuote';
 import { toUnits } from '../utils/format';
-import { type LpRouteOpts, type PostMoveTollCtx, rankRedeem } from './lpRoutes';
+import {
+  type LpRouteOpts,
+  type PostMoveTollCtx,
+  TOLL_FUTURE_SLACK_MS,
+  changeFace,
+  rankRedeem,
+} from './lpRoutes';
 import type { NamedPool } from './route.js';
 
 const SIG = sigmaSeed('stable');
@@ -45,7 +51,11 @@ const BE: LpRouteOpts = {
 
 /** Identity claim quote. `tolls` picks which claim-toll words the back sends (0 each). */
 function stub(
-  o: { tolls?: ('debit_toll' | 'credit_toll' | 'c_toll')[]; out?: (inRaw: bigint) => bigint } = {},
+  o: {
+    tolls?: ('debit_toll' | 'credit_toll' | 'c_toll')[];
+    out?: (inRaw: bigint) => bigint;
+    lpFee?: (outRaw: bigint) => bigint;
+  } = {},
 ) {
   const sent: Record<string, unknown>[] = [];
   // @ts-expect-error stub fetch
@@ -66,7 +76,7 @@ function stub(
         spread_pbps: 0,
         cov_toll: '0x0',
         proto_fee: '0x0',
-        lp_fee: '0x0',
+        lp_fee: hex(o.lpFee ? o.lpFee(out) : 0n),
         ...extra,
       }),
     };
@@ -199,7 +209,9 @@ describe('F3: same-asset toll is the settlement (lower-pass) toll', () => {
     expect(r.reason).toBe('toll-pending');
   });
 
-  test('degraded pool with previewWithdraw: refuses before reading the preview', async () => {
+  // Exits are never blocked: a dark leg cannot be priced off the state's toll word, so the chain's own
+  // preview (the lower-pass toll it will charge) prices a same-asset exit.
+  test('degraded pool with previewWithdraw: the same-asset exit is priced by the preview', async () => {
     const calls: [string, number][] = [];
     const [r] = await route(dark(), 'AUDF', 'AUDF', 10_000, {
       ...BE,
@@ -209,10 +221,28 @@ describe('F3: same-asset toll is the settlement (lower-pass) toll', () => {
         return 9_800_000_000n;
       },
     });
-    expect(calls).toEqual([]);
+    expect(calls).toEqual([['AUDF', 10_000]]);
+    expect(r.feasible).toBe(true);
+    expect(r.out).toBe(9_800);
+    expect(r.minOut).toBeCloseTo(9_800 * (1 - BE.slippageFrac), 6);
+  });
+
+  test('degraded pool with an unread preview: unpriced, never a zero or a model price', async () => {
+    const [r] = await route(dark(), 'AUDF', 'AUDF', 10_000, {
+      ...BE,
+      previewWithdraw: async () => null,
+    });
     expect(r.feasible).toBe(false);
     expect(r.reason).toBe('feed-unavailable');
     expect(r.out).toBe(0);
+  });
+
+  test('a degraded pool still refuses a claim larger than the leg owes', async () => {
+    const [r] = await route(dark(), 'AUDF', 'AUDF', 2_000_000, {
+      ...BE,
+      previewWithdraw: async () => 9_800_000_000n,
+    });
+    expect(r.reason).toBe('insufficient-liability');
   });
 
   test('a live pool takes the lower of the state toll and the preview', async () => {
@@ -588,7 +618,6 @@ describe('solvency freshness fails closed', () => {
   test.each([
     ['unstamped', undefined],
     ['null stamp', null],
-    ['future stamp', 1_000_001],
   ] as const)('%s: same-asset, cross and transfer are toll-stale', async (_name, at) => {
     stub({ tolls: ALL });
     const p = pool();
@@ -627,5 +656,101 @@ describe('same-asset preview can only lower the model quote', () => {
     expect(r.feasible).toBe(true);
     expect(r.out).toBe(model.out);
     expect(r.out).toBeLessThan(10_000);
+  });
+});
+
+describe('the stamp is chain time, compared with chain time', () => {
+  const T = 1_700_000_000_000;
+  const at = (stamp: number, now: number, max?: number) => {
+    const p = pool();
+    p.state.exitTollWad = 10n ** 15n;
+    p.state.solvencyAtMs = stamp;
+    return {
+      p,
+      opts: { ...BE, now: () => now, ...(max ? { maxTollAgeMs: max } : {}) } as LpRouteOpts,
+    };
+  };
+  const reason = async (x: ReturnType<typeof at>) =>
+    (await route(x.p, 'AUDF', 'AUDF', 1_000, x.opts))[0];
+
+  test('a device 100 s behind the chain: a stamp read now ranks when now is the chain clock', async () => {
+    // Device clock T - 100 s; chain time T. The stamp is the header time, ahead of the device.
+    const devicePrices = await reason(at(T, T - 100_000));
+    expect(devicePrices.reason).toBe('toll-clock');
+    const chainPrices = await reason(at(T, T + 2_000));
+    expect(chainPrices.feasible).toBe(true);
+  });
+
+  test('61 s old in chain time against a 60 s bound is toll-stale; 60 s is fresh', async () => {
+    expect((await reason(at(T, T + 61_000, 60_000))).reason).toBe('toll-stale');
+    expect((await reason(at(T, T + 60_000, 60_000))).feasible).toBe(true);
+  });
+
+  test('a stamp up to the future slack ahead reads as age 0; beyond it is refused as toll-clock', async () => {
+    expect((await reason(at(T + TOLL_FUTURE_SLACK_MS, T))).feasible).toBe(true);
+    const far = await reason(at(T + TOLL_FUTURE_SLACK_MS + 1, T));
+    expect(far.feasible).toBe(false);
+    expect(far.reason).toBe('toll-clock');
+    expect(far.out).toBe(0);
+  });
+
+  test('a non-finite clock fails closed', async () => {
+    expect((await reason(at(T, Number.NaN))).reason).toBe('toll-stale');
+  });
+});
+
+describe('transfer-exit: the tail is sized at the post-fee index the second call reads', () => {
+  test('swapLiability books its LP fee into the out leg index before the mint; the tail face follows it', async () => {
+    // lp fee 1% of the converted amount; rich books as in the F5 case. Identity claim conversion.
+    stub({ tolls: ALL, lpFee: (out) => out / 100n });
+    const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
+    p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
+    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0 };
+    const idx = 1_000_900_900_000_000_000n;
+    const tw = 7n * 10n ** 15n;
+    let post: PostMoveTollCtx | undefined;
+    const opts: LpRouteOpts = {
+      ...BE,
+      liquidityIndexWad: () => Number(idx),
+      postMoveExitTollWad: async (ctx) => {
+        post = ctx;
+        return tw;
+      },
+    };
+    const r = (await route(p, 'NZDF', 'AUDF', 0.999, opts)).find((x) => x.id === 'transfer-exit');
+    expect(r?.feasible).toBe(true);
+    const lpBurn = toUnits(r?.steps[1].amountIn ?? 0, 6);
+    const ps = post!.postState;
+    const raw = (v: number) => BigInt(Math.round(v * 1e6));
+    const books = [ps.hub!, ...Object.values(ps.legs)].map((l) => {
+      const b = l as { res: number; liab: number };
+      return [raw(b.res), raw(b.liab)] as const;
+    });
+    const capW =
+      (books.reduce((t, [x]) => t + x, 0n) * WAD) / books.reduce((t, [, l]) => t + l, 0n);
+    const a = ps.legs.AUDF;
+    const fee = (0.999 * 0.9999) / 100; // ~1% of the converted amount, in face (C = 1)
+    const idxPost = BigInt(Math.floor(Number(idx) * (1 + fee / 1_000)));
+    const pre = chainSame(lpBurn, idx, raw(a.res), raw(a.liab), capW, tw);
+    const postIdx = chainSame(lpBurn, idxPost, raw(a.res), raw(a.liab), capW, tw);
+    expect(postIdx).toBeGreaterThan(pre);
+    const got = toUnits(r?.out ?? 0, 6);
+    // Never above the chain at the index the call reads, and priced on that index, not the pre-mint one.
+    expect(got).toBeLessThanOrEqual(postIdx);
+    expect(got).toBeGreaterThan(pre);
+  });
+});
+
+describe('changeFace: a missing book is refused, never conjured from undefined', () => {
+  test('hub, leg and a leg with no entry', () => {
+    const p = pool();
+    expect(changeFace(p.state, 'USDC', 5)).toBe(true);
+    expect(p.state.hub!.liab).toBe(2_000_005);
+    expect(changeFace(p.state, 'AUDF', -5)).toBe(true);
+    expect(p.state.legs.AUDF.liab).toBe(999_995);
+    const before = Object.keys(p.state.legs).join();
+    expect(changeFace(p.state, 'GHOST', 1)).toBe(false);
+    expect(Object.keys(p.state.legs).join()).toBe(before);
+    expect(Object.keys(p.state.legs)).not.toContain('GHOST');
   });
 });

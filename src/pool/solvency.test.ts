@@ -1,7 +1,13 @@
 import { expect, test } from 'bun:test';
 import type { PoolState } from '../amm/aimm';
 import type { Eip1193Provider } from '../eth/types';
-import { getPoolSolvency, previewWithdrawFor, withPoolSolvency } from './index';
+import {
+  chainNowMs,
+  getPoolSolvency,
+  previewWithdrawFor,
+  syncChainClock,
+  withPoolSolvency,
+} from './index';
 
 const pool = '0x1111111111111111111111111111111111111111' as const;
 const token = '0x2222222222222222222222222222222222222222' as const;
@@ -70,4 +76,32 @@ test('previewWithdrawFor: display shares go out raw at the leg decimals', async 
   expect(sent[0].slice(-64)).toBe(word(1_000_001n));
   expect(await pv({ addr: pool }, 'USDC', 1)).toBeNull();
   expect(await pv({}, 'WBTC', 1)).toBeNull();
+});
+
+test('an unstamped read is stamped in chain time: a device 100 s behind the chain stamps ahead of its clock', async () => {
+  const ahead = Math.floor(Date.now() / 1000) + 100;
+  const chain = { request: async () => ({ timestamp: `0x${ahead.toString(16)}` }) } as never;
+  await syncChainClock(chain);
+  try {
+    const gap = chainNowMs() - Date.now();
+    expect(gap).toBeGreaterThan(99_000);
+    expect(gap).toBeLessThan(101_000);
+    const st = withPoolSolvency({ base: 'USDC', legs: {} } as PoolState, {
+      ok: true,
+      exitTollWad: 1n,
+    });
+    expect((st.solvencyAtMs as number) - Date.now()).toBeGreaterThan(99_000);
+    // A read that carries its own header time keeps it.
+    expect(
+      withPoolSolvency({ base: 'USDC', legs: {} } as PoolState, {
+        ok: true,
+        exitTollWad: 1n,
+        observedAtMs: 42,
+      }).solvencyAtMs,
+    ).toBe(42);
+  } finally {
+    await syncChainClock({
+      request: async () => ({ timestamp: `0x${Math.floor(Date.now() / 1000).toString(16)}` }),
+    } as never);
+  }
 });

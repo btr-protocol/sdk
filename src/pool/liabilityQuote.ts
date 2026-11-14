@@ -22,14 +22,6 @@ import {
   poolSolvency,
 } from './liability.js';
 
-/** Sync pipeline deleted with the TS pricer: conversion is backend SSOT, use
- *  quoteSwapLiabilityCoreAsync. Kept by name so old imports fail loud, never silently local. */
-export function quoteSwapLiabilityCore(): SwapLiabilityQuote | null {
-  throw new Error(
-    'aimm TS pricer deleted: liability conversion over POST /v1/quote|quote-path via quoteSwapLiabilityCoreAsync (backend SSOT)',
-  );
-}
-
 /** Async mirror of `swapLiability` with the conversion injected (backend quoter). `poolC` is the
  *  pool rate (`poolSolvency`); a non-finite or non-positive rate is the chain's `FeedUnavailable`. */
 export async function quoteSwapLiabilityCoreAsync(
@@ -222,7 +214,7 @@ export function backendConvert(
 }
 
 /** Backend-priced liability swap: same pipeline as the core, rate off `state`, conversion over
- *  POST /v1/quote. Null when the pool has no rate (a mark is unusable: the chain reverts). */
+ *  POST /v1/quote-path. Null when the pool has no rate (a mark is unusable: the chain reverts). */
 export async function quoteSwapLiabilityAsync(
   state: PoolState,
   inLeg: LiabLeg,
