@@ -192,7 +192,8 @@ export interface RankedLpRoute {
   hops: number;
   steps: LpRouteStep[];
   /** Set when a leg is invested and only its total reserves clear the exit gate: the chain recalls
-   *  through the hook, the app warns and the on-chain simulation decides. `recallLegs` names them. */
+   *  through the hook. The router cannot see whether the hook can deliver (no pre-outflow flag, a
+   *  paused venue); the on-chain simulation decides. `recallLegs` names the legs. */
   recall?: true;
   recallLegs?: string[];
 }
@@ -205,12 +206,10 @@ export interface RankedLpPlan {
 type RouteShell = Omit<RankedLpRoute, 'feasible' | 'reason'> & { steps: LpRouteStep[] };
 
 /** Single infeasible-shell pipeline: every dead route is built here, never as an inline literal. */
-const unfeasible = (route: RouteShell, reason: string, out = 0): RankedLpRoute => ({
-  ...route,
-  out,
-  feasible: false,
-  reason,
-});
+const unfeasible = (route: RouteShell, reason: string, out = 0): RankedLpRoute => {
+  const { recall: _r, recallLegs: _l, ...rest } = route; // a dead route never carries a recall
+  return { ...rest, out, feasible: false, reason };
+};
 
 const MARKET_DEAD: RouteShell = {
   id: 'market-first',
@@ -254,8 +253,15 @@ const flagGate = (
   return null;
 };
 
-const rankRoutes = (routes: RankedLpRoute[]): RankedLpRoute[] =>
-  [...routes].sort((a, b) => b.out - a.out || +!!a.recall - +!!b.recall || a.hops - b.hops || 0);
+/** Output first, then hops. The caller takes `best` with no retry, so a recall route (it may still
+ *  fail at simulation) leads only when it beats the best clean route by more than 10 bps. */
+export const rankRoutes = (routes: RankedLpRoute[]): RankedLpRoute[] => {
+  const s = [...routes].sort((a, b) => b.out - a.out || a.hops - b.hops || 0);
+  const top = s.find((r) => r.feasible);
+  if (!top?.recall) return s;
+  const clean = s.find((r) => r.feasible && !r.recall && r.out >= top.out * (1 - 0.001));
+  return clean ? [clean, ...s.filter((r) => r !== clean)] : s;
+};
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 

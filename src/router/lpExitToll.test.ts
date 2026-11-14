@@ -8,9 +8,11 @@ import { toUnits } from '../utils/format';
 import {
   type LpRouteOpts,
   type PostMoveTollCtx,
+  type RankedLpRoute,
   TOLL_FUTURE_SLACK_MS,
   changeFace,
   rankRedeem,
+  rankRoutes,
 } from './lpRoutes';
 import { solvencyGate } from './lpRoutes.js';
 import type { NamedPool } from './route.js';
@@ -1031,5 +1033,71 @@ describe('exit gates on liquid reserves, not total', () => {
     const p = pool();
     setLeg(p, 'AUDF', { liquidRes: undefined });
     expect((await same(p)).routes[0].reason).toBe('min-liquidity-unknown');
+  });
+  test('both gates recall at once: two legs named; transfer with both legs invested', async () => {
+    stub({ tolls: ALL });
+    const base = await route(pool(), 'NZDF', 'AUDF', 10_000, post);
+    for (const id of IDS) {
+      const p = pool();
+      setLeg(p, 'AUDF', { liquidRes: find(base, id).out - 0.01 });
+      setLeg(p, 'NZDF', { liquidRes: 9_999 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect([...(r.recallLegs ?? [])].sort()).toEqual(['AUDF', 'NZDF']);
+    }
+  });
+  test('an unfeasible route never carries recall', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { liquidRes: 9_000 });
+    setLeg(p, 'NZDF', { liquidRes: 9_999 });
+    // transfer: recall set at the gate, then a later refusal (toll over the payout) must drop it.
+    const r = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, postMoveExitTollWad: async () => 0n }),
+      'transfer-exit',
+    );
+    expect(r.feasible).toBe(true);
+    const dead = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, maxRedeem: () => 1 }),
+      'transfer-exit',
+    );
+    expect(dead.feasible).toBe(false);
+    expect(dead.recall).toBeUndefined();
+    expect(dead.recallLegs).toBeUndefined();
+    // cross: the recall is set before `seasonGate` refuses on the cooldown capacity.
+    const deadX = find(
+      await route(p, 'NZDF', 'AUDF', 10_000, { ...BE, maxRedeem: () => 1 }),
+      'cross-exit',
+    );
+    expect(deadX.feasible).toBe(false);
+    expect(deadX.recall).toBeUndefined();
+    expect(deadX.recallLegs).toBeUndefined();
+  });
+});
+
+describe('rankRoutes: recall routes yield to clean ones within 10 bps', () => {
+  const mk = (id: 'cross-exit' | 'transfer-exit', out: number, recall: boolean): RankedLpRoute => ({
+    id,
+    label: id,
+    feasible: true,
+    out,
+    minOut: out,
+    hops: 1,
+    steps: [],
+    ...(recall ? { recall: true as const, recallLegs: ['AUDF'] } : {}),
+  });
+  test('equal, within bucket, beyond bucket', () => {
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 100, false)])[0].id).toBe(
+      'transfer-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 99.91, false)])[0].id).toBe(
+      'transfer-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, true), mk('transfer-exit', 99.89, false)])[0].id).toBe(
+      'cross-exit',
+    );
+    expect(rankRoutes([mk('cross-exit', 100, false), mk('transfer-exit', 101, true)])[0].id).toBe(
+      'transfer-exit',
+    );
   });
 });
