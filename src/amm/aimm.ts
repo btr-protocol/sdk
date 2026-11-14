@@ -9,6 +9,7 @@
 //   owned by the storage readers) + thin async fetchers over `POST /v1/quote|route|depth`.
 
 import { MAX_DISPERSION_PBPS } from '../abis/solidity.generated.js';
+import { isLegacyLayout } from '../pool/storageVersion.js';
 
 export { MAX_DISPERSION_PBPS };
 export const BPS = 1e4;
@@ -283,6 +284,10 @@ export interface PoolState {
    *  toll only while `solvencyOk` (a degraded sweep returns 0 here, the chain charges the
    *  lower-pass toll). */
   exitTollWad?: bigint | null;
+  /** First poolSolvencyWad return word: the chain's pool rate C (WAD). The claim paths (deposit mint,
+   *  cross exit, liability swap) price at THIS when present; absent = the book model
+   *  (`poolSolvency`), which cannot see the physical-backing cap the chain applies per leg. */
+  solvencyCWad?: bigint | null;
   /** Second poolSolvencyWad return word (`ok`: every armed mark usable); null/absent = not loaded.
    *  LP exits fail closed (pending) without it. Set both with `withPoolSolvency`. */
   solvencyOk?: boolean | null;
@@ -347,7 +352,6 @@ export function computeSkew(res: number, liab: number): number {
 }
 
 /** The v2 storage generation (`PoolLayout` 'v2'): its coverage law lives in `covBits`/`kneeBits`. */
-const STORAGE_V2 = 12;
 
 /** A v2 leg's coverage word was not read: there is no honest value to put on the wire. */
 export class CovWordMissing extends Error {
@@ -357,16 +361,16 @@ export class CovWordMissing extends Error {
   }
 }
 
-/** A coverage word for the wire: as read; absent is 0 only on a pool KNOWN to be below v2 (the field
- *  does not exist there), and unquotable on a v2 or an unknown generation, where 0 is a different law
- *  (no toll, no walls). */
+/** A coverage word for the wire: as read; absent is 0 only on a pool KNOWN to be a v1 layout
+ *  (`isLegacyLayout`: storageVersion 5..9, where the field does not exist). On v2, an unknown or any
+ *  other version it is unquotable: 0 there is a different law (no toll, no walls). */
 export function covWord(
   word: number | undefined,
   storageVersion: number | undefined,
   what: string,
 ) {
   if (word !== undefined) return word;
-  if (storageVersion === undefined || storageVersion === STORAGE_V2) throw new CovWordMissing(what);
+  if (!isLegacyLayout(storageVersion)) throw new CovWordMissing(what);
   return 0;
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { buildLegV1 } from '../../test/legFixture';
 import {
   CovWordMissing,
   INTERIOR_ENDPOINT,
@@ -12,7 +13,6 @@ import {
   quoteLegAsync,
   servableAddr,
 } from './aimm';
-import { buildLegV1 } from './legFixture';
 import { STABLE_PROFILE } from './profiles';
 
 // The wire is LEG-shaped; the chain settles PATHS. Everything here pins the two path quantities
@@ -20,7 +20,14 @@ import { STABLE_PROFILE } from './profiles';
 // `_covToll(cOut, …)`) and the endpoint-max vega (`acc.vegaBps = max(cIn, cOut)`) - because the
 // first cut of this codec dropped both and every spoke->base sell was quoted toll-free.
 
-const HUB = { res: 200_000, liab: 250_000, vegaBps: 10_000, kappaCovBps: 600, storageVersion: 1 };
+const HUB = {
+  res: 200_000,
+  liab: 250_000,
+  vegaBps: 10_000,
+  kappaCovBps: 600,
+  storageVersion: 7,
+  minLiquidity: 0,
+};
 const meta = { addressOf: (s: string): string => `0x${s}`, decimalsOf: (): number => 18 };
 const ADDRS = { pool: '0xpool', token: '0xtoken', base: '0xbase' };
 
@@ -532,8 +539,13 @@ describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => 
     expect(s.spokes[0].pricing.cov_bits).toBe(0); // the fixture leg carries none: v1 reading
   });
   test('v1 known: an absent word is 0, as before', () => {
-    expect(body(leg({ storageVersion: 1 })).cov_bits).toBe(0);
+    expect(body(leg({ storageVersion: 7 })).cov_bits).toBe(0);
     expect(body(leg({ storageVersion: 7 })).knee_bits).toBe(0);
+  });
+  test('a version outside the whitelist (13, a future one; 1; 10) is unquotable like unknown', () => {
+    for (const v of [13, 10, 4, 1])
+      expect(() => body(leg({ storageVersion: v }))).toThrow(CovWordMissing);
+    for (const v of [5, 9]) expect(body(leg({ storageVersion: v })).cov_bits).toBe(0);
   });
   test('generation unknown: an absent word is unquotable, never a 0 that skips toll and walls', () => {
     expect(() => body(leg())).toThrow(CovWordMissing);

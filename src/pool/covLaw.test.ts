@@ -4,9 +4,14 @@ import { join } from 'node:path';
 import { covCap, covDebitToll, covLegToll, covSwapToll, covToll, covWalls } from './covLaw';
 // dex-evm `tools/covlaw.py` writes the vectors (column-major decimal strings); the Solidity
 // `CovLaw.t.sol` replays the same file. Absent sibling checkout = skipped, never a green no-op in CI
-// (the SDK build clones dex-evm next to it).
+// (the SDK build clones dex-evm next to it). Where the checkout is expected (`CI` set, or
+// `BTR_DEPLOYMENTS_DIR` set: names only, values are never read out), a missing file FAILS.
 const path = join(import.meta.dir, '../../../dex-evm/test/proto/cov_vectors.json');
 const have = existsSync(path);
+const required = Boolean(process.env.CI) || Boolean(process.env.BTR_DEPLOYMENTS_DIR);
+test('the dex-evm vectors are present where the checkout is expected', () => {
+  if (!have && required) throw new Error(`cov_vectors.json missing at ${path}`);
+});
 type Col = string[];
 const V = have ? (JSON.parse(readFileSync(path, 'utf8')) as Record<string, Col[]>) : {};
 const rows = (t: string): bigint[][] => {

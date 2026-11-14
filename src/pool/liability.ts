@@ -23,6 +23,7 @@ import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import type { PoolState } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 import { covWalls } from './covLaw.js';
+import { isLegacyLayout } from './storageVersion.js';
 
 /** SC.WAD */
 export const WAD = 1e18;
@@ -43,11 +44,12 @@ export interface LiabLeg {
   minLiquidity?: number;
 }
 
-/** The leg's coverage word for a wall check: as read; absent is 0 only on a pool KNOWN to be below v2
- *  (the field does not exist there). Absent on v2 or on an unknown generation is null: a 0 there would
- *  skip the walls the chain enforces, so the caller refuses. */
+/** The leg's coverage word for a wall check: as read; absent is 0 only on a pool KNOWN to be a v1
+ *  layout (`isLegacyLayout`, storageVersion 5..9: the field does not exist there). Absent on v2, on any
+ *  other version or on an unknown generation is null: a 0 there would skip the walls the chain
+ *  enforces, so the caller refuses. */
 export const covBitsOf = (l: { covBits?: number; storageVersion?: number }): number | null =>
-  l.covBits ?? (l.storageVersion !== undefined && l.storageVersion !== 12 ? 0 : null);
+  l.covBits ?? (isLegacyLayout(l.storageVersion) ? 0 : null);
 
 export const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
 
@@ -95,6 +97,15 @@ export function poolSolvency(state: PoolState): number | null {
   if (!(claim > 0)) return nav > 0 ? null : 1;
   const c = nav / claim;
   return Number.isFinite(c) ? c : null;
+}
+
+/** The pool rate C the claim paths price at: the chain's own `poolSolvencyWad` first word when the
+ *  state carries it with `ok` (exact, includes the physical-backing cap), else the book model
+ *  {@link poolSolvency}. Null = no rate (the chain reverts `FeedUnavailable`). */
+export function claimRate(state: PoolState): number | null {
+  const w = state.solvencyCWad;
+  if (w != null && state.solvencyOk !== false) return w > 0n ? Number(w) / 1e18 : null;
+  return poolSolvency(state);
 }
 
 /** `PoolSolvencyLib.previewCap` from the sweep's sums: `nav`/`claim` over the usable legs (hub

@@ -9,6 +9,7 @@ import type { PoolState, QuoteRouteWire, WireMeta, routeAsync } from '../amm/aim
 import {
   type LiabLeg,
   WAD,
+  claimRate,
   covBitsOf,
   covWallsF,
   exitValue,
@@ -41,7 +42,7 @@ export interface LpRouteOpts {
    *  the chain's own preview: with live, fresh solvency words it is the lower of the preview and the
    *  state model; with the words pending, stale, off the chain clock or the pool degraded
    *  (`feed-unavailable`) the preview alone prices it, and an unread preview leaves it unpriced under
-   *  the gate's reason. Cross and transfer exits never use it. See `getPreviewWithdraw`. */
+   *  the gate's reason. Cross and transfer exits never use it. See the front's `previewWithdraw` reader. */
   previewWithdraw?: (pool: NamedPool, symbol: string, lpShares: number) => Promise<bigint | null>;
   /** The C toll (WAD) the transfer-exit's second call (`withdraw`) pays: `exitCap`'s sweep over the
    *  books AFTER the `swapLiability` claim move (both legs' claims and the exposure high-water
@@ -335,7 +336,7 @@ async function transferMint(
   if (flagged) return flagged;
   const gated = seasonGate(shell, xToken, amountIn, opts);
   if (!gated.feasible) return gated;
-  const c = poolSolvency(holder.state);
+  const c = claimRate(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
   // The deposit mints face `amountIn / C`; that face is what the liability swap then burns.
   const faceIn = amountIn / c;
@@ -380,7 +381,7 @@ export async function rankDeposit(
     const holder = poolHolding(pools, xToken, xToken);
     if (!holder) return { best: null, routes: [] };
     // Face minted at C (`PoolLiquidityLib.deposit`); no rate ⇒ the chain refuses the mint.
-    const c = poolSolvency(holder.state);
+    const c = claimRate(holder.state);
     const direct: RankedLpRoute = {
       id: 'market-first',
       label: 'direct deposit',
@@ -436,7 +437,7 @@ async function crossExit(
   const solv = solvencyGate(holder.state, opts);
   if (solv) return unfeasible(CROSS_DEAD, solv);
   // FAIR VALUE AT C, never at c_from (`_quoteWithdrawCross`): no rate ⇒ `mintRate` reverts.
-  const c = poolSolvency(holder.state);
+  const c = claimRate(holder.state);
   if (c === null) return unfeasible(CROSS_DEAD, 'feed-unavailable');
   // `creditRate(false)`'s toll, the third `poolSolvencyWad` word while `ok`. Absent = params not
   // loaded: unknown, never 0 (a 0 overstates the payout and minOut reverts).
@@ -510,8 +511,9 @@ async function crossExit(
   )
     return unfeasible(CROSS_DEAD, 'coverage-wall');
   // `withdrawTo` reverts `InsufficientAmount` when the out leg would fall under its keeper floor.
-  if (toLeg.reserves < out + (toLeg.minLiquidity ?? 0))
-    return unfeasible(CROSS_DEAD, 'min-liquidity');
+  // Absent is unknown, never 0: a floor that was not read cannot be proven clear.
+  if (toLeg.minLiquidity === undefined) return unfeasible(CROSS_DEAD, 'min-liquidity-unknown');
+  if (toLeg.reserves < out + toLeg.minLiquidity) return unfeasible(CROSS_DEAD, 'min-liquidity');
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -535,7 +537,7 @@ async function crossExit(
   return seasonGate(shell, targetSym, lpFaceIn, opts);
 }
 
-/** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `getPoolSolvency`):
+/** `PoolSolvencyLib.sweep`'s `ok` as the state carries it (`solvencyOk`, from `withPoolSolvency`):
  *  null when live and fresh; `toll-pending` when not loaded; `feed-unavailable` when degraded (a dark
  *  leg); `toll-stale` when the words are not provably fresh ({@link tollStale}). */
 export function solvencyGate(
@@ -555,7 +557,7 @@ export const TOLL_FUTURE_SLACK_MS = 10_000;
  *  is CHAIN time (the read's block header), so `now` must be chain time too (`chainNowMs`): a device
  *  clock behind the chain would otherwise date every stamp in the future. Unstamped, older than the
  *  caller's bound, or an unusable clock fail closed. */
-export function tollStaleReason(
+function tollStaleReason(
   state: PoolState,
   opts: Pick<LpRouteOpts, 'now' | 'maxTollAgeMs'>,
 ): 'toll-stale' | 'toll-clock' | null {
@@ -705,7 +707,7 @@ async function transferExit(
   // The second call's C toll is `exitCap`'s sweep AFTER the claim move, never the entry word
   // (the move reshapes the exposure the toll prices; the entry word can understate it).
   if (!opts.postMoveExitTollWad) return unfeasible(shell, 'toll-pending');
-  const c = poolSolvency(holder.state);
+  const c = claimRate(holder.state);
   if (c === null) return unfeasible(shell, 'feed-unavailable');
 
   let q: Awaited<ReturnType<typeof quoteSwapLiabilityCoreAsync>>;
@@ -725,6 +727,7 @@ async function transferExit(
   // The next call sweeps again: the conversion reduced the claim book and booked route fees.
   const postState = {
     ...holder.state,
+    solvencyCWad: null, // the chain word is the PRE-move rate; the post-move books are modelled
     hub: holder.state.hub && { ...holder.state.hub },
     legs: { ...holder.state.legs },
   };
@@ -775,8 +778,8 @@ async function transferExit(
           dOut,
         );
   if (!(exitOut > 0)) return unfeasible(shell, 'no-route');
-  if (toLeg.reserves < exitOut + (toLeg.minLiquidity ?? 0))
-    return unfeasible(shell, 'min-liquidity');
+  if (toLeg.minLiquidity === undefined) return unfeasible(shell, 'min-liquidity-unknown');
+  if (toLeg.reserves < exitOut + toLeg.minLiquidity) return unfeasible(shell, 'min-liquidity');
   // The tail burns what the exit was priced on: the floored share count (raw-exact when decimals).
   const lpWithdraw =
     dOut === undefined ? q.lpAmountOut : rawToOut(floorRaw(q.lpAmountOut, dOut), dOut);
@@ -875,7 +878,9 @@ export async function rankRedeem(
     if (!Number.isFinite(actual))
       return { best: null, routes: [unfeasible(gated, solv ?? 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
-    if (leg.reserves < actual + (leg.minLiquidity ?? 0))
+    if (leg.minLiquidity === undefined)
+      return { best: null, routes: [unfeasible(gated, 'min-liquidity-unknown')] };
+    if (leg.reserves < actual + leg.minLiquidity)
       return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);

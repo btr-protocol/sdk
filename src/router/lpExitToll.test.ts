@@ -1,7 +1,7 @@
 // bun test: LP exit quotes never promise more than the chain pays (review of feat/lp-exit-toll).
 // Every case here fails open on 26aaa3f: a missing toll input must leave the route pending.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
+import { buildLegV1 as buildLeg } from '../../test/legFixture.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { backendConvert, quoteSwapLiabilityCoreAsync } from '../pool/liabilityQuote';
 import { toUnits } from '../utils/format';
@@ -36,7 +36,14 @@ function pool(o?: { audfRes?: number; audfLiab?: number; nzdfMark?: number }): N
         AUDF: leg('AUDF', o?.audfRes ?? 1_000_000, o?.audfLiab ?? 1_000_000),
         NZDF: leg('NZDF', 1_000_000, 1_000_000, o?.nzdfMark ?? 1),
       },
-      hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
+      hub: {
+        res: 2_000_000,
+        liab: 2_000_000,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        storageVersion: 7,
+        minLiquidity: 0,
+      },
     },
   };
 }
@@ -380,7 +387,7 @@ function richPool(o: { res: number; liab: number }): NamedPool {
       solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
-      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 },
+      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0, storageVersion: 7, minLiquidity: 0 },
     },
   };
 }
@@ -438,7 +445,14 @@ describe('F5: integer face and mu (mu ≫ 1): same-asset and transfer never abov
     stub({ tolls: ALL });
     const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
     p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
-    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 };
+    p.state.hub = {
+      res: 2_000_000,
+      liab: 2_000,
+      vegaBps: 0,
+      kappaCovBps: 0,
+      storageVersion: 7,
+      minLiquidity: 0,
+    };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
     let post: PostMoveTollCtx | undefined;
@@ -722,7 +736,14 @@ describe('transfer-exit: the tail is sized at the post-fee index the second call
     stub({ tolls: ALL, lpFee: (out) => out / 100n });
     const p = pool({ audfRes: 1_000_000, audfLiab: 1_000 });
     p.state.legs.NZDF = { ...p.state.legs.NZDF, liab: 1_000 };
-    p.state.hub = { res: 2_000_000, liab: 2_000, vegaBps: 0, kappaCovBps: 0, storageVersion: 1 };
+    p.state.hub = {
+      res: 2_000_000,
+      liab: 2_000,
+      vegaBps: 0,
+      kappaCovBps: 0,
+      storageVersion: 7,
+      minLiquidity: 0,
+    };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
     let post: PostMoveTollCtx | undefined;
@@ -830,8 +851,53 @@ describe('an absent coverage word is not a zero the wall check can use', () => {
   test('known v1: the same leg prices as before', async () => {
     stub({ tolls: ALL });
     const p = unversioned();
-    p.state.legs.AUDF = { ...p.state.legs.AUDF, storageVersion: 1 };
+    p.state.legs.AUDF = { ...p.state.legs.AUDF, storageVersion: 7, minLiquidity: 0 };
     const r = (await route(p, 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
+    expect(r?.feasible).toBe(true);
+  });
+});
+
+describe('the claim rate is the chain cWad when the state carries it', () => {
+  test('c_wad on the wire is the chain word, not the book model', async () => {
+    const sent = stub({ tolls: ALL });
+    const p = pool();
+    p.state.solvencyCWad = 9n * 10n ** 17n; // the model reads 1.0 on these books
+    const r = (await route(p, 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
+    expect(r?.feasible).toBe(true);
+    const claim = (sent[0].claim ??
+      (sent[0].legs as { claim?: { c_wad: string } }[])?.[0]?.claim) as
+      | { c_wad: string }
+      | undefined;
+    expect(BigInt(claim?.c_wad ?? '0x0')).toBe(9n * 10n ** 17n);
+  });
+});
+
+describe('an unread minLiquidity is unknown, never 0', () => {
+  const unread = (): NamedPool => {
+    const p = pool();
+    const { minLiquidity: _a, ...audf } = p.state.legs.AUDF;
+    p.state.legs.AUDF = audf;
+    return p;
+  };
+  test('cross-exit, transfer-exit and same-asset into that leg are unfeasible: min-liquidity-unknown', async () => {
+    stub({ tolls: ALL });
+    const post = { ...BE, postMoveExitTollWad: async () => 0n };
+    const routes = await route(unread(), 'NZDF', 'AUDF', 10_000, post);
+    for (const id of ['cross-exit', 'transfer-exit']) {
+      const r = routes.find((x) => x.id === id);
+      expect(r?.feasible).toBe(false);
+      expect(r?.reason).toBe('min-liquidity-unknown');
+    }
+    const same = await rankRedeem([unread()], 'AUDF', 'AUDF', 1_000, {
+      ...BE,
+      previewWithdraw: async () => 990_000_000n,
+    });
+    expect(same.best).toBeNull();
+    expect(same.routes[0].reason).toBe('min-liquidity-unknown');
+  });
+  test('a declared floor (0 included) prices as before', async () => {
+    stub({ tolls: ALL });
+    const r = (await route(pool(), 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
     expect(r?.feasible).toBe(true);
   });
 });

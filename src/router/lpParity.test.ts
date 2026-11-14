@@ -2,7 +2,7 @@
 // backend convert stubbed by btr-core's own recorded answer (not the sdk's port). Fixture is generated
 // from the dex-evm recording; do not edit by hand.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { buildLegV1 as buildLeg } from '../amm/legFixture.js';
+import { buildLegV1 as buildLeg } from '../../test/legFixture.js';
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import { poolSolvency } from '../pool/liability.js';
 import vectors from './__fixtures__/lp_parity_vectors.json';
@@ -89,13 +89,14 @@ function build(ph: Phase): NamedPool {
         liab: human(base.liabilities, base.decimals),
         vegaBps: 0,
         kappaCovBps: 0,
-        storageVersion: 1,
+        storageVersion: 7,
         covBits: base.covBits,
         kneeBits: 0,
         minLiquidity: human(base.minLiquidity, base.decimals),
       },
       // Every recorded phase settled cross exits at the live rate (cWad re-derives from the books).
       solvencyOk: true,
+      solvencyCWad: BigInt(ph.cWad), // the chain's own rate, as the front carries it
       solvencyAtMs: Date.now(),
       exitTollWad: BigInt(ph.exitTollWad),
     },
@@ -166,7 +167,13 @@ for (const ph of vectors as Phase[]) {
         expect(r?.feasible).toBe(true);
         const want = Number(BigInt(row.chain));
         const got = (r?.out ?? 0) * 10 ** dec(row.to);
-        expect(Math.abs(got - want)).toBeLessThanOrEqual(want * 2e-8 + 4);
+        // Raw units, the chain's integer law. The sdk rounds every step toward the pool (gross floored,
+        // c_toll and debit ceiled: at most 4 raw under) and never pays above the chain. What remains is
+        // the f64 `out` itself: an 18-decimal payout above 2^53 raw cannot be exact in a double, which
+        // measures at most 3.2e-14 relative here, so the bound is 1e-13 (it was 2e-8).
+        const noise = want * 1e-13;
+        expect(got - want).toBeLessThanOrEqual(noise);
+        expect(want - got).toBeLessThanOrEqual(noise + 4);
       });
     });
   });

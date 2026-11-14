@@ -16,11 +16,11 @@ import {
   type LiabLeg,
   type SwapLiabilityQuote,
   WAD,
+  claimRate,
   covBitsOf,
   covWallsF,
   feeCredit,
   idxOf,
-  poolSolvency,
 } from './liability.js';
 
 /** Async mirror of `swapLiability` with the conversion injected (backend quoter). `poolC` is the
@@ -127,6 +127,7 @@ function claimWire(
   tokenOut: string,
   tollWad: bigint | null | undefined,
   exit: boolean,
+  chainCWad: bigint | null | undefined,
 ): { credit: boolean; face: string; c_wad: string; toll_wad?: string } {
   if (!(poolC !== undefined && Number.isFinite(poolC) && poolC > 0)) {
     throw new Error(`backendConvert: claim ${tokenIn}->${tokenOut} needs the pool rate C`);
@@ -136,7 +137,9 @@ function claimWire(
     // Chain floors `withdrawValue` and `fairValue` (`PoolLiquidityLib.sol:434,528`): both words
     // round toward the pool, never up (a rounded-up face prices a claim the burn does not carry).
     face: `0x${floorUnits(fairIn / poolC, decIn).toString(16)}`,
-    c_wad: `0x${floorUnits(poolC, 18).toString(16)}`,
+    // The chain's own word when the rate IS that word (a double cannot hold a 18-digit WAD: the round
+    // trip drifts by ~1e-14); else the floored model rate.
+    c_wad: `0x${(chainCWad && chainCWad > 0n && Number(chainCWad) / 1e18 === poolC ? chainCWad : floorUnits(poolC, 18)).toString(16)}`,
     // An exit always names its toll; an unloaded one (absent/null) is unknown, never 0.
     ...(exit ? { toll_wad: `0x${exitToll(tollWad, tokenIn, tokenOut).toString(16)}` } : {}),
   };
@@ -200,6 +203,7 @@ export function backendConvert(
             tokenOut,
             state.exitTollWad,
             mode === 'exit',
+            state.solvencyOk === false ? null : state.solvencyCWad,
           );
     const w = await quotePathAsync(
       {
@@ -225,7 +229,7 @@ export async function quoteSwapLiabilityAsync(
   lpAmountIn: number,
   opts: BackendConvertOpts,
 ): Promise<SwapLiabilityQuote | null> {
-  const c = poolSolvency(state);
+  const c = claimRate(state);
   if (c === null) return null;
   return quoteSwapLiabilityCoreAsync(
     inLeg,
