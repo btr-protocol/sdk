@@ -55,7 +55,9 @@ test('wire requests and URLs carry chain_id; caches separate chain, generation a
   expect(urls[0]).toContain('/v1/abis/Custom?chain_id=56&generation=g1');
   expect(urls[1]).toContain('chain_id=999');
   expect(urls[3]).toStartWith('https://other.invalid/');
-  expect(getAbiUrl('Flash', 143)).toEndWith('/v1/abis/Flash?chain_id=143&generation=pool-v2-s12e');
+  expect(getAbiUrl('Flash', 143, 'pool-v2-s12e')).toEndWith(
+    '/v1/abis/Flash?chain_id=143&generation=pool-v2-s12e',
+  );
 });
 
 test('wrong generation and content fail closed and never enter cache', async () => {

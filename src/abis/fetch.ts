@@ -101,6 +101,10 @@ async function load(
     return { abi: bundled[canonical], generation: selected, chainId };
   if (chainId === 143 && selected === V1 && bundledV1[canonical])
     return { abi: bundledV1[canonical], generation: selected, chainId };
+  if (selected === V1)
+    throw new Error(`ABI ${canonical} has no bundled ${V1} copy; ${V1} never goes to the wire`);
+  if (chains[String(chainId)] && !chains[String(chainId)].pins[canonical])
+    throw new Error(`ABI ${canonical} has no pin on chain ${chainId}; refused`);
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
   if (cached) return cached;
@@ -120,7 +124,7 @@ async function load(
     throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
-  const pin = selected === V1 ? undefined : chains[String(chainId)]?.pins[canonical];
+  const pin = chains[String(chainId)]?.pins[canonical];
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
   const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
   if (generation !== null) hot.set(key, meta);
@@ -130,7 +134,7 @@ async function load(
 export function resetFetchAbiCacheForTest(): void {
   hot.clear();
 }
-export function getAbiUrl(name: string, chainId = 143, generation = ABI_GENERATION) {
+export function getAbiUrl(name: string, chainId: number, generation: string) {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('invalid ABI chain id');
   return `${getApiRoot()}/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}&generation=${encodeURIComponent(generation)}`;
 }

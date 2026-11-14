@@ -103,6 +103,8 @@ describe('PoolFactory parity is pinned across repos', () => {
 });
 
 // The backend serves its own copy of each ABI; both must equal the lock.
+if (!hasBack)
+  console.log('SKIPPED: "the backend bakes the pinned surface" (../back/abis/generations absent)');
 describe.skipIf(!hasBack)('the backend bakes the pinned surface', () => {
   const lock = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8')).chains['143'].pins;
   test('back/abis/PoolFactory.json hashes to the lock', () => {
@@ -312,12 +314,14 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
       fetch: () => new Response(body, { headers: { 'x-btr-abi-generation': ABI_GENERATION } }),
     });
     try {
-      const r = await runScript(makeSandbox(), {
-        BTR_API_URL: `http://127.0.0.1:${server.port}`,
-        BTR_ABI_ALLOW_STALE: '',
-      });
-      // Admin has no stub here, so only Pool's path is asserted.
-      expect(r.out).toContain('fetch-abis: Pool from backend');
+      const r = makeSandbox();
+      cpSync(join(repo, 'abis'), join(r, 'abis'), { recursive: true });
+      // A full sandbox with the snapshot REPIN-free path would read the snapshot first; remove Pool
+      // so the backend is the Pool source, Admin comes from the snapshot.
+      rmSync(join(r, 'abis', 'Pool.json'));
+      const out = await runScript(r, { BTR_API_URL: `http://127.0.0.1:${server.port}` });
+      expect(out.out).toContain('fetch-abis: Pool from backend');
+      expect(out.code).toBe(0);
     } finally {
       server.stop(true);
     }
@@ -326,7 +330,7 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
   test('runtime: the URL carries the generation, 400 unknown_generation is a typed error', async () => {
     const { fetchAbi, getAbiUrl, resetFetchAbiCacheForTest, AbiUnknownGenerationError } =
       await import('../src/abis/fetch');
-    expect(getAbiUrl('Router', 143)).toContain(`generation=${ABI_GENERATION}`);
+    expect(getAbiUrl('Router', 56, 'g1')).toContain('chain_id=56&generation=g1');
     const orig = globalThis.fetch;
     const urls: string[] = [];
     globalThis.fetch = (async (u: string) => {
@@ -335,19 +339,35 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
     }) as unknown as typeof fetch;
     try {
       resetFetchAbiCacheForTest();
-      const err = await fetchAbi('Router', 143).catch((e) => e);
+      const err = await fetchAbi('Router', 56, 'g1').catch((e) => e);
       expect(err).toBeInstanceOf(AbiUnknownGenerationError);
-      expect(err).toMatchObject({
-        code: 'unknown_generation',
-        status: 400,
-        generation: ABI_GENERATION,
-      });
-      expect(urls[0]).toContain(`generation=${ABI_GENERATION}`);
+      expect(err).toMatchObject({ code: 'unknown_generation', status: 400, generation: 'g1' });
+      expect(urls[0]).toContain('generation=g1');
       // A 400 with another body stays a plain error.
       globalThis.fetch = (async () =>
         Response.json({ error: 'bad' }, { status: 400 })) as unknown as typeof fetch;
-      const plain = await fetchAbi('Router', 143).catch((e) => e);
+      const plain = await fetchAbi('Router', 56, 'g1').catch((e) => e);
       expect(plain).not.toBeInstanceOf(AbiUnknownGenerationError);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  test('a pinned chain refuses an unpinned name, and v1 never reaches the wire', async () => {
+    const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
+    const orig = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response('[]');
+    }) as unknown as typeof fetch;
+    try {
+      resetFetchAbiCacheForTest();
+      for (const n of ['Router', 'IPoolHooks', 'Faucet', 'ExternalOracleV4', 'MarkStoreV2'])
+        await expect(fetchAbi(n, 143)).rejects.toThrow('no pin on chain 143');
+      await expect(fetchAbi('Router', 143, 'pool-v1-s7')).rejects.toThrow('never goes to the wire');
+      await expect(fetchAbi('Flash', 143, 'pool-v1-s7')).rejects.toThrow('never goes to the wire');
+      expect(calls).toBe(0);
     } finally {
       globalThis.fetch = orig;
     }
