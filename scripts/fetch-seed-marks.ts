@@ -1,10 +1,11 @@
 /**
  * Fetch the ONE NX Rates mark snapshot a deploy ceremony seeds from.
  *
- *   bun run scripts/fetch-seed-marks.ts            # monad (default) → 143.seed-marks.json
  *   bun run scripts/fetch-seed-marks.ts bnb        # bnb → 56.seed-marks.json
- *   bun run scripts/fetch-seed-marks.ts monad      # same, explicit
+ *   bun run scripts/fetch-seed-marks.ts monad      # monad → 143.seed-marks.json
  *   CHAIN=monad bun run scripts/fetch-seed-marks.ts  # same, via env
+ *
+ * The chain is required: there is no default, so a bare run can never overwrite a live snapshot.
  *
  * Both halves of the ceremony read this file: the oracle deploy seeds every feed from it, and
  * `Pools.s.sol` converts each asset's manifest `seedUsd` to token units with it (then asserts its
@@ -60,7 +61,13 @@ const CHAINS = {
   monad: { chainId: 143, manifest: 'monad.manifest.json', basis: 'USDC' },
 } as const satisfies Record<string, { chainId: number; manifest: string; basis: MarkBasis }>;
 
-const chainArg = (process.argv[2] || process.env.CHAIN || 'monad').toLowerCase();
+const chainArg = (process.argv[2] || process.env.CHAIN || '').toLowerCase();
+if (!chainArg) {
+  console.error(
+    `usage: bun run scripts/fetch-seed-marks.ts <${Object.keys(CHAINS).join('|')}> (or CHAIN=<chain>)`,
+  );
+  process.exit(2);
+}
 const CHAIN = CHAINS[chainArg as keyof typeof CHAINS];
 if (!CHAIN) {
   console.error(`unknown chain '${chainArg}' — expected one of ${Object.keys(CHAINS).join(', ')}`);
