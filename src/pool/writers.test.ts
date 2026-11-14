@@ -67,7 +67,7 @@ describe('wallet-path writers bind the chain when asked', () => {
   test('pool txs carry the estimate × 1.25 as their gas limit, not the bare estimate', async () => {
     const { provider, sent } = wallet(780_023n);
     await swap(provider, POOL, swapParams());
-    await deposit(provider, POOL, { token: TOKEN, amount: 1n });
+    await deposit(provider, POOL, { token: TOKEN, amount: 1n, minLpOut: 1n });
     await withdraw(provider, POOL, { token: TOKEN, lpAmount: 1n, minAmountOut: 1n });
     expect(sent.map((t) => t.gas)).toEqual(['0xee0b5', '0xee0b5', '0xee0b5']); // 975,029
   });
@@ -77,9 +77,9 @@ describe('wallet-path writers bind the chain when asked', () => {
       request: ({ method }: { method: string }) =>
         method === 'eth_accounts' ? Promise.resolve([]) : Promise.reject(new Error(method)),
     } as unknown as Eip1193Provider;
-    await expect(deposit(provider, POOL, { token: TOKEN, amount: 1n })).rejects.toThrow(
-      /No account connected/,
-    );
+    await expect(
+      deposit(provider, POOL, { token: TOKEN, amount: 1n, minLpOut: 1n }),
+    ).rejects.toThrow(/No account connected/);
   });
 
   test('deposit and withdraw refuse another chain before anything is sent', async () => {
@@ -108,7 +108,7 @@ describe('wallet-path writers bind the chain when asked', () => {
 describe('pool send: estimate and send share the sender; a revert names the pool error', () => {
   test('the send carries the same from the estimate ran from', async () => {
     const { provider, sent } = wallet(780_023n);
-    await deposit(provider, POOL, { token: TOKEN, amount: 1n });
+    await deposit(provider, POOL, { token: TOKEN, amount: 1n, minLpOut: 1n });
     expect(sent[0].from).toBe(USER);
   });
 
