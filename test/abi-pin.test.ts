@@ -341,7 +341,7 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
       resetFetchAbiCacheForTest();
       const err = await fetchAbi('Router', 56, 'g1').catch((e) => e);
       expect(err).toBeInstanceOf(AbiUnknownGenerationError);
-      expect(err).toMatchObject({ code: 'unknown_generation', status: 400, generation: 'g1' });
+      expect(err).toMatchObject({ code: 'unknown_generation', generation: 'g1' });
       expect(urls[0]).toContain('generation=g1');
       // A 400 with another body stays a plain error.
       globalThis.fetch = (async () =>
@@ -365,6 +365,11 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
       resetFetchAbiCacheForTest();
       for (const n of ['Router', 'IPoolHooks', 'Faucet', 'ExternalOracleV4', 'MarkStoreV2'])
         await expect(fetchAbi(n, 143)).rejects.toThrow('no pin on chain 143');
+      for (const n of ['constructor', 'toString'])
+        await expect(fetchAbi(n, 143)).rejects.toThrow('no pin on chain 143');
+      await expect(fetchAbi('constructor', 143, 'pool-v1-s7')).rejects.toThrow(
+        'never goes to the wire',
+      );
       await expect(fetchAbi('Router', 143, 'pool-v1-s7')).rejects.toThrow('never goes to the wire');
       await expect(fetchAbi('Flash', 143, 'pool-v1-s7')).rejects.toThrow('never goes to the wire');
       expect(calls).toBe(0);

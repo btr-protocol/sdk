@@ -36,9 +36,9 @@ const bundledV1: Record<string, Abi> = {
 /** HTTP 400 `{"error":"unknown_generation"}`: the back does not serve the requested generation
  * (unknown, malformed, retired, or not mapped to the chain). Distinguishable from a transport
  * failure so a caller can show a degraded state. */
+// Consumers check `err.code === 'unknown_generation'`.
 export class AbiUnknownGenerationError extends Error {
   readonly code = 'unknown_generation';
-  readonly status = 400;
   constructor(
     readonly abiName: string,
     readonly chainId: number,
@@ -97,13 +97,13 @@ async function load(
       (n) => n.toLowerCase() === name.toLowerCase(),
     ) ?? name;
   if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error('invalid ABI name');
-  if (chainId === 143 && selected === ABI_GENERATION && bundled[canonical])
+  if (chainId === 143 && selected === ABI_GENERATION && Object.hasOwn(bundled, canonical))
     return { abi: bundled[canonical], generation: selected, chainId };
-  if (chainId === 143 && selected === V1 && bundledV1[canonical])
+  if (chainId === 143 && selected === V1 && Object.hasOwn(bundledV1, canonical))
     return { abi: bundledV1[canonical], generation: selected, chainId };
   if (selected === V1)
     throw new Error(`ABI ${canonical} has no bundled ${V1} copy; ${V1} never goes to the wire`);
-  if (chains[String(chainId)] && !chains[String(chainId)].pins[canonical])
+  if (chains[String(chainId)] && !Object.hasOwn(chains[String(chainId)].pins, canonical))
     throw new Error(`ABI ${canonical} has no pin on chain ${chainId}; refused`);
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
@@ -124,7 +124,8 @@ async function load(
     throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
-  const pin = chains[String(chainId)]?.pins[canonical];
+  const pins = chains[String(chainId)]?.pins;
+  const pin = pins && Object.hasOwn(pins, canonical) ? pins[canonical] : undefined;
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
   const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
   if (generation !== null) hot.set(key, meta);
