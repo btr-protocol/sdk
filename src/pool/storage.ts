@@ -21,6 +21,7 @@ import { encodeAbiParameters } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
 import { getCode } from '../eth/rpc.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
+import { STORAGE_V2, isLegacyLayout } from './storageVersion.js';
 
 /** EIP-7528 native sentinel + Solidity address(0): both map to PoolStorage.wnative. */
 const NATIVE_SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
@@ -94,8 +95,8 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
  *  (core/src/storage.rs): 5..=9 layout 5, 12 layout 10 (the v2 pool). Retired 2..4, 10, 11 and
  *  anything else throw, so a pool is never read through another layout's slots. */
 export function layoutOf(storageVersion: number): 5 | 10 {
-  if (storageVersion >= 5 && storageVersion <= 9) return 5;
-  if (storageVersion === 12) return 10;
+  if (isLegacyLayout(storageVersion)) return 5;
+  if (storageVersion === STORAGE_V2) return 10;
   throw new Error(`unsupported storageVersion ${storageVersion}: no storage layout for it`);
 }
 

@@ -9,28 +9,21 @@
 // swapLiability pipeline (PoolLiquidityLib.swapLiability):
 //   1. liabIn      = lpAmountIn * idxIn / WAD
 //   2. fairIn      = liabIn * C                     (mintRate: refuses when a mark is unusable)
-//   3. conv        = backendConvert(in -> out, fairIn); spread/toll/skew embedded
+//   3. conv        = backendConvert(in -> out, fairIn, 'credit'): the CLAIM law (no swap toll; the
+//                    from-leg debit and the credit leg's pair-row Φ⁻ come out of the value)
 //   4. markCap     = fairIn * q.markPrice   [Lemma B cap, _markCap]; conv clamped
 //   5. liabOut     = conv / C (quote output is a TOKEN amount, `liabilities` is a FACE book;
 //                    dividing by C re-denominates to face_in·m_in/m_out - no second haircut)
 //   6. lpAmountOut = liabOut / idxOut (deadOut ~ 0 on any seeded live leg)
 //
-// Protocol-fee EXEMPT and no accrueLpFee booking on-chain: the swapper pays the full embedded
-// spread only; no reserves move.
+// Charged as a swap: the quote's fee is already in `conv`; on-chain its LP slice raises the out
+// leg's index and its protocol slice books as treasury face at C. No reserves move.
 
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
-import {
-  type PoolLeg,
-  type PoolState,
-  type Quote,
-  type QuoteResponseWire,
-  type WireMeta,
-  poolStateToWire,
-  quoteFromWire,
-  quotePathAsync,
-  servableAddr,
-} from '../amm/aimm.js';
+import type { PoolState } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
+import { covWalls } from './covLaw.js';
+import { isLegacyLayout } from './storageVersion.js';
 
 /** SC.WAD */
 export const WAD = 1e18;
@@ -42,9 +35,44 @@ export interface LiabLeg {
   liabilities: number;
   /** Asset.liquidityIndexWad: face-per-share in WAD. Default WAD (1 share = 1 face). */
   indexWad?: number;
+  decimals?: number;
+  /** `Asset.covBits`: the leg's coverage terms (`decodeCovBits`). Absent / 0 = no wall check. */
+  covBits?: number;
+  /** The pool's `storageVersion` when known: decides what an absent `covBits` means ({@link covBitsOf}). */
+  storageVersion?: number;
+  /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
+  minLiquidity?: number;
 }
 
-const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
+/** The leg's coverage word for a wall check: as read; absent is 0 only on a pool KNOWN to be a v1
+ *  layout (`isLegacyLayout`, storageVersion 5..9: the field does not exist there). Absent on v2, on any
+ *  other version or on an unknown generation is null: a 0 there would skip the walls the chain
+ *  enforces, so the caller refuses. */
+export const covBitsOf = (l: { covBits?: number; storageVersion?: number }): number | null =>
+  l.covBits ?? (isLegacyLayout(l.storageVersion) ? 0 : null);
+
+export const idxOf = (leg: LiabLeg): number => leg.indexWad ?? WAD;
+
+/** `CovLib.walls` over float books: does the move `(r0, l0)` -> `(r1, l1)` end on or past a pole
+ *  (c_min falling, c_max rising)? The chain reverts `ThresholdViolation(r1·WAD/l1, pole)`. Books are
+ *  scaled to integers (1e6 per unit) and run through the bigint law, for indicative wall checks. */
+export function covWallsF(
+  covBits: number,
+  r0: number,
+  l0: number,
+  r1: number,
+  l1: number,
+): boolean {
+  if (!(covBits > 0) || !(l1 > 0)) return false;
+  const q = (x: number): bigint => BigInt(Math.round(x * 1e6));
+  return covWalls(BigInt(covBits), q(r0), q(l0), q(r1), q(l1));
+}
+
+/** `_credit`: a retained token fee buys face at max(lastGoodC, 1), capped by the old book. */
+export function feeCredit(fee: number, liab: number, c: number): number {
+  const face = fee / Math.max(c, 1);
+  return face > 0 && liab > 0 && face <= liab ? face : 0;
+}
 
 /** PoolIOLib.checkRiskFlags(asset.flags, LIABILITY_SWAP_ENABLED_BIT) as a predicate. */
 export const liabilitySwapEnabled = (flags: number): boolean =>
@@ -69,6 +97,15 @@ export function poolSolvency(state: PoolState): number | null {
   if (!(claim > 0)) return nav > 0 ? null : 1;
   const c = nav / claim;
   return Number.isFinite(c) ? c : null;
+}
+
+/** The pool rate C the claim paths price at: the chain's own `poolSolvencyWad` first word when the
+ *  state carries it with `ok` (exact, includes the physical-backing cap), else the book model
+ *  {@link poolSolvency}. Null = no rate (the chain reverts `FeedUnavailable`). */
+export function claimRate(state: PoolState): number | null {
+  const w = state.solvencyCWad;
+  if (w != null && state.solvencyOk !== false) return w > 0n ? Number(w) / 1e18 : null;
+  return poolSolvency(state);
 }
 
 /** `PoolSolvencyLib.previewCap` from the sweep's sums: `nav`/`claim` over the usable legs (hub
@@ -134,10 +171,17 @@ export interface SwapLiabilityQuote {
   liabOut: number;
   /** liabOut / idxOut: shares minted post-dead-seed (deadOut ~ 0 on a seeded live leg). */
   lpAmountOut: number;
+  /** Fee booking on the pre-mint output book, for subsequent steps in the same route. */
+  lpFeeCredit: number;
+  protoFeeCredit: number;
+  indexOutWad: number;
   /** 1 − received/redeemed-equivalent vs the 1:1-face baseline, bps of face moved. */
   impactBps: number;
   /** Settlement discount at C, bps of liabIn: real component of impactBps (0 when C ≥ 1). */
   haircutInBps: number;
+  /** Claim tolls inside `convQuoted` (out units): the debited leg's Φ⁺ and the credited leg's Φ⁻. */
+  debitToll: number;
+  creditToll: number;
   /** Half-spread actually deducted from the conversion output (path model). */
   convSpreadBps: number;
   /** Pure-curve movement along the fill. */
@@ -145,135 +189,6 @@ export interface SwapLiabilityQuote {
   /** Size of the Lemma B clamp when binding, bps of convQuoted; else 0. */
   markClampBps: number;
 }
-
-/** Sync pipeline deleted with the TS pricer: conversion is backend SSOT, use
- *  quoteSwapLiabilityCoreAsync. Kept by name so old imports fail loud, never silently local. */
-export function quoteSwapLiabilityCore(): SwapLiabilityQuote | null {
-  throw new Error(
-    'aimm TS pricer deleted: liability conversion over POST /v1/quote|quote-path via quoteSwapLiabilityCoreAsync (backend SSOT)',
-  );
-}
-
-/** Async mirror of `swapLiability` with the conversion injected (backend quoter). `poolC` is the
- *  pool rate (`poolSolvency`); a non-finite or non-positive rate is the chain's `FeedUnavailable`. */
-export async function quoteSwapLiabilityCoreAsync(
-  inLeg: LiabLeg,
-  outLeg: LiabLeg,
-  lpAmountIn: number,
-  poolC: number,
-  convert: (fairIn: number) => Promise<Quote | null>,
-): Promise<SwapLiabilityQuote | null> {
-  if (!(lpAmountIn > 0) || !(Number.isFinite(poolC) && poolC > 0)) return null;
-  const idxIn = idxOf(inLeg);
-  const idxOut = idxOf(outLeg);
-  const liabIn = (lpAmountIn * idxIn) / WAD;
-  if (!(inLeg.liabilities > 0) || liabIn > inLeg.liabilities) return null;
-
-  const fairIn = liabIn * poolC;
-  const haircutIn = liabIn > fairIn ? liabIn - fairIn : 0;
-
-  const q = await convert(fairIn);
-  if (!q) return null;
-  const markCap = fairIn * q.markPrice;
-  const markCapBinding = q.amountOut > markCap;
-  const conv = markCapBinding ? markCap : q.amountOut;
-
-  const liabOut = conv / poolC;
-  const lpAmountOut = (liabOut * WAD) / idxOut;
-  if (!(lpAmountOut > 0)) return null;
-
-  const faceMoved = (lpAmountIn * idxIn) / WAD;
-  const faceReceived = (lpAmountOut * idxOut) / WAD;
-  return {
-    liabIn,
-    haircutIn,
-    fairIn,
-    poolC,
-    convQuoted: q.amountOut,
-    markCap,
-    conv,
-    markCapBinding,
-    liabOut,
-    lpAmountOut,
-    impactBps: faceMoved > 0 ? (1 - faceReceived / faceMoved) * 1e4 : 0,
-    haircutInBps: liabIn > 0 ? (haircutIn / liabIn) * 1e4 : 0,
-    convSpreadBps: q.spreadBps / 2,
-    convImpactBps: q.priceImpactBps,
-    markClampBps:
-      q.amountOut > 0 && markCapBinding ? ((q.amountOut - conv) / q.amountOut) * 1e4 : 0,
-  };
-}
-
-export interface BackendConvertOpts {
-  meta: WireMeta;
-  baseDecimals: number;
-  backendBase?: string;
-  /** The pool's on-chain address (`NamedPool.addr`). REQUIRED: served mode prices the pool from
-   *  chain by it, and an address-less pool reads as HALTED, so every leg would be refused. */
-  poolAddress: string;
-}
-
-/**
- * Backend conversion for the liability pipeline: ONE POST /v1/quote-path over the pool's books.
- * The backend walks the anchor-tree path between the two tokens, applies the pair's class rows and
- * settles once, as the chain does, so no leg dispatch or hub selection happens here.
- * Unknown legs throw (fail closed: never a silent zero-Quote the pipeline would mint nothing
- * from); an off-scale quote resolves null (no honest price for this pair).
- */
-export function backendConvert(
-  state: PoolState,
-  tokenIn: string,
-  tokenOut: string,
-  opts: BackendConvertOpts,
-): (fairIn: number) => Promise<Quote | null> {
-  const dec = (t: string): number | undefined =>
-    t === state.base ? opts.baseDecimals : state.legs[t]?.decimals;
-  const decIn = dec(tokenIn);
-  const decOut = dec(tokenOut);
-  return async (fairIn: number): Promise<Quote | null> => {
-    // Refused before the wire: an absent or zero address would be priced as HALTED.
-    const addr = servableAddr(opts.poolAddress);
-    if (addr === null) {
-      throw new Error(`backendConvert: pool ${state.base} has no servable address`);
-    }
-    if (decIn === undefined || decOut === undefined || tokenIn === tokenOut) {
-      throw new Error(`backendConvert: unknown leg ${tokenIn}->${tokenOut} on base ${state.base}`);
-    }
-    const w = await quotePathAsync(
-      {
-        pool: poolStateToWire('pool', addr, state, opts.meta, opts.baseDecimals),
-        token_in: tokenIn,
-        token_out: tokenOut,
-        amount_in: `0x${BigInt(Math.round(fairIn * 10 ** decIn)).toString(16)}`,
-      },
-      opts.backendBase,
-    );
-    return quoteFromWire(w, decOut, [tokenIn, tokenOut], fairIn, false, decIn);
-  };
-}
-
-/** Backend-priced liability swap: same pipeline as the core, rate off `state`, conversion over
- *  POST /v1/quote-path (`opts.poolAddress` names the pool). Null when the pool has no rate (a mark
- *  is unusable: the chain reverts). */
-export async function quoteSwapLiabilityAsync(
-  state: PoolState,
-  inLeg: LiabLeg,
-  outLeg: LiabLeg,
-  lpAmountIn: number,
-  opts: BackendConvertOpts,
-): Promise<SwapLiabilityQuote | null> {
-  const c = poolSolvency(state);
-  if (c === null) return null;
-  return quoteSwapLiabilityCoreAsync(
-    inLeg,
-    outLeg,
-    lpAmountIn,
-    c,
-    backendConvert(state, inLeg.symbol, outLeg.symbol, opts),
-  );
-}
-
-export type { PoolLeg, QuoteResponseWire, WireMeta };
 
 /** §1.3 slippage guard: minLpAmountOut = quoted shares · (1 − slippageFrac), bigint, rounded DOWN
  *  (same applySlip semantics as the market-swap minOut floors). The contract checks it against the

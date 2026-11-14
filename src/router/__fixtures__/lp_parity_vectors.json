@@ -1,0 +1,5060 @@
+[
+  {
+    "tag": "a_base",
+    "cWad": "1015425119714331336",
+    "exitTollWad": "29789951493628",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "4000000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "2500000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1800000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2100000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "900000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "300000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "700000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "8432024",
+        "core": {
+          "amountOut": "0x80aa94",
+          "grossOut": "0x811bde",
+          "debitToll": "0x0",
+          "cToll": "0xfc",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "21077314",
+        "core": {
+          "amountOut": "0x1419fb6",
+          "grossOut": "0x142c52d",
+          "debitToll": "0x0",
+          "cToll": "0x274",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "63202512",
+        "core": {
+          "amountOut": "0x3c46c2b",
+          "grossOut": "0x3c84b15",
+          "debitToll": "0x0",
+          "cToll": "0x75b",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "168295638",
+        "core": {
+          "amountOut": "0xa08106c",
+          "grossOut": "0xa15fbda",
+          "debitToll": "0x0",
+          "cToll": "0x1396",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "417768724",
+        "core": {
+          "amountOut": "0x18e6d5b2",
+          "grossOut": "0x193623d6",
+          "debitToll": "0x0",
+          "cToll": "0x309e",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "1304432032",
+        "core": {
+          "amountOut": "0x4dc0a56d",
+          "grossOut": "0x4dd93d27",
+          "debitToll": "0x0",
+          "cToll": "0x97cd",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "3261082028",
+        "core": {
+          "amountOut": "0xc261a52b",
+          "grossOut": "0xc29f207f",
+          "debitToll": "0x0",
+          "cToll": "0x17b7f",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "9783247385",
+        "core": {
+          "amountOut": "0x24724f495",
+          "grossOut": "0x247dd6691",
+          "debitToll": "0x0",
+          "cToll": "0x4727c",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "26088660129",
+        "core": {
+          "amountOut": "0x6130d3895",
+          "grossOut": "0x614f91334",
+          "debitToll": "0x0",
+          "cToll": "0xbdbf4",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "65221651624",
+        "core": {
+          "amountOut": "0xf2fa11288",
+          "grossOut": "0xf346eb517",
+          "debitToll": "0x0",
+          "cToll": "0x1da5e0",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "130414155171",
+        "core": {
+          "amountOut": "0x1e5d855dff",
+          "grossOut": "0x1e68bb8a77",
+          "debitToll": "0x0",
+          "cToll": "0x3b485c",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "5495191069",
+        "core": {
+          "amountOut": "0x1478c7598",
+          "grossOut": "0x147a59f66",
+          "debitToll": "0x0",
+          "cToll": "0x27f7b",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "13737977679",
+        "core": {
+          "amountOut": "0x332df2601",
+          "grossOut": "0x3331e0e82",
+          "debitToll": "0x0",
+          "cToll": "0x63eb2",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "41213933037",
+        "core": {
+          "amountOut": "0x9989d7203",
+          "grossOut": "0x9995a2b86",
+          "debitToll": "0x0",
+          "cToll": "0x12bc16",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "109897091473",
+        "core": {
+          "amountOut": "0x1996927e58",
+          "grossOut": "0x1998f07413",
+          "debitToll": "0x0",
+          "cToll": "0x31f4c7",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "274567776328",
+        "core": {
+          "amountOut": "0x3fee0097dd",
+          "grossOut": "0x3ffe592230",
+          "debitToll": "0x0",
+          "cToll": "0x7ccf95",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "535250742846",
+        "core": {
+          "amountOut": "0x7fad55d0b9",
+          "grossOut": "0x7ffbe8f5f7",
+          "debitToll": "0x30cee5e6f",
+          "cToll": "0xf9440c",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "12155448",
+        "core": {
+          "amountOut": "0xb97ba3",
+          "grossOut": "0xba066f",
+          "debitToll": "0x0",
+          "cToll": "0x16b",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "30382838",
+        "core": {
+          "amountOut": "0x1cf9e80",
+          "grossOut": "0x1d10f25",
+          "debitToll": "0x0",
+          "cToll": "0x38a",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "91084041",
+        "core": {
+          "amountOut": "0x56ddfa3",
+          "grossOut": "0x57323cd",
+          "debitToll": "0x0",
+          "cToll": "0xa9a",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "241915577",
+        "core": {
+          "amountOut": "0xe71212e",
+          "grossOut": "0xe88143f",
+          "debitToll": "0x5ae43",
+          "cToll": "0x1c32",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "569244120",
+        "core": {
+          "amountOut": "0x232e70c9",
+          "grossOut": "0x245365ee",
+          "debitToll": "0x1403241",
+          "cToll": "0x44b0",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "5226336",
+        "core": {
+          "amountOut": "0x50e850",
+          "grossOut": "0x513b6d",
+          "debitToll": "0x12852",
+          "cToll": "0x9e",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "13056901",
+        "core": {
+          "amountOut": "0xca4099",
+          "grossOut": "0xcb145e",
+          "debitToll": "0x30389",
+          "cToll": "0x18b",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "39077042",
+        "core": {
+          "amountOut": "0x25e9577",
+          "grossOut": "0x2613aa0",
+          "debitToll": "0xa4c24",
+          "cToll": "0x4a1",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "103496138",
+        "core": {
+          "amountOut": "0x6504013",
+          "grossOut": "0x6588c89",
+          "debitToll": "0x24f9f5",
+          "cToll": "0xc54",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "252637792",
+        "core": {
+          "amountOut": "0xfbd5000",
+          "grossOut": "0xfdcf01d",
+          "debitToll": "0xae3ee5",
+          "cToll": "0x1ebb",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "450948065",
+        "core": {
+          "amountOut": "0x1f122005",
+          "grossOut": "0x1fb8fda4",
+          "debitToll": "0x430f77b",
+          "cToll": "0x3ca9",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "2637451300",
+        "core": {
+          "amountOut": "0x9d358310",
+          "grossOut": "0x9d50b758",
+          "debitToll": "0x0",
+          "cToll": "0x132ec",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "6593589333",
+        "core": {
+          "amountOut": "0x189052fa2",
+          "grossOut": "0x18949323c",
+          "debitToll": "0x0",
+          "cToll": "0x2ff4d",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "19780392127",
+        "core": {
+          "amountOut": "0x49b09d29a",
+          "grossOut": "0x49bd5d968",
+          "debitToll": "0x0",
+          "cToll": "0x8fddb",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "52745233534",
+        "core": {
+          "amountOut": "0xc47f45e7b",
+          "grossOut": "0xc4a146a13",
+          "debitToll": "0x0",
+          "cToll": "0x17f9fd",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "131819613236",
+        "core": {
+          "amountOut": "0x1eb14b981d",
+          "grossOut": "0x1eb8496f6b",
+          "debitToll": "0x0",
+          "cToll": "0x3bebe9",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "262872149554",
+        "core": {
+          "amountOut": "0x3d51612bc8",
+          "grossOut": "0x3d6d6549d6",
+          "debitToll": "0x1c82c75e",
+          "cToll": "0x77b638",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "7894791325828878313334",
+        "core": {
+          "amountOut": "0x1abfd80b4bce00b40db",
+          "grossOut": "0x1ac972a193db98106fb",
+          "debitToll": "0x0",
+          "cToll": "0x343924b26911965",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "19736978316570734317097",
+        "core": {
+          "amountOut": "0x42df9c1c5a985d6887f",
+          "grossOut": "0x42f79e940ec4c8ec6b3",
+          "debitToll": "0x0",
+          "cToll": "0x828edbbe3f73a56",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "59210934952710010751934",
+        "core": {
+          "amountOut": "0xc89ed4553b6921b3309",
+          "grossOut": "0xc8e6dbbc57fe0dea3f9",
+          "debitToll": "0x0",
+          "cToll": "0x187ac933b138674b",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "157588851066411782449138",
+        "core": {
+          "amountOut": "0x216c4f7e0fb82a6e9f4b",
+          "grossOut": "0x217bb726bfc039d52d67",
+          "debitToll": "0xd259aa4ee65a978fe",
+          "cToll": "0x41409b675065fe5b",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "379600202008721080043614",
+        "core": {
+          "amountOut": "0x53596399b33b0c9658f2",
+          "grossOut": "0x53b43d15e7c4f1f134fe",
+          "debitToll": "0x2f695d24264098a7433",
+          "cToll": "0xa2b949f98c4a1c61",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "670046107844837796669832",
+        "core": {
+          "amountOut": "0xa54f129fd2f58b90320a",
+          "grossOut": "0xa76473081ce1bc7098a8",
+          "debitToll": "0x176a8a2eed6b68c4153f",
+          "cToll": "0x142bc211668593343",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "b_lowC",
+    "cWad": "705798302742020627",
+    "exitTollWad": "163210605710629",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "2400000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "2500000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1080000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "1260000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "900000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "180000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "420000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "5860271",
+        "core": {
+          "amountOut": "0x596f6c",
+          "grossOut": "0x59bd9a",
+          "debitToll": "0x0",
+          "cToll": "0x3bd",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "14649371",
+        "core": {
+          "amountOut": "0xdf9173",
+          "grossOut": "0xe059c8",
+          "debitToll": "0x0",
+          "cToll": "0x958",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "43934364",
+        "core": {
+          "amountOut": "0x29e7ea0",
+          "grossOut": "0x2a10b1f",
+          "debitToll": "0x0",
+          "cToll": "0x1c04",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "117052365",
+        "core": {
+          "amountOut": "0x6fa5e71",
+          "grossOut": "0x702b8b7",
+          "debitToll": "0x0",
+          "cToll": "0x4aa4",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "291663894",
+        "core": {
+          "amountOut": "0x11632a11",
+          "grossOut": "0x11865e67",
+          "debitToll": "0x0",
+          "cToll": "0xb9fb",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "552025223",
+        "core": {
+          "amountOut": "0x22148e65",
+          "grossOut": "0x230c39e9",
+          "debitToll": "0x12be556",
+          "cToll": "0x16c88",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "855243619",
+        "core": {
+          "amountOut": "0x32fc1cbb",
+          "grossOut": "0x361c580d",
+          "debitToll": "0x0",
+          "cToll": "0x22158",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "2137979418",
+        "core": {
+          "amountOut": "0x7f744d60",
+          "grossOut": "0x8746e3bf",
+          "debitToll": "0x0",
+          "cToll": "0x55346",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "6412620739",
+        "core": {
+          "amountOut": "0x17e48ccbe",
+          "grossOut": "0x195d4b052",
+          "debitToll": "0x0",
+          "cToll": "0xff8fb",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "17091457791",
+        "core": {
+          "amountOut": "0x3fae5854a",
+          "grossOut": "0x43a372d37",
+          "debitToll": "0x0",
+          "cToll": "0x2a924b",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "42674370428",
+        "core": {
+          "amountOut": "0x9f001829b",
+          "grossOut": "0xa9189f61d",
+          "debitToll": "0x0",
+          "cToll": "0x6a4b1f",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "85160688245",
+        "core": {
+          "amountOut": "0x13d4cd18ca",
+          "grossOut": "0x152313f14f",
+          "debitToll": "0x0",
+          "cToll": "0xd41e55",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "3692125526",
+        "core": {
+          "amountOut": "0xdc1a8f9b",
+          "grossOut": "0xe3bd60c2",
+          "debitToll": "0x0",
+          "cToll": "0x93245",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "9228940740",
+        "core": {
+          "amountOut": "0x2262d728f",
+          "grossOut": "0x2395971e8",
+          "debitToll": "0x0",
+          "cToll": "0x16fccb",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "27672912264",
+        "core": {
+          "amountOut": "0x671b40f0b",
+          "grossOut": "0x6ac0c55ba",
+          "debitToll": "0x0",
+          "cToll": "0x44ed83",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "73698358077",
+        "core": {
+          "amountOut": "0x11297b44ab",
+          "grossOut": "0x11cacb8f47",
+          "debitToll": "0x0",
+          "cToll": "0xb7916e",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "183615679963",
+        "core": {
+          "amountOut": "0x2ac2224792",
+          "grossOut": "0x2c7afce633",
+          "debitToll": "0x0",
+          "cToll": "0x1c959b7",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "352176935498",
+        "core": {
+          "amountOut": "0x54ee4b4ffe",
+          "grossOut": "0x58f5ee235e",
+          "debitToll": "0x2eb5d4e6c",
+          "cToll": "0x38c6f48",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "8448162",
+        "core": {
+          "amountOut": "0x80ee06",
+          "grossOut": "0x814d4f",
+          "debitToll": "0x0",
+          "cToll": "0x564",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "21117650",
+        "core": {
+          "amountOut": "0x142484a",
+          "grossOut": "0x14340c8",
+          "debitToll": "0x0",
+          "cToll": "0xd78",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "63323415",
+        "core": {
+          "amountOut": "0x3c66578",
+          "grossOut": "0x3c9bde4",
+          "debitToll": "0x0",
+          "cToll": "0x2861",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "168617088",
+        "core": {
+          "amountOut": "0xa0d5005",
+          "grossOut": "0xa19d89d",
+          "debitToll": "0x0",
+          "cToll": "0x6b85",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "418555556",
+        "core": {
+          "amountOut": "0x18f3b188",
+          "grossOut": "0x193fcb6d",
+          "debitToll": "0x0",
+          "cToll": "0x10ae4",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "3685080",
+        "core": {
+          "amountOut": "0x383d32",
+          "grossOut": "0x3876bf",
+          "debitToll": "0x0",
+          "cToll": "0x25a",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "9212198",
+        "core": {
+          "amountOut": "0x8c9706",
+          "grossOut": "0x8d28ce",
+          "debitToll": "0x0",
+          "cToll": "0x5e0",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "27631311",
+        "core": {
+          "amountOut": "0x1a5b06e",
+          "grossOut": "0x1a7798e",
+          "debitToll": "0x0",
+          "cToll": "0x119f",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "73645016",
+        "core": {
+          "amountOut": "0x463eace",
+          "grossOut": "0x4693e17",
+          "debitToll": "0x0",
+          "cToll": "0x2ef6",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "183820533",
+        "core": {
+          "amountOut": "0xaf5562c",
+          "grossOut": "0xb06f434",
+          "debitToll": "0x0",
+          "cToll": "0x7537",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "365946737",
+        "core": {
+          "amountOut": "0x15d0d0ca",
+          "grossOut": "0x160d3c76",
+          "debitToll": "0x0",
+          "cToll": "0xe959",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "1729335020",
+        "core": {
+          "amountOut": "0x6717dda0",
+          "grossOut": "0x6d5b7b5c",
+          "debitToll": "0x0",
+          "cToll": "0x44eb4",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "4322799676",
+        "core": {
+          "amountOut": "0x101b374a6",
+          "grossOut": "0x11164b5ad",
+          "debitToll": "0x0",
+          "cToll": "0xac46a",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "12962983714",
+        "core": {
+          "amountOut": "0x304c7b8ec",
+          "grossOut": "0x3342e2107",
+          "debitToll": "0x0",
+          "cToll": "0x2049ca",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "34531242874",
+        "core": {
+          "amountOut": "0x80a8ef62c",
+          "grossOut": "0x88b25ad68",
+          "debitToll": "0x0",
+          "cToll": "0x5602b2",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "86098491269",
+        "core": {
+          "amountOut": "0x140cb52bd6",
+          "grossOut": "0x155bde3185",
+          "debitToll": "0x0",
+          "cToll": "0xd67451",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "171367347814",
+        "core": {
+          "amountOut": "0x27e7f50e05",
+          "grossOut": "0x2ab7bc6595",
+          "debitToll": "0x0",
+          "cToll": "0x1aad79f",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "5327856416802936013343",
+        "core": {
+          "amountOut": "0x120deee2ea19c8df96f",
+          "grossOut": "0x129cee90e7b7fa2e5b8",
+          "debitToll": "0x0",
+          "cToll": "0xc11cfbdfc04b750",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "13313532798447112754409",
+        "core": {
+          "amountOut": "0x2d1d88b1292884d21ce",
+          "grossOut": "0x2e88452c184fdd61903",
+          "debitToll": "0x0",
+          "cToll": "0x1e28fc812fe00ce5",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "39876561499139436881360",
+        "core": {
+          "amountOut": "0x87210cb52c4786c07d6",
+          "grossOut": "0x8b98340b37da497c49c",
+          "debitToll": "0x0",
+          "cToll": "0x5a55d260b8096206",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "105848715382122335201061",
+        "core": {
+          "amountOut": "0x166b01cc6af30061e8f7",
+          "grossOut": "0x1743bc776fa775d913db",
+          "debitToll": "0x0",
+          "cToll": "0xefc96570350d81d2",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "260356605709360364154625",
+        "core": {
+          "amountOut": "0x372443886e425b277727",
+          "grossOut": "0x3a28dd3e98653c03da56",
+          "debitToll": "0x0",
+          "cToll": "0x24dcdf6033bf50826",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "478773923956658532760748",
+        "core": {
+          "amountOut": "0x65669f868bedc709ab42",
+          "grossOut": "0x7451ba7d30ca7807b4ac",
+          "debitToll": "0x0",
+          "cToll": "0x43c99da5023a1ee96",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "c_highC",
+    "cWad": "1325051936686876304",
+    "exitTollWad": "113843543521490",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "5600000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "2500000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "2520000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2940000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "900000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "420000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "980000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "11001936",
+        "core": {
+          "amountOut": "0xa7e535",
+          "grossOut": "0xa87a1c",
+          "debitToll": "0x0",
+          "cToll": "0x4e5",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "27500128",
+        "core": {
+          "amountOut": "0x1a3aa9c",
+          "grossOut": "0x1a53087",
+          "debitToll": "0x0",
+          "cToll": "0xc3c",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "82448335",
+        "core": {
+          "amountOut": "0x4ea347b",
+          "grossOut": "0x4ef8982",
+          "debitToll": "0x0",
+          "cToll": "0x24ac",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "219394520",
+        "core": {
+          "amountOut": "0xd14136c",
+          "grossOut": "0xd293254",
+          "debitToll": "0x0",
+          "cToll": "0x6194",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "539640898",
+        "core": {
+          "amountOut": "0x202b3444",
+          "grossOut": "0x20e6286b",
+          "debitToll": "0x0",
+          "cToll": "0xf002",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "1702041041",
+        "core": {
+          "amountOut": "0x65760ace",
+          "grossOut": "0x65962240",
+          "debitToll": "0x0",
+          "cToll": "0x2f4fd",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "4255104552",
+        "core": {
+          "amountOut": "0xfda722a0",
+          "grossOut": "0xfdf75d3e",
+          "debitToll": "0x0",
+          "cToll": "0x76478",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "12765314960",
+        "core": {
+          "amountOut": "0x2f8f56cf7",
+          "grossOut": "0x2f9e61cd0",
+          "debitToll": "0x0",
+          "cToll": "0x162d67",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "34040840328",
+        "core": {
+          "amountOut": "0x7ed392444",
+          "grossOut": "0x7efbaf932",
+          "debitToll": "0x0",
+          "cToll": "0x3b23bc",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "85102101473",
+        "core": {
+          "amountOut": "0x13d10edd35",
+          "grossOut": "0x13d7537188",
+          "debitToll": "0x0",
+          "cToll": "0x93d954",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "170196884874",
+        "core": {
+          "amountOut": "0x27a1ae0cf1",
+          "grossOut": "0x27ae371244",
+          "debitToll": "0x0",
+          "cToll": "0x127af67",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "7170200326",
+        "core": {
+          "amountOut": "0x1ab6d07fc",
+          "grossOut": "0x1ab8dde0b",
+          "debitToll": "0x0",
+          "cToll": "0xc74f6",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "17925500815",
+        "core": {
+          "amountOut": "0x42c9093f6",
+          "grossOut": "0x42ce2ab1b",
+          "debitToll": "0x0",
+          "cToll": "0x1f2467",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "53776502447",
+        "core": {
+          "amountOut": "0xc85b1bbe4",
+          "grossOut": "0xc86a80152",
+          "debitToll": "0x0",
+          "cToll": "0x5d6d35",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "143404006531",
+        "core": {
+          "amountOut": "0x2164849fbb",
+          "grossOut": "0x21671558df",
+          "debitToll": "0x0",
+          "cToll": "0xf92338",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "358510016330",
+        "core": {
+          "amountOut": "0x537b4b8f54",
+          "grossOut": "0x5381b55e2e",
+          "debitToll": "0x0",
+          "cToll": "0x26ed80a",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "703857227938",
+        "core": {
+          "amountOut": "0xa6f494d745",
+          "grossOut": "0xa701684d77",
+          "debitToll": "0x30e8e3d8c",
+          "cToll": "0x4dda117",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xf20832",
+          "grossOut": "0xf2bf91",
+          "debitToll": "0xf20832",
+          "cToll": "0x70e",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x25ced3f",
+          "grossOut": "0x25edd37",
+          "debitToll": "0x25ced3f",
+          "cToll": "0x11a2",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x715029a",
+          "grossOut": "0x71c866a",
+          "debitToll": "0x715029a",
+          "cToll": "0x34d7",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x12cfacce",
+          "grossOut": "0x12f6309f",
+          "debitToll": "0x12cfacce",
+          "cToll": "0x8c5a",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x698f15",
+          "grossOut": "0x69fbf0",
+          "debitToll": "0x698f15",
+          "cToll": "0x314",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x107de75",
+          "grossOut": "0x108f571",
+          "debitToll": "0x107de75",
+          "cToll": "0x7b1",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x3174ea5",
+          "grossOut": "0x31adc77",
+          "debitToll": "0x3174ea5",
+          "cToll": "0x1710",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x83bc64c",
+          "grossOut": "0x847850a",
+          "debitToll": "0x83bc64c",
+          "cToll": "0x3d6e",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x147d57c3",
+          "grossOut": "0x14b1ffd0",
+          "debitToll": "0x147d57c3",
+          "cToll": "0x98df",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x2628cd8d",
+          "grossOut": "0x29634727",
+          "debitToll": "0x2628cd8d",
+          "cToll": "0x11cb4",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "3236232841",
+        "core": {
+          "amountOut": "0xccf674d5",
+          "grossOut": "0xcd19ec94",
+          "debitToll": "0xc0b7d19",
+          "cToll": "0x5f933",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "8079313106",
+        "core": {
+          "amountOut": "0x200673c96",
+          "grossOut": "0x200bfe7cb",
+          "debitToll": "0x1ec7c4cd",
+          "cToll": "0xeeef7",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "24115227601",
+        "core": {
+          "amountOut": "0x6012d0dbf",
+          "grossOut": "0x602370ddd",
+          "debitToll": "0x639f154a",
+          "cToll": "0x2ccca4",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "63251621952",
+        "core": {
+          "amountOut": "0x1002e7fa56",
+          "grossOut": "0x1005ad45cd",
+          "debitToll": "0x148595cc2",
+          "cToll": "0x777554",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "142853782935",
+        "core": {
+          "amountOut": "0x2805c9cd20",
+          "grossOut": "0x280cb6c859",
+          "debitToll": "0x6c1df753d",
+          "cToll": "0x12a9a4c",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x5005fefc65",
+          "grossOut": "0x5013d7fb9f",
+          "debitToll": "0x5005fefc65",
+          "cToll": "0x2550af5",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x22e7e94e4469a6715d3",
+          "grossOut": "0x22f47192c6129fee62e",
+          "debitToll": "0x22e7e94e4469a6715d3",
+          "cToll": "0x1046d7f960f6f2f1",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x5743c743ab08201b691",
+          "grossOut": "0x57631beeef2e8fd3f74",
+          "debitToll": "0x5743c743ab08201b691",
+          "cToll": "0x28b11bef72695f59",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x105cb55cb0fa30e256e3",
+          "grossOut": "0x1062953ccdc1b95dd8fd",
+          "debitToll": "0x105cb55cb0fa30e256e3",
+          "cToll": "0x7a1353ce5e0403aa",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x2ba1e3a1d83e10a54e18",
+          "grossOut": "0x2bb18df77a52431c4b83",
+          "debitToll": "0x2ba1e3a1d83e10a54e18",
+          "cToll": "0x14588df7ba7a2aba3",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x6d14b9149df829e91004",
+          "grossOut": "0x6d3be2eab32b255fe4b9",
+          "debitToll": "0x6d14b9149df829e91004",
+          "cToll": "0x32dd62eb52d428586",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xda0a894477f081e024ca",
+          "grossOut": "0xda77c5d5673f4925e411",
+          "debitToll": "0xda0a894477f081e024ca",
+          "cToll": "0x65ac5c07fd9111bf0",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "d_toRich",
+    "cWad": "1020184281205510725",
+    "exitTollWad": "175153170334040",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "4000000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "1200000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1800000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2100000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "3000000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "300000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "700000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "8484910",
+        "core": {
+          "amountOut": "0x817dfd",
+          "grossOut": "0x81b93c",
+          "debitToll": "0x0",
+          "cToll": "0x5cf",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "21212277",
+        "core": {
+          "amountOut": "0x143bafa",
+          "grossOut": "0x1444f17",
+          "debitToll": "0x0",
+          "cToll": "0xe85",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "63636837",
+        "core": {
+          "amountOut": "0x3cb30f2",
+          "grossOut": "0x3cced49",
+          "debitToll": "0x0",
+          "cToll": "0x2b8d",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "169698234",
+        "core": {
+          "amountOut": "0xa1dd7db",
+          "grossOut": "0xa2278c3",
+          "debitToll": "0x0",
+          "cToll": "0x7421",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "424245589",
+        "core": {
+          "amountOut": "0x194a9ba6",
+          "grossOut": "0x19562dea",
+          "debitToll": "0x0",
+          "cToll": "0x12251",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "848491180",
+        "core": {
+          "amountOut": "0x3295374e",
+          "grossOut": "0x32ac5bd6",
+          "debitToll": "0x0",
+          "cToll": "0x244a2",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x4e11f547",
+          "grossOut": "0x4e2aa6b9",
+          "debitToll": "0x4e11f547",
+          "cToll": "0x38028",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xc32cecce",
+          "grossOut": "0xc36aa86e",
+          "debitToll": "0xc32cecce",
+          "cToll": "0x8c064",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x24986c8f6",
+          "grossOut": "0x24a3ffbd4",
+          "debitToll": "0x24986c8f6",
+          "cToll": "0x1a412a",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x6196775ae",
+          "grossOut": "0x61b5552ac",
+          "debitToll": "0x6196775ae",
+          "cToll": "0x46031b",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xf3f82a635",
+          "grossOut": "0xf44554eaf",
+          "debitToll": "0xf3f82a635",
+          "cToll": "0xaf07c4",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x1e7d62ead5",
+          "grossOut": "0x1e88aaa271",
+          "debitToll": "0x1e7d62ead5",
+          "cToll": "0x15dfcc5",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "5520143727",
+        "core": {
+          "amountOut": "0x1491576f0",
+          "grossOut": "0x1492ebeef",
+          "debitToll": "0x0",
+          "cToll": "0xec181",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "13800359322",
+        "core": {
+          "amountOut": "0x336b5a95b",
+          "grossOut": "0x336f4dd57",
+          "debitToll": "0x0",
+          "cToll": "0x24e3c1",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "41401077970",
+        "core": {
+          "amountOut": "0x9a420fc13",
+          "grossOut": "0x9a4de9807",
+          "debitToll": "0x0",
+          "cToll": "0x6eab41",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "110395966459",
+        "core": {
+          "amountOut": "0x19b543dd42",
+          "grossOut": "0x19b7a6eac1",
+          "debitToll": "0x0",
+          "cToll": "0x1271947",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "275812932168",
+        "core": {
+          "amountOut": "0x403a9ca05d",
+          "grossOut": "0x404b214ae3",
+          "debitToll": "0x0",
+          "cToll": "0x2e14615",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "550847698211",
+        "core": {
+          "amountOut": "0x8046d54cca",
+          "grossOut": "0x80964295c7",
+          "debitToll": "0x0",
+          "cToll": "0x5c077a7",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "12232155",
+        "core": {
+          "amountOut": "0xbaae3a",
+          "grossOut": "0xbae946",
+          "debitToll": "0x0",
+          "cToll": "0x85f",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "30580388",
+        "core": {
+          "amountOut": "0x1d2b392",
+          "grossOut": "0x1d34730",
+          "debitToll": "0x0",
+          "cToll": "0x14ee",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "91741169",
+        "core": {
+          "amountOut": "0x5781ab9",
+          "grossOut": "0x579d592",
+          "debitToll": "0x0",
+          "cToll": "0x3ec8",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "244268912",
+        "core": {
+          "amountOut": "0xe959c9c",
+          "grossOut": "0xe9a3988",
+          "debitToll": "0x5b5c2",
+          "cToll": "0xa76a",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "589961616",
+        "core": {
+          "amountOut": "0x24760788",
+          "grossOut": "0x24818fd5",
+          "debitToll": "0x14a4b70",
+          "cToll": "0x1a288",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "1050723969",
+        "core": {
+          "amountOut": "0x48ec0f12",
+          "grossOut": "0x49031fac",
+          "debitToll": "0xa480381",
+          "cToll": "0x34510",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "5259298",
+        "core": {
+          "amountOut": "0x516c9c",
+          "grossOut": "0x519e6c",
+          "debitToll": "0x128d3",
+          "cToll": "0x3a7",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "13140337",
+        "core": {
+          "amountOut": "0xcb8f79",
+          "grossOut": "0xcc0c01",
+          "debitToll": "0x304e7",
+          "cToll": "0x921",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "39338203",
+        "core": {
+          "amountOut": "0x262adcb",
+          "grossOut": "0x2642363",
+          "debitToll": "0xa518e",
+          "cToll": "0x1b62",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "104274119",
+        "core": {
+          "amountOut": "0x65c76cc",
+          "grossOut": "0x6605b08",
+          "debitToll": "0x251500",
+          "cToll": "0x4905",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "255271065",
+        "core": {
+          "amountOut": "0xfe71214",
+          "grossOut": "0xff0cc9c",
+          "debitToll": "0xaf3aef",
+          "cToll": "0xb68c",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "461848512",
+        "core": {
+          "amountOut": "0x1fcdd709",
+          "grossOut": "0x1fe14be9",
+          "debitToll": "0x4452a36",
+          "cToll": "0x16d13",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "2649427715",
+        "core": {
+          "amountOut": "0x9df2240c",
+          "grossOut": "0x9e0d78f8",
+          "debitToll": "0x0",
+          "cToll": "0x71509",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "6623529218",
+        "core": {
+          "amountOut": "0x18adcbd92",
+          "grossOut": "0x18b2111c5",
+          "debitToll": "0x0",
+          "cToll": "0x11b490",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "19870211374",
+        "core": {
+          "amountOut": "0x4a0907a9b",
+          "grossOut": "0x4a15d7635",
+          "debitToll": "0x0",
+          "cToll": "0x351d6d",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "52984740049",
+        "core": {
+          "amountOut": "0xc56b09ae8",
+          "grossOut": "0xc58d33344",
+          "debitToll": "0x0",
+          "cToll": "0x8da217",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "132417604682",
+        "core": {
+          "amountOut": "0x1ed616433d",
+          "grossOut": "0x1edd23496d",
+          "debitToll": "0x0",
+          "cToll": "0x161f6f3",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "264064959949",
+        "core": {
+          "amountOut": "0x3d9ac55df5",
+          "grossOut": "0x3db7111f37",
+          "debitToll": "0x1c82b207",
+          "cToll": "0x2c32621",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "7930640130261166682174",
+        "core": {
+          "amountOut": "0x1adff05876a4d064c10",
+          "grossOut": "0x1ae99674a67edbd47c1",
+          "debitToll": "0x0",
+          "cToll": "0x1347db46628cdbd2",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "19826600326652040710992",
+        "core": {
+          "amountOut": "0x432fd8dd3726b6cf156",
+          "grossOut": "0x4347f823aecd0bf4e03",
+          "debitToll": "0x0",
+          "cToll": "0x3033a43000cee606",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "59479800981954370144091",
+        "core": {
+          "amountOut": "0xc98f8a97c2898013a60",
+          "grossOut": "0xc9d7e86b2986f0a1f49",
+          "debitToll": "0x0",
+          "cToll": "0x909aec90174a3305",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "158304677754120199498442",
+        "core": {
+          "amountOut": "0x21945dc45aa7b20669e0",
+          "grossOut": "0x21a3e3d197c56d096ab4",
+          "debitToll": "0xd2595fb49e6aead1a",
+          "cToll": "0x181744c1f924b51fc",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "381378123977269987728360",
+        "core": {
+          "amountOut": "0x53bcdef84943ce3c4b46",
+          "grossOut": "0x5418ab7e7fffa1b6e8fc",
+          "debitToll": "0x2f691141065294186c2",
+          "cToll": "0x3c1365f71955b689c",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      }
+    ]
+  },
+  {
+    "tag": "e_toThin",
+    "cWad": "993036675826962113",
+    "exitTollWad": "60942173230922",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "4000000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "2700000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1800000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2100000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "150000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "300000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "700000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "1275632238",
+        "core": {
+          "amountOut": "0x4c09ca1f",
+          "grossOut": "0x4c21d70b",
+          "debitToll": "0x0",
+          "cToll": "0x12fb1",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "3189080921",
+        "core": {
+          "amountOut": "0xbe187a93",
+          "grossOut": "0xbe549ae0",
+          "debitToll": "0x0",
+          "cToll": "0x2f73a",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "9567244715",
+        "core": {
+          "amountOut": "0x23a497758",
+          "grossOut": "0x23afdd83f",
+          "debitToll": "0x0",
+          "cToll": "0x8e5ad",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "25512653873",
+        "core": {
+          "amountOut": "0x5f0c3edfd",
+          "grossOut": "0x5f2a4f067",
+          "debitToll": "0x0",
+          "cToll": "0x17b9cc",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "63781634685",
+        "core": {
+          "amountOut": "0xed9e9d2fa",
+          "grossOut": "0xede9c5902",
+          "debitToll": "0x0",
+          "cToll": "0x3b507d",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "127538888206",
+        "core": {
+          "amountOut": "0x1db25f9939",
+          "grossOut": "0x1dbd38b719",
+          "debitToll": "0x0",
+          "cToll": "0x769b2b",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "5373858407",
+        "core": {
+          "amountOut": "0x1405391c2",
+          "grossOut": "0x1406c2d86",
+          "debitToll": "0x0",
+          "cToll": "0x4ff5b",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "13434632585",
+        "core": {
+          "amountOut": "0x320d0b7eb",
+          "grossOut": "0x3210e3d50",
+          "debitToll": "0x0",
+          "cToll": "0xc7e62",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "40303776846",
+        "core": {
+          "amountOut": "0x962704f6c",
+          "grossOut": "0x96328df77",
+          "debitToll": "0x0",
+          "cToll": "0x257b1e",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "107469852647",
+        "core": {
+          "amountOut": "0x190617c13d",
+          "grossOut": "0x19085e3ab9",
+          "debitToll": "0x0",
+          "cToll": "0x63f156",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "264475219303",
+        "core": {
+          "amountOut": "0x3e85117418",
+          "grossOut": "0x3e949da589",
+          "debitToll": "0xf0242bf3",
+          "cToll": "0xf9b2be",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "481612287819",
+        "core": {
+          "amountOut": "0x7cdd7db55c",
+          "grossOut": "0x7d282465ad",
+          "debitToll": "0xcb936b2e4",
+          "cToll": "0x1f2b32d",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "2579219356",
+        "core": {
+          "amountOut": "0x99be29a5",
+          "grossOut": "0x99d8c460",
+          "debitToll": "0x0",
+          "cToll": "0x26609",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "6448016796",
+        "core": {
+          "amountOut": "0x1805aecb1",
+          "grossOut": "0x1809d6f6f",
+          "debitToll": "0x0",
+          "cToll": "0x5ff15",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "19343684115",
+        "core": {
+          "amountOut": "0x4810b2f39",
+          "grossOut": "0x481d2b67a",
+          "debitToll": "0x0",
+          "cToll": "0x11fd26",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "51580784952",
+        "core": {
+          "amountOut": "0xc02a4490d",
+          "grossOut": "0xc04b8561f",
+          "debitToll": "0x0",
+          "cToll": "0x2ff7d5",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "128911724366",
+        "core": {
+          "amountOut": "0x1e0434b14e",
+          "grossOut": "0x1e0aec532f",
+          "debitToll": "0x0",
+          "cToll": "0x77e200",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "257071601461",
+        "core": {
+          "amountOut": "0x3bf81c06a0",
+          "grossOut": "0x3c12d4a12b",
+          "debitToll": "0x1c832c88",
+          "cToll": "0xef82e3",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "7720483714550087480335",
+        "core": {
+          "amountOut": "0x1a28dc3c39fbf1a3c78",
+          "grossOut": "0x1a32409d51358d2bb46",
+          "debitToll": "0x0",
+          "cToll": "0x687aa1dd4d34869",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "19301209287374456837335",
+        "core": {
+          "amountOut": "0x416626969f8089eca5b",
+          "grossOut": "0x417da1895995c74eecf",
+          "debitToll": "0x0",
+          "cToll": "0x1053294a97b17584",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "57903627864121846784997",
+        "core": {
+          "amountOut": "0xc43273c3fb96f96c56e",
+          "grossOut": "0xc478e49c29e122b01ad",
+          "debitToll": "0x0",
+          "cToll": "0x30f97bdfce56e189",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "154108157646553672425200",
+        "core": {
+          "amountOut": "0x20afe08d6905e74c9a27",
+          "grossOut": "0x20bebb4efe29eea0cf39",
+          "debitToll": "0xd25b135246e970f6d",
+          "cToll": "0x828c845a5e8febca",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "370953035249823275341071",
+        "core": {
+          "amountOut": "0x51855962ce86e3770926",
+          "grossOut": "0x51dbd2c4d39192cf54d2",
+          "debitToll": "0x2f6ac4a0ec9acd0e6ab",
+          "cToll": "0x14596397045694d6c",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "653180293592984102789242",
+        "core": {
+          "amountOut": "0xa1c16e4964492dbf0595",
+          "grossOut": "0xa3b3d54f38ac90a594fc",
+          "debitToll": "0x176deebc3c638ac1d64a",
+          "cToll": "0x2860962979c8eced1",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "f_frRich",
+    "cWad": "1269120625580019478",
+    "exitTollWad": "135482337266542",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "4000000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "6000000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1800000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2100000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "500000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "300000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "700000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x9c8a40",
+          "grossOut": "0xa132df",
+          "debitToll": "0x9c8a40",
+          "cToll": "0x56e",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x186ba05",
+          "grossOut": "0x192ff2f",
+          "debitToll": "0x186ba05",
+          "cToll": "0xd8e",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x48c6d7b",
+          "grossOut": "0x4b8fd8e",
+          "debitToll": "0x48c6d7b",
+          "cToll": "0x2863",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xbadcf02",
+          "grossOut": "0xc97f97c",
+          "debitToll": "0xbadcf02",
+          "cToll": "0x67b3",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "1630161323",
+        "core": {
+          "amountOut": "0x612da883",
+          "grossOut": "0x614c652d",
+          "debitToll": "0x0",
+          "cToll": "0x35ed8",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "4075405580",
+        "core": {
+          "amountOut": "0xf2f22e29",
+          "grossOut": "0xf33f05d4",
+          "debitToll": "0x0",
+          "cToll": "0x86d1d",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "12226218043",
+        "core": {
+          "amountOut": "0x2d8d68f91",
+          "grossOut": "0x2d9bd1692",
+          "debitToll": "0x0",
+          "cToll": "0x194756",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "32603248551",
+        "core": {
+          "amountOut": "0x79791808a",
+          "grossOut": "0x799f83de2",
+          "debitToll": "0x0",
+          "cToll": "0x4368e3",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "81507246586",
+        "core": {
+          "amountOut": "0x12fade67bb",
+          "grossOut": "0x1300ec9d40",
+          "debitToll": "0x0",
+          "cToll": "0xa885c1",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "162951327149",
+        "core": {
+          "amountOut": "0x25f1f8d7c0",
+          "grossOut": "0x2601d93d0a",
+          "debitToll": "0x0",
+          "cToll": "0x150ea13",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x1992c0297",
+          "grossOut": "0x1994b71a7",
+          "debitToll": "0x1992c0297",
+          "cToll": "0xe3107",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x3feee067a",
+          "grossOut": "0x3ff3c9c22",
+          "debitToll": "0x3feee067a",
+          "cToll": "0x237a91",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0xbfcca1372",
+          "grossOut": "0xbfdb5d468",
+          "debitToll": "0xbfcca1372",
+          "cToll": "0x6a6fb1",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x1ff64559a2",
+          "grossOut": "0x1ff9e4e118",
+          "debitToll": "0x1ff64559a2",
+          "cToll": "0x11bca25",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x4fd5c46c69",
+          "grossOut": "0x4ff0bc32be",
+          "debitToll": "0x4fd5c46c69",
+          "cToll": "0x2c4da55",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": {
+          "amountOut": "0x9f5e04cf69",
+          "grossOut": "0x9fe178657e",
+          "debitToll": "0x9f5e04cf69",
+          "cToll": "0x5870468",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "14788702",
+        "core": {
+          "amountOut": "0xe1b032",
+          "grossOut": "0xe861df",
+          "debitToll": "0x0",
+          "cToll": "0x7d4",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "36882557",
+        "core": {
+          "amountOut": "0x232dc03",
+          "grossOut": "0x244f4b0",
+          "debitToll": "0x0",
+          "cToll": "0x1386",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "109398400",
+        "core": {
+          "amountOut": "0x6858368",
+          "grossOut": "0x6cede10",
+          "debitToll": "0x0",
+          "cToll": "0x39e8",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "6381792",
+        "core": {
+          "amountOut": "0x6284fd",
+          "grossOut": "0x65798b",
+          "debitToll": "0x120b2",
+          "cToll": "0x36b",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "15931407",
+        "core": {
+          "amountOut": "0xf60f9c",
+          "grossOut": "0xfdafb9",
+          "debitToll": "0x2ef04",
+          "cToll": "0x889",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "47539079",
+        "core": {
+          "amountOut": "0x2df7a67",
+          "grossOut": "0x2f90e66",
+          "debitToll": "0x9fd5d",
+          "cToll": "0x1983",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "124413488",
+        "core": {
+          "amountOut": "0x78e1044",
+          "grossOut": "0x7ed7607",
+          "debitToll": "0x2366ff",
+          "cToll": "0x4315",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "3296044883",
+        "core": {
+          "amountOut": "0xc47c77ec",
+          "grossOut": "0xc49e782a",
+          "debitToll": "0x0",
+          "cToll": "0x6d099",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "8240055173",
+        "core": {
+          "amountOut": "0x1eb364cfb",
+          "grossOut": "0x1eb8b4d6e",
+          "debitToll": "0x0",
+          "cToll": "0x110976",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "24719572173",
+        "core": {
+          "amountOut": "0x5c199d8dd",
+          "grossOut": "0x5c298d8a4",
+          "debitToll": "0x0",
+          "cToll": "0x331c10",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "65914970696",
+        "core": {
+          "amountOut": "0xf595eeb0d",
+          "grossOut": "0xf5c06e02f",
+          "debitToll": "0x0",
+          "cToll": "0x8848c5",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "164696027500",
+        "core": {
+          "amountOut": "0x2659fa76f7",
+          "grossOut": "0x2664a1b5b4",
+          "debitToll": "0x0",
+          "cToll": "0x154858b",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "328427330360",
+        "core": {
+          "amountOut": "0x4c96f19917",
+          "grossOut": "0x4cc42696a2",
+          "debitToll": "0x1c7e3465",
+          "cToll": "0x2a8097a",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "9866196238750461318538",
+        "core": {
+          "amountOut": "0x216eb87dfd7e17d42c3",
+          "grossOut": "0x217ab9563037d7466e9",
+          "debitToll": "0x0",
+          "cToll": "0x128d8a0c392b6d39",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "24665490597375735120638",
+        "core": {
+          "amountOut": "0x5394cd3b0100927c07f",
+          "grossOut": "0x53b2cf577fd38d60e96",
+          "debitToll": "0x0",
+          "cToll": "0x2e61d91e92f57d81",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "73996471796123859956239",
+        "core": {
+          "amountOut": "0xfabe67b13d2c6ec0e35",
+          "grossOut": "0xfb186e06b9ba41a9642",
+          "debitToll": "0x0",
+          "cToll": "0x8b258b5bd927dc26",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "196937627262283464479173",
+        "core": {
+          "amountOut": "0x29c299e9e5f7e207fa8e",
+          "grossOut": "0x29d9338fe1bc3a130925",
+          "debitToll": "0xd24861ee378a34235",
+          "cToll": "0x172c9884d16fa2694",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "477187952334951647393227",
+        "core": {
+          "amountOut": "0x68057f9940708ad26fc1",
+          "grossOut": "0x689d57d6f7879883f4f7",
+          "debitToll": "0x2f57ad91a4bd4d00bd1",
+          "cToll": "0x39b9a87a1dbb4ae25",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "857089709834558937310072",
+        "core": {
+          "amountOut": "0xccb9e9d2f34fb09e049c",
+          "grossOut": "0xd133f051a900698d64d3",
+          "debitToll": "0x1733e2f0ca25652ff08b",
+          "cToll": "0x719c212899548f099",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "g_lowC_thin",
+    "cWad": "573596219477640741",
+    "exitTollWad": "342788271436871",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "2400000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "1200000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1080000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "1260000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "300000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "180000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "420000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "4010264",
+        "core": {
+          "amountOut": "0x3d3678",
+          "grossOut": "0x48e4a2",
+          "debitToll": "0x0",
+          "cToll": "0x560",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "9931767",
+        "core": {
+          "amountOut": "0x979945",
+          "grossOut": "0xb63b98",
+          "debitToll": "0x0",
+          "cToll": "0xd4e",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "28624122",
+        "core": {
+          "amountOut": "0x1b4eb52",
+          "grossOut": "0x222b2c9",
+          "debitToll": "0x0",
+          "cToll": "0x2658",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "58611753",
+        "core": {
+          "amountOut": "0x37ea6ac",
+          "grossOut": "0x5b1dcc5",
+          "debitToll": "0x0",
+          "cToll": "0x4e83",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "694930090",
+        "core": {
+          "amountOut": "0x296f6d82",
+          "grossOut": "0x2bf9b031",
+          "debitToll": "0x0",
+          "cToll": "0x3a2d8",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "1737238745",
+        "core": {
+          "amountOut": "0x67953fd7",
+          "grossOut": "0x6df039c1",
+          "debitToll": "0x0",
+          "cToll": "0x916fe",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "5210846789",
+        "core": {
+          "amountOut": "0x136b27a13",
+          "grossOut": "0x149d0afcd",
+          "debitToll": "0x0",
+          "cToll": "0x1b43ce",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "13889754013",
+        "core": {
+          "amountOut": "0x33c2d809b",
+          "grossOut": "0x36f81dd45",
+          "debitToll": "0x0",
+          "cToll": "0x48acfe",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "34688769121",
+        "core": {
+          "amountOut": "0x814521d26",
+          "grossOut": "0x896c4abb7",
+          "debitToll": "0x0",
+          "cToll": "0xb580c5",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "69255046754",
+        "core": {
+          "amountOut": "0x10215683d9",
+          "grossOut": "0x112d895c82",
+          "debitToll": "0x0",
+          "cToll": "0x16a5d77",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "3000075328",
+        "core": {
+          "amountOut": "0xb2e136c8",
+          "grossOut": "0xb915077a",
+          "debitToll": "0x0",
+          "cToll": "0xfb288",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "7499282791",
+        "core": {
+          "amountOut": "0x1bf253683",
+          "grossOut": "0x1ceb492b1",
+          "debitToll": "0x0",
+          "cToll": "0x273d1c",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "22488697302",
+        "core": {
+          "amountOut": "0x53ce3f4e8",
+          "grossOut": "0x56c1db816",
+          "debitToll": "0x0",
+          "cToll": "0x75ab12",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "59907079400",
+        "core": {
+          "amountOut": "0xdf3f6f0fe",
+          "grossOut": "0xe75a49594",
+          "debitToll": "0x0",
+          "cToll": "0x1397416",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "149363039678",
+        "core": {
+          "amountOut": "0x22c9c8a1ed",
+          "grossOut": "0x24261b75f3",
+          "debitToll": "0x0",
+          "cToll": "0x30d842f",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "297170569377",
+        "core": {
+          "amountOut": "0x4536d1ed6e",
+          "grossOut": "0x484c36ebe7",
+          "debitToll": "0x0",
+          "cToll": "0x612e4cd",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "5765952",
+        "core": {
+          "amountOut": "0x5802fa",
+          "grossOut": "0x690709",
+          "debitToll": "0x0",
+          "cToll": "0x7ba",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "14209963",
+        "core": {
+          "amountOut": "0xd8e6b4",
+          "grossOut": "0x1069198",
+          "debitToll": "0x0",
+          "cToll": "0x1309",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "39745512",
+        "core": {
+          "amountOut": "0x25ead25",
+          "grossOut": "0x313b4c9",
+          "debitToll": "0x0",
+          "cToll": "0x353d",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "2527206",
+        "core": {
+          "amountOut": "0x269349",
+          "grossOut": "0x2ddd10",
+          "debitToll": "0x0",
+          "cToll": "0x363",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "6282339",
+        "core": {
+          "amountOut": "0x5fe4ce",
+          "grossOut": "0x72a8a9",
+          "debitToll": "0x0",
+          "cToll": "0x86b",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "18440050",
+        "core": {
+          "amountOut": "0x1197826",
+          "grossOut": "0x157f9fe",
+          "debitToll": "0x0",
+          "cToll": "0x18b4",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "45051298",
+        "core": {
+          "amountOut": "0x2afa9fb",
+          "grossOut": "0x3954552",
+          "debitToll": "0x0",
+          "cToll": "0x3c59",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "1405184673",
+        "core": {
+          "amountOut": "0x53c8c4d7",
+          "grossOut": "0x58dfae42",
+          "debitToll": "0x0",
+          "cToll": "0x75a36",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "3512607740",
+        "core": {
+          "amountOut": "0xd170850a",
+          "grossOut": "0xde2f38ba",
+          "debitToll": "0x0",
+          "cToll": "0x12610e",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "10534253618",
+        "core": {
+          "amountOut": "0x2741b1293",
+          "grossOut": "0x29a8daa30",
+          "debitToll": "0x0",
+          "cToll": "0x371e61",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "28067219769",
+        "core": {
+          "amountOut": "0x68982a496",
+          "grossOut": "0x6f179c860",
+          "debitToll": "0x0",
+          "cToll": "0x92db5d",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "70018368626",
+        "core": {
+          "amountOut": "0x104ed9e05c",
+          "grossOut": "0x115bb07635",
+          "debitToll": "0x0",
+          "cToll": "0x16e5bea",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "139504419511",
+        "core": {
+          "amountOut": "0x207df67184",
+          "grossOut": "0x22b760eef5",
+          "debitToll": "0x0",
+          "cToll": "0x2d9eecd",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "4329372056420695598001",
+        "core": {
+          "amountOut": "0xeac6b5910213509837",
+          "grossOut": "0xf206c50915433ba6f7",
+          "debitToll": "0x0",
+          "cToll": "0x149a3db09155b486",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "10819416009287138352124",
+        "core": {
+          "amountOut": "0x24ab90bf70e8854e62a",
+          "grossOut": "0x25d104e09356498247e",
+          "debitToll": "0x0",
+          "cToll": "0x337cb6553a03ca2e",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "32416530456770803945260",
+        "core": {
+          "amountOut": "0x6dde7fe7cca7f7a04fb",
+          "grossOut": "0x7172a693b9fcac54ca3",
+          "debitToll": "0x0",
+          "cToll": "0x9a43507f4881b5cf",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "86134349414106616672065",
+        "core": {
+          "amountOut": "0x123ef41e386800054b7f",
+          "grossOut": "0x12e84206a74ff77e288e",
+          "debitToll": "0x0",
+          "cToll": "0x199e4d79e3f879c3e",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "212853561466515984224994",
+        "core": {
+          "amountOut": "0x2d16c57b71231a955902",
+          "grossOut": "0x2f440d56b4c84118680b",
+          "debitToll": "0x0",
+          "cToll": "0x3f4ec09d7af5d4620",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "408485177663985711328765",
+        "core": {
+          "amountOut": "0x56879e81c82c8d64e1aa",
+          "grossOut": "0x5e881aad6a79675ea89b",
+          "debitToll": "0x0",
+          "cToll": "0x797e38201783cb3ad",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  },
+  {
+    "tag": "h_minLiq",
+    "cWad": "1015425119714331336",
+    "exitTollWad": "29789951493628",
+    "legs": [
+      {
+        "symbol": "USDC",
+        "base": true,
+        "decimals": 6,
+        "reserves": "4000000000000",
+        "liabilities": "3900000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0"
+      },
+      {
+        "symbol": "USDT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "2500000000000",
+        "liabilities": "2700000000000",
+        "markWad": "0xde9987000000000",
+        "covBits": 3049886662,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "USDe",
+        "base": false,
+        "decimals": 18,
+        "reserves": "1800000000000000000000000",
+        "liabilities": "1700000000000000000000000",
+        "markWad": "0xdde3a0800000000",
+        "covBits": 2228520841,
+        "minLiquidity": "0",
+        "anchor": "USDT0"
+      },
+      {
+        "symbol": "cbBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "2100000000",
+        "liabilities": "2000000000",
+        "markWad": "0xdc2f580000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WBTC",
+        "base": false,
+        "decimals": 8,
+        "reserves": "900000000",
+        "liabilities": "990000000",
+        "markWad": "0xddf53f800000000",
+        "covBits": 1765229831,
+        "minLiquidity": "880000000",
+        "anchor": "cbBTC"
+      },
+      {
+        "symbol": "XAUT0",
+        "base": false,
+        "decimals": 6,
+        "reserves": "300000000",
+        "liabilities": "280000000",
+        "markWad": "0xb3922c000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      },
+      {
+        "symbol": "WETH",
+        "base": false,
+        "decimals": 18,
+        "reserves": "700000000000000000000",
+        "liabilities": "650000000000000000000",
+        "markWad": "0x879ec1000000000000",
+        "covBits": 1765229831,
+        "minLiquidity": "0",
+        "anchor": null
+      }
+    ],
+    "rows": [
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "8432024",
+        "core": {
+          "amountOut": "0x80aa94",
+          "grossOut": "0x811bde",
+          "debitToll": "0x0",
+          "cToll": "0xfc",
+          "markPrice": "0xe0913f0db81"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDT0",
+        "to": "WBTC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "1980000",
+        "index": "1000000000000000000",
+        "chain": "1304432032",
+        "core": {
+          "amountOut": "0x4dc0a56d",
+          "grossOut": "0x4dd93d27",
+          "debitToll": "0x0",
+          "cToll": "0x97cd",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "4950000",
+        "index": "1000000000000000000",
+        "chain": "3261082028",
+        "core": {
+          "amountOut": "0xc261a52b",
+          "grossOut": "0xc29f207f",
+          "debitToll": "0x0",
+          "cToll": "0x17b7f",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "14850000",
+        "index": "1000000000000000000",
+        "chain": "9783247385",
+        "core": {
+          "amountOut": "0x24724f495",
+          "grossOut": "0x247dd6691",
+          "debitToll": "0x0",
+          "cToll": "0x4727c",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "39600000",
+        "index": "1000000000000000000",
+        "chain": "26088660129",
+        "core": {
+          "amountOut": "0x6130d3895",
+          "grossOut": "0x614f91334",
+          "debitToll": "0x0",
+          "cToll": "0xbdbf4",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "99000000",
+        "index": "1000000000000000000",
+        "chain": "65221651624",
+        "core": {
+          "amountOut": "0xf2fa11288",
+          "grossOut": "0xf346eb517",
+          "debitToll": "0x0",
+          "cToll": "0x1da5e0",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "WBTC",
+        "to": "USDC",
+        "lp": "198000000",
+        "index": "1000000000000000000",
+        "chain": "130414155171",
+        "core": {
+          "amountOut": "0x1e5d855dff",
+          "grossOut": "0x1e68bb8a77",
+          "debitToll": "0x0",
+          "cToll": "0x3b485c",
+          "markPrice": "0xdc195bce97d4e316b30"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "5400000000",
+        "index": "1000000000000000000",
+        "chain": "5495191069",
+        "core": {
+          "amountOut": "0x1478c7598",
+          "grossOut": "0x147a59f66",
+          "debitToll": "0x0",
+          "cToll": "0x27f7b",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "13500000000",
+        "index": "1000000000000000000",
+        "chain": "13737977679",
+        "core": {
+          "amountOut": "0x332df2601",
+          "grossOut": "0x3331e0e82",
+          "debitToll": "0x0",
+          "cToll": "0x63eb2",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "40500000000",
+        "index": "1000000000000000000",
+        "chain": "41213933037",
+        "core": {
+          "amountOut": "0x9989d7203",
+          "grossOut": "0x9995a2b86",
+          "debitToll": "0x0",
+          "cToll": "0x12bc16",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "108000000000",
+        "index": "1000000000000000000",
+        "chain": "109897091473",
+        "core": {
+          "amountOut": "0x1996927e58",
+          "grossOut": "0x1998f07413",
+          "debitToll": "0x0",
+          "cToll": "0x31f4c7",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "270000000000",
+        "index": "1000000000000000000",
+        "chain": "274567776328",
+        "core": {
+          "amountOut": "0x3fee0097dd",
+          "grossOut": "0x3ffe592230",
+          "debitToll": "0x0",
+          "cToll": "0x7ccf95",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDT0",
+        "to": "USDC",
+        "lp": "540000000000",
+        "index": "1000000000000000000",
+        "chain": "535250742846",
+        "core": {
+          "amountOut": "0x7fad55d0b9",
+          "grossOut": "0x7ffbe8f5f7",
+          "debitToll": "0x30cee5e6f",
+          "cToll": "0xf9440c",
+          "markPrice": "0xde9987000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "12155448",
+        "core": {
+          "amountOut": "0xb97ba3",
+          "grossOut": "0xba066f",
+          "debitToll": "0x0",
+          "cToll": "0x16b",
+          "markPrice": "0xe001e1b4b66"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDC",
+        "to": "WBTC",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "3400000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "5226336",
+        "core": {
+          "amountOut": "0x50e850",
+          "grossOut": "0x513b6d",
+          "debitToll": "0x12852",
+          "cToll": "0x9e",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "8500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": "13056901",
+        "core": {
+          "amountOut": "0xca4099",
+          "grossOut": "0xcb145e",
+          "debitToll": "0x30389",
+          "cToll": "0x18b",
+          "markPrice": "0xe0690096aa8"
+        }
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "25500000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "68000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "170000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "USDe",
+        "to": "WBTC",
+        "lp": "340000000000000000000000",
+        "index": "1000000000000000000",
+        "chain": null,
+        "core": null
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "4000000",
+        "index": "1000000000000000000",
+        "chain": "2637451300",
+        "core": {
+          "amountOut": "0x9d358310",
+          "grossOut": "0x9d50b758",
+          "debitToll": "0x0",
+          "cToll": "0x132ec",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "10000000",
+        "index": "1000000000000000000",
+        "chain": "6593589333",
+        "core": {
+          "amountOut": "0x189052fa2",
+          "grossOut": "0x18949323c",
+          "debitToll": "0x0",
+          "cToll": "0x2ff4d",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "30000000",
+        "index": "1000000000000000000",
+        "chain": "19780392127",
+        "core": {
+          "amountOut": "0x49b09d29a",
+          "grossOut": "0x49bd5d968",
+          "debitToll": "0x0",
+          "cToll": "0x8fddb",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "80000000",
+        "index": "1000000000000000000",
+        "chain": "52745233534",
+        "core": {
+          "amountOut": "0xc47f45e7b",
+          "grossOut": "0xc4a146a13",
+          "debitToll": "0x0",
+          "cToll": "0x17f9fd",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "200000000",
+        "index": "1000000000000000000",
+        "chain": "131819613236",
+        "core": {
+          "amountOut": "0x1eb14b981d",
+          "grossOut": "0x1eb8496f6b",
+          "debitToll": "0x0",
+          "cToll": "0x3bebe9",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "cbBTC",
+        "to": "USDC",
+        "lp": "400000000",
+        "index": "1000000000000000000",
+        "chain": "262872149554",
+        "core": {
+          "amountOut": "0x3d51612bc8",
+          "grossOut": "0x3d6d6549d6",
+          "debitToll": "0x1c82c75e",
+          "cToll": "0x77b638",
+          "markPrice": "0xdc2f580000000000000"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "7800000000",
+        "index": "1000000000000000000",
+        "chain": "7894791325828878313334",
+        "core": {
+          "amountOut": "0x1abfd80b4bce00b40db",
+          "grossOut": "0x1ac972a193db98106fb",
+          "debitToll": "0x0",
+          "cToll": "0x343924b26911965",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "19500000000",
+        "index": "1000000000000000000",
+        "chain": "19736978316570734317097",
+        "core": {
+          "amountOut": "0x42df9c1c5a985d6887f",
+          "grossOut": "0x42f79e940ec4c8ec6b3",
+          "debitToll": "0x0",
+          "cToll": "0x828edbbe3f73a56",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "58500000000",
+        "index": "1000000000000000000",
+        "chain": "59210934952710010751934",
+        "core": {
+          "amountOut": "0xc89ed4553b6921b3309",
+          "grossOut": "0xc8e6dbbc57fe0dea3f9",
+          "debitToll": "0x0",
+          "cToll": "0x187ac933b138674b",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "156000000000",
+        "index": "1000000000000000000",
+        "chain": "157588851066411782449138",
+        "core": {
+          "amountOut": "0x216c4f7e0fb82a6e9f4b",
+          "grossOut": "0x217bb726bfc039d52d67",
+          "debitToll": "0xd259aa4ee65a978fe",
+          "cToll": "0x41409b675065fe5b",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "390000000000",
+        "index": "1000000000000000000",
+        "chain": "379600202008721080043614",
+        "core": {
+          "amountOut": "0x53596399b33b0c9658f2",
+          "grossOut": "0x53b43d15e7c4f1f134fe",
+          "debitToll": "0x2f695d24264098a7433",
+          "cToll": "0xa2b949f98c4a1c61",
+          "markPrice": "0xdda5629f603c745"
+        }
+      },
+      {
+        "from": "USDC",
+        "to": "USDe",
+        "lp": "780000000000",
+        "index": "1000000000000000000",
+        "chain": "670046107844837796669832",
+        "core": {
+          "amountOut": "0xa54f129fd2f58b90320a",
+          "grossOut": "0xa76473081ce1bc7098a8",
+          "debitToll": "0x176a8a2eed6b68c4153f",
+          "cToll": "0x142bc211668593343",
+          "markPrice": "0xdda5629f603c745"
+        }
+      }
+    ]
+  }
+]

@@ -1,27 +1,32 @@
 import { describe, expect, test } from 'bun:test';
+import { buildLegV1 as buildLeg } from '../../test/legFixture.js';
 import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
-import { type PoolState, buildLeg } from '../amm/aimm.js';
+import type { PoolState } from '../amm/aimm.js';
 // bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
 // PoolSolvencyLib.solvency/previewCap, PoolLiquidityLib.exitMu and swapLiability.
 import { STABLE_PROFILE, sigmaSeed } from '../amm/profiles';
 import {
   WAD,
-  backendConvert,
+  claimRate,
+  covBitsOf,
   exitCap,
   exitValue,
   legCoverage,
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
-  quoteSwapLiabilityCoreAsync,
 } from './liability';
+import {
+  backendConvert,
+  quoteSwapLiabilityAsync,
+  quoteSwapLiabilityCoreAsync,
+} from './liabilityQuote';
 
 const legOf = (symbol: string, reserves: number, liabilities: number) => ({
   symbol,
   reserves,
   liabilities,
+  storageVersion: 7,
 });
 
 // Balanced stable core: USDC hub + two $1 spokes. Small size ⇒ no clamp, negligible impact.
@@ -34,7 +39,14 @@ function balancedState(): PoolState {
       AUDF: buildLeg('AUDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
       NZDF: buildLeg('NZDF', 1, sigma, 1_000_000, 1_000_000, 2_000_000, 6, p, 0),
     },
-    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+    hub: {
+      res: 2_000_000,
+      liab: 2_000_000,
+      vegaBps: 0,
+      kappaCovBps: 0,
+      storageVersion: 7,
+      minLiquidity: 0,
+    },
   };
 }
 
@@ -43,7 +55,14 @@ describe('the one off-chain replica of pool-level settlement', () => {
   const stateAt = (hubRes: number, hubLiab: number, xRes: number, xLiab: number, mark = 2) => ({
     base: 'USDC',
     legs: { X: buildLeg('X', mark, 300, xRes, xLiab, hubRes, 6, STABLE_PROFILE, 0) },
-    hub: { res: hubRes, liab: hubLiab, vegaBps: 0, kappaCovBps: 0 },
+    hub: {
+      res: hubRes,
+      liab: hubLiab,
+      vegaBps: 0,
+      kappaCovBps: 0,
+      storageVersion: 7,
+      minLiquidity: 0,
+    },
   });
 
   test('poolSolvency is Σ R·m / Σ L·m, marks in base per token', () => {
@@ -103,12 +122,6 @@ describe('liabilitySwapEnabled (flag bit gate)', () => {
   });
 });
 
-describe('quoteSwapLiabilityCore (sync stub)', () => {
-  test('sync entry throws: conversion is backend SSOT, use the Async core', () => {
-    expect(() => quoteSwapLiabilityCore()).toThrow();
-  });
-});
-
 describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
   const inLeg = legOf('AUDF', 1_000_000, 1_000_000);
   const outLeg = legOf('NZDF', 1_000_000, 1_000_000);
@@ -128,11 +141,44 @@ describe('quoteSwapLiabilityCoreAsync (pipeline order)', () => {
         lpFeeBps: 0,
         protoFeeBps: 0,
         covTollBps: 0,
+        debitToll: 0,
+        creditToll: 0,
         route: ['AUDF', 'USDC', 'NZDF'],
       };
     };
     return convert;
   }
+
+  test('route fees book before the receiver mints at the raised index', async () => {
+    const base = makeConvert(9_900);
+    const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, async (fair) => ({
+      ...(await base(fair)),
+      grossOut: 10_000,
+      lpFeeBps: 100,
+      protoFeeBps: 100,
+    }));
+    expect(q?.lpFeeCredit).toBe(100);
+    expect(q?.protoFeeCredit).toBe(100);
+    expect(q?.indexOutWad).toBe(1.0001e18);
+    expect(q?.lpAmountOut).toBeCloseTo(9_900 / 1.0001, 8);
+  });
+
+  test('the credit wall checks claims before deducting claim tolls', async () => {
+    const base = makeConvert(10);
+    const q = await quoteSwapLiabilityCoreAsync(
+      inLeg,
+      {
+        ...outLeg,
+        reserves: 100,
+        liabilities: 100,
+        covBits: 45,
+      },
+      20,
+      1,
+      async (fair) => ({ ...(await base(fair)), creditToll: 10 }),
+    );
+    expect(q).toBeNull();
+  });
 
   test('balanced legs at mark: no haircuts, conversion passes through unclamped', async () => {
     const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 10_000, 1, makeConvert(9_990));
@@ -239,6 +285,8 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
     cov_toll: '0x0',
     proto_fee: '0x0',
     lp_fee: '0x0',
+    debit_toll: '0x0',
+    credit_toll: '0x0',
   });
 
   test('balanced pool: spoke cross settles ONCE over POST /v1/quote-path, never clamps', async () => {
@@ -334,7 +382,14 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
         0,
       ),
     },
-    hub: { res: 2_000_000, liab: 2_000_000, vegaBps: 0, kappaCovBps: 0 },
+    hub: {
+      res: 2_000_000,
+      liab: 2_000_000,
+      vegaBps: 0,
+      kappaCovBps: 0,
+      storageVersion: 7,
+      minLiquidity: 0,
+    },
   });
 
   const run = async (
@@ -427,8 +482,18 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
   });
 
   test('a null conversion makes the liability quote null, not a throw', async () => {
-    const inLeg = { symbol: 'WMON', reserves: 1_000_000, liabilities: 1_000_000 };
-    const outLeg = { symbol: 'AUDF', reserves: 1_000_000, liabilities: 1_000_000 };
+    const inLeg = {
+      symbol: 'WMON',
+      reserves: 1_000_000,
+      liabilities: 1_000_000,
+      storageVersion: 7,
+    };
+    const outLeg = {
+      symbol: 'AUDF',
+      reserves: 1_000_000,
+      liabilities: 1_000_000,
+      storageVersion: 7,
+    };
     const q = await quoteSwapLiabilityCoreAsync(inLeg, outLeg, 1_000, 1, async () => null);
     expect(q).toBeNull();
   });
@@ -443,5 +508,38 @@ describe('minLpAmountOut (applySlip semantics, rounds DOWN)', () => {
     expect(minLpAmountOut(123n, 0)).toBe(123n);
     expect(() => minLpAmountOut(123n, 1)).toThrow();
     expect(() => minLpAmountOut(123n, Number.NaN)).toThrow();
+  });
+});
+
+describe('covBitsOf: what an absent coverage word means for a wall check', () => {
+  test('as read; 0 only on a whitelisted v1 layout (5..9); null (refuse) on everything else', () => {
+    expect(covBitsOf({ covBits: 45 })).toBe(45);
+    expect(covBitsOf({ covBits: 0, storageVersion: 12 })).toBe(0);
+    for (const v of [5, 7, 9]) expect(covBitsOf({ storageVersion: v })).toBe(0);
+    for (const v of [12, 13, 4, 10, 1, 0]) expect(covBitsOf({ storageVersion: v })).toBeNull();
+    expect(covBitsOf({})).toBeNull();
+  });
+});
+
+describe('claimRate: the chain word first, the book model as the fallback', () => {
+  test('solvencyCWad with ok prices at the chain rate; without it, or degraded, the model', () => {
+    const st = {
+      base: 'USDC',
+      legs: { X: buildLeg('X', 2, 300, 500, 500, 1_000, 6, STABLE_PROFILE, 0) },
+      hub: {
+        res: 1_000,
+        liab: 1_000,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        storageVersion: 7,
+        minLiquidity: 0,
+      },
+    };
+    const model = poolSolvency(st);
+    expect(claimRate(st)).toBe(model);
+    expect(claimRate({ ...st, solvencyCWad: 9n * 10n ** 17n, solvencyOk: true })).toBe(0.9);
+    expect(claimRate({ ...st, solvencyCWad: 9n * 10n ** 17n })).toBe(0.9);
+    expect(claimRate({ ...st, solvencyCWad: 9n * 10n ** 17n, solvencyOk: false })).toBe(model);
+    expect(claimRate({ ...st, solvencyCWad: 0n, solvencyOk: true })).toBeNull();
   });
 });

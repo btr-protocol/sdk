@@ -41,6 +41,8 @@ export {
   premiumBps,
   computeSkew,
   buildLeg,
+  CovWordMissing,
+  covWord,
   invertDepthCurve,
   backendBase,
   quotePathAsync,

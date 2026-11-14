@@ -9,6 +9,7 @@
 //   owned by the storage readers) + thin async fetchers over `POST /v1/quote|route|depth`.
 
 import { MAX_DISPERSION_PBPS } from '../abis/solidity.generated.js';
+import { isLegacyLayout } from '../pool/storageVersion.js';
 
 export { MAX_DISPERSION_PBPS };
 export const BPS = 1e4;
@@ -220,6 +221,13 @@ export interface PoolLeg {
   decimals: number;
   profile: AimmProfile;
   kappaCovBps: number;
+  /** `Asset.covBits` / `Asset.kneeBits`, raw. Absent = not read: quoted as 0 on a v1 pool, refused
+   *  (`CovWordMissing`) on a v2 one, where 0 would price no coverage toll and no wall. */
+  covBits?: number;
+  kneeBits?: number;
+  /** The pool's `storageVersion` (12 = v2) when known; decides what an absent coverage word means. */
+  storageVersion?: number;
+  minLiquidity?: number;
   confidence?: number;
   staleExcess?: number;
   /** `refBandBps` word (bits 12..15 = depeg code) + the base's mark/word: the backend refuses a
@@ -260,6 +268,10 @@ interface HubBook {
   liab: number;
   vegaBps: number;
   kappaCovBps: number;
+  covBits?: number;
+  kneeBits?: number;
+  storageVersion?: number;
+  minLiquidity?: number;
 }
 
 export interface PoolState {
@@ -268,6 +280,22 @@ export interface PoolState {
   hub?: HubBook;
   /** The base's stored class words; absent = no `CLASS_ROWS_BIT`. */
   baseClass?: ClassWire;
+  /** Third poolSolvencyWad return word; null/absent means not loaded. Valid as the settlement
+   *  toll only while `solvencyOk` (a degraded sweep returns 0 here, the chain charges the
+   *  lower-pass toll). */
+  exitTollWad?: bigint | null;
+  /** First poolSolvencyWad return word: the chain's pool rate C (WAD). The claim paths (deposit mint,
+   *  cross exit, liability swap) price at THIS when present; absent = the book model
+   *  (`poolSolvency`), which cannot see the physical-backing cap the chain applies per leg. */
+  solvencyCWad?: bigint | null;
+  /** Second poolSolvencyWad return word (`ok`: every armed mark usable); null/absent = not loaded.
+   *  LP exits fail closed (pending) without it. Set both with `withPoolSolvency`. */
+  solvencyOk?: boolean | null;
+  /** When the two words above were read (ms epoch, `withPoolSolvency` stamps it). LP exits refuse a
+   *  toll older than `LpRouteOpts.maxTollAgeMs` (`toll-stale`): the toll moves with the books, and a
+   *  stale low word overquotes. Absent = the caller owns freshness (a hand-built state). */
+  solvencyAtMs?: number | null;
+  protoSharePct?: number;
 }
 
 export interface Quote {
@@ -286,6 +314,9 @@ export interface Quote {
   /** The delivering leg's gross was clamped at the coverage-wall argmax: `amountOut` is the
    *  flat top of the wall, not a price, so refuse the size rather than display it. */
   saturated?: boolean;
+  debitToll?: number;
+  cToll?: number;
+  creditToll?: number;
   route: string[];
 }
 
@@ -320,6 +351,29 @@ export function computeSkew(res: number, liab: number): number {
   return c < 1 ? Math.trunc(200 * (1 - c)) : -Math.trunc(100 * (c - 1)) || 0;
 }
 
+/** The v2 storage generation (`PoolLayout` 'v2'): its coverage law lives in `covBits`/`kneeBits`. */
+
+/** A v2 leg's coverage word was not read: there is no honest value to put on the wire. */
+export class CovWordMissing extends Error {
+  constructor(what: string) {
+    super(`${what}: the coverage word was not read for a v2 pool, so it cannot be quoted`);
+    this.name = 'CovWordMissing';
+  }
+}
+
+/** A coverage word for the wire: as read; absent is 0 only on a pool KNOWN to be a v1 layout
+ *  (`isLegacyLayout`: storageVersion 5..9, where the field does not exist). On v2, an unknown or any
+ *  other version it is unquotable: 0 there is a different law (no toll, no walls). */
+export function covWord(
+  word: number | undefined,
+  storageVersion: number | undefined,
+  what: string,
+) {
+  if (word !== undefined) return word;
+  if (!isLegacyLayout(storageVersion)) throw new CovWordMissing(what);
+  return 0;
+}
+
 export function buildLeg(
   token: string,
   twap: number,
@@ -330,7 +384,13 @@ export function buildLeg(
   decimals: number,
   profile: AimmProfile,
   kappaCovBps: number,
-  feed?: { confidence?: number; staleExcess?: number },
+  feed?: {
+    confidence?: number;
+    staleExcess?: number;
+    covBits?: number;
+    kneeBits?: number;
+    storageVersion?: number;
+  },
 ): PoolLeg {
   return {
     token,
@@ -342,6 +402,9 @@ export function buildLeg(
     decimals,
     profile,
     kappaCovBps,
+    covBits: feed?.covBits,
+    kneeBits: feed?.kneeBits,
+    storageVersion: feed?.storageVersion,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
   };
@@ -392,6 +455,8 @@ interface PricingWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
 }
 interface SpokeWire {
   token: string;
@@ -429,6 +494,8 @@ interface EndpointWire {
   liabilities: string;
   vega_bps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
 }
 export interface NamedPoolWire {
   tag: string;
@@ -441,6 +508,8 @@ export interface NamedPoolWire {
   base_liabilities?: string | null;
   base_vega_bps?: number | null;
   base_kappa_cov_bps?: number | null;
+  base_cov_bits?: number | null;
+  base_knee_bits?: number | null;
   /** Hub token decimals. The backend resolves an omitted value off chain metadata, at a WARN and
    *  a round trip; the caller already scaled `base_reserves` by it, so it is never a guess here. */
   base_decimals?: number | null;
@@ -705,6 +774,8 @@ interface QuoteRequestWire {
   vega_bps: number;
   min_fee_pbps: number;
   kappa_cov_bps: number;
+  cov_bits?: number;
+  knee_bits?: number;
   amount_in: string;
   reserves: string;
   liabilities: string;
@@ -743,6 +814,8 @@ export interface PathRequestWire {
   token_out: string;
   /** 0x hex, raw at `token_in`'s decimals. */
   amount_in: string;
+  /** LP claim conversion; amount_in is ignored when present. */
+  claim?: { credit: boolean; face: string; c_wad: string; toll_wad?: string };
 }
 
 /** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
@@ -765,6 +838,9 @@ export interface QuoteResponseWire extends QuoteBaseWire {
   /** Gross clamped at the coverage argmax. Current back no longer sends it (b9b9875 refuses a
    *  gross past the cap instead), so absent reads as unsaturated. */
   saturated?: boolean;
+  debit_toll?: string;
+  c_toll?: string;
+  credit_toll?: string;
 }
 
 /**
@@ -778,6 +854,8 @@ export const INTERIOR_ENDPOINT: EndpointWire = {
   liabilities: '0x0',
   vega_bps: 0,
   kappa_cov_bps: 0,
+  cov_bits: 0,
+  knee_bits: 0,
 };
 
 /**
@@ -792,6 +870,8 @@ export function hubEndpointWire(hub: HubBook, decimals: number): EndpointWire {
     liabilities: toU128Hex(hub.liab * 10 ** decimals),
     vega_bps: hub.vegaBps,
     kappa_cov_bps: hub.kappaCovBps,
+    cov_bits: covWord(hub.covBits, hub.storageVersion, 'hub covBits'),
+    knee_bits: covWord(hub.kneeBits, hub.storageVersion, 'hub kneeBits'),
   };
 }
 
@@ -827,6 +907,8 @@ export function legToQuoteBody(
     vega_bps: leg.profile.vega,
     min_fee_pbps: leg.profile.minFeePbps,
     kappa_cov_bps: leg.kappaCovBps,
+    cov_bits: covWord(leg.covBits, leg.storageVersion, `${leg.token} covBits`),
+    knee_bits: covWord(leg.kneeBits, leg.storageVersion, `${leg.token} kneeBits`),
     amount_in: toU128Hex(amountInTok * 10 ** (selling ? decimalsIn : leg.decimals)),
     reserves: toU128Hex(leg.res * 10 ** leg.decimals),
     liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),
@@ -947,6 +1029,13 @@ export function quoteFromWire(
     protoFeeBps: feeBps(w.proto_fee),
     covTollBps: grossOut > 0 ? (Number(BigInt(w.cov_toll)) / Number(BigInt(w.gross_out))) * 1e4 : 0,
     saturated: w.saturated === true,
+    ...(w.debit_toll !== undefined
+      ? { debitToll: Number(BigInt(w.debit_toll)) / 10 ** wireDecimals }
+      : {}),
+    ...(w.c_toll !== undefined ? { cToll: Number(BigInt(w.c_toll)) / 10 ** wireDecimals } : {}),
+    ...(w.credit_toll !== undefined
+      ? { creditToll: Number(BigInt(w.credit_toll)) / 10 ** wireDecimals }
+      : {}),
     route,
   };
 }
@@ -986,6 +1075,8 @@ export function poolStateToWire(
     base_liabilities: hub?.liabilities ?? null,
     base_vega_bps: hub?.vega_bps ?? null,
     base_kappa_cov_bps: hub?.kappa_cov_bps ?? null,
+    base_cov_bits: hub?.cov_bits ?? null,
+    base_knee_bits: hub?.knee_bits ?? null,
     base_decimals: hubDecimals,
     ...baseDepegWire(Object.values(state.legs)[0]),
     base_class: state.baseClass ?? null,
@@ -998,6 +1089,8 @@ export function poolStateToWire(
         vega_bps: leg.profile.vega,
         min_fee_pbps: leg.profile.minFeePbps,
         kappa_cov_bps: leg.kappaCovBps,
+        cov_bits: covWord(leg.covBits, leg.storageVersion, `${leg.token} covBits`),
+        knee_bits: covWord(leg.kneeBits, leg.storageVersion, `${leg.token} kneeBits`),
       },
       reserves: toU128Hex(leg.res * 10 ** leg.decimals),
       liabilities: toU128Hex(leg.liab * 10 ** leg.decimals),

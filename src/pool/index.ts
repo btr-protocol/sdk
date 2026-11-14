@@ -10,6 +10,7 @@ import type {
   FieldsMatch,
   SwapQuoteFields,
 } from '../abis/structs.generated.js';
+import type { PoolState } from '../amm/aimm.js';
 import { decodeErrorResult, decodeFn, encodeFn } from '../eth/abi';
 import { ContractRevertError } from '../eth/contract';
 import { estimateCallGas } from '../eth/gas';
@@ -125,6 +126,23 @@ export async function getAsset(
   return toAsset(decodeFn({ abi: POOL_ABI, functionName: 'getAsset', data: result }));
 }
 
+/** `PoolState` carrying the `poolSolvencyWad` words the LP exit quotes need: `solvencyCWad` (the pool
+ *  rate C, WAD), `solvencyOk` (the `ok` word) and `exitTollWad` (the toll word, the settlement toll
+ *  only while `ok`), stamped with the read time in CHAIN time (`solvencyAtMs`; `sol.observedAtMs`,
+ *  else {@link chainNowMs}). `cWad` absent = the claim rate falls back to the book model. */
+export function withPoolSolvency<S extends PoolState>(
+  state: S,
+  sol: { ok: boolean; exitTollWad: bigint | null; observedAtMs?: number; cWad?: bigint | null },
+): S {
+  return {
+    ...state,
+    solvencyOk: sol.ok,
+    solvencyCWad: sol.cWad ?? null,
+    exitTollWad: sol.ok ? sol.exitTollWad : null,
+    solvencyAtMs: sol.observedAtMs ?? chainNowMs(),
+  };
+}
+
 /**
  * Fetch coverage ratio for an asset
  */
@@ -147,10 +165,7 @@ export async function getCoverageRatio(
   return decodeFn({ abi: POOL_ABI, functionName: 'getCoverageRatio', data: result });
 }
 
-export type {
-  LiabLeg,
-  SwapLiabilityQuote,
-} from './liability.js';
+export type { LiabLeg, SwapLiabilityQuote } from './liability.js';
 export {
   WAD as WAD_F,
   exitCap,
@@ -159,10 +174,11 @@ export {
   liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCore,
-  quoteSwapLiabilityCoreAsync,
 } from './liability.js';
+export {
+  quoteSwapLiabilityAsync,
+  quoteSwapLiabilityCoreAsync,
+} from './liabilityQuote.js';
 export type { Head, LegLpValue, LegMark } from './lpValue.js';
 export {
   LEGACY_LIQUIDITY_INDEX,
@@ -338,6 +354,9 @@ export { MAX_CLOCK_SKEW_S };
 let chainSkewS = 0;
 
 const chainNowS = (): number => Math.floor(Date.now() / 1000) + chainSkewS;
+/** Chain time in ms (the device clock plus the offset of the last {@link syncChainClock}). The clock
+ *  for comparing against chain stamps such as `solvencyAtMs`. */
+export const chainNowMs = (): number => Date.now() + chainSkewS * 1000;
 
 /**
  * Anchor every deadline to CHAIN time: reads the latest block's timestamp through `provider`

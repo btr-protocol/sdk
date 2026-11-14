@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { buildLegV1 } from '../../test/legFixture';
 import {
+  CovWordMissing,
   INTERIOR_ENDPOINT,
   type PoolState,
   type QuoteResponseWire,
@@ -18,14 +20,21 @@ import { STABLE_PROFILE } from './profiles';
 // `_covToll(cOut, …)`) and the endpoint-max vega (`acc.vegaBps = max(cIn, cOut)`) - because the
 // first cut of this codec dropped both and every spoke->base sell was quoted toll-free.
 
-const HUB = { res: 200_000, liab: 250_000, vegaBps: 10_000, kappaCovBps: 600 };
+const HUB = {
+  res: 200_000,
+  liab: 250_000,
+  vegaBps: 10_000,
+  kappaCovBps: 600,
+  storageVersion: 7,
+  minLiquidity: 0,
+};
 const meta = { addressOf: (s: string): string => `0x${s}`, decimalsOf: (): number => 18 };
 const ADDRS = { pool: '0xpool', token: '0xtoken', base: '0xbase' };
 
 const state = (hub?: PoolState['hub']): PoolState => ({
   base: 'USDC',
   legs: {
-    USDT: buildLeg(
+    USDT: buildLegV1(
       'USDT',
       1,
       300,
@@ -50,6 +59,8 @@ describe('hubEndpointWire', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 });
@@ -166,6 +177,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x3a35294400',
       vega_bps: 10_000,
       kappa_cov_bps: 600,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 
@@ -176,6 +189,8 @@ describe('legToQuoteBody', () => {
       liabilities: '0x0',
       vega_bps: 0,
       kappa_cov_bps: 0,
+      cov_bits: 0,
+      knee_bits: 0,
     });
   });
 
@@ -188,7 +203,7 @@ describe('legToQuoteBody', () => {
   });
 
   test('a buy scales amount_in to the spoke decimals (18 base -> 6 spoke)', () => {
-    const l6 = buildLeg('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
+    const l6 = buildLegV1('USDC6', 1, 300, 1_000_000, 1_000_000, 200_000, 6, STABLE_PROFILE, 0);
     const b = legToQuoteBody(l6, 2.5, false, 18, INTERIOR_ENDPOINT, ADDRS);
     expect(BigInt(b.amount_in)).toBe(2_500_000n);
   });
@@ -507,5 +522,44 @@ describe('quoteFromWire: flat quote in SPOKE scale (mixed decimals)', () => {
     expect(quoteFromWire(resp(1_000, 1_000, 18, 1_000), 18, [], 1_000)).toBeNull();
     expect(quoteFromWire(resp(1_000, 1_000, 18, 0.001), 18, [], 1_000)).toBeNull();
     expect(quoteFromWire(resp(1_000, 1_000, 18, 1.5), 18, [], 1_000)).not.toBeNull();
+  });
+});
+
+describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => {
+  const BITS = 34_504_704;
+  const leg = (feed?: Parameters<typeof buildLeg>[9]) =>
+    buildLeg('USDT', 1, 300, 1_000_000, 1_000_000, 200_000, 18, STABLE_PROFILE, 600, feed);
+  const body = (l: ReturnType<typeof leg>) =>
+    legToQuoteBody(l, 1, true, 18, INTERIOR_ENDPOINT, ADDRS);
+
+  test('the words read off the asset row go on the wire as read', () => {
+    const b = body(leg({ covBits: BITS, kneeBits: 3, storageVersion: 12 }));
+    expect([b.cov_bits, b.knee_bits]).toEqual([BITS, 3]);
+    const s = poolStateToWire('p', '0xp', state(), meta, 18);
+    expect(s.spokes[0].pricing.cov_bits).toBe(0); // the fixture leg carries none: v1 reading
+  });
+  test('v1 known: an absent word is 0, as before', () => {
+    expect(body(leg({ storageVersion: 7 })).cov_bits).toBe(0);
+    expect(body(leg({ storageVersion: 7 })).knee_bits).toBe(0);
+  });
+  test('a version outside the whitelist (13, a future one; 1; 10) is unquotable like unknown', () => {
+    for (const v of [13, 10, 4, 1])
+      expect(() => body(leg({ storageVersion: v }))).toThrow(CovWordMissing);
+    for (const v of [5, 9]) expect(body(leg({ storageVersion: v })).cov_bits).toBe(0);
+  });
+  test('generation unknown: an absent word is unquotable, never a 0 that skips toll and walls', () => {
+    expect(() => body(leg())).toThrow(CovWordMissing);
+    expect(() => hubEndpointWire({ ...HUB, storageVersion: undefined }, 6)).toThrow(CovWordMissing);
+  });
+  test('v2: an absent word is unquotable, never a 0 that prices no toll and no walls', () => {
+    expect(() => body(leg({ storageVersion: 12 }))).toThrow(CovWordMissing);
+    expect(() => body(leg({ covBits: BITS, storageVersion: 12 }))).toThrow(CovWordMissing);
+    const v2 = state();
+    v2.legs.USDT = leg({ storageVersion: 12 });
+    expect(() => poolStateToWire('p', '0xp', v2, meta, 18)).toThrow(CovWordMissing);
+    expect(() => hubEndpointWire({ ...HUB, storageVersion: 12 }, 6)).toThrow(CovWordMissing);
+    expect(
+      hubEndpointWire({ ...HUB, covBits: BITS, kneeBits: 0, storageVersion: 12 }, 6).cov_bits,
+    ).toBe(BITS);
   });
 });
