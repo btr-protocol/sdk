@@ -166,6 +166,6 @@ describe("estimate reverts surface as the pool's own error", () => {
   test('clipped revert data keeps the transport error', async () => {
     const err = Object.assign(new Error('reverted'), { data: '0x203d82d8' + 'ab' });
     const e = await deposit(failing(err), POOL, dep).catch((x) => x);
-    expect(e).toBeInstanceOf(Error);
+    expect(e).toBe(err);
   });
 });
