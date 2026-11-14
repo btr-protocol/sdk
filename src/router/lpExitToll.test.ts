@@ -915,75 +915,121 @@ describe('an unread minLiquidity is unknown, never 0', () => {
 
 describe('exit gates on liquid reserves, not total', () => {
   const post = { ...BE, postMoveExitTollWad: async () => 0n };
-  const setLiquid = (p: NamedPool, sym: string, liquidRes: number | undefined) => {
-    p.state.legs[sym] = { ...p.state.legs[sym], liquidRes };
+  const setLeg = (
+    p: NamedPool,
+    sym: string,
+    patch: Partial<NamedPool['state']['legs'][string]>,
+  ) => {
+    p.state.legs[sym] = { ...p.state.legs[sym], ...patch };
   };
-  const find = (rs: { id: string }[], id: string) =>
-    rs.find((x) => x.id === id) as never as {
-      feasible: boolean;
-      reason?: string;
-      out: number;
-    };
-  test('invested > 0: total passes, liquid fails; liquid = out passes (cross, transfer)', async () => {
+  type R = {
+    id: string;
+    feasible: boolean;
+    reason?: string;
+    out: number;
+    recall?: true;
+    recallLegs?: string[];
+  };
+  const find = (rs: unknown[], id: string) => (rs as R[]).find((x) => x.id === id) as R;
+  const IDS = ['cross-exit', 'transfer-exit'];
+  const same = (p: NamedPool) =>
+    rankRedeem([p], 'AUDF', 'AUDF', 1_000, { ...BE, previewWithdraw: async () => 990_000_000n });
+
+  test('invested out leg: liquid fails, total passes => feasible with recall', async () => {
     stub({ tolls: ALL });
     const base = await route(pool(), 'NZDF', 'AUDF', 10_000, post);
-    for (const id of ['cross-exit', 'transfer-exit']) {
+    for (const id of IDS) {
       const { out } = find(base, id);
-      expect(find(base, id).feasible).toBe(true);
-      const short = pool();
-      setLiquid(short, 'AUDF', out - 0.01); // reserves 1_000_000 ≫ out
-      const r = find(await route(short, 'NZDF', 'AUDF', 10_000, post), id);
-      expect(r.feasible).toBe(false);
-      expect(r.reason).toBe('min-liquidity');
-      const exact = pool();
-      setLiquid(exact, 'AUDF', out);
-      expect(find(await route(exact, 'NZDF', 'AUDF', 10_000, post), id).feasible).toBe(true);
+      expect(find(base, id).recall).toBeUndefined();
+      const p = pool();
+      setLeg(p, 'AUDF', { liquidRes: out - 0.01 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect(r.recall).toBe(true);
+      expect(r.recallLegs).toEqual(['AUDF']);
     }
   });
-  test('same-asset: total passes, liquid fails', async () => {
+  test('invested from leg: fence fails on liquid, passes on total => recall', async () => {
+    stub({ tolls: ALL });
+    // NZDF R = L = 1_000_000, face 10_000, C = 1 => x = 10_000.
+    for (const id of IDS) {
+      const p = pool();
+      setLeg(p, 'NZDF', { liquidRes: 9_999 });
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(true);
+      expect(r.recallLegs).toEqual(['NZDF']);
+      const ok = pool();
+      setLeg(ok, 'NZDF', { liquidRes: 10_000 });
+      expect(find(await route(ok, 'NZDF', 'AUDF', 10_000, post), id).recall).toBeUndefined();
+    }
+  });
+  test('same-asset: invested and liquid fails, total passes => recall', async () => {
     const p = pool();
-    setLiquid(p, 'AUDF', 500);
-    const r = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
-      ...BE,
-      previewWithdraw: async () => 990_000_000n,
-    });
-    expect(r.best).toBeNull();
-    expect(r.routes[0].reason).toBe('min-liquidity');
+    setLeg(p, 'AUDF', { liquidRes: 500 });
+    const r = await same(p);
+    expect(r.best?.feasible).toBe(true);
+    expect(r.best?.recallLegs).toEqual(['AUDF']);
+  });
+  test('not invested and failing => refused', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 1_000_000 }); // liquid = total
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    const s = await same(p);
+    expect(s.best).toBeNull();
+    expect(s.routes[0].reason).toBe('min-liquidity');
+  });
+  test('failing against total reserves too => refused though invested', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 10 });
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    const s = await same(p);
+    expect(s.routes[0].reason).toBe('min-liquidity');
+  });
+  test('hub as from leg: invested hub fences with recall', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    p.state.hub = { ...(p.state.hub as NonNullable<typeof p.state.hub>), liquidRes: 100 };
+    const r = find(await route(p, 'USDC', 'AUDF', 10_000, post), 'cross-exit');
+    expect(r.feasible).toBe(true);
+    expect(r.recallLegs).toEqual(['USDC']);
+  });
+  test('relative 1e-12 boundary with non-integer values', async () => {
+    stub({ tolls: ALL });
+    const { out } = find(await route(pool(), 'NZDF', 'AUDF', 10_000, post), 'cross-exit');
+    const inside = pool();
+    setLeg(inside, 'AUDF', { liquidRes: out * (1 - 1e-13) });
+    const a = find(await route(inside, 'NZDF', 'AUDF', 10_000, post), 'cross-exit');
+    expect(a.feasible).toBe(true);
+    expect(a.recall).toBeUndefined(); // one ulp-scale shortfall is not a recall
+    const outside = pool();
+    setLeg(outside, 'AUDF', { liquidRes: out * (1 - 1e-9) });
+    expect(find(await route(outside, 'NZDF', 'AUDF', 10_000, post), 'cross-exit').recall).toBe(
+      true,
+    );
   });
   test('unread liquid book is unknown on every exit', async () => {
     stub({ tolls: ALL });
-    for (const [from, to, sym] of [
-      ['NZDF', 'AUDF', 'AUDF'],
-      ['NZDF', 'AUDF', 'NZDF'],
-    ]) {
+    for (const sym of ['AUDF', 'NZDF']) {
       const p = pool();
-      setLiquid(p, sym, undefined);
-      for (const id of ['cross-exit', 'transfer-exit']) {
-        const r = find(await route(p, from, to, 10_000, post), id);
+      setLeg(p, sym, { liquidRes: undefined });
+      for (const id of IDS) {
+        const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
         expect(r.feasible).toBe(false);
         expect(r.reason).toBe('min-liquidity-unknown');
       }
     }
-    const same = pool();
-    setLiquid(same, 'AUDF', undefined);
-    const r = await rankRedeem([same], 'AUDF', 'AUDF', 1_000, {
-      ...BE,
-      previewWithdraw: async () => 990_000_000n,
-    });
-    expect(r.routes[0].reason).toBe('min-liquidity-unknown');
-  });
-  test('fence: out leg liquid clears the floor, from leg liquid < R - (L - face)·C refuses', async () => {
-    stub({ tolls: ALL });
-    // NZDF R = L = 1_000_000, face 10_000, C = 1 ⇒ x = 10_000.
-    for (const id of ['cross-exit', 'transfer-exit']) {
-      const short = pool();
-      setLiquid(short, 'NZDF', 9_999);
-      const r = find(await route(short, 'NZDF', 'AUDF', 10_000, post), id);
-      expect(r.feasible).toBe(false);
-      expect(r.reason).toBe('liquidity-fence');
-      const ok = pool();
-      setLiquid(ok, 'NZDF', 10_000);
-      expect(find(await route(ok, 'NZDF', 'AUDF', 10_000, post), id).feasible).toBe(true);
-    }
+    const p = pool();
+    setLeg(p, 'AUDF', { liquidRes: undefined });
+    expect((await same(p)).routes[0].reason).toBe('min-liquidity-unknown');
   });
 });
