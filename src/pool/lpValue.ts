@@ -80,13 +80,17 @@ export interface LegLpValue {
   usdPerLp: number | null;
   /** Observation time of the mark (unix seconds); null when there is no mark. */
   obs: number | null;
-  /** The mark is older than the pool's freshness window (the value is still returned: it is the last mark the pool holds). null when there is no mark. */
+  /** The mark is older than the pool's freshness window, measured against the pinned block's timestamp (`blockTs`) and `ttlSecs`. null when there is no mark.
+   *  A `stale` or `halted` value is the LAST mark the pool holds, returned so that consumers decide: it is NOT a live USD figure and must not be displayed as one. */
   stale: boolean | null;
   halted: boolean | null;
+  /** The pool's freshness window for this mark, seconds; null when there is no mark. */
+  ttlSecs: number | null;
   /** INTERNAL mode: the leg quotes the 1.0 peg (`markUsd` is 1), so a consumer can label it. null when there is no mark. */
   peg: boolean | null;
-  /** The block every read of this value was pinned to; null when none could be pinned. */
+  /** The block every read of this value was pinned to, and its timestamp (unix seconds); null when none could be pinned. */
   block: number | null;
+  blockTs: number | null;
 }
 
 const UNKNOWN = (token: Address): LegLpValue => ({
@@ -98,30 +102,41 @@ const UNKNOWN = (token: Address): LegLpValue => ({
   obs: null,
   stale: null,
   halted: null,
+  ttlSecs: null,
   peg: null,
   block: null,
+  blockTs: null,
 });
 
-/** A provider whose `latest` state reads (eth_call, eth_getStorageAt) are rewritten to `block`: the sdk readers all read `latest`. */
+/** A provider whose `latest` state reads (eth_call, eth_getStorageAt) are rewritten to `block`: the sdk readers all read `latest`. Any OTHER block tag on those
+ *  methods throws instead of passing through, so a reader that learns to pass its own tag cannot silently mix blocks. */
 export function pinBlock(provider: Eip1193Provider, block: number): Eip1193Provider {
   const tag = `0x${block.toString(16)}`;
   return {
     ...provider,
     request: ((args: { method: string; params?: unknown[] }) => {
-      const pin = args.method === 'eth_call' || args.method === 'eth_getStorageAt';
-      const params =
-        pin && Array.isArray(args.params)
-          ? args.params.map((x) => (x === 'latest' ? tag : x))
-          : args.params;
+      if (args.method !== 'eth_call' && args.method !== 'eth_getStorageAt')
+        return provider.request(args as never);
+      const params = [...(args.params ?? [])];
+      const at = params.length - 1;
+      if (params[at] !== 'latest' && params[at] !== tag)
+        throw new Error(`pinBlock: unexpected block tag ${String(params[at])} on ${args.method}`);
+      params[at] = tag;
       return provider.request({ ...args, params } as never);
     }) as Eip1193Provider['request'],
   };
 }
 
+/** The head block a set of reads is pinned to. */
+export interface Head {
+  number: number;
+  ts: number;
+}
+
 /** Everything read from chain for one leg; injectable for tests. */
 export interface LegReaders {
   /** The head block and its timestamp, read once per call. */
-  head: (p: Eip1193Provider) => Promise<{ number: number; ts: number }>;
+  head: (p: Eip1193Provider) => Promise<Head>;
   asset: typeof getAsset;
   marks: (
     p: Eip1193Provider,
@@ -133,6 +148,9 @@ export interface LegReaders {
 }
 
 const ZERO = /^0x0*$/i;
+
+/** The chain's head block and its timestamp (one read; pass it to several `readLegLpValues` calls so they share ONE block). */
+export const readHead = (provider: Eip1193Provider): Promise<Head> => chainReaders.head(provider);
 
 const chainReaders: LegReaders = {
   head: async (p) => {
@@ -158,19 +176,21 @@ const chainReaders: LegReaders = {
 };
 
 /**
- * Per-leg LP value of `pool` for the given underlying tokens, live from chain: ONE head block is read, and every read (index, receipt, mark) is pinned to
- * it, with the mark's clock the block's timestamp. A token the pool does not list (lpToken 0 or a revert) is all null and its mark is never read (the sdk
- * mark reader would fall back to lane 0). A node that refuses the pinned block gives all-null values, never mixed-block ones.
+ * Per-leg LP value of `pool` for the given underlying tokens, live from chain: ONE head block (`opts.head`, else read here) is the block of every read (index,
+ * receipt, mark), with the mark's clock that block's timestamp. A token the pool does not list (lpToken 0 or a revert) is all null and its mark is never read
+ * (the sdk mark reader would fall back to lane 0). A node that cannot serve the head gives all-null values, never mixed-block ones.
+ * Values flagged `halted` or `stale` are returned as numbers so consumers decide; they are NOT live USD figures and must not be displayed as such.
  */
 export async function readLegLpValues(
   provider: Eip1193Provider,
   pool: Address,
   tokens: readonly Address[],
-  read: LegReaders = chainReaders,
+  opts: { head?: Head; read?: LegReaders } = {},
 ): Promise<LegLpValue[]> {
-  let head: { number: number; ts: number };
+  const read = opts.read ?? chainReaders;
+  let head: Head;
   try {
-    head = await read.head(provider);
+    head = opts.head ?? (await read.head(provider));
   } catch {
     return tokens.map(UNKNOWN);
   }
@@ -197,8 +217,10 @@ export async function readLegLpValues(
           obs: px === null ? null : mark!.obs,
           stale: px === null ? null : head.ts - mark!.obs > mark!.ttlSecs,
           halted: px === null ? null : mark!.halted,
+          ttlSecs: px === null ? null : mark!.ttlSecs,
           peg: px === null ? null : mark!.internal,
           block: head.number,
+          blockTs: head.ts,
         };
       } catch {
         return UNKNOWN(token);

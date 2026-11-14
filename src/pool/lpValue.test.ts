@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import type { Address } from '../eth/types.js';
 import {
+  type Head,
   type LegMark,
   type LegReaders,
   legMarkUsd,
   lpUsdPerUnit,
   pinBlock,
-  readLegLpValues,
+  readLegLpValues as readLegs,
   shareIndexWad,
 } from './lpValue';
 
@@ -50,6 +51,14 @@ describe('lpUsdPerUnit', () => {
   });
 });
 
+/** The tests' old shape: (provider, pool, tokens, readers). */
+const readLegLpValues = (
+  p: never,
+  pool: Address,
+  tokens: Address[],
+  read: LegReaders,
+  head?: Head,
+) => readLegs(p, pool, tokens, { read, head });
 const POOL = '0x00000000000000000000000000000000000000f0' as Address;
 const A = '0x00000000000000000000000000000000000000a1' as Address;
 const B = '0x00000000000000000000000000000000000000b2' as Address;
@@ -207,5 +216,38 @@ describe('pinBlock', () => {
       ['0x1', '0x2', '0xff'],
       ['latest', false],
     ]);
+  });
+});
+
+describe('one head for several calls', () => {
+  test('a head passed in is used by every call, no head read at all', async () => {
+    let heads = 0;
+    const r = readers({
+      head: async () => {
+        heads++;
+        return { number: 1, ts: 1 };
+      },
+    });
+    const head = { number: 99, ts: NOW };
+    const [a] = await readLegLpValues({} as never, POOL, [A], r, head);
+    const [b] = await readLegLpValues({} as never, POOL, [B], r, head);
+    expect(heads).toBe(0);
+    expect([a!.block, b!.block, a!.blockTs]).toEqual([99, 99, NOW]);
+  });
+  test('values carry ttlSecs and blockTs', async () => {
+    const [a] = await readLegLpValues({} as never, POOL, [A], readers());
+    expect(a).toMatchObject({ ttlSecs: 600, blockTs: NOW });
+  });
+});
+
+describe('pinBlock refuses a foreign block tag', () => {
+  test('throws instead of passing an unrecognised tag through', () => {
+    const p = pinBlock({ request: async () => '0x' as never } as never, 255);
+    expect(() => p.request({ method: 'eth_call', params: [{}, '0x10'] } as never)).toThrow(
+      /unexpected block tag/,
+    );
+    expect(() =>
+      p.request({ method: 'eth_getStorageAt', params: ['0x1', '0x2', 'safe'] } as never),
+    ).toThrow(/unexpected block tag/);
   });
 });

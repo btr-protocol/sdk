@@ -163,12 +163,13 @@ export {
   quoteSwapLiabilityCore,
   quoteSwapLiabilityCoreAsync,
 } from './liability.js';
-export type { LegLpValue, LegMark } from './lpValue.js';
+export type { Head, LegLpValue, LegMark } from './lpValue.js';
 export {
   LEGACY_LIQUIDITY_INDEX,
   legMarkUsd,
   lpUsdPerUnit,
   pinBlock,
+  readHead,
   readLegLpValues,
   shareIndexWad,
 } from './lpValue.js';
