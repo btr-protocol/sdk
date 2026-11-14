@@ -44,8 +44,8 @@ export function retiredChainIds(dexEvm: string): Set<number> {
 }
 
 /** Chains the SDK serves: a `CHAINS` row (src/eth/chains.ts) and not retired. The row is required
- *  because a dex-evm pin can record a chain the SDK has no row for; the CI pin predates
- *  retired.json and still records arc (5042002) as its default, so retirement alone is not enough.
+ *  because a dex-evm pin can record a chain the SDK has no row for; a CI pin that predates
+ *  retired.json can still record a since-retired chain as its default, so retirement alone is not enough.
  *  The same set at every pin. */
 export function servedChainIds(dexEvm: string): Set<number> {
   const retired = retiredChainIds(dexEvm);

@@ -199,8 +199,7 @@ describe('multi-output decode is positional', () => {
   // to key EVERY member by `name || index` into a plain object, so unnamed
   // outputs came back as `{0: .., 1: ..}`, which is not iterable, and
   // `const [a] = await readContract(...)` threw "{} is not iterable" instead of
-  // reading the first return value. Live blob below is the Arc testnet
-  // btr-stable pool answering previewWithdraw(USDT, 1e6).
+  // reading the first return value. Live blob below is a btr-stable pool answering previewWithdraw(USDT, 1e6).
   const LIVE_PREVIEW_WITHDRAW =
     '0x00000000000000000000000000000000000000000000000000000000000f4263' +
     '0000000000000000000000000000000000000000000000000000000000000000';

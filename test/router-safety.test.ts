@@ -29,7 +29,7 @@ import {
   quoteAllExactIn,
 } from '../src/venues/router';
 
-/** Monad: the only chain BTR is deployed on (Arc testnet is retired). */
+/** Monad: the only chain BTR is deployed on. */
 const MONAD = 143;
 const MONAD_TOKENS = chainVenue(MONAD).tokens;
 

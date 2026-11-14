@@ -42,8 +42,7 @@ describe('served chains', () => {
 
 describe('chain registry', () => {
   // The owner's list: BNB, Monad, X Layer, Base, Avalanche, Arbitrum, Ethereum, Robinhood, Arc
-  // (mainnet), Polygon, HyperEVM; plus local Anvil. A chain not here is not offered. Arc testnet
-  // (5042002) is retired (dex-evm deployments/retired.json) and is not listed.
+  // (mainnet), Polygon, HyperEVM; plus local Anvil. A chain not here is not offered.
   const LISTED = [1, 56, 137, 143, 196, 999, 4663, 5042, 8453, 42161, 43114, 31337];
 
   test('is the listed chains plus Anvil, and covers every served chain', () => {
