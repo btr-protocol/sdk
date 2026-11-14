@@ -168,6 +168,7 @@ export {
   LEGACY_LIQUIDITY_INDEX,
   legMarkUsd,
   lpUsdPerUnit,
+  pinBlock,
   readLegLpValues,
   shareIndexWad,
 } from './lpValue.js';

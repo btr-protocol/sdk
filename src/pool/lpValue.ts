@@ -7,6 +7,10 @@
  *
  * Keyed by the pool and the underlying token ADDRESS, never by a symbol. Receipts carry the
  * underlying's decimals, so a receipt amount in token units prices without a decimals factor.
+ *
+ * Mark scale: `mark1e18` is the pool's own 1e18-WAD mark of the leg (IOracle.sol:10 `mark1e18`, "live mark in 1e18 WAD"), decoded off the P8 store word
+ * (`readMarks` storage.ts:808 -> `decodeStoreWord` -> `laneFloat` storage.ts:578, `mant << (e - 16)`), so `Number(mark1e18) / 1e18` is the USD price of one
+ * underlying unit (the base leg's mark is ~1.0). Every read of one call is pinned to ONE block (`pinBlock`).
  */
 
 import { POOL_ABI } from '../abis/Pool.js';
@@ -16,7 +20,9 @@ import { getAsset } from './index.js';
 import { readMarks } from './storage.js';
 
 const WAD = 10n ** 18n;
-/** ConstantsLib LEGACY_LIQUIDITY_INDEX: a leg listed before the base was written stores 0, which the pool lazy-inits to 1e12. */
+/** v1 fleet only (storage 5..9): a leg listed before the base was written stores 0, which that pool lazy-inits to 1e12 (front/src/hooks/usePoolData.ts:60-64).
+ *  A v2 pool (dex-evm PoolConfigLib.sol:352) writes WAD at initAsset and treats 0 as WIPED, never as this sentinel; a v2 leg cannot hold 0 with liabilities > 0
+ *  (writeDown floors the index at MIN_WRITEDOWN_INDEX, PoolConstantsLib.sol:139). Not verified: that a deployed v1 leg still returns it. */
 export const LEGACY_LIQUIDITY_INDEX = 10n ** 12n;
 
 /**
@@ -65,20 +71,57 @@ export function lpUsdPerUnit(
 export interface LegLpValue {
   /** Underlying token of the leg. */
   token: Address;
-  /** The leg's LP receipt token, as `Pool.lpToken(token)` answers. */
-  lp: Address;
-  indexWad: bigint;
+  /** The leg's LP receipt token, as `Pool.lpToken(token)` answers; null = the pool does not list the token (or could not be read). */
+  lp: Address | null;
+  indexWad: bigint | null;
   /** USD per underlying unit (the pool's own mark); null = unknown. */
   markUsd: number | null;
   /** USD per LP receipt unit = index x mark; null = unknown. */
   usdPerLp: number | null;
-  /** The mark is older than the pool's freshness window (value still returned: it is the last mark the pool holds). */
-  stale: boolean;
-  halted: boolean;
+  /** Observation time of the mark (unix seconds); null when there is no mark. */
+  obs: number | null;
+  /** The mark is older than the pool's freshness window (the value is still returned: it is the last mark the pool holds). null when there is no mark. */
+  stale: boolean | null;
+  halted: boolean | null;
+  /** INTERNAL mode: the leg quotes the 1.0 peg (`markUsd` is 1), so a consumer can label it. null when there is no mark. */
+  peg: boolean | null;
+  /** The block every read of this value was pinned to; null when none could be pinned. */
+  block: number | null;
+}
+
+const UNKNOWN = (token: Address): LegLpValue => ({
+  token,
+  lp: null,
+  indexWad: null,
+  markUsd: null,
+  usdPerLp: null,
+  obs: null,
+  stale: null,
+  halted: null,
+  peg: null,
+  block: null,
+});
+
+/** A provider whose `latest` state reads (eth_call, eth_getStorageAt) are rewritten to `block`: the sdk readers all read `latest`. */
+export function pinBlock(provider: Eip1193Provider, block: number): Eip1193Provider {
+  const tag = `0x${block.toString(16)}`;
+  return {
+    ...provider,
+    request: ((args: { method: string; params?: unknown[] }) => {
+      const pin = args.method === 'eth_call' || args.method === 'eth_getStorageAt';
+      const params =
+        pin && Array.isArray(args.params)
+          ? args.params.map((x) => (x === 'latest' ? tag : x))
+          : args.params;
+      return provider.request({ ...args, params } as never);
+    }) as Eip1193Provider['request'],
+  };
 }
 
 /** Everything read from chain for one leg; injectable for tests. */
 export interface LegReaders {
+  /** The head block and its timestamp, read once per call. */
+  head: (p: Eip1193Provider) => Promise<{ number: number; ts: number }>;
   asset: typeof getAsset;
   marks: (
     p: Eip1193Provider,
@@ -89,7 +132,17 @@ export interface LegReaders {
   lpToken: (p: Eip1193Provider, pool: Address, token: Address) => Promise<Address>;
 }
 
+const ZERO = /^0x0*$/i;
+
 const chainReaders: LegReaders = {
+  head: async (p) => {
+    const n = (await p.request({ method: 'eth_blockNumber', params: [] })) as Hex;
+    const b = (await p.request({ method: 'eth_getBlockByNumber', params: [n, false] })) as {
+      timestamp: Hex;
+    } | null;
+    if (!b) throw new Error('head block not served');
+    return { number: Number(BigInt(n)), ts: Number(BigInt(b.timestamp)) };
+  },
   asset: (p, pool, token) => getAsset(p, pool, token), // lazy: ./index re-exports this module
   marks: (p, pool, token, nowSecs) => readMarks(p, pool, token, nowSecs),
   lpToken: async (p, pool, token) => {
@@ -105,35 +158,51 @@ const chainReaders: LegReaders = {
 };
 
 /**
- * Per-leg LP value of `pool` for the given underlying tokens, live from chain (reads at `latest`,
- * all legs in parallel). A leg whose mark cannot be read comes back with `markUsd`/`usdPerLp` null.
+ * Per-leg LP value of `pool` for the given underlying tokens, live from chain: ONE head block is read, and every read (index, receipt, mark) is pinned to
+ * it, with the mark's clock the block's timestamp. A token the pool does not list (lpToken 0 or a revert) is all null and its mark is never read (the sdk
+ * mark reader would fall back to lane 0). A node that refuses the pinned block gives all-null values, never mixed-block ones.
  */
 export async function readLegLpValues(
   provider: Eip1193Provider,
   pool: Address,
   tokens: readonly Address[],
-  nowSecs = Math.floor(Date.now() / 1000),
   read: LegReaders = chainReaders,
 ): Promise<LegLpValue[]> {
+  let head: { number: number; ts: number };
+  try {
+    head = await read.head(provider);
+  } catch {
+    return tokens.map(UNKNOWN);
+  }
+  const at = pinBlock(provider, head.number);
   return Promise.all(
     tokens.map(async (token): Promise<LegLpValue> => {
-      const [asset, lp, mark] = await Promise.all([
-        read.asset(provider, pool, token),
-        read.lpToken(provider, pool, token),
-        read.marks(provider, pool, token, nowSecs).then(
-          (m) => m.primary,
-          () => null,
-        ),
-      ]);
-      return {
-        token,
-        lp,
-        indexWad: shareIndexWad(asset),
-        markUsd: legMarkUsd(mark),
-        usdPerLp: lpUsdPerUnit(asset, mark),
-        stale: mark ? nowSecs - mark.obs > mark.ttlSecs : false,
-        halted: mark?.halted ?? false,
-      };
+      try {
+        const lp = await read.lpToken(at, pool, token);
+        if (!lp || ZERO.test(lp)) return UNKNOWN(token);
+        const [asset, mark] = await Promise.all([
+          read.asset(at, pool, token),
+          read.marks(at, pool, token, head.ts).then(
+            (m) => m.primary,
+            () => null,
+          ),
+        ]);
+        const px = legMarkUsd(mark);
+        return {
+          token,
+          lp,
+          indexWad: shareIndexWad(asset),
+          markUsd: px,
+          usdPerLp: lpUsdPerUnit(asset, mark),
+          obs: px === null ? null : mark!.obs,
+          stale: px === null ? null : head.ts - mark!.obs > mark!.ttlSecs,
+          halted: px === null ? null : mark!.halted,
+          peg: px === null ? null : mark!.internal,
+          block: head.number,
+        };
+      } catch {
+        return UNKNOWN(token);
+      }
     }),
   );
 }
