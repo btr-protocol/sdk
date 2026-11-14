@@ -260,3 +260,14 @@ describe('fetch-abis refuses what it cannot pin', () => {
     expect(existsSync(join(sandbox, 'repo', 'src', 'abis', 'Pool.ts'))).toBe(true);
   }, 30_000);
 });
+
+// The revert decoder reads the root snapshot, chain 143 reads the generation file: one error set.
+test('pool-v2-s12 Pool carries the same errors as the root snapshot', () => {
+  const sig = (abi: unknown[]) =>
+    (abi as { type: string; name: string; inputs: { type: string }[] }[])
+      .filter((e) => e.type === 'error')
+      .map((e) => `${e.name}(${e.inputs.map((i) => i.type).join(',')})`)
+      .sort();
+  const s12 = readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json'));
+  expect(sig(s12)).toEqual(sig(POOL_ABI));
+});
