@@ -4,12 +4,13 @@ import accessControlV1 from '../../abis/generations/pool-v1-s7/AccessControl.jso
 import adminV1 from '../../abis/generations/pool-v1-s7/Admin.json';
 import poolV1 from '../../abis/generations/pool-v1-s7/Pool.json';
 import poolFactoryV1 from '../../abis/generations/pool-v1-s7/PoolFactory.json';
-import accessControl from '../../abis/generations/pool-v2-s12/AccessControl.json';
-import admin from '../../abis/generations/pool-v2-s12/Admin.json';
-import pool from '../../abis/generations/pool-v2-s12/Pool.json';
-import poolFactory from '../../abis/generations/pool-v2-s12/PoolFactory.json';
+import accessControl from '../../abis/generations/pool-v2-s12e/AccessControl.json';
+import admin from '../../abis/generations/pool-v2-s12e/Admin.json';
+import pool from '../../abis/generations/pool-v2-s12e/Pool.json';
+import poolFactory from '../../abis/generations/pool-v2-s12e/PoolFactory.json';
 import { getApiRoot } from '../api.js';
 import type { Abi } from '../eth/abi.js';
+import { ABI_GENERATION } from './generation.js';
 import { abiHash } from './hash.js';
 
 type Deployment = { generation: string; pins: Record<string, string> };
@@ -32,6 +33,22 @@ const bundledV1: Record<string, Abi> = {
   PoolFactory: poolFactoryV1 as Abi,
   AccessControl: accessControlV1 as Abi,
 };
+/** HTTP 400 on an ABI request: the back does not serve the requested generation (unknown,
+ * malformed, retired, or not mapped to the chain). Every request carries a generation and the
+ * gateway masks the error body (`{"error":"bad request"}`), so the status alone decides.
+ * Distinguishable from a transport failure so a caller can show a degraded state. */
+// Consumers check `err.code === 'unknown_generation'`.
+export class AbiUnknownGenerationError extends Error {
+  readonly code = 'unknown_generation';
+  constructor(
+    readonly abiName: string,
+    readonly chainId: number,
+    readonly generation: string,
+  ) {
+    super(`BTR ABI unknown_generation ${generation} (${abiName} on chain ${chainId})`);
+    this.name = 'AbiUnknownGenerationError';
+  }
+}
 export type AbiWithMeta = {
   abi: Abi;
   /** The generation the back stamped in `x-btr-abi-generation`; null when the header is absent (an older back). */
@@ -81,14 +98,21 @@ async function load(
       (n) => n.toLowerCase() === name.toLowerCase(),
     ) ?? name;
   if (!/^[a-zA-Z0-9]{1,64}$/.test(canonical)) throw new Error('invalid ABI name');
-  if (chainId === 143 && selected === 'pool-v2-s12' && bundled[canonical])
+  if (chainId === 143 && selected === ABI_GENERATION && Object.hasOwn(bundled, canonical))
     return { abi: bundled[canonical], generation: selected, chainId };
-  if (chainId === 143 && selected === V1 && bundledV1[canonical])
+  if (chainId === 143 && selected === V1 && Object.hasOwn(bundledV1, canonical))
     return { abi: bundledV1[canonical], generation: selected, chainId };
+  if (selected === V1)
+    throw new Error(`ABI ${canonical} has no bundled ${V1} copy; ${V1} never goes to the wire`);
+  if (chains[String(chainId)] && !Object.hasOwn(chains[String(chainId)].pins, canonical))
+    throw new Error(`ABI ${canonical} has no pin on chain ${chainId}; refused`);
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
   if (cached) return cached;
-  const res = await fetch(getAbiUrl(canonical, chainId), { signal: AbortSignal.timeout(10_000) });
+  const res = await fetch(getAbiUrl(canonical, chainId, selected), {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 400) throw new AbiUnknownGenerationError(canonical, chainId, selected);
   if (!res.ok) throw new Error(`BTR ABI ${res.status} ${canonical} on chain ${chainId}`);
   const generation = res.headers.get('x-btr-abi-generation');
   if (generation !== null && generation !== selected)
@@ -97,7 +121,8 @@ async function load(
     throw new Error('ABI response generation differs from requested generation');
   const abi = await res.json();
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
-  const pin = selected === V1 ? undefined : chains[String(chainId)]?.pins[canonical];
+  const pins = chains[String(chainId)]?.pins;
+  const pin = pins && Object.hasOwn(pins, canonical) ? pins[canonical] : undefined;
   if (pin && abiHash(abi) !== pin) throw new Error('ABI response misses chain/generation pin');
   const meta: AbiWithMeta = { abi: abi as Abi, generation, chainId };
   if (generation !== null) hot.set(key, meta);
@@ -107,9 +132,9 @@ async function load(
 export function resetFetchAbiCacheForTest(): void {
   hot.clear();
 }
-export function getAbiUrl(name: string, chainId = 143) {
+export function getAbiUrl(name: string, chainId: number, generation: string) {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('invalid ABI chain id');
-  return `${getApiRoot()}/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}`;
+  return `${getApiRoot()}/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}&generation=${encodeURIComponent(generation)}`;
 }
 // Source mirror only; this URL does not establish a deployment generation.
 export function getAbiGithubUrl(name: string) {

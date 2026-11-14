@@ -13,10 +13,12 @@ into `src/abis/` before every typecheck, test and build. What makes that safe is
 a normalised content hash per ABI, and nothing is written that misses its pin — not the backend's
 answer, not a sibling checkout, not the file already on disk.
 
-- `fetchAbi('Pool', 143)` → the pinned deployed `pool-v2-s12` ABI; Admin, PoolFactory and
+- `fetchAbi('Pool', 143)` → the pinned deployed `pool-v2-s12e` ABI; Admin, PoolFactory and
   AccessControl also come from the deployed bundle without network or `localStorage`.
-- `fetchAbi(other, 143)` → `GET {api}/v1/abis/{name}?chain_id=143`; content and generation
-  are checked against `abis.lock.json.chains[143]`, then cached by API, chain, generation, name.
+- `fetchAbi(other, 143)` → refused locally: a name without a pin in `abis.lock.json.chains[143]`
+  never reaches the wire, and `pool-v1-s7` is served from the bundle only. On an unpinned chain
+  the request is `GET {api}/v1/abis/{name}?chain_id=N&generation=G`, checked against G and cached
+  by API, chain, generation, name.
 - Name-only calls retain chain 143 for compatibility. Pass the chain explicitly in new code.
   An unpinned chain requires an explicit expected generation as the third argument; the server
   must confirm it. A different generation for an already pinned chain fails closed.

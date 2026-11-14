@@ -18,12 +18,12 @@
   },
   "chains": {
     "143": {
-      "generation": "pool-v2-s12",
+      "generation": "pool-v2-s12e",
       "pins": {
         "Admin": "0xbe546935a5417a74ccdc14bcd6ba2a0e7b839eef35bbe64fad24dedbac91085b",
         "LPToken": "0x2af271e015aeec368ae2a9e61efb3b84bc72c01f9594bc9f940d21b80849960c",
         "AccessControl": "0x44113180bf658a5b0bd6c6faee183c57a571a9f204651e89e568c574ec7c8449",
-        "Pool": "0x13e3e32a370cba2233c3eefcf20cef596129e2db3e5dd0da81a97a6459f99f3f",
+        "Pool": "0xd6720b67ee25809ac6835f1f96b12d4d50c4b2cc9572a960ee098b1a577107f3",
         "PoolFactory": "0x9954ea291ce8bb92024b22d16eb079aabb789bc49b7706ff8d2256470193f31e",
         "Flash": "0x685d689c173537f768e39f8f65cb5374226322e7d388f6ca2fd330c1a7c6c442",
         "MarkStore": "0x1b95f400bd455c13d35be502977f1bb01d11cf1b3a9b66e5146bc4ef1ceb91ec"
