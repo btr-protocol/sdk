@@ -43,6 +43,7 @@ function pool(o?: { audfRes?: number; audfLiab?: number; nzdfMark?: number }): N
         kappaCovBps: 0,
         storageVersion: 7,
         minLiquidity: 0,
+        liquidRes: 2_000_000,
       },
     },
   };
@@ -387,7 +388,15 @@ function richPool(o: { res: number; liab: number }): NamedPool {
       solvencyAtMs: Date.now(),
       exitTollWad: 0n,
       legs: { AUDF: buildLeg('AUDF', 1, SIG, o.res, o.liab, 3_000_000, 6, STABLE_PROFILE, 0) },
-      hub: { res: 0, liab: 0, vegaBps: 0, kappaCovBps: 0, storageVersion: 7, minLiquidity: 0 },
+      hub: {
+        res: 0,
+        liab: 0,
+        vegaBps: 0,
+        kappaCovBps: 0,
+        storageVersion: 7,
+        minLiquidity: 0,
+        liquidRes: 0,
+      },
     },
   };
 }
@@ -452,6 +461,7 @@ describe('F5: integer face and mu (mu ≫ 1): same-asset and transfer never abov
       kappaCovBps: 0,
       storageVersion: 7,
       minLiquidity: 0,
+      liquidRes: 2_000_000,
     };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
@@ -743,6 +753,7 @@ describe('transfer-exit: the tail is sized at the post-fee index the second call
       kappaCovBps: 0,
       storageVersion: 7,
       minLiquidity: 0,
+      liquidRes: 2_000_000,
     };
     const idx = 1_000_900_900_000_000_000n;
     const tw = 7n * 10n ** 15n;
@@ -899,5 +910,80 @@ describe('an unread minLiquidity is unknown, never 0', () => {
     stub({ tolls: ALL });
     const r = (await route(pool(), 'NZDF', 'AUDF', 10_000)).find((x) => x.id === 'cross-exit');
     expect(r?.feasible).toBe(true);
+  });
+});
+
+describe('exit gates on liquid reserves, not total', () => {
+  const post = { ...BE, postMoveExitTollWad: async () => 0n };
+  const setLiquid = (p: NamedPool, sym: string, liquidRes: number | undefined) => {
+    p.state.legs[sym] = { ...p.state.legs[sym], liquidRes };
+  };
+  const find = (rs: { id: string }[], id: string) =>
+    rs.find((x) => x.id === id) as never as {
+      feasible: boolean;
+      reason?: string;
+      out: number;
+    };
+  test('invested > 0: total passes, liquid fails; liquid = out passes (cross, transfer)', async () => {
+    stub({ tolls: ALL });
+    const base = await route(pool(), 'NZDF', 'AUDF', 10_000, post);
+    for (const id of ['cross-exit', 'transfer-exit']) {
+      const { out } = find(base, id);
+      expect(find(base, id).feasible).toBe(true);
+      const short = pool();
+      setLiquid(short, 'AUDF', out - 0.01); // reserves 1_000_000 ≫ out
+      const r = find(await route(short, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+      const exact = pool();
+      setLiquid(exact, 'AUDF', out);
+      expect(find(await route(exact, 'NZDF', 'AUDF', 10_000, post), id).feasible).toBe(true);
+    }
+  });
+  test('same-asset: total passes, liquid fails', async () => {
+    const p = pool();
+    setLiquid(p, 'AUDF', 500);
+    const r = await rankRedeem([p], 'AUDF', 'AUDF', 1_000, {
+      ...BE,
+      previewWithdraw: async () => 990_000_000n,
+    });
+    expect(r.best).toBeNull();
+    expect(r.routes[0].reason).toBe('min-liquidity');
+  });
+  test('unread liquid book is unknown on every exit', async () => {
+    stub({ tolls: ALL });
+    for (const [from, to, sym] of [
+      ['NZDF', 'AUDF', 'AUDF'],
+      ['NZDF', 'AUDF', 'NZDF'],
+    ]) {
+      const p = pool();
+      setLiquid(p, sym, undefined);
+      for (const id of ['cross-exit', 'transfer-exit']) {
+        const r = find(await route(p, from, to, 10_000, post), id);
+        expect(r.feasible).toBe(false);
+        expect(r.reason).toBe('min-liquidity-unknown');
+      }
+    }
+    const same = pool();
+    setLiquid(same, 'AUDF', undefined);
+    const r = await rankRedeem([same], 'AUDF', 'AUDF', 1_000, {
+      ...BE,
+      previewWithdraw: async () => 990_000_000n,
+    });
+    expect(r.routes[0].reason).toBe('min-liquidity-unknown');
+  });
+  test('fence: out leg liquid clears the floor, from leg liquid < R - (L - face)·C refuses', async () => {
+    stub({ tolls: ALL });
+    // NZDF R = L = 1_000_000, face 10_000, C = 1 ⇒ x = 10_000.
+    for (const id of ['cross-exit', 'transfer-exit']) {
+      const short = pool();
+      setLiquid(short, 'NZDF', 9_999);
+      const r = find(await route(short, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('liquidity-fence');
+      const ok = pool();
+      setLiquid(ok, 'NZDF', 10_000);
+      expect(find(await route(ok, 'NZDF', 'AUDF', 10_000, post), id).feasible).toBe(true);
+    }
   });
 });

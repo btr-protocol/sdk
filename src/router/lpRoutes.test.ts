@@ -587,6 +587,7 @@ function mkPool(tag: string, legs: Record<string, ReturnType<typeof buildLeg>>):
         kappaCovBps: 0,
         storageVersion: 7,
         minLiquidity: 0,
+        liquidRes: 2_000_000,
       },
     },
   };

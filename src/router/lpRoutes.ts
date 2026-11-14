@@ -104,6 +104,7 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
       covBits: s.hub.covBits,
       storageVersion: s.hub.storageVersion,
       minLiquidity: s.hub.minLiquidity,
+      liquidRes: s.hub.liquidRes,
       decimals: opts.backend?.baseDecimals,
     };
   }
@@ -117,8 +118,28 @@ function liabLeg(pool: NamedPool, symbol: string, opts: LpRouteOpts): LiabLeg | 
     covBits: leg.covBits,
     storageVersion: leg.storageVersion,
     minLiquidity: leg.minLiquidity,
+    liquidRes: leg.liquidRes,
     decimals: leg.decimals,
   };
+}
+
+/** `withdraw`/`withdrawTo` keep `R_liq − out ≥ minLiquidity` (`PoolLiquidityLib.sol:465-466`,
+ *  `PoolHooksLib.liquidReserves` = reserves − invested). Liquid-only: the hook recall is not modelled.
+ *  An unread floor or liquid book is unknown, never 0. */
+function liquidFloor(leg: LiabLeg, out: number): 'min-liquidity-unknown' | 'min-liquidity' | null {
+  if (leg.minLiquidity === undefined || leg.liquidRes === undefined) return 'min-liquidity-unknown';
+  return leg.liquidRes - out < leg.minLiquidity ? 'min-liquidity' : null;
+}
+
+/** `_fence` (`PoolLiquidityLib.sol:566-577`) on the leg that burns `face` at the pool rate `c`: the
+ *  liquid book must cover `x = R − (L − face)·c` (`:570-572`). */
+function liquidFence(
+  leg: LiabLeg,
+  face: number,
+  c: number,
+): 'min-liquidity-unknown' | 'liquidity-fence' | null {
+  if (leg.liquidRes === undefined) return 'min-liquidity-unknown';
+  return leg.liquidRes < leg.reserves - (leg.liabilities - face) * c ? 'liquidity-fence' : null;
 }
 
 interface LpRouteStep {
@@ -512,8 +533,10 @@ async function crossExit(
     return unfeasible(CROSS_DEAD, 'coverage-wall');
   // `withdrawTo` reverts `InsufficientAmount` when the out leg would fall under its keeper floor.
   // Absent is unknown, never 0: a floor that was not read cannot be proven clear.
-  if (toLeg.minLiquidity === undefined) return unfeasible(CROSS_DEAD, 'min-liquidity-unknown');
-  if (toLeg.reserves < out + toLeg.minLiquidity) return unfeasible(CROSS_DEAD, 'min-liquidity');
+  const floor = liquidFloor(toLeg, out);
+  if (floor) return unfeasible(CROSS_DEAD, floor);
+  const fence = liquidFence(fromLeg, withdrawValue, c);
+  if (fence) return unfeasible(CROSS_DEAD, fence);
 
   const shell: RouteShell = {
     id: 'cross-exit',
@@ -778,8 +801,10 @@ async function transferExit(
           dOut,
         );
   if (!(exitOut > 0)) return unfeasible(shell, 'no-route');
-  if (toLeg.minLiquidity === undefined) return unfeasible(shell, 'min-liquidity-unknown');
-  if (toLeg.reserves < exitOut + toLeg.minLiquidity) return unfeasible(shell, 'min-liquidity');
+  const floor = liquidFloor(toLeg, exitOut);
+  if (floor) return unfeasible(shell, floor);
+  const fence = liquidFence(fromLeg, q.liabIn, c);
+  if (fence) return unfeasible(shell, fence);
   // The tail burns what the exit was priced on: the floored share count (raw-exact when decimals).
   const lpWithdraw =
     dOut === undefined ? q.lpAmountOut : rawToOut(floorRaw(q.lpAmountOut, dOut), dOut);
@@ -878,10 +903,8 @@ export async function rankRedeem(
     if (!Number.isFinite(actual))
       return { best: null, routes: [unfeasible(gated, solv ?? 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
-    if (leg.minLiquidity === undefined)
-      return { best: null, routes: [unfeasible(gated, 'min-liquidity-unknown')] };
-    if (leg.reserves < actual + leg.minLiquidity)
-      return { best: null, routes: [unfeasible(gated, 'min-liquidity')] };
+    const floor = liquidFloor(leg, actual);
+    if (floor) return { best: null, routes: [unfeasible(gated, floor)] };
     gated.steps[0].amountOut = actual;
     gated.steps[0].minOut = actual * (1 - slip);
     gated.out = actual;

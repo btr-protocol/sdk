@@ -13,6 +13,7 @@ export const buildLegV1 = (
       storageVersion: 7,
       ...feed,
     }),
+    liquidRes: res,
     minLiquidity: 0, // declared: an absent floor is unknown, and a route over it is unfeasible
   };
 };
