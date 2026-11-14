@@ -13,7 +13,7 @@ into `src/abis/` before every typecheck, test and build. What makes that safe is
 a normalised content hash per ABI, and nothing is written that misses its pin — not the backend's
 answer, not a sibling checkout, not the file already on disk.
 
-- `fetchAbi('Pool', 143)` → the pinned deployed `pool-v2-s12` ABI; Admin, PoolFactory and
+- `fetchAbi('Pool', 143)` → the pinned deployed `pool-v2-s12e` ABI; Admin, PoolFactory and
   AccessControl also come from the deployed bundle without network or `localStorage`.
 - `fetchAbi(other, 143)` → `GET {api}/v1/abis/{name}?chain_id=143`; content and generation
   are checked against `abis.lock.json.chains[143]`, then cached by API, chain, generation, name.

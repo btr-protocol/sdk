@@ -52,17 +52,17 @@ test('wire requests and URLs carry chain_id; caches separate chain, generation a
   setApiRoot('https://other.invalid');
   await fetchAbi('Custom', 56, 'g2');
   expect(urls.length).toBe(4);
-  expect(urls[0]).toContain('/v1/abis/Custom?chain_id=56');
+  expect(urls[0]).toContain('/v1/abis/Custom?chain_id=56&generation=g1');
   expect(urls[1]).toContain('chain_id=999');
   expect(urls[3]).toStartWith('https://other.invalid/');
-  expect(getAbiUrl('Flash', 143)).toEndWith('/v1/abis/Flash?chain_id=143');
+  expect(getAbiUrl('Flash', 143)).toEndWith('/v1/abis/Flash?chain_id=143&generation=pool-v2-s12e');
 });
 
 test('wrong generation and content fail closed and never enter cache', async () => {
   let calls = 0;
   globalThis.fetch = (async () => {
     calls++;
-    return reply(calls === 1 ? 'wrong' : 'pool-v2-s12');
+    return reply(calls === 1 ? 'wrong' : 'pool-v2-s12e');
   }) as unknown as typeof fetch;
   await expect(fetchAbi('Flash', 143)).rejects.toThrow('generation');
   await expect(fetchAbi('Flash', 143)).rejects.toThrow('pin');
@@ -76,7 +76,7 @@ test('wrong generation and content fail closed and never enter cache', async () 
 test('all deployed artifacts match chain/generation lock pins', async () => {
   for (const [name, pin] of Object.entries(lock.chains['143'].pins)) {
     const abi = await Bun.file(
-      new URL(`../../abis/generations/pool-v2-s12/${name}.json`, import.meta.url),
+      new URL(`../../abis/generations/pool-v2-s12e/${name}.json`, import.meta.url),
     ).json();
     expect(String(abiHash(abi))).toBe(pin);
   }
@@ -121,6 +121,6 @@ test('fetchAbiWithMeta names the bundled generation without a request', async ()
     throw new Error('bundled ABI went to wire');
   }) as unknown as typeof fetch;
   const meta = await fetchAbiWithMeta('Pool');
-  expect(meta).toMatchObject({ generation: 'pool-v2-s12', chainId: 143 });
+  expect(meta).toMatchObject({ generation: 'pool-v2-s12e', chainId: 143 });
   expect(meta.abi).toBe(await fetchAbi('Pool', 143));
 });

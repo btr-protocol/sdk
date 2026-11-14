@@ -41,6 +41,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { keccak_256 } from '@noble/hashes/sha3.js';
 import { $ } from 'bun';
+import { ABI_GENERATION } from '../src/abis/generation.js';
 import { abiHash } from '../src/abis/hash.js';
 import { ABI_FALLBACKS } from './abis.fallback.js';
 
@@ -143,10 +144,12 @@ function unwrap(v: unknown): unknown[] {
 }
 
 async function fromBackend(name: string): Promise<unknown[]> {
-  const res = await fetch(`${api}/v1/abis/${name}?chain_id=143`, { signal: AbortSignal.timeout(10_000) });
+  const res = await fetch(`${api}/v1/abis/${name}?chain_id=143&generation=${ABI_GENERATION}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) throw new Error(`BTR API ${res.status} /v1/abis/${name}`);
-  if (res.headers.get('x-btr-abi-generation') !== publication.bundled.generation)
-    throw new Error('backend generation differs from bundled build-head pins; use BTR_DEX_EVM');
+  if (res.headers.get('x-btr-abi-generation') !== ABI_GENERATION)
+    throw new Error(`backend generation differs from ${ABI_GENERATION}; use BTR_DEX_EVM`);
   return unwrap(await res.json());
 }
 

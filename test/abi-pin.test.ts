@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ACCESS_CONTROL_ABI } from '../src/abis/AccessControl';
 import { POOL_FACTORY_ABI } from '../src/abis/PoolFactory';
+import { ABI_GENERATION } from '../src/abis/generation';
 import { abiHash } from '../src/abis/hash';
 
 const repo = join(import.meta.dir, '..');
@@ -20,7 +21,7 @@ const readAbi = (p: string): unknown[] => {
 };
 const POOL_ABI = readAbi(join(repo, 'abis', 'Pool.json'));
 // The backend's served copy lives in the sibling checkout; CI has none, so those checks skip.
-const backAbis = join(repo, '..', 'back', 'abis/generations/pool-v2-s12');
+const backAbis = join(repo, '..', 'back', 'abis/generations/pool-v2-s12e');
 const hasBack = existsSync(join(backAbis, 'Pool.json'));
 
 // ── the hash itself ──────────────────────────────────────────────────────────
@@ -126,13 +127,13 @@ describe('fetchAbi serves the pinned guardian ABIs from the bundle', () => {
       const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
       resetFetchAbiCacheForTest();
       expect(await fetchAbi('PoolFactory')).toEqual(
-        readAbi(join(repo, 'abis/generations/pool-v2-s12/PoolFactory.json')),
+        readAbi(join(repo, 'abis/generations/pool-v2-s12e/PoolFactory.json')),
       );
       expect(await fetchAbi('accesscontrol')).toEqual(
-        readAbi(join(repo, 'abis/generations/pool-v2-s12/AccessControl.json')),
+        readAbi(join(repo, 'abis/generations/pool-v2-s12e/AccessControl.json')),
       );
       expect(await fetchAbi('pool')).toEqual(
-        readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json')),
+        readAbi(join(repo, 'abis/generations/pool-v2-s12e/Pool.json')),
       );
     } finally {
       globalThis.fetch = origFetch;
@@ -150,7 +151,7 @@ describe('fetchAbi serves the retired v1 generation on request', () => {
       const { fetchAbi, resetFetchAbiCacheForTest } = await import('../src/abis/fetch');
       resetFetchAbiCacheForTest();
       const v1 = readAbi(join(repo, 'abis/generations/pool-v1-s7/Pool.json'));
-      const v2 = readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json'));
+      const v2 = readAbi(join(repo, 'abis/generations/pool-v2-s12e/Pool.json'));
       expect(await fetchAbi('Pool', 143, 'pool-v1-s7')).toEqual(v1);
       expect(await fetchAbi('Pool', 143)).toEqual(v2);
       expect(abiHash(v1)).not.toBe(abiHash(v2));
@@ -172,6 +173,7 @@ function makeSandbox(): string {
   const r = join(sandbox, 'repo');
   cpSync(join(repo, 'scripts'), join(r, 'scripts'), { recursive: true });
   cpSync(join(repo, 'src', 'abis', 'hash.ts'), join(r, 'src', 'abis', 'hash.ts'));
+  cpSync(join(repo, 'src', 'abis', 'generation.ts'), join(r, 'src', 'abis', 'generation.ts'));
   cpSync(join(repo, 'src', 'eth', 'abi.ts'), join(r, 'src', 'eth', 'abi.ts'));
   cpSync(join(repo, 'src', 'eth', 'types.ts'), join(r, 'src', 'eth', 'types.ts'));
   cpSync(join(repo, 'abis.lock.json'), join(r, 'abis.lock.json'));
@@ -216,7 +218,7 @@ describe('fetch-abis refuses what it cannot pin', () => {
       port: 0,
       fetch: () =>
         new Response(JSON.stringify(hostile), {
-          headers: { 'content-type': 'application/json', 'x-btr-abi-generation': 'build-head' },
+          headers: { 'content-type': 'application/json', 'x-btr-abi-generation': ABI_GENERATION },
         }),
     });
     try {
@@ -262,12 +264,92 @@ describe('fetch-abis refuses what it cannot pin', () => {
 });
 
 // The revert decoder reads the root snapshot, chain 143 reads the generation file: one error set.
-test('pool-v2-s12 Pool carries the same errors as the root snapshot', () => {
+test('pool-v2-s12e Pool carries the same errors as the root snapshot', () => {
   const sig = (abi: unknown[]) =>
     (abi as { type: string; name: string; inputs: { type: string }[] }[])
       .filter((e) => e.type === 'error')
       .map((e) => `${e.name}(${e.inputs.map((i) => i.type).join(',')})`)
       .sort();
-  const s12 = readAbi(join(repo, 'abis/generations/pool-v2-s12/Pool.json'));
+  const s12 = readAbi(join(repo, 'abis/generations/pool-v2-s12e/Pool.json'));
   expect(sig(s12)).toEqual(sig(POOL_ABI));
+});
+
+// ── explicit generation (offline: every fetch is stubbed or served from a local port) ──────────
+
+describe('the SDK is pinned to one explicit ABI generation', () => {
+  const lockJson = JSON.parse(readFileSync(join(repo, 'abis.lock.json'), 'utf8'));
+  const body = JSON.stringify(POOL_ABI);
+
+  test('lock generation and Pool pin equal the constant and the bundled build-head Pool', () => {
+    expect(ABI_GENERATION).toBe('pool-v2-s12e');
+    expect(lockJson.chains['143'].generation).toBe(ABI_GENERATION);
+    expect(lockJson.chains['143'].pins.Pool).toBe(lockJson.bundled.pins.Pool);
+    expect(lockJson.chains['143'].pins.Pool).toBe(abiHash(POOL_ABI));
+  });
+
+  test('the postinstall request names the generation and rejects a mismatching header', async () => {
+    const seen: string[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seen.push(new URL(req.url).search);
+        return new Response(body, { headers: { 'x-btr-abi-generation': 'pool-v2-s12' } });
+      },
+    });
+    try {
+      const r = await runScript(makeSandbox(), { BTR_API_URL: `http://127.0.0.1:${server.port}` });
+      expect(r.code).not.toBe(0);
+      expect(r.out).toContain(`backend generation differs from ${ABI_GENERATION}`);
+      expect(seen[0]).toBe(`?chain_id=143&generation=${ABI_GENERATION}`);
+    } finally {
+      server.stop(true);
+    }
+  }, 30_000);
+
+  test('the postinstall script accepts a matching header and the pinned bytes', async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => new Response(body, { headers: { 'x-btr-abi-generation': ABI_GENERATION } }),
+    });
+    try {
+      const r = await runScript(makeSandbox(), {
+        BTR_API_URL: `http://127.0.0.1:${server.port}`,
+        BTR_ABI_ALLOW_STALE: '',
+      });
+      // Admin has no stub here, so only Pool's path is asserted.
+      expect(r.out).toContain('fetch-abis: Pool from backend');
+    } finally {
+      server.stop(true);
+    }
+  }, 30_000);
+
+  test('runtime: the URL carries the generation, 400 unknown_generation is a typed error', async () => {
+    const { fetchAbi, getAbiUrl, resetFetchAbiCacheForTest, AbiUnknownGenerationError } =
+      await import('../src/abis/fetch');
+    expect(getAbiUrl('Router', 143)).toContain(`generation=${ABI_GENERATION}`);
+    const orig = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = (async (u: string) => {
+      urls.push(String(u));
+      return Response.json({ error: 'unknown_generation' }, { status: 400 });
+    }) as unknown as typeof fetch;
+    try {
+      resetFetchAbiCacheForTest();
+      const err = await fetchAbi('Router', 143).catch((e) => e);
+      expect(err).toBeInstanceOf(AbiUnknownGenerationError);
+      expect(err).toMatchObject({
+        code: 'unknown_generation',
+        status: 400,
+        generation: ABI_GENERATION,
+      });
+      expect(urls[0]).toContain(`generation=${ABI_GENERATION}`);
+      // A 400 with another body stays a plain error.
+      globalThis.fetch = (async () =>
+        Response.json({ error: 'bad' }, { status: 400 })) as unknown as typeof fetch;
+      const plain = await fetchAbi('Router', 143).catch((e) => e);
+      expect(plain).not.toBeInstanceOf(AbiUnknownGenerationError);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
 });
