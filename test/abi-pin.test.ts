@@ -327,7 +327,7 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
     }
   }, 30_000);
 
-  test('runtime: the URL carries the generation, 400 unknown_generation is a typed error', async () => {
+  test('runtime: the URL carries the generation, a 400 is a typed error', async () => {
     const { fetchAbi, getAbiUrl, resetFetchAbiCacheForTest, AbiUnknownGenerationError } =
       await import('../src/abis/fetch');
     expect(getAbiUrl('Router', 56, 'g1')).toContain('chain_id=56&generation=g1');
@@ -343,9 +343,13 @@ describe('the SDK is pinned to one explicit ABI generation', () => {
       expect(err).toBeInstanceOf(AbiUnknownGenerationError);
       expect(err).toMatchObject({ code: 'unknown_generation', generation: 'g1' });
       expect(urls[0]).toContain('generation=g1');
-      // A 400 with another body stays a plain error.
+      // The gateway masks the body: any 400 is the typed error; another status stays plain.
       globalThis.fetch = (async () =>
-        Response.json({ error: 'bad' }, { status: 400 })) as unknown as typeof fetch;
+        Response.json({ error: 'bad request' }, { status: 400 })) as unknown as typeof fetch;
+      const masked = await fetchAbi('Router', 56, 'g1').catch((e) => e);
+      expect(masked).toBeInstanceOf(AbiUnknownGenerationError);
+      globalThis.fetch = (async () =>
+        Response.json({ error: 'not found' }, { status: 404 })) as unknown as typeof fetch;
       const plain = await fetchAbi('Router', 56, 'g1').catch((e) => e);
       expect(plain).not.toBeInstanceOf(AbiUnknownGenerationError);
     } finally {

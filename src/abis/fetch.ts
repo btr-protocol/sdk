@@ -33,9 +33,10 @@ const bundledV1: Record<string, Abi> = {
   PoolFactory: poolFactoryV1 as Abi,
   AccessControl: accessControlV1 as Abi,
 };
-/** HTTP 400 `{"error":"unknown_generation"}`: the back does not serve the requested generation
- * (unknown, malformed, retired, or not mapped to the chain). Distinguishable from a transport
- * failure so a caller can show a degraded state. */
+/** HTTP 400 on an ABI request: the back does not serve the requested generation (unknown,
+ * malformed, retired, or not mapped to the chain). Every request carries a generation and the
+ * gateway masks the error body (`{"error":"bad request"}`), so the status alone decides.
+ * Distinguishable from a transport failure so a caller can show a degraded state. */
 // Consumers check `err.code === 'unknown_generation'`.
 export class AbiUnknownGenerationError extends Error {
   readonly code = 'unknown_generation';
@@ -111,11 +112,7 @@ async function load(
   const res = await fetch(getAbiUrl(canonical, chainId, selected), {
     signal: AbortSignal.timeout(10_000),
   });
-  if (res.status === 400) {
-    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
-    if (body?.error === 'unknown_generation')
-      throw new AbiUnknownGenerationError(canonical, chainId, selected);
-  }
+  if (res.status === 400) throw new AbiUnknownGenerationError(canonical, chainId, selected);
   if (!res.ok) throw new Error(`BTR ABI ${res.status} ${canonical} on chain ${chainId}`);
   const generation = res.headers.get('x-btr-abi-generation');
   if (generation !== null && generation !== selected)
