@@ -131,26 +131,32 @@ type LiquidGate = { reason: string } | { recall: string } | null;
 
 /** `need` must clear the liquid book. The chain recalls invested funds through the hook before it
  *  reverts (`PoolHooksLib.sol:95-128`): when the leg is invested and TOTAL reserves clear `need`, the
- *  route stays feasible and names the leg in `recall`; the on-chain simulation is the binding check. */
-function liquidClear(leg: LiabLeg, need: number, reason: string): LiquidGate {
+ *  route stays feasible and names the leg in `recall`; the on-chain simulation is the binding check
+ *  (the 1e-12 tolerance in {@link geq} is safe only because of it). A liquid figure above total is a
+ *  data mismatch: clamped to `reserves`, it never makes a refused route feasible. */
+function liquidClear(leg: LiabLeg, need: number): LiquidGate {
   if (leg.liquidRes === undefined) return { reason: 'min-liquidity-unknown' };
-  if (geq(leg.liquidRes, need)) return null;
-  if (leg.liquidRes < leg.reserves && geq(leg.reserves, need)) return { recall: leg.symbol };
-  return { reason };
+  const liquid = Math.min(leg.liquidRes, leg.reserves);
+  if (geq(liquid, need)) return null;
+  return geq(leg.reserves, need) ? { recall: leg.symbol } : { reason: 'min-liquidity' };
 }
 
 /** `withdraw`/`withdrawTo` keep `R_liq − out ≥ minLiquidity` (`PoolLiquidityLib.sol:465-466`,
  *  `PoolHooksLib.liquidReserves` = reserves − invested). An unread floor or liquid book is unknown,
- *  never 0. */
+ *  never 0. A cross exit's out leg has `ctx.cWad = 0` (`:403`, set only on the same-asset arm `:502`),
+ *  so `_fence` skips its `x` term there and only this floor applies. */
 function liquidFloor(leg: LiabLeg, out: number): LiquidGate {
   if (leg.minLiquidity === undefined) return { reason: 'min-liquidity-unknown' };
-  return liquidClear(leg, out + leg.minLiquidity, 'min-liquidity');
+  return liquidClear(leg, out + leg.minLiquidity);
 }
 
-/** `_fence` (`PoolLiquidityLib.sol:566-577`) on the leg that burns `face` at the pool rate `c`: the
- *  liquid book must cover `x = R − (L − face)·c` (`:570-572`). */
+/** `_fence` (`PoolLiquidityLib.sol:566-577`) on the leg that burns `face` at rate `c`: the liquid book
+ *  must cover `x = R − (L − face)·c` (`:570-572`). Recall-type only: `x ≤ R` whenever `face ≤ L`
+ *  (checked upstream, `insufficient-liability`) and `c ≥ 0`, so total reserves always clear it. */
 function liquidFence(leg: LiabLeg, face: number, c: number): LiquidGate {
-  return liquidClear(leg, leg.reserves - (leg.liabilities - face) * c, 'liquidity-fence');
+  if (leg.liquidRes === undefined) return { reason: 'min-liquidity-unknown' };
+  const x = leg.reserves - (leg.liabilities - face) * c;
+  return geq(Math.min(leg.liquidRes, leg.reserves), x) ? null : { recall: leg.symbol };
 }
 
 /** Collects the gates of one route: the first hard refusal, else the legs needing a recall. */
@@ -158,7 +164,7 @@ function gateRecall(...gates: LiquidGate[]): { reason: string } | { recallLegs: 
   const recallLegs: string[] = [];
   for (const g of gates) {
     if (g && 'reason' in g) return g;
-    if (g) recallLegs.push(g.recall);
+    if (g && !recallLegs.includes(g.recall)) recallLegs.push(g.recall);
   }
   return { recallLegs };
 }
@@ -934,7 +940,12 @@ export async function rankRedeem(
     if (!Number.isFinite(actual))
       return { best: null, routes: [unfeasible(gated, solv ?? 'toll-pending')] };
     if (!(actual > 0)) return { best: null, routes: [unfeasible(gated, 'no-route')] };
-    const gate = gateRecall(liquidFloor(leg, actual));
+    // Fence at the pool rate: a degraded pool's book rate is `lastGoodC`, not in state: skipped.
+    const c = solv === null ? claimRate(holder.state) : null;
+    const gate = gateRecall(
+      liquidFloor(leg, actual),
+      c === null ? null : liquidFence(leg, face, c),
+    );
     if ('reason' in gate) return { best: null, routes: [unfeasible(gated, gate.reason)] };
     Object.assign(gated, recallFields(gate.recallLegs));
     gated.steps[0].amountOut = actual;

@@ -228,7 +228,7 @@ export interface PoolLeg {
   /** The pool's `storageVersion` (12 = v2) when known; decides what an absent coverage word means. */
   storageVersion?: number;
   minLiquidity?: number;
-  /** Reserves not invested in a hook (`liquidReserves`), human units like `res`. Absent = unread. */
+  /** Reserves not invested in a hook (`liquidReserves`), human token units like `res`. Absent = unread. */
   liquidRes?: number;
   confidence?: number;
   staleExcess?: number;
@@ -274,6 +274,7 @@ interface HubBook {
   kneeBits?: number;
   storageVersion?: number;
   minLiquidity?: number;
+  /** Reserves not invested in a hook (`liquidReserves`), human token units like `res`. */
   liquidRes?: number;
 }
 

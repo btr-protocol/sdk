@@ -42,7 +42,7 @@ export interface LiabLeg {
   storageVersion?: number;
   /** `Asset.minLiquidity`, face units like `reserves`. Absent = 0. */
   minLiquidity?: number;
-  /** Reserves − invested (`PoolHooksLib.liquidReserves`), face units. Absent = unread. */
+  /** Reserves − invested (`PoolHooksLib.liquidReserves`), human token units like `reserves`. Absent = unread. */
   liquidRes?: number;
 }
 

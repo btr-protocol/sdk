@@ -1046,6 +1046,36 @@ describe('exit gates on liquid reserves, not total', () => {
       expect([...(r.recallLegs ?? [])].sort()).toEqual(['AUDF', 'NZDF']);
     }
   });
+  test('a liquid figure above total is clamped: a refused route stays refused', async () => {
+    stub({ tolls: ALL });
+    const p = pool();
+    setLeg(p, 'AUDF', { minLiquidity: 999_999, liquidRes: 5_000_000 });
+    for (const id of IDS) {
+      const r = find(await route(p, 'NZDF', 'AUDF', 10_000, post), id);
+      expect(r.feasible).toBe(false);
+      expect(r.reason).toBe('min-liquidity');
+    }
+    expect((await same(p)).routes[0].reason).toBe('min-liquidity');
+  });
+  test('same-asset fence is recall-only: R=1e6 L=8e5 face=100, liquid under x', async () => {
+    const mkp = (liquidRes: number) => {
+      const p = pool({ audfRes: 1_000_000, audfLiab: 800_000 });
+      setLeg(p, 'AUDF', { liquidRes });
+      return p;
+    };
+    const ok = await same(mkp(1_000_000));
+    expect(ok.best?.feasible).toBe(true);
+    expect(ok.best?.recall).toBeUndefined();
+    // C = 4e6 / 3.8e6, x = 1e6 - 799_900 * C ~ 158_000; the payout (~100) clears the floor.
+    const r = await same(mkp(100_000));
+    expect(r.best?.feasible).toBe(true);
+    expect(r.best?.recallLegs).toEqual(['AUDF']);
+    // degraded pool: book rate unknown, the fence is skipped (the floor alone passes).
+    const d = mkp(100_000);
+    d.state.solvencyOk = false;
+    const dr = await same(d);
+    expect(dr.best?.recall).toBeUndefined();
+  });
   test('an unfeasible route never carries recall', async () => {
     stub({ tolls: ALL });
     const p = pool();
