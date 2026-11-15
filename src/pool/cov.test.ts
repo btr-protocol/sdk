@@ -38,3 +38,10 @@ describe('cov codec mirrors CovLib.sol / core cov.rs', () => {
     expect(decodeKneeBits(0)).toEqual({ kneeCovBps: 0, kappaKneeBps: 0 });
   });
 });
+
+describe('knee decode masks the kappa code to 6 bits', () => {
+  test('bits above the uint16 word do not leak into kappa', () => {
+    const w = (20 << 6) | 10;
+    expect(decodeKneeBits(w | (1 << 16))).toEqual(decodeKneeBits(w));
+  });
+});
