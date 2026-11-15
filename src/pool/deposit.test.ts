@@ -38,7 +38,11 @@ describe('depositMin plumbing', () => {
     );
     expect(floored[0].data.length).toBe(2 + 2 * (4 + 32 * 3));
     expect(() =>
-      buildDepositCalls(POOL, { ...t, minLpOut: 0n }, { recipient: USER, needsApproval: () => false }),
+      buildDepositCalls(
+        POOL,
+        { ...t, minLpOut: 0n },
+        { recipient: USER, needsApproval: () => false },
+      ),
     ).toThrow(/positive/);
   });
   test('pool.deposit sends depositMin with a floor and refuses none or zero', async () => {
