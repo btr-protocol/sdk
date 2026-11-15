@@ -56,6 +56,27 @@ describe('aggregatePairDepthAsync', () => {
     expect(book?.bids.length).toBe(1);
   });
 
+  test('gate fields carry through, plain and inverted', async () => {
+    const gated = { ...wire, swap_gated: true, open_path: false, reason: 'future_reason' };
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async () => ({ ok: true, json: async () => gated });
+    for (const invert of [false, true]) {
+      const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], { invert });
+      expect(book?.swap_gated).toBe(true);
+      expect(book?.open_path).toBe(false);
+      expect(book?.reason).toBe('future_reason');
+    }
+  });
+
+  test('older back: gate fields absent, reason null', async () => {
+    // @ts-expect-error stub fetch
+    globalThis.fetch = async () => ({ ok: true, json: async () => wire });
+    const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], {});
+    expect(book?.swap_gated).toBeUndefined();
+    expect(book?.open_path).toBeUndefined();
+    expect(book?.reason).toBeNull();
+  });
+
   test('same-token pair resolves to null without a round trip', async () => {
     let called = false;
     // @ts-expect-error stub fetch

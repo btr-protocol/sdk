@@ -12,7 +12,7 @@
  * `pct`% of the spread the response itself names.
  */
 
-import type { QuoteBaseWire } from '../amm/aimm.js';
+import type { GateFields, QuoteBaseWire } from '../amm/aimm.js';
 import { btrFetchRaw, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
 import { ChainError, type ChainErrorFields, parseChainError } from './errors.js';
@@ -59,15 +59,13 @@ interface ChainQuoteRequest {
   slippage: Slippage;
 }
 
-export interface QuoteFlags {
+/** Quote: `swap_gated` = either endpoint carries SWAP_GATED (`swap` needs the caller in
+ *  `Pool.swapGate`, v10+; `readSwapGateMember`); `open_path` = both endpoints admit a perm-less executor. */
+export interface QuoteFlags extends GateFields {
   in: number;
   out: number;
   swap_enabled: boolean;
   halted: boolean;
-  /** Either endpoint carries SWAP_GATED: `swap` needs the caller in `Pool.swapGate` (v10+; `readSwapGateMember`), AccessControl perms bit 10 on older pools. */
-  swap_gated?: boolean;
-  /** Both endpoints admit a perm-less executor (no halt, swaps on, not gated). */
-  open_path?: boolean;
 }
 
 export interface ChainQuoteResponse {
@@ -119,7 +117,9 @@ export interface ChainLegFlags {
   word: number;
 }
 
-interface ChainRouteResponse {
+/** Route: `swap_gated` = a leg of `best` is gated (callers outside `Pool.swapGate` revert NotAuthorized);
+ *  `open_path` = every leg admits a perm-less executor, false with no `best`. */
+interface ChainRouteResponse extends GateFields {
   chain_id: number;
   block: BlockRef;
   source: 'chain';
@@ -128,10 +128,6 @@ interface ChainRouteResponse {
   refused: Refused[];
   /** Every fetched (pool, token) word; empty on a head-surface answer. */
   flags?: ChainLegFlags[];
-  /** A leg of `best` is SWAP_GATED: callers outside `Pool.swapGate` (v10+; AC perms bit 10 before) revert NotAuthorized. */
-  swap_gated?: boolean;
-  /** Every leg of `best` admits a perm-less executor; false with no `best`. */
-  open_path?: boolean;
 }
 
 interface ChainClientOpts {

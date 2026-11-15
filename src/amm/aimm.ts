@@ -550,7 +550,7 @@ export interface QuoteRouteWire {
   amount_in: string;
   amount_out: string;
 }
-interface RouteResponseWire {
+interface RouteResponseWire extends GateFields {
   best_amount_out: string;
   best_is_split: boolean;
   best_parts: SplitPartWire[];
@@ -566,7 +566,7 @@ export interface DepthProfile {
   bids: [number, number][];
   asks: [number, number][];
 }
-export interface DepthBookWire {
+export interface DepthBookWire extends DepthGate {
   mark: number;
   mid: number;
   bid: number;
@@ -822,6 +822,21 @@ export interface PathRequestWire {
   claim?: { credit: boolean; face: string; c_wad: string; toll_wad?: string };
 }
 
+/** Gate fields the back serves on depth, quote and route answers. The one TS home: every wire type
+ *  extends this, never re-lists it. Absent from a back that predates them. */
+export interface GateFields {
+  /** Priced, but only an executor holding the swap allowlist permission fills it. */
+  swap_gated?: boolean;
+  /** A perm-less executor can fill the answer's path. */
+  open_path?: boolean;
+}
+
+/** `/v1/depth` gate fields. `reason` says why the book is empty (a 200, not an error); null on a
+ *  book with rungs. Open set (today: no_route, unread, halted, unpriced): never switch exhaustively. */
+export interface DepthGate extends GateFields {
+  reason?: string | null;
+}
+
 /** The quote fields every btr-quote surface serves, book mode (`QuoteResponse`, `/quote`) and
  *  chain mode (`chain_api.rs:QuotedAmount`, `/v1/chain/quote`) alike. The one TS home: each
  *  surface's wire type extends this, never re-lists it. 0x hex amounts, WAD prices. */
@@ -836,7 +851,7 @@ export interface QuoteBaseWire {
 }
 
 /** Book-mode `/quote` + `/quote-path` response (`back crates/quote/src/lib.rs:QuoteResponse`). */
-export interface QuoteResponseWire extends QuoteBaseWire {
+export interface QuoteResponseWire extends QuoteBaseWire, GateFields {
   gross_out: string;
   avg_price: string;
   /** Gross clamped at the coverage argmax. Current back no longer sends it (b9b9875 refuses a

@@ -9,6 +9,7 @@
 
 import {
   type DepthBookWire,
+  type DepthGate,
   type DepthLevel,
   type DepthRequestWire,
   type NamedPoolWire,
@@ -226,7 +227,7 @@ export interface AggregateDepthOpts {
   invert?: boolean;
 }
 
-export interface AggregatedDepthBook {
+export interface AggregatedDepthBook extends DepthGate {
   mark: number;
   mid: number;
   spreadBps: number;
@@ -306,6 +307,11 @@ export async function aggregatePairDepthAsync(
           return price == null ? [] : [{ price, size: r.size, cum: r.cum }];
         })
       : rs.map((r) => ({ price: r.price, size: r.size, cum: r.cum }));
+  const gate: DepthGate = {
+    swap_gated: wire.swap_gated,
+    open_path: wire.open_path,
+    reason: wire.reason ?? null,
+  };
   const bids = rows(wire.bids);
   const asks = rows(wire.asks);
   if (flip) {
@@ -328,6 +334,7 @@ export async function aggregatePairDepthAsync(
       ladder: null,
       poolCount: wire.poolCount ?? 1,
       routeCount: wire.routeCount,
+      ...gate,
     };
   }
   return {
@@ -346,6 +353,7 @@ export async function aggregatePairDepthAsync(
     ladder: null,
     poolCount: wire.poolCount ?? 1,
     routeCount: wire.routeCount,
+    ...gate,
   };
 }
 

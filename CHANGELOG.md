@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Depth gate fields: `aggregatePairDepthAsync` books now carry `swap_gated`, `open_path` and
+  `reason` (`string | null`, an open set: today `no_route`, `unread`, `halted`, `unpriced`) from
+  `/v1/depth`, inverted books included. One shared `GateFields` / `DepthGate` type in `amm/aimm`
+  is extended by the depth, quote, route and chain quote/route wire types.
+
 ### Changed
 
 - Pool `swap` / `deposit` / `withdraw` send with gas LIMIT = `eth_estimateGas` × 1.25, capped at
