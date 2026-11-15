@@ -33,6 +33,8 @@ export interface Refused {
   name: string;
   selector: string;
   args: string[];
+  /** Stable machine reason from the back; absent on older backs. */
+  code?: string;
 }
 
 export interface QuotedAmount extends QuoteBaseWire {
