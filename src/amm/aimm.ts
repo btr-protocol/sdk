@@ -324,24 +324,6 @@ export interface Quote {
   route: string[];
 }
 
-export interface DepthLevel {
-  price: number;
-  netPrice: number;
-  cumTok: number;
-  cumBase: number;
-}
-
-export interface DepthCurve {
-  mark: number;
-  mid: number;
-  spreadBps: number;
-  bids: DepthLevel[];
-  asks: DepthLevel[];
-  maxTokBid: number;
-  maxTokAsk: number;
-  unit: 'token' | 'base';
-}
-
 export function premiumBps(price: number, mark: number): number {
   return mark > 0 ? ((price - mark) / mark) * 1e4 : 0;
 }
@@ -411,30 +393,6 @@ export function buildLeg(
     storageVersion: feed?.storageVersion,
     confidence: feed?.confidence,
     staleExcess: feed?.staleExcess,
-  };
-}
-
-/** Pure reciprocal of a depth curve: no curve math, no quote. */
-export function invertDepthCurve(c: DepthCurve): DepthCurve {
-  const inv = (x: number) => (x > 0 ? 1 / x : 0);
-  const swap = (ls: DepthLevel[]): DepthLevel[] =>
-    ls.map((l) => ({
-      price: inv(l.price),
-      netPrice: inv(l.netPrice),
-      cumTok: l.cumBase,
-      cumBase: l.cumTok,
-    }));
-  const bids = swap(c.asks);
-  const asks = swap(c.bids);
-  return {
-    mark: inv(c.mark),
-    mid: inv(c.mid),
-    spreadBps: c.spreadBps,
-    bids,
-    asks,
-    maxTokBid: bids[bids.length - 1]?.cumTok ?? 0,
-    maxTokAsk: asks[asks.length - 1]?.cumTok ?? 0,
-    unit: c.unit,
   };
 }
 
@@ -556,10 +514,25 @@ interface RouteResponseWire extends GateFields {
   best_parts: SplitPartWire[];
   singles: QuoteRouteWire[];
 }
-interface DepthRowWire {
+/** `/v1/depth` row, in the REQUESTED pair (from, to): `price` = from per to, `size`/`cum` and
+ *  `cum_quote` in `from`, `cum_base` in `to`. */
+export interface DepthRowWire {
   price: number;
   size: number;
   cum: number;
+  cum_base?: number;
+  cum_quote?: number;
+  worst?: number;
+  /** The remainder past the last ordinary row (at most one per side, always last): `price` is its
+   *  outer edge, `size`/`cum*` cover everything left. Absent when false. */
+  tail?: boolean;
+}
+/** How one side of a `/v1/depth` book ends; `null` on an empty side. `price` is the outermost
+ *  priced price, `size` the `to`-token cumulative there. */
+export interface DepthEnd {
+  price: number;
+  size: number;
+  kind: 'reached_cap' | 'stopped_on_refusal';
 }
 /** `/depth` `profile`: `[offsetBp from mark, to-token mass per bp]` per side, each ascending in offset. */
 export interface DepthProfile {
@@ -571,11 +544,15 @@ export interface DepthBookWire extends DepthGate {
   mid: number;
   bid: number;
   ask: number;
-  bid_net: number;
-  ask_net: number;
+  /** Row width used (a value of `steps`); from a back that predates `steps` it is only a tick. */
   step: number;
+  /** Valid `step` request values for this mid, ascending (from per to). Absent on an old back,
+   *  which is also how a client tells the two apart. */
+  steps?: number[];
   bids: DepthRowWire[];
   asks: DepthRowWire[];
+  bid_end?: DepthEnd | null;
+  ask_end?: DepthEnd | null;
   /** Distinct pools the merged book draws on. */
   poolCount?: number;
   /** Itineraries merged into it: > `poolCount` whenever routes share a pool. */
@@ -587,6 +564,8 @@ export interface DepthRequestWire {
   pools: NamedPoolWire[];
   from: string;
   to: string;
+  /** Row width, price units of (from, to); the back snaps it to its `steps`. Omitted: its default. */
+  step?: number;
 }
 
 const DEFAULT_BASE = 'https://api.btr.markets/v1';

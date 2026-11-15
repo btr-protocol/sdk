@@ -734,7 +734,6 @@ export type {
 } from './route.js';
 export { poolHas, poolHolding } from './route.js';
 export type {
-  Row,
   AggRow,
   AggregateDepthOpts,
   AggregatedDepthBook,
@@ -742,9 +741,6 @@ export type {
 export {
   niceStep,
   stepLadder,
-  aggregate,
-  mergeAgg,
-  depthLevelsToRows,
   aggregateDepthCurvesAsync,
   aggregatePairDepthAsync,
 } from './depth.js';

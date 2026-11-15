@@ -1,13 +1,6 @@
-// bun test: order-book aggregation ladder (bucketing over backend-priced rows).
+// bun test: step ladder and the curves entry point (rows are the back's).
 import { afterEach, describe, expect, test } from 'bun:test';
-import {
-  type Row,
-  aggregate,
-  aggregateDepthCurvesAsync,
-  mergeAgg,
-  niceStep,
-  stepLadder,
-} from '../router/depth.js';
+import { aggregateDepthCurvesAsync, niceStep, stepLadder } from '../router/depth.js';
 import { buildLeg } from './aimm.js';
 import { STABLE_PROFILE, sigmaSeed } from './profiles';
 
@@ -32,74 +25,12 @@ describe('stepLadder', () => {
   });
 });
 
-describe('aggregate', () => {
-  const bids: Row[] = [
-    { price: 106, size: 0, cum: 0 },
-    { price: 100.8, size: 2, cum: 2 },
-    { price: 100.2, size: 1, cum: 3 },
-  ];
-
-  test('densifies sparse curve: smaller step → more rows, larger → fewer', () => {
-    const fine = aggregate(bids, 0.5, 'bid', 'base');
-    const mid = aggregate(bids, 2, 'bid', 'base');
-    const coarse = aggregate(bids, 5, 'bid', 'base');
-    expect(fine.length).toBeGreaterThan(mid.length);
-    expect(mid.length).toBeGreaterThanOrEqual(coarse.length);
-    expect(coarse.length).toBeGreaterThanOrEqual(1);
-    expect(fine[fine.length - 1].cum).toBeCloseTo(3, 9);
-    expect(coarse[coarse.length - 1].cum).toBeCloseTo(3, 9);
-  });
-
-  test('ask side densifies mid→far with monotone cum', () => {
-    const asks: Row[] = [
-      { price: 100, size: 0, cum: 0 },
-      { price: 110, size: 4, cum: 4 },
-      { price: 120, size: 6, cum: 10 },
-    ];
-    const out = aggregate(asks, 5, 'ask', 'base');
-    expect(out.length).toBeGreaterThan(2);
-    expect(out[0].price).toBeLessThan(out[out.length - 1].price);
-    expect(out[out.length - 1].cum).toBeCloseTo(10, 9);
-    for (let i = 1; i < out.length; i++) expect(out[i].cum).toBeGreaterThan(out[i - 1].cum);
-  });
-
-  test('quote denom scales token→quote by bucket price', () => {
-    const rows: Row[] = [
-      { price: 100, size: 0, cum: 0 },
-      { price: 105, size: 2, cum: 2 },
-    ];
-    const out = aggregate(rows, 5, 'ask', 'quote');
-    expect(out.length).toBeGreaterThanOrEqual(1);
-    expect(out[out.length - 1].cum).toBeGreaterThan(0);
-    expect(out[out.length - 1].cum).toBeGreaterThan(2 * 100);
-    expect(out[out.length - 1].cum).toBeLessThanOrEqual(2 * 105 + 1e-9);
-  });
-});
-
-describe('mergeAgg', () => {
-  test('sums same-price buckets across pools', () => {
-    const a = [
-      { price: 100, size: 1, cum: 1 },
-      { price: 99, size: 2, cum: 3 },
-    ];
-    const b = [
-      { price: 100, size: 3, cum: 3 },
-      { price: 98, size: 1, cum: 4 },
-    ];
-    const out = mergeAgg([a, b], 'bid');
-    expect(out.find((r) => r.price === 100)?.size).toBe(4);
-    expect(out[0].price).toBeGreaterThan(out[out.length - 1].price);
-  });
-});
-
 describe('aggregateDepthCurvesAsync (backend SSOT)', () => {
   const wire = {
     mark: 1,
     mid: 1.0001,
     bid: 0.9999,
     ask: 1.0003,
-    bid_net: 0.9998,
-    ask_net: 1.0004,
     step: 0.0001,
     bids: [{ price: 0.9998, size: 10, cum: 10 }],
     asks: [{ price: 1.0004, size: 12, cum: 12 }],

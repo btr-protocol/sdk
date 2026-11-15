@@ -12,14 +12,16 @@ export type {
   PoolLeg,
   PoolState,
   Quote,
-  DepthLevel,
-  DepthCurve,
   CurveWire,
   LegAddrs,
   NamedPoolWire,
   RouteRequestWire,
   QuoteRouteWire,
   DepthBookWire,
+  DepthRowWire,
+  DepthEnd,
+  GateFields,
+  DepthGate,
   DepthProfile,
   DepthRequestWire,
   WireMeta,
@@ -43,7 +45,6 @@ export {
   buildLeg,
   CovWordMissing,
   covWord,
-  invertDepthCurve,
   backendBase,
   quotePathAsync,
   routeAsync,
@@ -67,7 +68,6 @@ export type {
 } from '../router/route.js';
 export { poolHas, poolHolding } from '../router/route.js';
 export type {
-  Row,
   AggRow,
   AggregateDepthOpts,
   AggregatedDepthBook,
@@ -75,9 +75,6 @@ export type {
 export {
   niceStep,
   stepLadder,
-  aggregate,
-  mergeAgg,
-  depthLevelsToRows,
   aggregateDepthCurvesAsync,
   aggregatePairDepthAsync,
 } from '../router/depth.js';
