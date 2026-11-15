@@ -207,6 +207,10 @@ export interface ProtocolKpis extends YieldRates {
   feesUsd?: number | null;
   revenueUsd?: number | null;
   protocolSharePct?: number | null;
+  /** Unix ms: end of the last minute the swap rollups have drained and committed. Swap-derived
+   *  figures (`volumeUsd`, fees, `swapCount`) are complete up to it; `asOf` is only the build
+   *  time. Null until the indexer's first commit; absent from a back that predates it. */
+  swapsClosedThroughMs?: number | null;
   coverageAvg: number | null;
   utilization: number | null;
   deployedRatio: number | null;
@@ -240,8 +244,9 @@ export interface ProtocolMetricsSummary {
 export interface TimeseriesPoint {
   t: number;
   v: number | null;
-  /** `hook.yield.usd` only: a hooked leg in the bucket had a skipped or unmeasured interval, so
-   *  `v` understates (or is a gap). Never a 0. */
+  /** `hook.yield.usd`: a hooked leg in the bucket had a skipped or unmeasured interval, so
+   *  `v` understates (or is a gap). Never a 0. Swap-derived metrics (volume, fees, swap count,
+   *  spread): the bucket ends after the summary's `swapsClosedThroughMs`, so it is still open. */
   partial?: boolean;
 }
 
