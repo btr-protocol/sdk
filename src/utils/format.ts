@@ -291,47 +291,49 @@ export function formatAxisLabel(n: number | null | undefined): string {
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Percentage value. Legacy fixed-decimals wrapper, kept so existing call sites do not have to
- * care which formatter they hold: it delegates to the ONE magnitude-adaptive percent formatter
- * (`formatPercentSig`) at the app-wide law of three significant figures. The old behaviour (a
- * hardcoded decimal count that collapsed 0.004% to "0.00%", and a ≥200% detour into "2.8x")
- * is gone: a rate reads as a percent at every magnitude.
+ * THE rate formatter: every spread, premium, fee, slippage, impact, deviation, haircut and price
+ * move. Input in BASIS POINTS. Unit law, decided once: |x| below 1% (100 bps) reads in bps, from
+ * 1% up in percent. Spelled "bps" always (never "bp", never the subscript-zero form, which is for
+ * token prices only). Rounding: 1 decimal under 10 bps, whole bps from 10, three significant
+ * figures in percent. True zero is "0 bps"; anything smaller than 0.1 bps but not zero is
+ * "<0.1 bps" (a real value is never shown as a zero). Unread input is "-" (the unavailable glyph).
  */
-export function formatPercent(
-  n: number | null | undefined,
-  _decimals?: number,
-  signed = false,
-): string {
-  return formatPercentSig(n, 3, signed);
+export function formatBps(bps: number | null | undefined, signed = false): string {
+  if (bps == null || !Number.isFinite(bps)) return '-';
+  if (bps === 0) return '0 bps';
+  const abs = Math.abs(bps);
+  if (abs < 0.1) return '<0.1 bps';
+  const sign = bps < 0 ? '-' : signed ? '+' : '';
+  const r = abs < 10 ? Math.round(abs * 10) / 10 : Math.round(abs);
+  if (r >= 100) {
+    const pct = Math.max(abs, 100) / 100; // 99.6 bps rounds up to a whole 1%
+    return `${sign}${trimZeros(pct, Math.max(0, 2 - Math.floor(Math.log10(pct))))}%`;
+  }
+  return `${sign}${r.toFixed(abs < 10 && r < 10 ? 1 : 0)} bps`;
+}
+
+/** `formatBps` for a value held in PERCENT units (0.012 -> "1.2 bps", 2.4 -> "2.4%"). */
+export function formatRate(pct: number | null | undefined, signed = false): string {
+  return formatBps(pct == null ? pct : pct * 100, signed);
 }
 
 /**
- * THE shared percentage formatter: magnitude-adaptive, `sig` significant digits always (default
- * 3: the percent analogue of the 5-significant-digit convention amounts use), trailing zeros
- * trimmed, exactly zero as unsigned "0.00%". Small values keep precision (0.42%, 0.0412%) instead
- * of collapsing to a bare "0%"; below roughly 0.001% the leading-zero run folds into the exchange
- * subscript form (0.0000123% → "0.0₄123%"), same as prices. Input is already in percent units
- * (2.4 → "2.4%").
- *
- * `sig` caps DECIMALS, so above 10^sig every integer digit survives (2222 stays "2222%"). That is
- * right for a spread, where the integer part is the measurement; for a yield it is not, which is
- * what `formatYield` is for.
+ * Percent for QUANTITIES that are not spreads (coverage, haircut share, yields): input in percent
+ * units (2.4 -> "2.4%"), three significant figures, trailing zeros trimmed, exactly zero as
+ * "0.00%". Below 0.001% it reads "<0.001%": percent never takes the subscript-zero form.
  */
 export function formatPercentSig(n: number | null | undefined, sig = 3, signed = false): string {
   if (n == null || !Number.isFinite(n) || n === 0) return '0.00%';
   const abs = Math.abs(n);
+  if (abs < 0.001) return `${n < 0 ? '-' : ''}<0.001%`;
   const decimals = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
-  // Fold a leading-zero run of three or more into the subscript form (0.0000002% ->
-  // 0.0₆2%), exactly what formatPrice does for sub-1 prices: ten literal zeros are the
-  // unreadable part, not the digits after them.
-  const s = subscriptZeros(trimZeros(abs, decimals));
-  return `${n < 0 ? '-' : signed ? '+' : ''}${s}%`;
+  return `${n < 0 ? '-' : signed ? '+' : ''}${trimZeros(abs, decimals)}%`;
 }
 
 /**
  * The ONE yield formatter: APR, APY, fee APR, strategy APR, protocol APR. Input in PERCENT units
  * (17.456 → "17.5%"). Same law as every other percent on the page: `formatPercentSig` at three
- * significant figures, magnitude-adaptive: 281%, 14.8%, 1.58%, 0.42%, 0.0412%, 0.0₄123%; exactly
+ * significant figures, magnitude-adaptive: 281%, 14.8%, 1.58%, 0.42%, 0.0412%, <0.001%; exactly
  * zero renders as unsigned "0.00%". The old step down to two figures below 1% is gone: it was the
  * reason a small hook yield could print as a bare "0%".
  */

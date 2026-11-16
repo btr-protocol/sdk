@@ -1,9 +1,11 @@
 // bun test: numeric display formatting.
 import { describe, expect, test } from 'bun:test';
 import {
+  formatBps,
   formatNumber,
   formatPercentSig,
   formatPrice,
+  formatRate,
   formatUnits,
   formatYield,
   parseUnits,
@@ -41,14 +43,49 @@ describe('formatPercentSig keeps three significant figures at every magnitude', 
   });
 });
 
-// Small values are the reason the strip exists: they must keep their precision.
-test('sub-unit percents fold long leading-zero runs into the subscript form', () => {
-  expect(formatPercentSig(0.000000002)).toBe('0.0₈2%');
-  expect(formatPercentSig(-0.000000002)).toBe('-0.0₈2%');
-  expect(formatPercentSig(0.0001)).toBe('0.0₃1%');
-  expect(formatPercentSig(0.0000123)).toBe('0.0₄123%');
-  // Two zeros stay plain: the run is short enough to read.
+test('percent never takes the subscript-zero form', () => {
+  expect(formatPercentSig(0.000000002)).toBe('<0.001%');
+  expect(formatPercentSig(-0.0000123)).toBe('-<0.001%');
   expect(formatPercentSig(0.024)).toBe('0.024%');
+});
+
+// One unit law for rates: bps under 1%, percent from 1%; "bps" always; no subscript zeros.
+describe('formatBps / formatRate', () => {
+  test.each([
+    [0, 'bps0', '0 bps'],
+    [0.00001, 'bps', '<0.1 bps'],
+    [0.01, 'bps', '<0.1 bps'],
+    [0.096, 'bps', '<0.1 bps'],
+    [0.96, 'bps', '+1.0 bps'],
+    [0.1, 'bps', '+0.1 bps'],
+    [-0.96, 'bps', '-1.0 bps'],
+    [9.96, 'bps', '+10 bps'],
+    [50, 'bps', '+50 bps'],
+    [99.6, 'bps', '+1% '.trim()],
+    [100, 'bps', '+1%'],
+    [123, 'bps', '+1.23%'],
+    [-123, 'bps', '-1.23%'],
+    [1230, 'bps', '+12.3%'],
+  ])('formatBps(%p, signed) = %p', (bps, _l, want) => {
+    expect(formatBps(bps, true)).toBe(want);
+  });
+  test('rate input is percent units', () => {
+    expect(formatRate(0.0001)).toBe('<0.1 bps');
+    expect(formatRate(0.0096, true)).toBe('+1.0 bps');
+    expect(formatRate(0.5)).toBe('50 bps');
+    expect(formatRate(1)).toBe('1%');
+    expect(formatRate(12.3, true)).toBe('+12.3%');
+  });
+  test('unsigned and unread', () => {
+    expect(formatBps(5)).toBe('5.0 bps');
+    expect(formatBps(Number.NaN)).toBe('-');
+    expect(formatBps(null)).toBe('-');
+    expect(formatRate(undefined)).toBe('-');
+  });
+  test('no subscript zeros in any output', () => {
+    for (const v of [1e-12, 1e-6, 1e-3, 0.5, 5, 50, 500])
+      expect(formatBps(v, true)).not.toMatch(/[₀-₉]/);
+  });
 });
 
 test('sub-unit percents keep three significant figures', () => {
@@ -155,7 +192,7 @@ describe('formatYield rounds to significant figures', () => {
     [12, '12%'],
     [100, '100%'],
     [0.5, '0.5%'],
-    [0.00012, '0.0₃12%'], // ≥3 leading zeros fold, same as prices
+    [0.00012, '<0.001%'],
     [-4.55, '-4.55%'],
     [0, '0.00%'],
   ])('formatYield(%p) = %p', (input, want) => {
