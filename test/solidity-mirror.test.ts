@@ -22,7 +22,6 @@ import {
   DEPEG_STEP_BPS,
   KNEE_BIT,
   MAX_FAMILY,
-  SWAP_GATE_SLOTS,
   decodeClassRisk,
 } from '../src/pool/storage';
 
@@ -239,10 +238,5 @@ describe('solidity.generated.ts mirrors the declaring sources', () => {
         ),
       ),
     );
-  });
-
-  test('SWAP_GATE_SLOTS matches PoolConstantsLib.sol', () => {
-    const c = constants(src(join(DEX, 'src', 'libraries', 'PoolConstantsLib.sol')));
-    expect(c.get('SWAP_GATE_SLOTS')).toBe(SWAP_GATE_SLOTS);
   });
 });

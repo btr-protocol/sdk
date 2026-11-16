@@ -236,9 +236,7 @@ export {
   readClassHead,
   readCustody,
   recordSlot,
-  SWAP_GATE_SLOTS,
   readSwapGateMember,
-  swapGateAdmits,
 } from './storage.js';
 
 /**

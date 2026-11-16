@@ -4,7 +4,9 @@
  */
 import { describe, expect, spyOn, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import { POOL_ABI } from '../abis/Pool';
 import { buildCurve } from '../amm/aimm';
+import { encodeFn } from '../eth/abi';
 import { keccak256 } from '../eth/index';
 import type { Eip1193Provider } from '../eth/types';
 import {
@@ -44,8 +46,8 @@ import {
   readMarks,
   readOracleConfig,
   readSolvencyState,
+  readSwapGateMember,
   recordSlot,
-  swapGateAdmits,
   u8At,
   u16At,
   u32At,
@@ -1033,20 +1035,96 @@ describe('layout v10', () => {
   });
 });
 
-describe('swapGate membership (v10 Pool.swapGate, not AccessControl perms)', () => {
-  const A = `0x${'00'.repeat(19)}05` as `0x${string}`; // home index 5
-  const B = `0x${'00'.repeat(19)}45` as `0x${string}`; // 0x45 % 64 = 5: collides with A
-  const ZERO = `0x${'00'.repeat(20)}` as `0x${string}`;
-  const table = (m: Record<number, `0x${string}`>) => async (i: number) => m[i] ?? ZERO;
-  test('home hit, collision probe, miss at the first empty slot', async () => {
-    expect(await swapGateAdmits(table({ 5: A, 6: B }), A)).toBe(true);
-    expect(await swapGateAdmits(table({ 5: A, 6: B }), B)).toBe(true);
-    expect(await swapGateAdmits(table({ 5: A }), B)).toBe(false);
-    expect(await swapGateAdmits(table({}), A)).toBe(false);
+describe('swapGate membership (Pool.inSwapGate eth_call)', () => {
+  const POOLX = `0x${'ab'.repeat(20)}` as `0x${string}`;
+  const WHO = `0x${'00'.repeat(19)}05` as `0x${string}`;
+  const SEL = encodeFn({ abi: POOL_ABI, functionName: 'inSwapGate', args: [WHO] }).slice(0, 10);
+  const word = (b: boolean) => `0x${'00'.repeat(31)}0${b ? 1 : 0}`;
+  const prov = (f: () => unknown) =>
+    ({
+      request: async (a: { method: string; params?: unknown[] }) => {
+        expect(a.method).toBe('eth_call');
+        const tx = a.params?.[0] as { to: string; data: string };
+        expect(tx.to).toBe(POOLX);
+        expect(tx.data.startsWith(SEL)).toBe(true);
+        return f();
+      },
+    }) as never;
+  test('member, non-member', async () => {
+    expect(
+      await readSwapGateMember(
+        prov(() => word(true)),
+        POOLX,
+        WHO,
+      ),
+    ).toBe(true);
+    expect(
+      await readSwapGateMember(
+        prov(() => word(false)),
+        POOLX,
+        WHO,
+      ),
+    ).toBe(false);
   });
-  test('probe wraps past the last slot', async () => {
-    const C = `0x${'00'.repeat(19)}3f` as `0x${string}`; // 63
-    const D = `0x${'00'.repeat(19)}7f` as `0x${string}`; // 127 % 64 = 63
-    expect(await swapGateAdmits(table({ 63: C, 0: D }), D)).toBe(true);
+  test('pool without the function: revert or empty return is null (AC lane)', async () => {
+    const rv = Object.assign(new Error('execution reverted'), { code: 3 });
+    expect(
+      await readSwapGateMember(
+        prov(() => {
+          throw rv;
+        }),
+        POOLX,
+        WHO,
+      ),
+    ).toBeNull();
+    expect(
+      await readSwapGateMember(
+        prov(() => '0x'),
+        POOLX,
+        WHO,
+      ),
+    ).toBeNull();
+  });
+  test('revert with data is unread (rejects), not the AC lane', async () => {
+    for (const e of [
+      Object.assign(new Error('execution reverted: Paused'), { code: 3, data: '0x08c379a0aa' }),
+      Object.assign(new Error('execution reverted'), { data: '0xdeadbeef' }),
+      new Error('execution reverted: custom error 0x12345678'),
+      Object.assign(new Error('execution reverted: Paused'), { code: 3 }),
+    ]) {
+      await expect(
+        readSwapGateMember(
+          prov(() => {
+            throw e;
+          }),
+          POOLX,
+          WHO,
+        ),
+      ).rejects.toBe(e);
+    }
+  });
+  test('empty-data code-3 revert is null', async () => {
+    const e = Object.assign(new Error('execution reverted'), { code: 3, data: '0x' });
+    expect(
+      await readSwapGateMember(
+        prov(() => {
+          throw e;
+        }),
+        POOLX,
+        WHO,
+      ),
+    ).toBeNull();
+  });
+  test('transport failure is unread (rejects), never a verdict', async () => {
+    const down = new Error('fetch failed');
+    await expect(
+      readSwapGateMember(
+        prov(() => {
+          throw down;
+        }),
+        POOLX,
+        WHO,
+      ),
+    ).rejects.toBe(down);
   });
 });

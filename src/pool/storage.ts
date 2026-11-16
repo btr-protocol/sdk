@@ -16,8 +16,9 @@
  * Off-chain ONLY. On-chain consumers (Flash / hooks) keep thin view fns they need.
  */
 
+import { POOL_ABI } from '../abis/Pool.js';
 import { BPS, type QuarticCurve, type QuarticSeg } from '../amm/aimm.js';
-import { encodeAbiParameters } from '../eth/abi.js';
+import { decodeFn, encodeAbiParameters, encodeFn } from '../eth/abi.js';
 import { bytesToHex, hexToBytes, keccak256 } from '../eth/index.js';
 import { getCode } from '../eth/rpc.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
@@ -484,43 +485,36 @@ export async function readLegCov(
   return { ...decodeCovBits(u32At(slot2, f.covBits[1])), ...knee, flags };
 }
 
-/** `PoolConstantsLib.SWAP_GATE_SLOTS`: the open-addressed `swapGate` table (v10), pinned by
- *  test/solidity-mirror.test.ts. */
-export const SWAP_GATE_SLOTS = 64;
-
-/** `PoolIOLib.requireSwapGate`: probe up from `uint160(caller) % 64` until the caller or the
- *  first empty slot. `readSlot(i)` returns table entry `i` (zero address = empty). A full table
- *  without the caller is a miss, as on chain (the loop there is bounded by the empty slot the
- *  table always keeps). */
-export async function swapGateAdmits(
-  readSlot: (i: number) => Promise<Address>,
-  caller: Address,
-): Promise<boolean> {
-  const want = caller.toLowerCase();
-  const start = Number(BigInt(caller) % BigInt(SWAP_GATE_SLOTS));
-  for (let n = 0; n < SWAP_GATE_SLOTS; n++) {
-    const a = (await readSlot((start + n) % SWAP_GATE_SLOTS)).toLowerCase();
-    if (a === want) return true;
-    if (BigInt(a) === 0n) return false;
-  }
-  return false;
-}
-
-/** Is `caller` in the pool's swap allowlist? v10+ pools gate swaps on `Pool.swapGate`, never on
- *  `AccessControl.perms` (that lane is DEPOSIT_GATED's only); older pools keep the AC lane, so
- *  they return `null` and the caller reads `perms` as before. */
+/** Is `caller` the `msg.sender` a gated leg admits? `Pool.inSwapGate(caller)` is the contract's own
+ *  answer (`PoolIOLib.requireSwapGate`), so no table layout is mirrored here. A pool without the
+ *  function (older pools gate on the `AccessControl.perms` lane) reverts empty or returns nothing: `null`,
+ *  and the caller reads `perms` as before. Any other failure (transport, rate limit) rejects: unread. */
 export async function readSwapGateMember(
   provider: Eip1193Provider,
   pool: Address,
   caller: Address,
 ): Promise<boolean | null> {
-  const v = await readStorageVersion(provider, pool);
-  if (layoutOf(v) !== 10) return null;
-  const base = POOL_STORAGE_V10.swapGate;
-  return swapGateAdmits(
-    async (i) => addressAt(await getStorageAt(provider, pool, base + BigInt(i)), 0),
-    caller,
-  );
+  let r: Hex;
+  try {
+    r = (await provider.request({
+      method: 'eth_call',
+      params: [
+        {
+          to: pool,
+          data: encodeFn({ abi: POOL_ABI, functionName: 'inSwapGate', args: [caller] }),
+        },
+        'latest',
+      ],
+    })) as Hex;
+  } catch (e) {
+    // Only "function absent" (an empty-data revert) is null; a revert carrying data is a real error: unread.
+    const x = e as { code?: number; message?: string; data?: unknown };
+    const empty = x.data === undefined || x.data === null || x.data === '' || x.data === '0x';
+    if (empty && /^execution reverted\s*$/i.test(x.message ?? '')) return null;
+    throw e;
+  }
+  if (!r || r === '0x') return null;
+  return decodeFn<boolean>({ abi: POOL_ABI, functionName: 'inSwapGate', data: r });
 }
 
 /** `PoolStorage.lastGoodCWad9`: the uint40 in slot 0, 1e-9 WAD: the degraded same-asset exit cap
