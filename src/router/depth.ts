@@ -1,6 +1,6 @@
 // Depth over POST /v1/depth (btr-quote SSOT). The back prices, bucketizes and ladders every
-// book; this module sends the request and validates what comes back. `stepLadder` is the
-// client-side ladder kept only for the front's picker until it reads the server's `steps`.
+// book (its `steps` is the only step ladder); this module sends the request and validates what
+// comes back.
 
 import {
   type DepthBookWire,
@@ -15,7 +15,7 @@ import { type NamedPool, poolHas } from './route.js';
 
 /** One row of an aggregated book, as served, in the REQUESTED (displayed) pair (from, to). */
 export interface AggRow {
-  /** The row's price as the back serves it, from per to. */
+  /** The row's level as the back serves it, from per to: a conservative bound on the marginal. */
   price: number;
   /** from-valued increment of this row. */
   size: number;
@@ -25,8 +25,6 @@ export interface AggRow {
   cum_base?: number;
   /** from-token running total paid (asks) or received (bids). Absent from an old back. */
   cum_quote?: number;
-  /** Average marginal fill price over this row's slice, from per to (the front draws `worst ?? price`). */
-  worst?: number;
   /** Server remainder row (last on its side); only set when true. */
   tail?: boolean;
 }
@@ -34,38 +32,6 @@ export interface AggRow {
 interface DepthPool {
   tag: string;
   state: import('../amm/aimm.js').PoolState;
-}
-
-const SEQ = [1, 2, 5];
-
-export function niceStep(x: number, dir: 'up' | 'down' | 'near' = 'near'): number {
-  if (!(x > 0)) return 0;
-  const base = 10 ** Math.floor(Math.log10(x));
-  const m = x / base;
-  const rungs = [1, 2, 5, 10];
-  if (dir === 'up') return base * rungs.find((s) => s >= m - 1e-9)!;
-  if (dir === 'down') return base * [...rungs].reverse().find((s) => s <= m + 1e-9)!;
-  return (
-    base * rungs.reduce((best, s) => (Math.abs(s - m) < Math.abs(best - m) ? s : best), rungs[0])
-  );
-}
-
-const rungAt = (i: number) => SEQ[((i % 3) + 3) % 3] * 10 ** Math.floor(i / 3);
-
-export function stepLadder(
-  price: number,
-  opts?: { targetFrac?: number; count?: number },
-): { steps: number[]; defaultIdx: number } {
-  const targetFrac = opts?.targetFrac ?? 0.00015;
-  const count = Math.max(3, opts?.count ?? 9);
-  const defStep = niceStep(Math.max(price * targetFrac, Number.MIN_VALUE), 'near');
-  let di = 0;
-  while (rungAt(di) < defStep * (1 - 1e-9)) di++;
-  while (rungAt(di) > defStep * (1 + 1e-9)) di--;
-  const below = Math.min(6, count - 1);
-  const startIdx = di - below;
-  const steps = Array.from({ length: count }, (_, j) => rungAt(startIdx + j));
-  return { steps, defaultIdx: below };
 }
 
 export interface AggregateDepthOpts {
@@ -113,8 +79,6 @@ export interface AggregatedDepthBook extends DepthGate {
   ask_end?: DepthEnd | null;
   bidDisp: AggRow[];
   askDisp: AggRow[];
-  /** `{ steps, defaultIdx }` with `defaultIdx` the index of `step` in `steps`; null when absent. */
-  ladder: { steps: number[]; defaultIdx: number } | null;
   poolCount: number;
   /** Itineraries merged into the book. */
   routeCount?: number;
@@ -143,7 +107,6 @@ function readRows(rs: DepthRowWire[]): AggRow[] {
     const row: AggRow = { price: r.price, size: r.size, cum: r.cum };
     if (num(r.cum_base)) row.cum_base = r.cum_base;
     if (num(r.cum_quote)) row.cum_quote = r.cum_quote;
-    if (num(r.worst)) row.worst = r.worst;
     if (r.tail === true) row.tail = true;
     return [row];
   });
@@ -238,9 +201,7 @@ export async function aggregatePairDepthAsync(
     open_path: wire.open_path,
     reason: wire.reason ?? null,
   };
-  // `steps` is the new back's mark; an old back has none. A `step` off the ladder: no ladder.
   const steps = wire.steps;
-  const idx = steps ? steps.indexOf(wire.step) : -1;
   return {
     mark: wire.mark,
     mid: wire.mid,
@@ -257,7 +218,6 @@ export async function aggregatePairDepthAsync(
     ask_end: wire.ask_end,
     bidDisp: [],
     askDisp: [],
-    ladder: steps && idx >= 0 ? { steps, defaultIdx: idx } : null,
     poolCount: wire.poolCount ?? 1,
     routeCount: wire.routeCount,
     ...gate,

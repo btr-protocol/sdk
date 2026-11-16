@@ -144,7 +144,6 @@ describe('aggregatePairDepthAsync', () => {
           cum: 10,
           cum_base: 10,
           cum_quote: 9.99,
-          worst: px - 0.0002,
         },
         { price: px - 0.01, size: 5, cum: 15, cum_base: 5, cum_quote: 4.9, tail: true },
       ],
@@ -170,17 +169,15 @@ describe('aggregatePairDepthAsync', () => {
       expect.objectContaining({ from: 'USDT', to: 'USDC' }),
     ]);
     expect(fwd?.mid).toBe(1.0001);
-    expect(fwd?.ladder).toEqual({ steps: [0.0001, 0.0002], defaultIdx: 1 });
+    expect(fwd?.steps).toEqual([0.0001, 0.0002]);
     expect(inv?.mid).toBe(0.9999);
     expect(inv?.steps).toEqual([0.5, 1]);
-    expect(inv?.ladder).toEqual({ steps: [0.5, 1], defaultIdx: 1 });
     expect(inv?.bids[0]).toEqual({
       price: 0.9998,
       size: 10,
       cum: 10,
       cum_base: 10,
       cum_quote: 9.99,
-      worst: 0.9997,
     });
     expect(inv?.bids[1]).toMatchObject({ tail: true, cum_base: 5, cum_quote: 4.9 });
     expect(inv?.bids[0].tail).toBeUndefined();
@@ -193,7 +190,7 @@ describe('aggregatePairDepthAsync', () => {
       ...wire,
       step: 0.0003,
       steps: [0.0001, 0.0002],
-      bids: [{ price: 0.9, size: 1, cum: 1, tail: 'false', worst: 'x', cum_base: Number.NaN }],
+      bids: [{ price: 0.9, size: 1, cum: 1, tail: 'false', cum_base: Number.NaN }],
       bid_end: { price: 0.9, size: 1, kind: 'weird' },
       ask_end: { price: 1.1, size: 1 },
     };
@@ -203,31 +200,27 @@ describe('aggregatePairDepthAsync', () => {
     expect(book?.bids[0]).toEqual({ price: 0.9, size: 1, cum: 1 });
     expect(book?.bid_end).toBeUndefined();
     expect(book?.ask_end).toBeUndefined();
-    expect(book?.ladder).toBeNull(); // step off the ladder: no index 0 guess
     expect(book?.steps).toEqual([0.0001, 0.0002]);
     for (const steps of ['x', [0.1, 'a'], [0, 1], { 0: 1 }]) {
       // @ts-expect-error stub fetch
       globalThis.fetch = async () => ({ ok: true, json: async () => ({ ...bad, steps }) });
       const b = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
       expect(b?.steps).toBeUndefined();
-      expect(b?.ladder).toBeNull();
     }
   });
 
-  test('empty steps: kept as the marker, no ladder', async () => {
+  test('empty steps: kept as the marker', async () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => ({ ok: true, json: async () => ({ ...wire, steps: [] }) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
     expect(book?.steps).toEqual([]);
-    expect(book?.ladder).toBeNull();
   });
 
-  test('old back: no steps, no ends, ladder null', async () => {
+  test('old back: no steps, no ends', async () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => ({ ok: true, json: async () => wire });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], {});
     expect(book?.steps).toBeUndefined();
-    expect(book?.ladder).toBeNull();
     expect(book?.bid_end).toBeUndefined();
     expect(book?.asks[0].tail).toBeUndefined();
   });

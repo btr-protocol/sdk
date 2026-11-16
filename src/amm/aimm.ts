@@ -522,7 +522,6 @@ export interface DepthRowWire {
   cum: number;
   cum_base?: number;
   cum_quote?: number;
-  worst?: number;
   /** The remainder past the last ordinary row (at most one per side, always last): `price` is its
    *  outer edge, `size`/`cum*` cover everything left. Absent when false. */
   tail?: boolean;

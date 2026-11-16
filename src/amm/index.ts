@@ -73,8 +73,6 @@ export type {
   AggregatedDepthBook,
 } from '../router/depth.js';
 export {
-  niceStep,
-  stepLadder,
   aggregateDepthCurvesAsync,
   aggregatePairDepthAsync,
 } from '../router/depth.js';
