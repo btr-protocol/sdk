@@ -1,5 +1,11 @@
 #!/usr/bin/env bun
-import { type RegistryOpts, fetchAbi, fetchRegistry, fetchRoster } from '../venues/live.js';
+import {
+  type RegistryOpts,
+  fetchAbi,
+  fetchAbis,
+  fetchRegistry,
+  rosterFor,
+} from '../venues/live.js';
 // `btr` CLI (bun only): read-only views of the live registry. No signing, no tx sending.
 // Data goes to `out`; usage, warnings and errors go to stderr; exit 0 ok, 1 failure, 2 usage.
 import { defaultChainId } from '../venues/registry.js';
@@ -8,6 +14,7 @@ const USAGE = `btr registry [--chain <id>] [--json]
 btr pools [--chain <id>] [--json]
 btr roster [--chain <id>]
 btr abi <Name>
+btr abis [--chain <id>]
 flags: --trust-live (accept live that differs from baked), --fallback-baked (use baked if live is down)`;
 
 const err = (s: string) => console.error(s);
@@ -36,11 +43,15 @@ export async function run(
         err(USAGE);
         return 2;
       }
-      out(JSON.stringify(await fetchAbi(rest[0], opts)));
+      out(JSON.stringify(await fetchAbi(rest[0], opts, chain)));
+      return 0;
+    }
+    if (cmd === 'abis') {
+      out(JSON.stringify(await fetchAbis(chain ?? defaultChainId(), opts), null, 2));
       return 0;
     }
     if (cmd === 'roster') {
-      out(JSON.stringify(await fetchRoster(chain ?? defaultChainId(), opts), null, 2));
+      out(JSON.stringify(await rosterFor(chain ?? defaultChainId(), opts), null, 2));
       return 0;
     }
     if (cmd !== 'registry' && cmd !== 'pools') {
@@ -49,6 +60,7 @@ export async function run(
     }
     const r = await fetchRegistry(chain, opts);
     for (const w of r.warnings) err(`warning: ${w}`);
+    if (r.degraded) err('warning: registry reports degraded (roster/abis may be missing)');
     if (flag('json')) out(JSON.stringify(cmd === 'pools' ? r.pools : r, null, 2));
     else if (cmd === 'pools')
       for (const p of r.pools) out(`${p.tag}\t${p.address}\t${p.symbols.join(',')}`);

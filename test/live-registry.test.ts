@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 import { run } from '../src/cli/btr.js';
 import { handle, handleLine } from '../src/cli/mcp.js';
 import { fetchRegistry } from '../src/venues/live.js';
-import fixture from './fixtures/assets-pools-143.json';
+import abisIndex from './fixtures/abis-143.json';
+import fixture from './fixtures/registry-143.json';
 
 const mock = (body: unknown, status = 200) =>
   (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -31,7 +32,7 @@ test('allowlisted contract missing live throws; non-allowlisted live drift ignor
   const j = structuredClone(fixture) as typeof fixture & { contracts: Record<string, string> };
   j.contracts.extra = `0x${'2'.padStart(40, '0')}`;
   expect((await fetchRegistry(143, { fetch: mock(j) })).warnings).toEqual([]);
-  delete (j.contracts as Record<string, string>).flash;
+  Reflect.deleteProperty(j.contracts, 'flash');
   await expect(fetchRegistry(143, { fetch: mock(j) })).rejects.toThrow('contracts.flash');
 });
 
@@ -76,6 +77,64 @@ test('cli: exit codes and roster', async () => {
   expect(await run(['pools', '--chain', '-5'], out, real)).toBe(2);
   expect(await run(['registry', '--chain', '143'], out, tampered())).toBe(1);
   expect(await run(['registry', '--chain', '143'], out, { fetch: mock({}, 500) })).toBe(1);
-  expect(await run(['roster', '--chain', '143'], out, { fetch: mock({ safes: [] }) })).toBe(0);
+  lines.length = 0;
+  expect(await run(['roster', '--chain', '143'], out, real)).toBe(0);
+  expect(lines.join()).toContain(fixture.roster.safes[0]!.address);
+  lines.length = 0;
+  expect(await run(['abis', '--chain', '143'], out, { fetch: mock(abisIndex) })).toBe(0);
+  expect(lines.join()).toContain('Pool');
   expect(await run(['bogus'], out)).toBe(2);
+});
+
+test('only status=live pools are compared; others exposed', async () => {
+  const r = await fetchRegistry(143, real);
+  expect(r.pools.every((p) => p.status === 'live')).toBe(true);
+  expect(r.otherPools.map((p) => p.status)).toEqual(['superseded']);
+  const j = structuredClone(fixture);
+  j.pools[1]!.address = `0x${'3'.padStart(40, '0')}`; // superseded drift: ignored
+  expect((await fetchRegistry(143, { fetch: mock(j) })).warnings).toEqual([]);
+  j.pools[0]!.address = `0x${'4'.padStart(40, '0')}`; // live drift: throws
+  await expect(fetchRegistry(143, { fetch: mock(j) })).rejects.toThrow('pools.btr-core');
+});
+
+test('null contract = missing: allowlisted throws, other ignored', async () => {
+  const j = structuredClone(fixture) as unknown as { contracts: Record<string, string | null> };
+  j.contracts.adminImpl = null;
+  expect((await fetchRegistry(143, { fetch: mock(j) })).warnings).toEqual([]);
+  j.contracts.router = null;
+  await expect(fetchRegistry(143, { fetch: mock(j) })).rejects.toThrow('contracts.router');
+});
+
+test('degraded with null roster/abis does not throw', async () => {
+  const j = { ...structuredClone(fixture), degraded: true, roster: null, abis: null };
+  const r = await fetchRegistry(143, { fetch: mock(j) });
+  expect(r.degraded).toBe(true);
+  expect(r.roster).toBeNull();
+  expect(r.abis).toBeNull();
+  // get_roster falls back to /v1/roster when nothing is embedded
+  const f = (async (u: string) =>
+    new Response(
+      JSON.stringify(String(u).includes('/v1/roster') ? { safes: ['x'] } : j),
+    )) as unknown as typeof fetch;
+  const res: any = await handle(
+    { id: 1, method: 'tools/call', params: { name: 'get_roster', arguments: { chainId: 143 } } },
+    { fetch: f },
+  );
+  expect(JSON.parse(res.result.content[0].text)).toEqual({ safes: ['x'] });
+});
+
+test('mcp list_abis and requests hit /v1/registry', async () => {
+  const urls: string[] = [];
+  const f = (async (u: string) => {
+    urls.push(String(u));
+    return new Response(JSON.stringify(String(u).includes('/v1/abis') ? abisIndex : fixture));
+  }) as unknown as typeof fetch;
+  const res: any = await handle(
+    { id: 1, method: 'tools/call', params: { name: 'list_abis', arguments: { chainId: 143 } } },
+    { fetch: f },
+  );
+  expect(JSON.parse(res.result.content[0].text).names).toContain('Pool');
+  await fetchRegistry(143, { fetch: f });
+  expect(urls[0]).toEndWith('/v1/abis?chainId=143');
+  expect(urls[1]).toEndWith('/v1/registry?chainId=143');
 });

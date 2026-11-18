@@ -6,13 +6,16 @@ import { type Address, isAddress } from '../eth/types.js';
 import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { chainVenue, defaultChainId, eqAddr } from './registry.js';
 
-/** One constant: switch to '/v1/registry' when the API ships it. */
-export const REGISTRY_PATH = '/v1/assets/pools';
+/** One constant: the registry endpoint (`?chainId=<id>` is appended). */
+export const REGISTRY_PATH = '/v1/registry';
 
 export interface LivePool {
   address: Address;
   tag: string;
   symbols: string[];
+  /** `live` | `superseded` | ... as served; absent on old payloads (treated as live). */
+  status?: string;
+  generation?: string;
 }
 
 export interface LiveRegistry {
@@ -20,7 +23,16 @@ export interface LiveRegistry {
   name: string;
   contracts: Record<string, Address>;
   tokens: Record<string, Address>;
+  /** status=live pools: the only ones compared against the baked copy. */
   pools: LivePool[];
+  /** Pools the API serves with any other status (superseded generations), not compared. */
+  otherPools: LivePool[];
+  /** The API says part of the payload is degraded (roster/abis may be null). Not an error. */
+  degraded: boolean;
+  /** Embedded roster, null when degraded. */
+  roster: unknown | null;
+  /** Embedded ABI index (`{generation,index,item,names}`), null when degraded. */
+  abis: unknown | null;
   /** `live` = API answered; `baked` = fetch failed, generated file used. */
   source: 'live' | 'baked';
   warnings: string[];
@@ -48,6 +60,7 @@ function addrMap(label: string, m: unknown): Record<string, Address> {
   if (!m || typeof m !== 'object') throw new Error(`${label}: not an object`);
   const out: Record<string, Address> = {};
   for (const [k, v] of Object.entries(m)) {
+    if (v === null) continue; // null = not served: treated as missing
     if (typeof v !== 'string' || !isAddress(v)) throw new Error(`${label}.${k}: bad address`);
     out[k] = v;
   }
@@ -59,12 +72,23 @@ function addrMap(label: string, m: unknown): Record<string, Address> {
 export function parseLive(j: any): Omit<LiveRegistry, 'source' | 'warnings' | 'info'> {
   if (!j || typeof j.chainId !== 'number') throw new Error('registry: no chainId');
   // biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
-  const pools: LivePool[] = (j.pools ?? []).map((p: any) => {
+  const all: LivePool[] = (j.pools ?? []).map((p: any) => {
     if (typeof p?.address !== 'string' || !isAddress(p.address))
       throw new Error(`pool ${p?.tag}: bad address`);
-    return { address: p.address, tag: String(p.tag), symbols: p.symbols ?? [] };
+    return {
+      address: p.address,
+      tag: String(p.tag),
+      symbols: p.symbols ?? [],
+      status: p.status,
+      generation: p.generation,
+    };
   });
+  const pools = all.filter((p) => (p.status ?? 'live') === 'live');
   return {
+    otherPools: all.filter((p) => !pools.includes(p)),
+    degraded: j.degraded === true || j.roster?.degraded === true,
+    roster: j.roster ?? null,
+    abis: j.abis ?? null,
     chainId: j.chainId,
     name: String(j.name ?? ''),
     contracts: addrMap('contracts', j.contracts),
@@ -81,6 +105,10 @@ function bakedRegistry(chainId: number): LiveRegistry {
     contracts: v.contracts,
     tokens: v.tokens,
     pools: v.pools,
+    otherPools: [],
+    degraded: false,
+    roster: null,
+    abis: null,
     source: 'baked',
     warnings: [],
     info: [],
@@ -176,7 +204,17 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
 export const fetchRoster = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
   getJson(`/v1/roster?chainId=${chainId}`, o);
 
-export const fetchAbi = (name: string, o: LiveOpts = {}): Promise<unknown> => {
+/** Roster for `chainId`: the one embedded in the registry when present, else `/v1/roster`. */
+export async function rosterFor(chainId: number, o: RegistryOpts = {}): Promise<unknown> {
+  const r = await fetchRegistry(chainId, o);
+  return r.roster ?? fetchRoster(chainId, o);
+}
+
+/** ABI index for a chain: `{chainId, generation, names, source, storageVersion}`. */
+export const fetchAbis = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
+  getJson(`/v1/abis?chainId=${chainId}`, o);
+
+export const fetchAbi = (name: string, o: LiveOpts = {}, chainId?: number): Promise<unknown> => {
   if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`bad ABI name: ${name}`);
-  return getJson(`/v1/abis/${name}`, o);
+  return getJson(`/v1/abis/${name}${chainId ? `?chainId=${chainId}` : ''}`, o);
 };

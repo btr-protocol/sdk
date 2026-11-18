@@ -1,7 +1,13 @@
 #!/usr/bin/env bun
 // Read-only MCP server over stdio (newline-delimited JSON-RPC 2.0), bun only.
 // No signing, no tx sending.
-import { type RegistryOpts, fetchAbi, fetchRegistry, fetchRoster } from '../venues/live.js';
+import {
+  type RegistryOpts,
+  fetchAbi,
+  fetchAbis,
+  fetchRegistry,
+  rosterFor,
+} from '../venues/live.js';
 import { defaultChainId } from '../venues/registry.js';
 
 const PROTOCOL = '2024-11-05';
@@ -25,6 +31,11 @@ export const TOOLS = [
     inputSchema: { type: 'object', properties: chainProp },
   },
   {
+    name: 'list_abis',
+    description: 'Index of ABI names served for a chain',
+    inputSchema: { type: 'object', properties: chainProp },
+  },
+  {
     name: 'get_roster',
     description: 'Keeper/signer roster for a chain',
     inputSchema: { type: 'object', properties: chainProp },
@@ -42,12 +53,21 @@ function chainArg(a: Rec | undefined): number | undefined {
 }
 
 async function call(name: unknown, a: Rec | undefined, o: RegistryOpts): Promise<unknown> {
-  if (name === 'get_abi') return fetchAbi(String(a?.name), o);
   const chain = chainArg(a);
-  if (name === 'get_roster') return fetchRoster(chain ?? defaultChainId(), o);
+  if (name === 'get_abi') return fetchAbi(String(a?.name), o, chain);
+  if (name === 'list_abis') return fetchAbis(chain ?? defaultChainId(), o);
+  if (name === 'get_roster') return rosterFor(chain ?? defaultChainId(), o);
   if (name === 'get_registry' || name === 'list_pools') {
     const r = await fetchRegistry(chain, o);
-    return name === 'list_pools' ? { pools: r.pools, source: r.source, warnings: r.warnings } : r;
+    return name === 'list_pools'
+      ? {
+          pools: r.pools,
+          otherPools: r.otherPools,
+          degraded: r.degraded,
+          source: r.source,
+          warnings: r.warnings,
+        }
+      : r;
   }
   throw new Error(`unknown tool ${String(name)}`);
 }

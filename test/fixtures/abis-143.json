@@ -1,0 +1,19 @@
+{
+ "chainId": 143,
+ "generation": "pool-v2-s12",
+ "names": [
+  "AccessControl",
+  "Admin",
+  "CoopArb",
+  "Flash",
+  "IOracle",
+  "LPToken",
+  "MarkStore",
+  "Pool",
+  "PoolFactory",
+  "PoolLens",
+  "Router"
+ ],
+ "source": "99e733c5009fc2cfee31985d7d4274dc655b84ff",
+ "storageVersion": 12
+}

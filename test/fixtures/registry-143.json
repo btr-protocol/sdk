@@ -1,0 +1,564 @@
+{
+ "abis": {
+  "generation": "pool-v2-s12",
+  "index": "/v1/abis?chainId=143",
+  "item": "/v1/abis/{name}?chainId=143",
+  "names": [
+   "AccessControl",
+   "Admin",
+   "CoopArb",
+   "Flash",
+   "IOracle",
+   "LPToken",
+   "MarkStore",
+   "Pool",
+   "PoolFactory",
+   "PoolLens",
+   "Router"
+  ]
+ },
+ "chainId": 143,
+ "contracts": {
+  "accessControl": "0xbbbbbbb10CD446E774fAFE513Bb2B7669Fe823D5",
+  "admin": "0xbbbbbbb11d97d894264e1928144c2433D8734cea",
+  "coopArb": "0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF",
+  "flash": "0xbbbbbbb16959356457A6F357525Cfea95d463520",
+  "markStoreP8": "0x1B3C22d2Bdc4CB5dCFBcDC12485B8914a70b2027",
+  "poolFactory": "0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0",
+  "poolLens": "0x4eC4E80442C8cB0333ce3E58eC68A96e70f24867",
+  "router": "0xbbbbbbb17647a22D61E49d62a95445B1284b1296"
+ },
+ "degraded": false,
+ "docs": {
+  "apiReference": "https://btr.markets/docs/5-2-1-api-sdk-reference",
+  "assetRegistry": "https://btr.markets/docs/2-2-asset-registry",
+  "contractAddresses": "https://btr.markets/docs/2-1-contract-addresses",
+  "index": "https://btr.markets/docs",
+  "llms": "https://btr.markets/llms.txt",
+  "openapi": "https://btr.markets/openapi.json",
+  "poolComposition": "https://btr.markets/docs/2-3-pool-composition"
+ },
+ "libraries": {
+  "adminParams": "0x875e6717CFF77333a97706B08972Aa2C5fEAa830",
+  "cov": "0x4c8583B9FD9fF17c3BdBF231d16e5A1B7DEeC567",
+  "nuQuartic": "0x8f10c8E8C28BE9A092cE967962348728cD80F558",
+  "pendle": "0x1fA26e3f38c387C4C6dFbAac6Db00Ea1d378adeD",
+  "poolConfig": "0x81e0fEfb8261ba482C7b10b2d65Fa52Ae3B14182",
+  "poolLiquidity": "0xaA58f0E0921C6D5d94EAA09a52BFCDc5c6BA9898",
+  "pricing": "0x8a87e145C264B7906a7a0769e7e7124d399Ce087",
+  "yieldHook": "0x43e26dAb3902e39D12E5bc022a209c1ec787C1d5",
+  "yieldHookTraits": "0x8fa2b94eEfA2A2565bc38bA57a6c8daf2B151c1a"
+ },
+ "name": "monad",
+ "pools": [
+  {
+   "address": "0xbbbbbbbd7060b1CED79c381eAD40d73FcB9Ae0C6",
+   "generation": "pool-v2-s12",
+   "hooks": {
+    "AUSD": "0xbbbbbbbf9E5FCCEbe6dB57D0eF25b04225Aca99A",
+    "GHO": "0xbbbbbbbFA7fd15f6179a0c88b4fb7aE7Ba29f017",
+    "MUSD": "0xbbbbbbbF80dD41eAdcCFBaC4BB42a20786c19eBF",
+    "SYRUPUSDC": "0xbbbbbbb2860E994af6CA63CE2C2bac78D6E485AA",
+    "USDAT": "0xbbbbbbb347517F2476c24852bED79fc805726c76",
+    "USDC": "0xbbbbbbbf7a1D4564f863c71DD7547a3c05Cc9ca4",
+    "USDE": "0xbbbbbbb1E21B49Ff64B3D8444c1eD7C3eCe658de",
+    "USDT0": "0xbbbbbbbfb642BC167e3a959763CE54dB27ef60e3",
+    "WETH": "0xbbbbbbb1a709EA84D0Dd0C0e850068B7b42437Db"
+   },
+   "key": "core",
+   "receipts": [
+    {
+     "address": "0x5aA70C365D0f343727f3b2185aC3dB464c598C79",
+     "decimals": null,
+     "name": "BTR Core Pool AUSD",
+     "pool": "btr-core",
+     "symbol": "BC-AUSD",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a"
+    },
+    {
+     "address": "0xDB8B343BB0C89ccf34862D0F33351D60fCA9b19D",
+     "decimals": null,
+     "name": "BTR Core Pool cbBTC",
+     "pool": "btr-core",
+     "symbol": "BC-cbBTC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b"
+    },
+    {
+     "address": "0x453390Da6CE21fE8934C39d7e5F4e62A79403D8C",
+     "decimals": null,
+     "name": "BTR Core Pool GHO",
+     "pool": "btr-core",
+     "symbol": "BC-GHO",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xfc421aD3C883Bf9E7C4f42dE845C4e4405799e73"
+    },
+    {
+     "address": "0x431daccd82d9b508F9CAa9ab999A91ca24fDC3F6",
+     "decimals": null,
+     "name": "BTR Core Pool mUSD",
+     "pool": "btr-core",
+     "symbol": "BC-mUSD",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xacA92E438df0B2401fF60dA7E4337B687a2435DA"
+    },
+    {
+     "address": "0x6077071F1EE126801DAbeA3FA84f78553594d7A9",
+     "decimals": null,
+     "name": "BTR Core Pool syrUSDC",
+     "pool": "btr-core",
+     "symbol": "BC-syrUSDC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xaB6e5a0C3799d020c790D34F7B2C02639e238AF7"
+    },
+    {
+     "address": "0xC2bDb5746F7AC687bD07F814CdAa3De4AACcb354",
+     "decimals": null,
+     "name": "BTR Core Pool USDat",
+     "pool": "btr-core",
+     "symbol": "BC-USDat",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x0Bb150DFa86EA5d7742F07FEfCD8E8edA81D64eF"
+    },
+    {
+     "address": "0x7090ac23841D659620d00f9B0080DaaeF39F961E",
+     "decimals": null,
+     "name": "BTR Core Pool USDC",
+     "pool": "btr-core",
+     "symbol": "BC-USDC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+    },
+    {
+     "address": "0xBbaB5A878d78fCbE943d8A5062f31a22dc2aB3f2",
+     "decimals": null,
+     "name": "BTR Core Pool USDe",
+     "pool": "btr-core",
+     "symbol": "BC-USDe",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34"
+    },
+    {
+     "address": "0x1b63b172f5C9AD938557cE4B9ee56E6fB904DbcB",
+     "decimals": null,
+     "name": "BTR Core Pool USDT",
+     "pool": "btr-core",
+     "symbol": "BC-USDT",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xe7cd86e13AC4309349F30B3435a9d337750fC82D"
+    },
+    {
+     "address": "0x85fB35C6035B3684Fe6698Dde165851318Bab255",
+     "decimals": null,
+     "name": "BTR Core Pool WBTC",
+     "pool": "btr-core",
+     "symbol": "BC-WBTC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c"
+    },
+    {
+     "address": "0x73fdA98a2C994bE6B77a75005dE06c517ea7C649",
+     "decimals": null,
+     "name": "BTR Core Pool WETH",
+     "pool": "btr-core",
+     "symbol": "BC-WETH",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
+    },
+    {
+     "address": "0x37f48236eDfD21D9d8c9239E6b5b85aD098d014C",
+     "decimals": null,
+     "name": "BTR Core Pool WMON",
+     "pool": "btr-core",
+     "symbol": "BC-WMON",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A"
+    },
+    {
+     "address": "0x23DA18C40dC623c9Ce4f5d01D90ce5d970A17DdC",
+     "decimals": null,
+     "name": "BTR Core Pool XAUT",
+     "pool": "btr-core",
+     "symbol": "BC-XAUT",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071"
+    }
+   ],
+   "refFeeds": [],
+   "spokes": [
+    {
+     "address": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+     "receipt": "0x5aA70C365D0f343727f3b2185aC3dB464c598C79",
+     "symbol": "AUSD"
+    },
+    {
+     "address": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b",
+     "receipt": "0xDB8B343BB0C89ccf34862D0F33351D60fCA9b19D",
+     "symbol": "CBBTC"
+    },
+    {
+     "address": "0xfc421aD3C883Bf9E7C4f42dE845C4e4405799e73",
+     "receipt": "0x453390Da6CE21fE8934C39d7e5F4e62A79403D8C",
+     "symbol": "GHO"
+    },
+    {
+     "address": "0xacA92E438df0B2401fF60dA7E4337B687a2435DA",
+     "receipt": "0x431daccd82d9b508F9CAa9ab999A91ca24fDC3F6",
+     "symbol": "MUSD"
+    },
+    {
+     "address": "0xaB6e5a0C3799d020c790D34F7B2C02639e238AF7",
+     "receipt": "0x6077071F1EE126801DAbeA3FA84f78553594d7A9",
+     "symbol": "SYRUPUSDC"
+    },
+    {
+     "address": "0x0Bb150DFa86EA5d7742F07FEfCD8E8edA81D64eF",
+     "receipt": "0xC2bDb5746F7AC687bD07F814CdAa3De4AACcb354",
+     "symbol": "USDAT"
+    },
+    {
+     "address": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+     "receipt": "0x7090ac23841D659620d00f9B0080DaaeF39F961E",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+     "receipt": "0xBbaB5A878d78fCbE943d8A5062f31a22dc2aB3f2",
+     "symbol": "USDE"
+    },
+    {
+     "address": "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
+     "receipt": "0x1b63b172f5C9AD938557cE4B9ee56E6fB904DbcB",
+     "symbol": "USDT0"
+    },
+    {
+     "address": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+     "receipt": "0x85fB35C6035B3684Fe6698Dde165851318Bab255",
+     "symbol": "WBTC"
+    },
+    {
+     "address": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
+     "receipt": "0x73fdA98a2C994bE6B77a75005dE06c517ea7C649",
+     "symbol": "WETH"
+    },
+    {
+     "address": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+     "receipt": "0x37f48236eDfD21D9d8c9239E6b5b85aD098d014C",
+     "symbol": "WMON"
+    },
+    {
+     "address": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071",
+     "receipt": "0x23DA18C40dC623c9Ce4f5d01D90ce5d970A17DdC",
+     "symbol": "XAUT0"
+    }
+   ],
+   "status": "live",
+   "symbols": [
+    "AUSD",
+    "CBBTC",
+    "GHO",
+    "MUSD",
+    "SYRUPUSDC",
+    "USDAT",
+    "USDC",
+    "USDE",
+    "USDT0",
+    "WBTC",
+    "WETH",
+    "WMON",
+    "XAUT0"
+   ],
+   "tag": "btr-core"
+  },
+  {
+   "address": "0xbbbbbbb04f5b762A4CdD1d89E341e2537e3267e4",
+   "generation": "core",
+   "hooks": {
+    "CBBTC": "0xbbbbbbb0BEaAcf66068BdBa8E2a318492F752353",
+    "WMON": "0xbbbbbbb0B455a22D784eC890c1D28Cff7CBA2fB8"
+   },
+   "key": "core",
+   "receipts": [
+    {
+     "address": "0xDdFcC77047a63980E421E16BFef9bC97C7D9c713",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-CBBTC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b"
+    },
+    {
+     "address": "0x09fFC8792cCd722417ECB3b6Ca58c0CE730bb429",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-USDC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+    },
+    {
+     "address": "0xB539D6e377368fF820129F9dC5C36057f7fB36b6",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-WBTC",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c"
+    },
+    {
+     "address": "0x157a21A8dbBEee969d774053EB7D23c42816DeC2",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-WETH",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
+    },
+    {
+     "address": "0x88C8057a4064993Da10E964D4c817cFc259e90B6",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-WMON",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A"
+    },
+    {
+     "address": "0xfe233c927F474d35f85B6802DE6BAa795E23a97C",
+     "decimals": null,
+     "name": null,
+     "pool": "btr-core",
+     "symbol": "LP-XAUT0",
+     "tags": [
+      "lp",
+      "core"
+     ],
+     "underlying": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071"
+    }
+   ],
+   "refFeeds": [
+    "WMON",
+    "CBBTC",
+    "WBTC",
+    "WETH",
+    "XAUT0"
+   ],
+   "spokes": [
+    {
+     "address": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b",
+     "receipt": "0xDdFcC77047a63980E421E16BFef9bC97C7D9c713",
+     "symbol": "CBBTC"
+    },
+    {
+     "address": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+     "receipt": "0x09fFC8792cCd722417ECB3b6Ca58c0CE730bb429",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+     "receipt": "0xB539D6e377368fF820129F9dC5C36057f7fB36b6",
+     "symbol": "WBTC"
+    },
+    {
+     "address": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
+     "receipt": "0x157a21A8dbBEee969d774053EB7D23c42816DeC2",
+     "symbol": "WETH"
+    },
+    {
+     "address": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+     "receipt": "0x88C8057a4064993Da10E964D4c817cFc259e90B6",
+     "symbol": "WMON"
+    },
+    {
+     "address": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071",
+     "receipt": "0xfe233c927F474d35f85B6802DE6BAa795E23a97C",
+     "symbol": "XAUT0"
+    }
+   ],
+   "status": "superseded",
+   "symbols": [
+    "CBBTC",
+    "USDC",
+    "WBTC",
+    "WETH",
+    "WMON",
+    "XAUT0"
+   ],
+   "tag": "btr-core"
+  }
+ ],
+ "roster": {
+  "chainId": 143,
+  "degraded": false,
+  "refuel": null,
+  "safes": [
+   {
+    "address": "0xb6cc92e2c63ab6bdad6bd333892e3990f808f618",
+    "drift": false,
+    "kind": "safe",
+    "owners": [
+     "0xd4cd9ee834971a462becf5e7088594f656a572a7",
+     "0x41684720c057237ce49af297a3387dbcd0a318fa",
+     "0xb28c2b4dd37b53a016d6593e1497834129b8c140",
+     "0xab7bb2f7e39eaed8e5543220f43fa545ea780760"
+    ],
+    "role": "owner",
+    "source": "manifest",
+    "threshold": 3
+   },
+   {
+    "address": "0x0e7a1152074492649a126dc1b931b635bf54c8fb",
+    "drift": false,
+    "kind": "safe",
+    "owners": [
+     "0xd4cd9ee834971a462becf5e7088594f656a572a7",
+     "0x41684720c057237ce49af297a3387dbcd0a318fa",
+     "0xb28c2b4dd37b53a016d6593e1497834129b8c140",
+     "0xab7bb2f7e39eaed8e5543220f43fa545ea780760"
+    ],
+    "role": "treasury",
+    "source": "manifest",
+    "threshold": 3
+   },
+   {
+    "address": "0x3f617767c1985f0953c1fcb4426c650ee5c4a625",
+    "declaredThreshold": 1,
+    "drift": false,
+    "kind": "safe",
+    "owners": [
+     "0x6c86bf61316ae3caea30d6f6cd000d857b9dbee3",
+     "0x85c0be9177cc47d430632fa65c0d48224c090abe",
+     "0xbd0a78297bd3a4db8bb788236012bcb5912addcd",
+     "0x71875246f6c3056c9ccec2dddbc2771adec6ed62",
+     "0xd4cd9ee834971a462becf5e7088594f656a572a7",
+     "0xab7bb2f7e39eaed8e5543220f43fa545ea780760"
+    ],
+    "role": "guardian",
+    "source": "manifest",
+    "threshold": 1
+   },
+   {
+    "address": "0xecc0ac71b881c6b2bd9bbe098558b656dc3aa915",
+    "declaredThreshold": 2,
+    "drift": false,
+    "kind": "safe",
+    "owners": [
+     "0x9569ce0bafaf5fa5ce7b99bd691962bd0e908a75",
+     "0xffd171ed7fb5d235e93dcd8e3512dab7863edaad",
+     "0x3f07175cedef025152784f2f16d1e06b663a86a9",
+     "0x98955fc5df92285e0faee7e6bdfecd7136d2dcc1",
+     "0xd4cd9ee834971a462becf5e7088594f656a572a7",
+     "0xab7bb2f7e39eaed8e5543220f43fa545ea780760"
+    ],
+    "role": "steward",
+    "source": "manifest",
+    "threshold": 2
+   }
+  ]
+ },
+ "supersededGenerations": [
+  {
+   "contracts": {
+    "accessControl": "0xbbbbbbbb3473f8433A8A1a044E8a102D39dC8779",
+    "admin": "0xbbbbbbbb3f4840848D747b7085C89bf5D9E2E4f0",
+    "adminImpl": "0x572288d1378AB3Bd3eaecbd0682B9E513501D434",
+    "coopArb": "0xbbbbbbb1E1dabc155c79F4688CdB462A462F4040",
+    "coopArbV1": "0xbbbbbbb1B6E6e1b035e0f9815c67E2968dF8e827",
+    "coopArbV2": "0xbbbbbbbb4A77CeD2902712A5d153DA7bCd5942C6",
+    "coopArbV3": "0xbbbbbbb0d5cFe5BC7939ae0Fce2cf21b95E806A7",
+    "coopArbV4": "0xbbbbbbb0f219f537A64d41a907192bA41b5225Be",
+    "coopArbV5": "0xbbbbbbb0F8C5D06406A6Ff39ABe1d514e25adE2e",
+    "coopArbV6": "0xbbbbbbb1E1dabc155c79F4688CdB462A462F4040",
+    "flash": "0xbbbbbbbb17d75FF66b3A9521c919a210637F3eCf",
+    "flashImpl": "0x399d335D47eB2589b1692b4adB32f315581E6Db8",
+    "markStoreLogic": "0x04425AE3b46CbC324B476EB2FfA5537Bfdcd0F6A",
+    "markStoreP8": "0x04425AE3b46CbC324B476EB2FfA5537Bfdcd0F6A",
+    "poolFactory": "0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF",
+    "poolImpl": "0x154be75fff18c9dFdD15D7F902B64a7b93B2A638",
+    "router": "0xbbbbbbbbb9687Ae7E49AE486e2e5C6408d2AA7fe",
+    "verifierP": "0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF",
+    "verifierR": "0xBccAE41A5df0f9241454198d4565426Abf41cA83"
+   },
+   "label": "core",
+   "libraries": {
+    "adminParams": "0xB80970F51aC19031dbe5B9015F785348A18189FA",
+    "nuQuartic": "0xc1912C1570960cEF293BDeE587d561dbFa3680fA",
+    "poolConfig": "0x35a0FAa70AFA08048269dCcA7B1278d017207097",
+    "poolLiquidity": "0x67D99c763cB9Ed206515944aBe0D77156b04DC46",
+    "pricing": "0xd3488f96E70CBc41D8Bbe830C6c8544765E90B16"
+   },
+   "status": "superseded"
+  }
+ ],
+ "tokens": {
+  "AUSD": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+  "CBBTC": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b",
+  "GHO": "0xfc421aD3C883Bf9E7C4f42dE845C4e4405799e73",
+  "MUSD": "0xacA92E438df0B2401fF60dA7E4337B687a2435DA",
+  "SYRUPUSDC": "0xaB6e5a0C3799d020c790D34F7B2C02639e238AF7",
+  "USDAT": "0x0Bb150DFa86EA5d7742F07FEfCD8E8edA81D64eF",
+  "USDC": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+  "USDE": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+  "USDT0": "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
+  "WBTC": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+  "WETH": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
+  "WMON": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+  "XAUT0": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071"
+ }
+}

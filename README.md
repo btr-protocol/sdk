@@ -96,7 +96,7 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 ## Integrate
 
 - API base: `https://api.btr.markets` (override `BTR_API_URL` / `setApiRoot()`).
-- Registry endpoint: `GET /v1/assets/pools?chainId=<id>` (one constant, `REGISTRY_PATH` in `src/venues/live.ts`, to move to `/v1/registry`); roster `GET /v1/roster`, ABIs `GET /v1/abis/{Name}`.
+- Registry endpoint: `GET /v1/registry?chainId=<id>` (one constant, `REGISTRY_PATH` in `src/venues/live.ts`): contracts, tokens, pools (only `status=live` pools are checked against the baked copy; superseded ones are returned as `otherPools`), plus embedded `roster` and `abis` index. A null contract is treated as missing; null roster/abis come back with `degraded: true` and do not throw. Also `GET /v1/roster`, `GET /v1/abis?chainId=<id>` (index), `GET /v1/abis/{Name}`.
 - Docs for agents: https://btr.markets/llms.txt
 
 ```ts
@@ -104,8 +104,8 @@ import { fetchRegistry } from '@btr-protocol/sdk/venues';
 const r = await fetchRegistry(143); // live wins; r.source = 'baked' on fetch failure; r.warnings on drift
 ```
 
-CLI (read-only, bun only; the bins are TypeScript with a bun shebang): `bunx btr registry --chain 143 --json`, `btr pools`, `btr roster`, `btr abi Pool`. Live data that differs from the baked record, or a failed fetch, is an error (exit 1); opt in with `--trust-live` / `--fallback-baked` (API: `trustLive`, `fallback: 'baked'`).
-MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`, `get_roster`; bun only): `{"command":"bunx","args":["btr-mcp"]}`.
+CLI (read-only, bun only; the bins are TypeScript with a bun shebang): `bunx btr registry --chain 143 --json`, `btr pools`, `btr roster` (embedded roster when present), `btr abis`, `btr abi Pool`. Live data that differs from the baked record, or a failed fetch, is an error (exit 1); opt in with `--trust-live` / `--fallback-baked` (API: `trustLive`, `fallback: 'baked'`).
+MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`, `get_roster`, `list_abis`; bun only): `{"command":"bunx","args":["btr-mcp"]}`.
 
 ## Chain quoting trust boundary
 
