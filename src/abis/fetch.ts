@@ -1,13 +1,13 @@
 /** Chain-scoped deployment ABIs. Build-head exports are separate decode/build surfaces. */
-import lock from '../../abis.lock.json';
-import accessControlV1 from '../../abis/generations/pool-v1-s7/AccessControl.json';
-import adminV1 from '../../abis/generations/pool-v1-s7/Admin.json';
-import poolV1 from '../../abis/generations/pool-v1-s7/Pool.json';
-import poolFactoryV1 from '../../abis/generations/pool-v1-s7/PoolFactory.json';
-import accessControl from '../../abis/generations/pool-v2-s12e/AccessControl.json';
-import admin from '../../abis/generations/pool-v2-s12e/Admin.json';
-import pool from '../../abis/generations/pool-v2-s12e/Pool.json';
-import poolFactory from '../../abis/generations/pool-v2-s12e/PoolFactory.json';
+import lock from '../../abis.lock.json' with { type: 'json' };
+import accessControlV1 from '../../abis/generations/pool-v1-s7/AccessControl.json' with { type: 'json' };
+import adminV1 from '../../abis/generations/pool-v1-s7/Admin.json' with { type: 'json' };
+import poolV1 from '../../abis/generations/pool-v1-s7/Pool.json' with { type: 'json' };
+import poolFactoryV1 from '../../abis/generations/pool-v1-s7/PoolFactory.json' with { type: 'json' };
+import accessControl from '../../abis/generations/pool-v2-s12e/AccessControl.json' with { type: 'json' };
+import admin from '../../abis/generations/pool-v2-s12e/Admin.json' with { type: 'json' };
+import pool from '../../abis/generations/pool-v2-s12e/Pool.json' with { type: 'json' };
+import poolFactory from '../../abis/generations/pool-v2-s12e/PoolFactory.json' with { type: 'json' };
 import { getApiRoot } from '../api.js';
 import type { Abi } from '../eth/abi.js';
 import { ABI_GENERATION } from './generation.js';

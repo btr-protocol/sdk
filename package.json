@@ -82,8 +82,27 @@
     }
   },
   "description": "Lightweight EVM RPC + ABIs + contract helpers for BTR (front, back, keepers, contracts)",
-  "files": ["src", "scripts", "abis", "abis.lock.json", "rpc-origins.txt", "README.md"],
-  "keywords": ["btr", "evm", "rpc", "abi", "dex", "amm", "oracle"],
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "abis",
+    "abis.lock.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "btr",
+    "evm",
+    "rpc",
+    "abi",
+    "dex",
+    "amm",
+    "oracle",
+    "mcp",
+    "model-context-protocol",
+    "bun"
+  ],
   "scripts": {
     "build": "bun run fetch-abis && bun build ./src/index.ts --outdir ./dist --target node",
     "check": "bun run typecheck && bun test",
@@ -92,9 +111,9 @@
     "format": "bunx biome format --write src",
     "refresh-rpcs": "bun scripts/refresh-rpcs.ts",
     "lint": "bunx biome check src",
-    "postinstall": "bun run fetch-abis",
     "test": "bun run fetch-abis && bun test",
-    "typecheck": "bun run fetch-abis && bunx tsgo -p tsconfig.json --noEmit"
+    "typecheck": "bun run fetch-abis && bunx tsgo -p tsconfig.json --noEmit",
+    "prepublishOnly": "bun run fetch-abis && bun run typecheck && bun test"
   },
   "sideEffects": false,
   "type": "module",
@@ -102,5 +121,18 @@
   "dependencies": {
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btr-protocol/sdk.git"
+  },
+  "homepage": "https://github.com/btr-protocol/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/btr-protocol/sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "mcpName": "io.github.btr-protocol/btr-mcp"
 }

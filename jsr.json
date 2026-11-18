@@ -1,0 +1,41 @@
+{
+  "name": "@btr-protocol/sdk",
+  "version": "0.6.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abis": "./src/abis/index.ts",
+    "./amm": "./src/amm/index.ts",
+    "./eth": "./src/eth/index.ts",
+    "./oracle": "./src/oracle/index.ts",
+    "./governance": "./src/governance/index.ts",
+    "./eth/gas": "./src/eth/gas.ts",
+    "./eth/wallets": "./src/eth/wallets.ts",
+    "./pool": "./src/pool/index.ts",
+    "./pool/slippage": "./src/pool/slippage.ts",
+    "./router": "./src/router/index.ts",
+    "./venues": "./src/venues/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./utils/format": "./src/utils/format.ts",
+    "./types": "./src/types/index.ts",
+    "./utils/logger": "./src/utils/logger.ts"
+  },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.json",
+      "abis/**",
+      "abis.lock.json",
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+      "src/abis/Pool.ts",
+      "src/abis/Admin.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "!src/abis/Pool.ts",
+      "!src/abis/Admin.ts"
+    ]
+  }
+}

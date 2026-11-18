@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.btr-protocol/btr-mcp",
+  "title": "BTR",
+  "description": "Read-only BTR DEX MCP server: venues, pools, quotes and oracle marks. No signing.",
+  "repository": { "url": "https://github.com/btr-protocol/sdk", "source": "github" },
+  "version": "0.6.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@btr-protocol/sdk",
+      "version": "0.6.0",
+      "runtimeHint": "bunx",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}
