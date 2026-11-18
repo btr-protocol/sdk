@@ -39,6 +39,25 @@ export interface ChainVenue {
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names read off the reference tier, union of every core's `<key>RefFeeds`. */
   refFeeds: string[];
+  /** Current generation's `libraries` (record key ⇒ address; linked into pools). */
+  libraries: Record<string, Address>;
+  /** Current generation's role addresses (deployer, owner, guardian, treasury): people, not code. */
+  roles: Record<string, Address>;
+  /** Other generations by record suffix (`<id>-<tag>.pools.json`, e.g. `core` = v1, `v2`).
+   *  `status` is `current` iff its factory is the current one, else `superseded`. `pools` =
+   *  core-pool address by record key, `receipts`/`hooks` = `<key>Receipts`/`<key>Hooks` maps. */
+  versions: Record<
+    string,
+    {
+      status: 'current' | 'superseded';
+      contracts: Record<string, Address>;
+      roles: Record<string, Address>;
+      libraries: Record<string, Address>;
+      pools: Record<string, Address>;
+      receipts: Record<string, Record<string, Address>>;
+      hooks: Record<string, Record<string, Address>>;
+    }
+  >;
 }
 
 export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
@@ -50,6 +69,7 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       admin: '0xbbbbbbb11d97d894264e1928144c2433D8734cea',
       adminImpl: '0x231f8d727A6082B7aE2F47055640DC2B82a1FA9a',
       coopArb: '0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF',
+      coopArbAdapters: '0xbbbbbbb38Bb56E3C5ee4a6742Ef54d658A46a08f',
       coopArbV7: '0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF',
       flash: '0xbbbbbbb16959356457A6F357525Cfea95d463520',
       flashImpl: '0xDAb1cc5c72df7bad5e7eBCbadC01956b93E3feA6',
@@ -63,6 +83,152 @@ export const DEPLOYED_VENUES: Record<number, ChainVenue> = {
       router: '0xbbbbbbb17647a22D61E49d62a95445B1284b1296',
       store: '0xf1dd174b3540F298809d51E06Ffc9F7F05b161F5',
       verifierP: '0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0',
+    },
+    libraries: {
+      adminParams: '0x875e6717CFF77333a97706B08972Aa2C5fEAa830',
+      cov: '0x4c8583B9FD9fF17c3BdBF231d16e5A1B7DEeC567',
+      nuQuartic: '0x8f10c8E8C28BE9A092cE967962348728cD80F558',
+      pendle: '0x1fA26e3f38c387C4C6dFbAac6Db00Ea1d378adeD',
+      poolConfig: '0x81e0fEfb8261ba482C7b10b2d65Fa52Ae3B14182',
+      poolLiquidity: '0xaA58f0E0921C6D5d94EAA09a52BFCDc5c6BA9898',
+      pricing: '0x8a87e145C264B7906a7a0769e7e7124d399Ce087',
+      yieldHook: '0x43e26dAb3902e39D12E5bc022a209c1ec787C1d5',
+      yieldHookTraits: '0x8fa2b94eEfA2A2565bc38bA57a6c8daf2B151c1a',
+    },
+    roles: {
+      deployer: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3',
+      treasury: '0x0E7A1152074492649a126DC1b931B635bf54c8Fb',
+    },
+    versions: {
+      core: {
+        status: 'superseded',
+        contracts: {
+          ac: '0xbbbbbbbb3473f8433A8A1a044E8a102D39dC8779',
+          accessControl: '0xbbbbbbbb3473f8433A8A1a044E8a102D39dC8779',
+          admin: '0xbbbbbbbb3f4840848D747b7085C89bf5D9E2E4f0',
+          adminImpl: '0x572288d1378AB3Bd3eaecbd0682B9E513501D434',
+          coopArb: '0xbbbbbbb1E1dabc155c79F4688CdB462A462F4040',
+          coopArbV1: '0xbbbbbbb1B6E6e1b035e0f9815c67E2968dF8e827',
+          coopArbV2: '0xbbbbbbbb4A77CeD2902712A5d153DA7bCd5942C6',
+          coopArbV3: '0xbbbbbbb0d5cFe5BC7939ae0Fce2cf21b95E806A7',
+          coopArbV4: '0xbbbbbbb0f219f537A64d41a907192bA41b5225Be',
+          coopArbV5: '0xbbbbbbb0F8C5D06406A6Ff39ABe1d514e25adE2e',
+          coopArbV6: '0xbbbbbbb1E1dabc155c79F4688CdB462A462F4040',
+          flash: '0xbbbbbbbb17d75FF66b3A9521c919a210637F3eCf',
+          flashImpl: '0x399d335D47eB2589b1692b4adB32f315581E6Db8',
+          logic: '0x04425AE3b46CbC324B476EB2FfA5537Bfdcd0F6A',
+          markStoreLogic: '0x04425AE3b46CbC324B476EB2FfA5537Bfdcd0F6A',
+          markStoreP8: '0x04425AE3b46CbC324B476EB2FfA5537Bfdcd0F6A',
+          oracle: '0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF',
+          poolFactory: '0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF',
+          poolImpl: '0x154be75fff18c9dFdD15D7F902B64a7b93B2A638',
+          router: '0xbbbbbbbbb9687Ae7E49AE486e2e5C6408d2AA7fe',
+          store: '0x154be75fff18c9dFdD15D7F902B64a7b93B2A638',
+          verifierP: '0xbbbbbbbbbd5e955E20F323cA1F95f8191fD0E0BF',
+          verifierR: '0xBccAE41A5df0f9241454198d4565426Abf41cA83',
+        },
+        roles: {
+          deployer: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3',
+          treasury: '0x0E7A1152074492649a126DC1b931B635bf54c8Fb',
+        },
+        libraries: {
+          adminParams: '0xB80970F51aC19031dbe5B9015F785348A18189FA',
+          nuQuartic: '0xc1912C1570960cEF293BDeE587d561dbFa3680fA',
+          poolConfig: '0x35a0FAa70AFA08048269dCcA7B1278d017207097',
+          poolLiquidity: '0x67D99c763cB9Ed206515944aBe0D77156b04DC46',
+          pricing: '0xd3488f96E70CBc41D8Bbe830C6c8544765E90B16',
+        },
+        pools: {
+          core: '0xbbbbbbb04f5b762A4CdD1d89E341e2537e3267e4',
+        },
+        receipts: {
+          coreReceipts: {
+            CBBTC: '0xDdFcC77047a63980E421E16BFef9bC97C7D9c713',
+            USDC: '0x09fFC8792cCd722417ECB3b6Ca58c0CE730bb429',
+            WBTC: '0xB539D6e377368fF820129F9dC5C36057f7fB36b6',
+            WETH: '0x157a21A8dbBEee969d774053EB7D23c42816DeC2',
+            WMON: '0x88C8057a4064993Da10E964D4c817cFc259e90B6',
+            XAUT0: '0xfe233c927F474d35f85B6802DE6BAa795E23a97C',
+          },
+        },
+        hooks: {
+          coreHooks: {
+            CBBTC: '0xbbbbbbb0BEaAcf66068BdBa8E2a318492F752353',
+            WMON: '0xbbbbbbb0B455a22D784eC890c1D28Cff7CBA2fB8',
+          },
+        },
+      },
+      v2: {
+        status: 'current',
+        contracts: {
+          ac: '0xbbbbbbb10CD446E774fAFE513Bb2B7669Fe823D5',
+          accessControl: '0xbbbbbbb10CD446E774fAFE513Bb2B7669Fe823D5',
+          admin: '0xbbbbbbb11d97d894264e1928144c2433D8734cea',
+          adminImpl: '0x231f8d727A6082B7aE2F47055640DC2B82a1FA9a',
+          coopArb: '0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF',
+          coopArbAdapters: '0xbbbbbbb38Bb56E3C5ee4a6742Ef54d658A46a08f',
+          coopArbV7: '0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF',
+          flash: '0xbbbbbbb16959356457A6F357525Cfea95d463520',
+          flashImpl: '0xDAb1cc5c72df7bad5e7eBCbadC01956b93E3feA6',
+          logic: '0x1B3C22d2Bdc4CB5dCFBcDC12485B8914a70b2027',
+          markStoreLogic: '0x1B3C22d2Bdc4CB5dCFBcDC12485B8914a70b2027',
+          markStoreP8: '0x1B3C22d2Bdc4CB5dCFBcDC12485B8914a70b2027',
+          oracle: '0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0',
+          poolFactory: '0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0',
+          poolImpl: '0xf1dd174b3540F298809d51E06Ffc9F7F05b161F5',
+          poolLens: '0x4eC4E80442C8cB0333ce3E58eC68A96e70f24867',
+          router: '0xbbbbbbb17647a22D61E49d62a95445B1284b1296',
+          stable: '0xbbbbbbbd7060b1CED79c381eAD40d73FcB9Ae0C6',
+          store: '0xf1dd174b3540F298809d51E06Ffc9F7F05b161F5',
+          verifierP: '0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0',
+        },
+        roles: {
+          deployer: '0x0a37aEc263CbA0aaBC09Bac56A0F2074a22E69A3',
+          treasury: '0x0E7A1152074492649a126DC1b931B635bf54c8Fb',
+        },
+        libraries: {
+          adminParams: '0x875e6717CFF77333a97706B08972Aa2C5fEAa830',
+          cov: '0x4c8583B9FD9fF17c3BdBF231d16e5A1B7DEeC567',
+          nuQuartic: '0x8f10c8E8C28BE9A092cE967962348728cD80F558',
+          pendle: '0x1fA26e3f38c387C4C6dFbAac6Db00Ea1d378adeD',
+          poolConfig: '0x81e0fEfb8261ba482C7b10b2d65Fa52Ae3B14182',
+          poolLiquidity: '0xaA58f0E0921C6D5d94EAA09a52BFCDc5c6BA9898',
+          pricing: '0x8a87e145C264B7906a7a0769e7e7124d399Ce087',
+          yieldHook: '0x43e26dAb3902e39D12E5bc022a209c1ec787C1d5',
+          yieldHookTraits: '0x8fa2b94eEfA2A2565bc38bA57a6c8daf2B151c1a',
+        },
+        pools: {},
+        receipts: {
+          stableReceipts: {
+            AUSD: '0x5aA70C365D0f343727f3b2185aC3dB464c598C79',
+            CBBTC: '0xDB8B343BB0C89ccf34862D0F33351D60fCA9b19D',
+            GHO: '0x453390Da6CE21fE8934C39d7e5F4e62A79403D8C',
+            MUSD: '0x431daccd82d9b508F9CAa9ab999A91ca24fDC3F6',
+            SYRUPUSDC: '0x6077071F1EE126801DAbeA3FA84f78553594d7A9',
+            USDAT: '0xC2bDb5746F7AC687bD07F814CdAa3De4AACcb354',
+            USDC: '0x7090ac23841D659620d00f9B0080DaaeF39F961E',
+            USDE: '0xBbaB5A878d78fCbE943d8A5062f31a22dc2aB3f2',
+            USDT0: '0x1b63b172f5C9AD938557cE4B9ee56E6fB904DbcB',
+            WBTC: '0x85fB35C6035B3684Fe6698Dde165851318Bab255',
+            WETH: '0x73fdA98a2C994bE6B77a75005dE06c517ea7C649',
+            WMON: '0x37f48236eDfD21D9d8c9239E6b5b85aD098d014C',
+            XAUT0: '0x23DA18C40dC623c9Ce4f5d01D90ce5d970A17DdC',
+          },
+        },
+        hooks: {
+          stableHooks: {
+            AUSD: '0xbbbbbbbf9E5FCCEbe6dB57D0eF25b04225Aca99A',
+            GHO: '0xbbbbbbbFA7fd15f6179a0c88b4fb7aE7Ba29f017',
+            MUSD: '0xbbbbbbbF80dD41eAdcCFBaC4BB42a20786c19eBF',
+            SYRUPUSDC: '0xbbbbbbb2860E994af6CA63CE2C2bac78D6E485AA',
+            USDAT: '0xbbbbbbb347517F2476c24852bED79fc805726c76',
+            USDC: '0xbbbbbbbf7a1D4564f863c71DD7547a3c05Cc9ca4',
+            USDE: '0xbbbbbbb1E21B49Ff64B3D8444c1eD7C3eCe658de',
+            USDT0: '0xbbbbbbbfb642BC167e3a959763CE54dB27ef60e3',
+            WETH: '0xbbbbbbb1a709EA84D0Dd0C0e850068B7b42437Db',
+          },
+        },
+      },
     },
     tokens: {
       USDC: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603',

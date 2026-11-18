@@ -8,7 +8,7 @@
  * has no broadcast core is left out, so `chainVenue` keeps throwing for it. The output is
  * committed (a Docker build has no sibling); `test/venues-mirror.test.ts` fails when it drifts. */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
@@ -26,6 +26,21 @@ type Venue = {
   lp: Record<string, { code: string; name: string }>;
   pools: Array<{ tag: string; address: string; symbols: string[] }>;
   refFeeds: string[];
+  libraries: Record<string, string>;
+  roles: Record<string, string>;
+  versions: Record<string, VenueVersion>;
+};
+
+/** One `<id>-<tag>.{deploy,pools}.json` pair: a generation other than `<id>.*`. Key-driven: every
+ *  address-valued top-level key is kept, nothing is named here. */
+type VenueVersion = {
+  status: 'current' | 'superseded';
+  contracts: Record<string, string>;
+  roles: Record<string, string>;
+  libraries: Record<string, string>;
+  pools: Record<string, string>;
+  receipts: Record<string, Record<string, string>>;
+  hooks: Record<string, Record<string, string>>;
 };
 
 const ZERO = /^0x0{40}$/i;
@@ -64,6 +79,46 @@ export function poolTag(key: string): string | null {
   const m = /^([a-z][a-zA-Z0-9]*?)(Core|Pool)$/.exec(key);
   if (!m) return null;
   return m[2] === 'Core' ? `btr-${m[1]}-core` : `btr-${m[1]}`;
+}
+
+const live = (v: unknown): v is string => typeof v === 'string' && ADDR.test(v) && !ZERO.test(v);
+const addrMap = (o: unknown): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries((o && typeof o === 'object' ? o : {}) as Record<string, unknown>)
+      .filter(([, v]) => live(v))
+      .sort(([a], [b]) => a.localeCompare(b)) as Array<[string, string]>,
+  );
+const nested = (rec: Record<string, unknown>, suffix: string) =>
+  Object.fromEntries(
+    Object.entries(rec)
+      .filter(([k, v]) => k.endsWith(suffix) && v && typeof v === 'object')
+      .map(([k, v]) => [k, addrMap(v)] as const),
+  );
+
+/** A generation's records, split by kind: addresses by key, role EOAs, libraries, core pools. */
+function versionOf(deploy: Record<string, any>, pools: Record<string, any>, status: VenueVersion['status']): VenueVersion {
+  const contracts: Record<string, string> = {};
+  const roles: Record<string, string> = {};
+  const pls: Record<string, string> = {};
+  for (const rec of [pools, deploy])
+    for (const [k, v] of Object.entries<unknown>(rec)) {
+      if (!live(v) || /^[A-Z0-9]+$/.test(k)) continue; // token keys are upper-case
+      if (ROLES.has(k)) roles[k] = v;
+      else if (poolTag(k)) pls[k] = v;
+      else contracts[k] = v;
+    }
+  const ref = deploy.derived?.referenceTierVerifier;
+  if (live(ref)) contracts.verifierR = ref;
+  const sort = (o: Record<string, string>) => addrMap(o);
+  return {
+    status,
+    contracts: sort(contracts),
+    roles: sort(roles),
+    libraries: addrMap(pools.libraries),
+    pools: sort(pls),
+    receipts: nested(pools, 'Receipts'),
+    hooks: nested(pools, 'Hooks'),
+  };
 }
 
 /** Feed record key → on-chain feed name: spokes are `<SYM>-USDC`, the reference keeps its pair. */
@@ -153,9 +208,24 @@ export function venuesFromRecords(dexEvm: string): Record<number, Venue> {
         if (!refFeeds.includes(feedName(s))) refFeeds.push(feedName(s));
     }
     if (live.length === 0) continue;
+    const cur = versionOf(deploy, pools, 'current');
+    const versions: Record<string, VenueVersion> = {};
+    for (const f of readdirSync(dir).sort()) {
+      const m = new RegExp(`^${id}-([A-Za-z0-9_.]+)\\.pools\\.json$`).exec(f);
+      if (!m) continue;
+      const vp = read(join(dir, f));
+      if (Number(vp.chainId) !== Number(id)) continue;
+      const vd = join(dir, `${id}-${m[1]}.deploy.json`);
+      const v = versionOf(existsSync(vd) ? read(vd) : {}, vp, 'superseded');
+      const same = v.contracts.poolFactory?.toLowerCase() === pools.poolFactory.toLowerCase();
+      versions[m[1]] = { ...v, status: same ? 'current' : 'superseded' };
+    }
     out[Number(id)] = {
       chainId: Number(id),
-      contracts: sortedContracts,
+      contracts: { ...sortedContracts, ...(cur.contracts.verifierR ? { verifierR: cur.contracts.verifierR } : {}) },
+      libraries: cur.libraries,
+      roles: cur.roles,
+      versions,
       tokens,
       symbols,
       decimals,
@@ -232,6 +302,25 @@ export interface ChainVenue {
   pools: Array<{ tag: string; address: Address; symbols: string[] }>;
   /** Feed names read off the reference tier, union of every core's \`<key>RefFeeds\`. */
   refFeeds: string[];
+  /** Current generation's \`libraries\` (record key ⇒ address; linked into pools). */
+  libraries: Record<string, Address>;
+  /** Current generation's role addresses (deployer, owner, guardian, treasury): people, not code. */
+  roles: Record<string, Address>;
+  /** Other generations by record suffix (\`<id>-<tag>.pools.json\`, e.g. \`core\` = v1, \`v2\`).
+   *  \`status\` is \`current\` iff its factory is the current one, else \`superseded\`. \`pools\` =
+   *  core-pool address by record key, \`receipts\`/\`hooks\` = \`<key>Receipts\`/\`<key>Hooks\` maps. */
+  versions: Record<
+    string,
+    {
+      status: 'current' | 'superseded';
+      contracts: Record<string, Address>;
+      roles: Record<string, Address>;
+      libraries: Record<string, Address>;
+      pools: Record<string, Address>;
+      receipts: Record<string, Record<string, Address>>;
+      hooks: Record<string, Record<string, Address>>;
+    }
+  >;
 }
 
 export const DEPLOYED_VENUES: Record<number, ChainVenue> = `;
