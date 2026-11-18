@@ -85,6 +85,7 @@
   "files": [
     "src",
     "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
     "abis",
     "abis.lock.json",
     "README.md",

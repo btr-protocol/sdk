@@ -23,3 +23,23 @@ test('live ABI fetch has its own name', () => {
   expect(typeof live.fetchLiveAbi).toBe('function');
   expect('fetchAbi' in live).toBe(false);
 });
+
+test('oversized line followed by a valid one in the same chunk: error, then served', async () => {
+  const p = Bun.spawn(['bun', 'src/cli/mcp.ts'], {
+    stdin: 'pipe',
+    stdout: 'pipe',
+    stderr: 'ignore',
+  });
+  p.stdin.write(
+    `${'x'.repeat(MAX_LINE + 10)}\n${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' })}\n`,
+  );
+  p.stdin.end();
+  const lines = (await new Response(p.stdout).text())
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l));
+  expect(lines[0].error.code).toBe(-32700);
+  expect(lines[1].result.serverInfo.version).toBe(
+    (await import('../../package.json')).default.version,
+  );
+});

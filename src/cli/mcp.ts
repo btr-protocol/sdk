@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // Read-only MCP server over stdio (newline-delimited JSON-RPC 2.0), bun only.
 // No signing, no tx sending.
+import pkg from '../../package.json' with { type: 'json' };
 import {
   type RegistryOpts,
   fetchLiveAbi,
@@ -91,7 +92,7 @@ export async function handle(req: unknown, o: RegistryOpts = {}): Promise<unknow
       return ok({
         protocolVersion: PROTOCOL,
         capabilities: { tools: {} },
-        serverInfo: { name: 'btr', version: '0.1.0' },
+        serverInfo: { name: 'btr', version: pkg.version },
       });
     if (method === 'tools/list') return ok({ tools: TOOLS });
     if (method === 'tools/call') {
@@ -131,23 +132,34 @@ if (import.meta.main) {
   let buf = '';
   let queue: Promise<void> = Promise.resolve(); // serial: responses keep request order
   process.stdin.setEncoding('utf8');
+  let skipping = false; // inside an oversized line: drop input until its newline
+  const over = () =>
+    process.stdout.write(`${JSON.stringify(rpcErr(null, -32700, 'line too large'))}\n`);
   const feed = (c: string, final = false) => {
-    buf += final ? '\n' : c;
-    if (buf.length > MAX_LINE && buf.indexOf('\n') < 0) {
+    let rest = final ? '\n' : c;
+    while (rest) {
+      const nl = rest.indexOf('\n');
+      const piece = nl < 0 ? rest : rest.slice(0, nl);
+      rest = nl < 0 ? '' : rest.slice(nl + 1);
+      if (skipping) {
+        if (nl >= 0) skipping = false;
+        continue;
+      }
+      buf += piece;
+      if (buf.length > MAX_LINE) {
+        buf = '';
+        over();
+        skipping = nl < 0;
+        continue;
+      }
+      if (nl < 0) break;
+      const line = buf.trim();
       buf = '';
-      process.stdout.write(`${JSON.stringify(rpcErr(null, -32700, 'line too large'))}\n`);
-      return;
-    }
-    let i = buf.indexOf('\n');
-    while (i >= 0) {
-      const line = buf.slice(0, i).trim();
-      buf = buf.slice(i + 1);
       if (line)
         queue = queue.then(async () => {
           const res = await handleLine(line);
           if (res) process.stdout.write(`${JSON.stringify(res)}\n`);
         });
-      i = buf.indexOf('\n');
     }
   };
   process.stdin.on('data', (c: string) => feed(c));

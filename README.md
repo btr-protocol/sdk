@@ -6,7 +6,7 @@ TypeScript SDK for BTR — a thin client over the BTR backend.
 ships no contract source and no build pipeline for one: it talks to the deployed protocol through
 the backend API and standard EVM JSON-RPC.
 
-**Runtime:** the `btr` and `btr-mcp` bins have a bun shebang and need [bun](https://bun.sh) (`bunx @btr-protocol/sdk`); the library ships TypeScript source.
+**Runtime:** the `btr` and `btr-mcp` bins have a bun shebang and need [bun](https://bun.sh) (`bunx -p @btr-protocol/sdk btr`); the library ships TypeScript source.
 
 ## ABIs come from the backend, pinned at build time
 
@@ -106,8 +106,8 @@ import { fetchRegistry } from '@btr-protocol/sdk/venues';
 const r = await fetchRegistry(143); // live wins; r.source = 'baked' on fetch failure; r.warnings on drift
 ```
 
-CLI (read-only, bun only; the bins are TypeScript with a bun shebang): `bunx btr registry --chain 143 --json`, `btr pools`, `btr roster` (embedded roster when present), `btr abis`, `btr abi Pool`. Live data that differs from the baked record, or a failed fetch, is an error (exit 1); opt in with `--trust-live` / `--fallback-baked` (API: `trustLive`, `fallback: 'baked'`).
-MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`, `get_roster`, `list_abis`; bun only): `{"command":"bunx","args":["btr-mcp"]}`.
+CLI (read-only, bun only; the bins are TypeScript with a bun shebang): `bunx -p @btr-protocol/sdk btr registry --chain 143 --json`, `btr pools`, `btr roster` (embedded roster when present), `btr abis`, `btr abi Pool`. Live data that differs from the baked record, or a failed fetch, is an error (exit 1); opt in with `--trust-live` / `--fallback-baked` (API: `trustLive`, `fallback: 'baked'`).
+MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`, `get_roster`, `list_abis`; bun only): `{"command":"bunx","args":["-p","@btr-protocol/sdk","btr-mcp"]}` (verified against the packed tarball).
 
 ## Chain quoting trust boundary
 

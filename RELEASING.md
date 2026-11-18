@@ -14,3 +14,7 @@ breaking change while 0.x, major once 1.0. Keep these in lockstep: `package.json
 8. MCP registry (after npm is live, the registry verifies `mcpName` in the published package):
    `mcp-publisher login github && mcp-publisher publish` (installs: `brew install mcp-publisher`).
 9. Verify: `npm view @btr-protocol/sdk version`, `bunx jsr info @btr-protocol/sdk` (or jsr.io page), registry search for `io.github.btr-protocol/btr-mcp`.
+
+Note: the MCP registry composes `bunx <identifier>`, which cannot name the `btr-mcp` bin of a
+two-bin package; clients should use `bunx -p @btr-protocol/sdk btr-mcp` (README). Confirm the
+published listing's launch line after step 8.
