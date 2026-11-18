@@ -104,8 +104,8 @@ import { fetchRegistry } from '@btr-protocol/sdk/venues';
 const r = await fetchRegistry(143); // live wins; r.source = 'baked' on fetch failure; r.warnings on drift
 ```
 
-CLI (read-only): `bunx btr registry --chain 143 --json`, `btr pools`, `btr abi Pool`.
-MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`): `{"command":"bunx","args":["btr-mcp"]}`.
+CLI (read-only, bun only; the bins are TypeScript with a bun shebang): `bunx btr registry --chain 143 --json`, `btr pools`, `btr roster`, `btr abi Pool`. Live data that differs from the baked record, or a failed fetch, is an error (exit 1); opt in with `--trust-live` / `--fallback-baked` (API: `trustLive`, `fallback: 'baked'`).
+MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`, `get_roster`; bun only): `{"command":"bunx","args":["btr-mcp"]}`.
 
 ## Chain quoting trust boundary
 

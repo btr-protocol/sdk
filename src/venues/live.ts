@@ -3,7 +3,7 @@
 
 import { getApiRoot } from '../api.js';
 import { type Address, isAddress } from '../eth/types.js';
-import type { ChainVenue } from './deployments.generated.js';
+import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { chainVenue, defaultChainId, eqAddr } from './registry.js';
 
 /** One constant: switch to '/v1/registry' when the API ships it. */
@@ -84,35 +84,70 @@ function bakedRegistry(chainId: number): LiveRegistry {
   };
 }
 
+/** Both directions. `hard` = live disagrees with a baked address or serves one baked lacks
+ *  (changed, new or renamed key); `soft` = baked-only keys (impls/adapters the live shape omits). */
 function diff(live: Record<string, string>, baked: Record<string, string>, what: string) {
-  const w: string[] = [];
+  const hard: string[] = [];
+  const soft: string[] = [];
   for (const [k, a] of Object.entries(live)) {
     const b = baked[k];
-    if (b && !eqAddr(a, b)) w.push(`${what}.${k}: live ${a} != baked ${b}`);
+    if (!b) hard.push(`${what}.${k}: live ${a}, absent from baked`);
+    else if (!eqAddr(a, b)) hard.push(`${what}.${k}: live ${a} != baked ${b}`);
   }
-  return w;
+  for (const k of Object.keys(baked)) if (!(k in live)) soft.push(`${what}.${k}: baked only`);
+  return { hard, soft };
 }
 
-/** Live registry for `chainId` (default: baked default chain). Never throws on network failure. */
-export async function fetchRegistry(chainId?: number, o: LiveOpts = {}): Promise<LiveRegistry> {
+export interface RegistryOpts extends LiveOpts {
+  /** Accept live data that disagrees with the baked record (warnings still returned). */
+  trustLive?: boolean;
+  /** Only way to get baked data: return it, with a warning, when the live fetch fails. */
+  fallback?: 'baked';
+}
+
+/**
+ * Live registry for `chainId` (default: baked default chain). Throws when the fetch fails
+ * (unless `fallback: 'baked'`), when live disagrees with baked, or when the chain has no baked
+ * record to check against (unless `trustLive`). Callers never get baked data silently.
+ */
+export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Promise<LiveRegistry> {
   const id = chainId ?? defaultChainId();
+  let live: ReturnType<typeof parseLive>;
   try {
-    const live = parseLive(await getJson(`${REGISTRY_PATH}?chainId=${id}`, o));
+    live = parseLive(await getJson(`${REGISTRY_PATH}?chainId=${id}`, o));
     if (live.chainId !== id) throw new Error(`asked chain ${id}, got ${live.chainId}`);
-    const warnings: string[] = [];
-    try {
-      const b = chainVenue(id);
-      warnings.push(...diff(live.contracts, b.contracts, 'contracts'));
-      warnings.push(...diff(live.tokens, b.tokens, 'tokens'));
-    } catch {
-      warnings.push(`chain ${id} has no baked record to compare`);
-    }
-    return { ...live, source: 'live', warnings };
   } catch (e) {
+    if (o.fallback !== 'baked')
+      throw new Error(`live registry fetch failed: ${(e as Error).message}`);
     const b = bakedRegistry(id); // throws if chain not baked either
     b.warnings.push(`live fetch failed (${(e as Error).message}); using baked deployments`);
     return b;
   }
+  const hard: string[] = [];
+  const soft: string[] = [];
+  const v = DEPLOYED_VENUES[id];
+  if (!v) hard.push(`chain ${id}: no baked record to verify live against`);
+  else {
+    for (const [what, l, b] of [
+      ['contracts', live.contracts, v.contracts],
+      ['tokens', live.tokens, v.tokens],
+      [
+        'pools',
+        Object.fromEntries(live.pools.map((p) => [p.tag, p.address])),
+        Object.fromEntries(v.pools.map((p) => [p.tag, p.address])),
+      ],
+    ] as const) {
+      const d = diff(l, b, what);
+      hard.push(...d.hard);
+      // a baked-only pool is a pool the live API no longer serves: that is a real mismatch
+      (what === 'pools' ? hard : soft).push(...d.soft);
+    }
+  }
+  if (hard.length && !o.trustLive)
+    throw new Error(
+      `live registry disagrees with baked deployments (pass trustLive to accept): ${hard.join('; ')}`,
+    );
+  return { ...live, source: 'live', warnings: [...hard, ...soft] };
 }
 
 export const fetchRoster = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>

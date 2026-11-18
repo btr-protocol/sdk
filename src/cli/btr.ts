@@ -1,48 +1,66 @@
 #!/usr/bin/env bun
-// `btr` CLI: read-only views of the live registry. No signing, no tx sending.
-import { type LiveOpts, fetchAbi, fetchRegistry } from '../venues/live.js';
+import { type RegistryOpts, fetchAbi, fetchRegistry, fetchRoster } from '../venues/live.js';
+// `btr` CLI (bun only): read-only views of the live registry. No signing, no tx sending.
+// Data goes to `out`; usage, warnings and errors go to stderr; exit 0 ok, 1 failure, 2 usage.
+import { defaultChainId } from '../venues/registry.js';
 
 const USAGE = `btr registry [--chain <id>] [--json]
+btr pools [--chain <id>] [--json]
+btr roster [--chain <id>]
 btr abi <Name>
-btr pools [--chain <id>] [--json]`;
+flags: --trust-live (accept live that differs from baked), --fallback-baked (use baked if live is down)`;
+
+const err = (s: string) => console.error(s);
 
 export async function run(
   argv: string[],
   out: (s: string) => void,
-  o: LiveOpts = {},
+  o: RegistryOpts = {},
 ): Promise<number> {
-  const [cmd, ...rest] = argv;
-  const flag = (n: string) => rest.includes(`--${n}`);
-  const ci = rest.indexOf('--chain');
-  const chain = ci >= 0 ? Number(rest[ci + 1]) : undefined;
-  if (chain !== undefined && !Number.isInteger(chain)) {
-    out('bad --chain');
-    return 2;
-  }
-  const json = flag('json');
-  if (cmd === 'abi') {
-    if (!rest[0]) {
-      out(USAGE);
+  try {
+    const [cmd, ...rest] = argv;
+    const flag = (n: string) => rest.includes(`--${n}`);
+    const ci = rest.indexOf('--chain');
+    const chain = ci >= 0 ? Number(rest[ci + 1]) : undefined;
+    if (chain !== undefined && !(Number.isInteger(chain) && chain > 0)) {
+      err('--chain must be a positive integer');
       return 2;
     }
-    out(JSON.stringify(await fetchAbi(rest[0], o)));
+    const opts: RegistryOpts = {
+      ...o,
+      trustLive: o.trustLive ?? flag('trust-live'),
+      fallback: o.fallback ?? (flag('fallback-baked') ? 'baked' : undefined),
+    };
+    if (cmd === 'abi') {
+      if (!rest[0] || rest[0].startsWith('--')) {
+        err(USAGE);
+        return 2;
+      }
+      out(JSON.stringify(await fetchAbi(rest[0], opts)));
+      return 0;
+    }
+    if (cmd === 'roster') {
+      out(JSON.stringify(await fetchRoster(chain ?? defaultChainId(), opts), null, 2));
+      return 0;
+    }
+    if (cmd !== 'registry' && cmd !== 'pools') {
+      err(USAGE);
+      return 2;
+    }
+    const r = await fetchRegistry(chain, opts);
+    for (const w of r.warnings) err(`warning: ${w}`);
+    if (flag('json')) out(JSON.stringify(cmd === 'pools' ? r.pools : r, null, 2));
+    else if (cmd === 'pools')
+      for (const p of r.pools) out(`${p.tag}\t${p.address}\t${p.symbols.join(',')}`);
+    else {
+      out(`chain ${r.chainId} (${r.source})`);
+      for (const [k, v] of Object.entries(r.contracts)) out(`${k}\t${v}`);
+    }
     return 0;
+  } catch (e) {
+    err(`btr: ${(e as Error).message}`);
+    return 1;
   }
-  if (cmd !== 'registry' && cmd !== 'pools') {
-    out(USAGE);
-    return 2;
-  }
-  const r = await fetchRegistry(chain, o);
-  for (const w of r.warnings) console.error(`warning: ${w}`);
-  const body = cmd === 'pools' ? r.pools : r;
-  if (json) out(JSON.stringify(body, null, 2));
-  else if (cmd === 'pools')
-    for (const p of r.pools) out(`${p.tag}\t${p.address}\t${p.symbols.join(',')}`);
-  else {
-    out(`chain ${r.chainId} (${r.source})`);
-    for (const [k, v] of Object.entries(r.contracts)) out(`${k}\t${v}`);
-  }
-  return 0;
 }
 
 if (import.meta.main) process.exit(await run(process.argv.slice(2), console.log));
