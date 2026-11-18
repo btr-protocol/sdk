@@ -93,6 +93,20 @@ const calls = buildSwapCalls(legs ?? [], { recipient: yourAddress });
 // calls = deduplicated [...approvals, ...swaps] — EIP-5792 wallet_sendCalls or sequential
 ```
 
+## Integrate
+
+- API base: `https://api.btr.markets` (override `BTR_API_URL` / `setApiRoot()`).
+- Registry endpoint: `GET /v1/assets/pools?chainId=<id>` (one constant, `REGISTRY_PATH` in `src/venues/live.ts`, to move to `/v1/registry`); roster `GET /v1/roster`, ABIs `GET /v1/abis/{Name}`.
+- Docs for agents: https://btr.markets/llms.txt
+
+```ts
+import { fetchRegistry } from '@btr-protocol/sdk/venues';
+const r = await fetchRegistry(143); // live wins; r.source = 'baked' on fetch failure; r.warnings on drift
+```
+
+CLI (read-only): `bunx btr registry --chain 143 --json`, `btr pools`, `btr abi Pool`.
+MCP (stdio, read-only; tools `get_registry`, `get_abi`, `list_pools`): `{"command":"bunx","args":["btr-mcp"]}`.
+
 ## Chain quoting trust boundary
 
 `chainQuote` / `chainRoute` reject a server-authored floor (`tol_pbps`) wider than the request's own

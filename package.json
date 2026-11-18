@@ -8,6 +8,10 @@
     "@types/node": "^20.10.0",
     "@typescript/native-preview": "^7.0.0-dev.20251227.1"
   },
+  "bin": {
+    "btr": "./src/cli/btr.ts",
+    "btr-mcp": "./src/cli/mcp.ts"
+  },
   "exports": {
     ".": {
       "types": "./src/index.ts",
