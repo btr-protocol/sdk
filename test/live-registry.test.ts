@@ -17,12 +17,22 @@ test('real payload matches baked: live source, no throw', async () => {
   const r = await fetchRegistry(143, real);
   expect(r.source).toBe('live');
   expect(r.pools.length).toBeGreaterThan(0);
+  expect(r.warnings).toEqual([]);
+  expect(r.info.length).toBeGreaterThan(0);
 });
 
 test('mismatch throws; trustLive accepts with warning', async () => {
   await expect(fetchRegistry(143, tampered())).rejects.toThrow('contracts.router');
   const r = await fetchRegistry(143, { ...tampered(), trustLive: true });
   expect(r.warnings.join()).toContain('contracts.router');
+});
+
+test('allowlisted contract missing live throws; non-allowlisted live drift ignored', async () => {
+  const j = structuredClone(fixture) as typeof fixture & { contracts: Record<string, string> };
+  j.contracts.extra = `0x${'2'.padStart(40, '0')}`;
+  expect((await fetchRegistry(143, { fetch: mock(j) })).warnings).toEqual([]);
+  delete (j.contracts as Record<string, string>).flash;
+  await expect(fetchRegistry(143, { fetch: mock(j) })).rejects.toThrow('contracts.flash');
 });
 
 test('fetch failure throws unless fallback baked; bad address throws', async () => {

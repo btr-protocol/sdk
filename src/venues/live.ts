@@ -24,6 +24,8 @@ export interface LiveRegistry {
   /** `live` = API answered; `baked` = fetch failed, generated file used. */
   source: 'live' | 'baked';
   warnings: string[];
+  /** Baked keys the server does not serve (not an error). */
+  info: string[];
 }
 
 type Fetch = typeof fetch;
@@ -81,8 +83,21 @@ function bakedRegistry(chainId: number): LiveRegistry {
     pools: v.pools,
     source: 'baked',
     warnings: [],
+    info: [],
   };
 }
+
+/** The contracts the SDK pins: each one the built-in copy has must be served live, same address. */
+export const CONTRACT_ALLOWLIST = [
+  'accessControl',
+  'admin',
+  'coopArb',
+  'flash',
+  'markStoreP8',
+  'poolFactory',
+  'poolLens',
+  'router',
+] as const;
 
 /** Both directions. `hard` = live disagrees with a baked address or serves one baked lacks
  *  (changed, new or renamed key); `soft` = baked-only keys (impls/adapters the live shape omits). */
@@ -128,8 +143,16 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
   const v = DEPLOYED_VENUES[id];
   if (!v) hard.push(`chain ${id}: no baked record to verify live against`);
   else {
+    for (const k of CONTRACT_ALLOWLIST) {
+      const b = v.contracts[k];
+      const l = live.contracts[k];
+      if (!b) continue;
+      if (!l) hard.push(`contracts.${k}: baked ${b}, not served live`);
+      else if (!eqAddr(l, b)) hard.push(`contracts.${k}: live ${l} != baked ${b}`);
+    }
+    for (const k of Object.keys(v.contracts))
+      if (!(k in live.contracts)) soft.push(`contracts.${k}: baked only`);
     for (const [what, l, b] of [
-      ['contracts', live.contracts, v.contracts],
       ['tokens', live.tokens, v.tokens],
       [
         'pools',
@@ -147,7 +170,7 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
     throw new Error(
       `live registry disagrees with baked deployments (pass trustLive to accept): ${hard.join('; ')}`,
     );
-  return { ...live, source: 'live', warnings: [...hard, ...soft] };
+  return { ...live, source: 'live', warnings: hard, info: soft };
 }
 
 export const fetchRoster = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
