@@ -60,6 +60,7 @@ BTR_ABI_ALLOW_STALE=1 bun run fetch-abis # offline build against the vendored ST
 | `/pool` | Single-pool reads + tx builders (`getSwapQuote`, `swap`, `deposit`, `withdraw`) |
 | `/router` | Route plan → ordered approve+swap calldata (`planToLegs`, `buildSwapCalls`) |
 | `/venues` | Chain / venue registry, backend-fetched with static fallback |
+| `/public` | Typed fetchers for the public GETs (`fetchVenues`, `fetchPools`, `fetchMarks`, `fetchOhlc`, …) + `OPS`, the read-only operation table behind the CLI and MCP server |
 | `/utils` | encoding, validation, math, formatting, logger, constants |
 
 ## Usage
@@ -115,6 +116,21 @@ The SDK bounds the **tolerance only**. `amount_out` itself is server-authored; t
 re-price it on chain before signing (the front does). Floor self-consistency does not verify price.
 Route floors carry no `spread_pbps`, so their spread policy uses the field maximum plus the caller's
 absolute ceiling, without a served-spread check.
+
+## CLI and MCP server
+
+Two read-only front-ends over the public API live beside the SDK as Bun workspaces. Both render
+from one operation table (`src/public/ops.ts`): one name, one argument schema, one SDK call per
+operation, so a command and its tool cannot drift. No keys, no signing, no transaction tools.
+
+| Package | Run | Docs |
+|---|---|---|
+| [`cli/`](cli/README.md) `btr` | `bun cli/src/bin.ts quote USDC WETH 1000000 --json` | https://btr.markets/docs/5-2-4-cli |
+| [`mcp/`](mcp/README.md) `btr-mcp` | `bun mcp/src/bin.ts` (stdio) · `--http --port 8787` | https://btr.markets/docs/5-2-5-mcp-server |
+
+Operations: `chains`, `venues`, `registry` (offline SDK records incl. superseded generations),
+`pools`, `quote`, `route`, `depth`, `marks`, `ohlc`. Tests replay recorded API bodies from
+`test/fixtures/public/` (`bun scripts/record-public-fixtures.ts` re-records them).
 
 ## Toolchain
 

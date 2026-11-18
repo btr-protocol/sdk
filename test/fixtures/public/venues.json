@@ -1,0 +1,367 @@
+{
+  "method": "GET",
+  "path": "/v1/venues",
+  "status": 200,
+  "response": {
+    "56": {
+      "chain_id": 56,
+      "contracts": {},
+      "curve_names": {
+        "1": "bell_100",
+        "3": "bell_100_inv",
+        "4": "bell_500_inv",
+        "5": "bell_500"
+      },
+      "feed_meta": {
+        "BTCB-USDC": {
+          "asset_class": "volatile",
+          "global_index": 5,
+          "max_dev_bps": 100,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "BTCB",
+          "ttl_secs": 600
+        },
+        "ETH-USDC": {
+          "asset_class": "volatile",
+          "global_index": 6,
+          "max_dev_bps": 100,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "ETH",
+          "ttl_secs": 600
+        },
+        "QQQb-USDC": {
+          "asset_class": "equity",
+          "global_index": 8,
+          "max_dev_bps": 100,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "QQQb",
+          "ttl_secs": 600
+        },
+        "U-USDC": {
+          "asset_class": "stable",
+          "global_index": 3,
+          "max_dev_bps": 50,
+          "min_sigma_pbps": 160,
+          "quote_unit": 1,
+          "symbol": "U",
+          "ttl_secs": 1020
+        },
+        "USD1-USDC": {
+          "asset_class": "stable",
+          "global_index": 2,
+          "max_dev_bps": 50,
+          "min_sigma_pbps": 160,
+          "quote_unit": 1,
+          "symbol": "USD1",
+          "ttl_secs": 1020
+        },
+        "USDC-USD": {
+          "asset_class": "stable",
+          "global_index": 1,
+          "max_dev_bps": 50,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "USDC-USD",
+          "ttl_secs": 1020
+        },
+        "USDT-USDC": {
+          "asset_class": "stable",
+          "global_index": 0,
+          "max_dev_bps": 50,
+          "min_sigma_pbps": 160,
+          "quote_unit": 0,
+          "symbol": "USDT",
+          "ttl_secs": 1020
+        },
+        "WBNB-USDC": {
+          "asset_class": "volatile",
+          "global_index": 4,
+          "max_dev_bps": 100,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "WBNB",
+          "ttl_secs": 600
+        },
+        "XAUT-USDC": {
+          "asset_class": "volatile",
+          "global_index": 7,
+          "max_dev_bps": 100,
+          "min_sigma_pbps": 300,
+          "quote_unit": 0,
+          "symbol": "XAUT",
+          "ttl_secs": 600
+        }
+      },
+      "feeds": {
+        "BTCB-USDC": "0x000000000000000000000000000000000000000000000000060a8d6484500000",
+        "ETH-USDC": "0x0000000000000000000000000000000000000000000000000616a96484500000",
+        "QQQb-USDC": "0x000000000000000000000000000000000000000000000000003f216484500000",
+        "U-USDC": "0x0000000000000000000000000000000000000000000000000650153138900000",
+        "USD1-USDC": "0x0000000000000000000000000000000000000000000000000622613138900000",
+        "USDC-USD": "0x0000000000000000000000000000000000000000000000000648453138900000",
+        "USDT-USDC": "0x0000000000000000000000000000000000000000000000000644c16484500000",
+        "WBNB-USDC": "0x00000000000000000000000000000000000000000000000006076d6484500000",
+        "XAUT-USDC": "0x000000000000000000000000000000000000000000000000064ee96484500000"
+      },
+      "name": "bnb",
+      "pools": {},
+      "ref_feeds": [],
+      "seeds": {},
+      "tokens": {
+        "BTCB": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+        "ETH": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+        "QQQb": "0x205812CDbED920aFf76c6580ABD681a46D11EFC7",
+        "U": "0xcE24439F2D9C6a2289F741120FE202248B666666",
+        "USD1": "0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d",
+        "USDC": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+        "USDT": "0x55d398326f99059fF775485246999027B3197955",
+        "WBNB": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        "XAUT": "0x21cAef8A43163Eea865baeE23b9C2E327696A3bf"
+      }
+    },
+    "143": {
+      "chain_id": 143,
+      "contracts": {
+        "accessControl": "0xbbbbbbb10CD446E774fAFE513Bb2B7669Fe823D5",
+        "admin": "0xbbbbbbb11d97d894264e1928144c2433D8734cea",
+        "coopArb": "0xbbbbbbb2A9C5b6DA52F2cC79f6A306EBCB37E5cF",
+        "flash": "0xbbbbbbb16959356457A6F357525Cfea95d463520",
+        "markStoreP8": "0x1B3C22d2Bdc4CB5dCFBcDC12485B8914a70b2027",
+        "poolFactory": "0xbbbbbbb16b9B5Fa94AD8CD35e696bEA55DB9C8B0",
+        "poolLens": "0x4eC4E80442C8cB0333ce3E58eC68A96e70f24867",
+        "router": "0xbbbbbbb17647a22D61E49d62a95445B1284b1296"
+      },
+      "curve_names": {
+        "1": "bell_100",
+        "3": "bell_100_inv",
+        "4": "bell_500_inv",
+        "5": "bell_500",
+        "6": "asym3",
+        "7": "asym5"
+      },
+      "feed_meta": {
+        "AUSD-USDC": {
+          "asset_class": "stable",
+          "global_index": 7,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "AUSD",
+          "ttl_secs": 1020
+        },
+        "CBBTC-USDC": {
+          "asset_class": "major",
+          "global_index": 2,
+          "max_dev_bps": 29,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "CBBTC",
+          "ttl_secs": 345
+        },
+        "GHO-USDC": {
+          "asset_class": "stable",
+          "global_index": 8,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "GHO",
+          "ttl_secs": 1020
+        },
+        "MUSD-USDC": {
+          "asset_class": "stable",
+          "global_index": 6,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "MUSD",
+          "ttl_secs": 1020
+        },
+        "SYRUPUSDC-USDC": {
+          "asset_class": "stable",
+          "global_index": 12,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 200,
+          "quote_unit": 0,
+          "symbol": "SYRUPUSDC",
+          "ttl_secs": 1020
+        },
+        "USDAT-USDC": {
+          "asset_class": "stable",
+          "global_index": 11,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 200,
+          "quote_unit": 0,
+          "symbol": "USDAT",
+          "ttl_secs": 1020
+        },
+        "USDC-USD": {
+          "asset_class": "stable",
+          "global_index": 0,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "USDC-USD",
+          "ttl_secs": 1020
+        },
+        "USDE-USDC": {
+          "asset_class": "stable",
+          "global_index": 10,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 200,
+          "quote_unit": 0,
+          "symbol": "USDE",
+          "ttl_secs": 1020
+        },
+        "USDT0-USDC": {
+          "asset_class": "stable",
+          "global_index": 9,
+          "max_dev_bps": 15,
+          "min_sigma_pbps": 100,
+          "quote_unit": 0,
+          "symbol": "USDT0",
+          "ttl_secs": 1020
+        },
+        "WBTC-USDC": {
+          "asset_class": "major",
+          "global_index": 3,
+          "max_dev_bps": 29,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "WBTC",
+          "ttl_secs": 345
+        },
+        "WETH-USDC": {
+          "asset_class": "major",
+          "global_index": 4,
+          "max_dev_bps": 29,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "WETH",
+          "ttl_secs": 345
+        },
+        "WMON-USDC": {
+          "asset_class": "alt",
+          "global_index": 1,
+          "max_dev_bps": 59,
+          "min_sigma_pbps": 500,
+          "quote_unit": 0,
+          "symbol": "WMON",
+          "ttl_secs": 180
+        },
+        "XAUT0-USDC": {
+          "asset_class": "gold",
+          "global_index": 5,
+          "max_dev_bps": 24,
+          "min_sigma_pbps": 300,
+          "quote_unit": 0,
+          "symbol": "XAUT0",
+          "ttl_secs": 417
+        }
+      },
+      "feeds": {
+        "AUSD-USDC": "0x0000000000000000000000000000000000000000000000000601f56484500000",
+        "CBBTC-USDC": "0x000000000000000000000000000000000000000000000000060f3d6484500000",
+        "GHO-USDC": "0x0000000000000000000000000000000000000000000000000600c96484500000",
+        "MUSD-USDC": "0x000000000000000000000000000000000000000000000000065e256484500000",
+        "SYRUPUSDC-USDC": "0x000000000000000000000000000000000000000000000000065b696484500000",
+        "USDAT-USDC": "0x000000000000000000000000000000000000000000000000065fb56484500000",
+        "USDC-USD": "0x0000000000000000000000000000000000000000000000000648453138900000",
+        "USDE-USDC": "0x0000000000000000000000000000000000000000000000000615196484500000",
+        "USDT0-USDC": "0x0000000000000000000000000000000000000000000000000644c16484500000",
+        "WBTC-USDC": "0x000000000000000000000000000000000000000000000000064b016484500000",
+        "WETH-USDC": "0x0000000000000000000000000000000000000000000000000616a96484500000",
+        "WMON-USDC": "0x000000000000000000000000000000000000000000000000065b056484500000",
+        "XAUT0-USDC": "0x000000000000000000000000000000000000000000000000064ee96484500000"
+      },
+      "name": "monad",
+      "pools": {
+        "btr-core": {
+          "address": "0xbbbbbbbd7060b1CED79c381eAD40d73FcB9Ae0C6",
+          "hooks": {
+            "AUSD": "0xbbbbbbbf9E5FCCEbe6dB57D0eF25b04225Aca99A",
+            "GHO": "0xbbbbbbbFA7fd15f6179a0c88b4fb7aE7Ba29f017",
+            "MUSD": "0xbbbbbbbF80dD41eAdcCFBaC4BB42a20786c19eBF",
+            "SYRUPUSDC": "0xbbbbbbb2860E994af6CA63CE2C2bac78D6E485AA",
+            "USDAT": "0xbbbbbbb347517F2476c24852bED79fc805726c76",
+            "USDC": "0xbbbbbbbf7a1D4564f863c71DD7547a3c05Cc9ca4",
+            "USDE": "0xbbbbbbb1E21B49Ff64B3D8444c1eD7C3eCe658de",
+            "USDT0": "0xbbbbbbbfb642BC167e3a959763CE54dB27ef60e3",
+            "WETH": "0xbbbbbbb1a709EA84D0Dd0C0e850068B7b42437Db"
+          },
+          "key": "core",
+          "listed": {
+            "AUSD": "AUSD",
+            "CBBTC": "cbBTC",
+            "GHO": "GHO",
+            "MUSD": "mUSD",
+            "SYRUPUSDC": "syrUSDC",
+            "USDAT": "USDat",
+            "USDC": "USDC",
+            "USDE": "USDe",
+            "USDT0": "USDT",
+            "WBTC": "WBTC",
+            "WETH": "WETH",
+            "WMON": "WMON",
+            "XAUT0": "XAUT"
+          },
+          "lp": {
+            "code": "C",
+            "name": "Core"
+          },
+          "receipts": {
+            "AUSD": "0x5aA70C365D0f343727f3b2185aC3dB464c598C79",
+            "CBBTC": "0xDB8B343BB0C89ccf34862D0F33351D60fCA9b19D",
+            "GHO": "0x453390Da6CE21fE8934C39d7e5F4e62A79403D8C",
+            "MUSD": "0x431daccd82d9b508F9CAa9ab999A91ca24fDC3F6",
+            "SYRUPUSDC": "0x6077071F1EE126801DAbeA3FA84f78553594d7A9",
+            "USDAT": "0xC2bDb5746F7AC687bD07F814CdAa3De4AACcb354",
+            "USDC": "0x7090ac23841D659620d00f9B0080DaaeF39F961E",
+            "USDE": "0xBbaB5A878d78fCbE943d8A5062f31a22dc2aB3f2",
+            "USDT0": "0x1b63b172f5C9AD938557cE4B9ee56E6fB904DbcB",
+            "WBTC": "0x85fB35C6035B3684Fe6698Dde165851318Bab255",
+            "WETH": "0x73fdA98a2C994bE6B77a75005dE06c517ea7C649",
+            "WMON": "0x37f48236eDfD21D9d8c9239E6b5b85aD098d014C",
+            "XAUT0": "0x23DA18C40dC623c9Ce4f5d01D90ce5d970A17DdC"
+          },
+          "ref_feeds": [],
+          "symbols": [
+            "AUSD",
+            "CBBTC",
+            "GHO",
+            "MUSD",
+            "SYRUPUSDC",
+            "USDAT",
+            "USDC",
+            "USDE",
+            "USDT0",
+            "WBTC",
+            "WETH",
+            "WMON",
+            "XAUT0"
+          ],
+          "tag": "btr-core"
+        }
+      },
+      "ref_feeds": [],
+      "seeds": {},
+      "tokens": {
+        "AUSD": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+        "CBBTC": "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b",
+        "GHO": "0xfc421aD3C883Bf9E7C4f42dE845C4e4405799e73",
+        "MUSD": "0xacA92E438df0B2401fF60dA7E4337B687a2435DA",
+        "SYRUPUSDC": "0xaB6e5a0C3799d020c790D34F7B2C02639e238AF7",
+        "USDAT": "0x0Bb150DFa86EA5d7742F07FEfCD8E8edA81D64eF",
+        "USDC": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+        "USDE": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+        "USDT0": "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
+        "WBTC": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+        "WETH": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
+        "WMON": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+        "XAUT0": "0x01bFF41798a0BcF287b996046Ca68b395DbC1071"
+      }
+    }
+  }
+}

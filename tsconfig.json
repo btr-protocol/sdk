@@ -12,8 +12,8 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["bun-types"]
+    "types": ["bun"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "cli/src/**/*", "mcp/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

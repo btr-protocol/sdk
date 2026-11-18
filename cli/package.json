@@ -1,0 +1,17 @@
+{
+  "name": "@btr-protocol/cli",
+  "version": "0.1.0",
+  "description": "btr: read-only command line for the public BTR API, built on @btr-protocol/sdk",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "btr": "./src/bin.ts" },
+  "exports": { ".": "./src/cli.ts" },
+  "files": ["src", "README.md"],
+  "keywords": ["btr", "dex", "cli", "api"],
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@btr-protocol/sdk": "workspace:*"
+  }
+}

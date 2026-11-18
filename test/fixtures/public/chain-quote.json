@@ -1,0 +1,65 @@
+{
+  "method": "POST",
+  "path": "/v1/chain/quote?chainId=143",
+  "body": {
+    "chain_id": 143,
+    "token_in": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "token_out": "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
+    "amounts_in": ["0xf4240", "0x989680"],
+    "slippage": {
+      "mode": "spread",
+      "pct": 50
+    }
+  },
+  "status": 200,
+  "response": {
+    "chain_id": 143,
+    "block": {
+      "number": 123244826,
+      "timestamp": 1794988054
+    },
+    "source": "chain",
+    "amounts": [
+      {
+        "amount_out": "0x1f4ae23701ffc",
+        "spread_pbps": 1176,
+        "proto_fee": "0x78a83cad4",
+        "lp_fee": "0x43dea22175",
+        "cov_toll": "0x51f9600e20",
+        "mark_price": "0x1f56b59791c79",
+        "mid_price": "0x1f54b85f61a65",
+        "route_hops": [
+          "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+          "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
+        ],
+        "hop_amounts": ["0xf4240", "0x1f54b85f61a65"],
+        "tol_pbps": 588,
+        "min_out": "0x0000000000000000000000000000000000000000000000000001f462c5a42ad4"
+      },
+      {
+        "amount_out": "0x138ec7358bea49",
+        "spread_pbps": 1176,
+        "proto_fee": "0x4b690e1cee",
+        "lp_fee": "0x2a6b17f0462",
+        "cov_toll": "0x338a3119346",
+        "mark_price": "0x1f56b59791c79",
+        "mid_price": "0x1f54b85f61a65",
+        "route_hops": [
+          "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+          "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
+        ],
+        "hop_amounts": ["0x989680", "0x1394f1f32a9edf"],
+        "tol_pbps": 588,
+        "min_out": "0x00000000000000000000000000000000000000000000000000138bd58c824c66"
+      }
+    ],
+    "flags": {
+      "in": 7930,
+      "out": 3824,
+      "swap_enabled": true,
+      "halted": false,
+      "swap_gated": true,
+      "open_path": false
+    }
+  }
+}

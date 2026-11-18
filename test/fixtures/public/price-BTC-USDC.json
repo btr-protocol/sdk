@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/v1/md/price/BTC-USDC",
+  "status": 200,
+  "response": {
+    "ask": 64669.10791,
+    "bid": 64665.37606,
+    "mid": 64667.24195
+  }
+}

@@ -49,6 +49,10 @@
       "types": "./src/pool/slippage.ts",
       "default": "./src/pool/slippage.ts"
     },
+    "./public": {
+      "types": "./src/public/index.ts",
+      "default": "./src/public/index.ts"
+    },
     "./router": {
       "types": "./src/router/index.ts",
       "default": "./src/router/index.ts"
@@ -82,9 +86,9 @@
     "check": "bun run typecheck && bun test",
     "dev": "bunx tsgo -p tsconfig.json --watch --noEmit",
     "fetch-abis": "bun scripts/gen-constants.ts && bun scripts/gen-venues.ts && bun scripts/gen-rpcs.ts && bun scripts/gen-nxr-marks.ts && bun scripts/fetch-abis.ts",
-    "format": "bunx biome format --write src",
+    "format": "bunx biome format --write src cli mcp",
     "refresh-rpcs": "bun scripts/refresh-rpcs.ts",
-    "lint": "bunx biome check src",
+    "lint": "bunx biome check src cli mcp test/publicFetch.ts scripts/record-public-fixtures.ts",
     "postinstall": "bun run fetch-abis",
     "test": "bun run fetch-abis && bun test",
     "typecheck": "bun run fetch-abis && bunx tsgo -p tsconfig.json --noEmit"
@@ -95,5 +99,6 @@
   "dependencies": {
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0"
-  }
+  },
+  "workspaces": ["cli", "mcp"]
 }

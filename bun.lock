@@ -15,6 +15,26 @@
         "@typescript/native-preview": "^7.0.0-dev.20251227.1",
       },
     },
+    "cli": {
+      "name": "@btr-protocol/cli",
+      "version": "0.1.0",
+      "bin": {
+        "btr": "./src/bin.ts",
+      },
+      "dependencies": {
+        "@btr-protocol/sdk": "workspace:*",
+      },
+    },
+    "mcp": {
+      "name": "@btr-protocol/mcp",
+      "version": "0.1.0",
+      "bin": {
+        "btr-mcp": "./src/bin.ts",
+      },
+      "dependencies": {
+        "@btr-protocol/sdk": "workspace:*",
+      },
+    },
   },
   "packages": {
     "@biomejs/biome": ["@biomejs/biome@1.9.4", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "1.9.4", "@biomejs/cli-darwin-x64": "1.9.4", "@biomejs/cli-linux-arm64": "1.9.4", "@biomejs/cli-linux-arm64-musl": "1.9.4", "@biomejs/cli-linux-x64": "1.9.4", "@biomejs/cli-linux-x64-musl": "1.9.4", "@biomejs/cli-win32-arm64": "1.9.4", "@biomejs/cli-win32-x64": "1.9.4" }, "bin": { "biome": "bin/biome" } }, "sha512-1rkd7G70+o9KkTn5KLmDYXihGoTaIGO9PIIN2ZB7UJxFrWw04CZHPYiMRjYsaDvVV7hP1dYNRLxSANLaBFGpog=="],
@@ -34,6 +54,12 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@1.9.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-tlbhLk+WXZmgwoIKwHIHEBZUwxml7bRJgk0X2sPyNR3S93cdRq6XulAZRQJ17FYGGzWne0fgrXBKpl7l4M87Hg=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@1.9.4", "", { "os": "win32", "cpu": "x64" }, "sha512-8Y5wMhVIPaWe6jw2H+KlEm4wP/f7EW3810ZLmDlrEEy5KvBsb9ECEfu/kMWD484ijfQ8+nIi0giMgu9g1UAuuA=="],
+
+    "@btr-protocol/cli": ["@btr-protocol/cli@workspace:cli"],
+
+    "@btr-protocol/mcp": ["@btr-protocol/mcp@workspace:mcp"],
+
+    "@btr-protocol/sdk": ["@btr-protocol/sdk@root:", {}],
 
     "@noble/curves": ["@noble/curves@2.3.0", "", { "dependencies": { "@noble/hashes": "2.3.0" } }, "sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg=="],
 

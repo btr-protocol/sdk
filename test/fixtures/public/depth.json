@@ -1,0 +1,27 @@
+{
+  "method": "POST",
+  "path": "/v1/depth",
+  "note": "Hand-written DepthBookWire: /v1/depth prices caller-supplied pool state, so there is no state-free request to record.",
+  "body": {
+    "pools": [],
+    "from": "USDC",
+    "to": "USDT0",
+    "step": 0.0001
+  },
+  "status": 200,
+  "response": {
+    "mark": 1,
+    "mid": 1.0001,
+    "bid": 0.9999,
+    "ask": 1.0003,
+    "step": 0.0001,
+    "steps": [0.0001, 0.0005, 0.001],
+    "bids": [{ "price": 0.9998, "size": 10, "cum": 10 }],
+    "asks": [{ "price": 1.0004, "size": 12, "cum": 12 }],
+    "bid_end": "capacity",
+    "ask_end": "capacity",
+    "poolCount": 1,
+    "swap_gated": false,
+    "open_path": true
+  }
+}

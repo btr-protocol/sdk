@@ -1,0 +1,28 @@
+{
+  "method": "GET",
+  "path": "/v1/pools?chainId=143",
+  "status": 200,
+  "response": {
+    "pools": [
+      {
+        "address": "0xbbbbbbbd7060b1ced79c381ead40d73fcb9ae0c6",
+        "symbols": [
+          "AUSD",
+          "CBBTC",
+          "GHO",
+          "MUSD",
+          "SYRUPUSDC",
+          "USDAT",
+          "USDC",
+          "USDE",
+          "USDT0",
+          "WBTC",
+          "WETH",
+          "WMON",
+          "XAUT0"
+        ],
+        "tag": "btr-core"
+      }
+    ]
+  }
+}

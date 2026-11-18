@@ -1,0 +1,74 @@
+{
+  "method": "POST",
+  "path": "/v1/chain/route?chainId=143",
+  "body": {
+    "chain_id": 143,
+    "token_in": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "token_out": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+    "amount_in": "0x3b9aca00",
+    "slippage": {
+      "mode": "spread",
+      "pct": 50
+    }
+  },
+  "status": 200,
+  "response": {
+    "chain_id": 143,
+    "block": {
+      "number": 123244827,
+      "timestamp": 1794988054
+    },
+    "source": "chain",
+    "best": {
+      "parts": [
+        {
+          "hops": [
+            {
+              "pool": "btr-core",
+              "token_in": "USDC",
+              "token_out": "WBTC",
+              "amount_in": "0x3b9aca00",
+              "amount_out": "0x178779"
+            }
+          ]
+        }
+      ],
+      "floors": [
+        {
+          "token": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+          "amount_out": "0x178779",
+          "tol_pbps": 662,
+          "min_out": "0x000000000000000000000000000000000000000000000000000000000017837c"
+        }
+      ]
+    },
+    "singles": [
+      {
+        "hops": [
+          {
+            "pool": "btr-core",
+            "token_in": "USDC",
+            "token_out": "WBTC",
+            "amount_in": "0x3b9aca00",
+            "amount_out": "0x178779"
+          }
+        ]
+      }
+    ],
+    "refused": [],
+    "flags": [
+      {
+        "pool": "btr-core",
+        "token": "USDC",
+        "word": 7930
+      },
+      {
+        "pool": "btr-core",
+        "token": "WBTC",
+        "word": 3824
+      }
+    ],
+    "swap_gated": true,
+    "open_path": false
+  }
+}
