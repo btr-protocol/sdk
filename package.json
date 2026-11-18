@@ -114,7 +114,7 @@
     "lint": "bunx biome check src",
     "test": "bun run fetch-abis && bun test",
     "typecheck": "bun run fetch-abis && bunx tsgo -p tsconfig.json --noEmit",
-    "prepublishOnly": "bun run fetch-abis && bun run typecheck && bun test"
+    "prepublishOnly": "bun run fetch-abis && bun run typecheck && bun test ./src ./test"
   },
   "sideEffects": false,
   "type": "module",
