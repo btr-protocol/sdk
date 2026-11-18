@@ -128,7 +128,7 @@ export async function handleLine(line: string, o: RegistryOpts = {}): Promise<un
 /** Max bytes of one JSON-RPC line; larger input is dropped with -32700. */
 export const MAX_LINE = 1_048_576;
 
-if (import.meta.main) {
+export function serve(): void {
   let buf = '';
   let queue: Promise<void> = Promise.resolve(); // serial: responses keep request order
   process.stdin.setEncoding('utf8');
@@ -165,3 +165,4 @@ if (import.meta.main) {
   process.stdin.on('data', (c: string) => feed(c));
   process.stdin.on('end', () => feed('', true));
 }
+if (import.meta.main) serve();

@@ -12,8 +12,8 @@
     "bun": ">=1.1"
   },
   "bin": {
-    "btr": "./src/cli/btr.ts",
-    "btr-mcp": "./src/cli/mcp.ts"
+    "btr": "bin/btr.js",
+    "btr-mcp": "bin/btr-mcp.js"
   },
   "exports": {
     ".": {
@@ -90,7 +90,8 @@
     "abis.lock.json",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "bin"
   ],
   "keywords": [
     "btr",
