@@ -54,7 +54,7 @@ function chainArg(a: Rec | undefined): number | undefined {
 
 async function call(name: unknown, a: Rec | undefined, o: RegistryOpts): Promise<unknown> {
   const chain = chainArg(a);
-  if (name === 'get_abi') return fetchAbi(String(a?.name), o, chain);
+  if (name === 'get_abi') return fetchAbi(String(a?.name), o, chain ?? defaultChainId());
   if (name === 'list_abis') return fetchAbis(chain ?? defaultChainId(), o);
   if (name === 'get_roster') return rosterFor(chain ?? defaultChainId(), o);
   if (name === 'get_registry' || name === 'list_pools') {
@@ -128,8 +128,8 @@ if (import.meta.main) {
   let buf = '';
   let queue: Promise<void> = Promise.resolve(); // serial: responses keep request order
   process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (c: string) => {
-    buf += c;
+  const feed = (c: string, final = false) => {
+    buf += final ? '\n' : c;
     let i = buf.indexOf('\n');
     while (i >= 0) {
       const line = buf.slice(0, i).trim();
@@ -141,5 +141,7 @@ if (import.meta.main) {
         });
       i = buf.indexOf('\n');
     }
-  });
+  };
+  process.stdin.on('data', (c: string) => feed(c));
+  process.stdin.on('end', () => feed('', true));
 }

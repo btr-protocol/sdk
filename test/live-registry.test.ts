@@ -80,6 +80,7 @@ test('cli: exit codes and roster', async () => {
   lines.length = 0;
   expect(await run(['roster', '--chain', '143'], out, real)).toBe(0);
   expect(lines.join()).toContain(fixture.roster.safes[0]!.address);
+  expect(lines.join()).toContain('"degraded": false');
   lines.length = 0;
   expect(await run(['abis', '--chain', '143'], out, { fetch: mock(abisIndex) })).toBe(0);
   expect(lines.join()).toContain('Pool');
@@ -102,6 +103,9 @@ test('null contract = missing: allowlisted throws, other ignored', async () => {
   j.contracts.adminImpl = null;
   expect((await fetchRegistry(143, { fetch: mock(j) })).warnings).toEqual([]);
   j.contracts.router = null;
+  expect((await fetchRegistry(143, { fetch: mock(j), trustLive: true })).warnings.join()).toContain(
+    'contracts.router',
+  );
   await expect(fetchRegistry(143, { fetch: mock(j) })).rejects.toThrow('contracts.router');
 });
 
@@ -120,7 +124,10 @@ test('degraded with null roster/abis does not throw', async () => {
     { id: 1, method: 'tools/call', params: { name: 'get_roster', arguments: { chainId: 143 } } },
     { fetch: f },
   );
-  expect(JSON.parse(res.result.content[0].text)).toEqual({ safes: ['x'] });
+  expect(JSON.parse(res.result.content[0].text)).toMatchObject({
+    roster: { safes: ['x'] },
+    degraded: true,
+  });
 });
 
 test('mcp list_abis and requests hit /v1/registry', async () => {
@@ -137,4 +144,17 @@ test('mcp list_abis and requests hit /v1/registry', async () => {
   await fetchRegistry(143, { fetch: f });
   expect(urls[0]).toEndWith('/v1/abis?chainId=143');
   expect(urls[1]).toEndWith('/v1/registry?chainId=143');
+});
+
+test('wrong-chain roster/abis and duplicate pool tags are refused', async () => {
+  const wrong = { ...fixture, roster: { ...fixture.roster, chainId: 1 } };
+  const res: any = await handle(
+    { id: 1, method: 'tools/call', params: { name: 'get_roster', arguments: { chainId: 143 } } },
+    { fetch: mock(wrong) },
+  );
+  expect(res.result.isError).toBe(true);
+  const dup = structuredClone(fixture);
+  dup.pools[1] = { ...dup.pools[1]!, status: 'live' };
+  await expect(fetchRegistry(143, { fetch: mock(dup) })).rejects.toThrow('duplicate tag');
+  expect(await run(['abis', '--chain', '143'], () => {}, { fetch: mock({ chainId: 1 }) })).toBe(1);
 });

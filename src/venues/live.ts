@@ -72,21 +72,30 @@ function addrMap(label: string, m: unknown): Record<string, Address> {
 export function parseLive(j: any): Omit<LiveRegistry, 'source' | 'warnings' | 'info'> {
   if (!j || typeof j.chainId !== 'number') throw new Error('registry: no chainId');
   // biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
+  if (j.pools !== undefined && !Array.isArray(j.pools)) throw new Error('registry: bad pools');
   const all: LivePool[] = (j.pools ?? []).map((p: any) => {
     if (typeof p?.address !== 'string' || !isAddress(p.address))
       throw new Error(`pool ${p?.tag}: bad address`);
+    if (typeof p.tag !== 'string' || !p.tag) throw new Error('pool: missing tag');
+    if (p.symbols !== undefined && !Array.isArray(p.symbols))
+      throw new Error(`pool ${p.tag}: bad symbols`);
     return {
       address: p.address,
-      tag: String(p.tag),
+      tag: p.tag,
       symbols: p.symbols ?? [],
       status: p.status,
       generation: p.generation,
     };
   });
+  const seen = new Set<string>();
+  for (const p of all) {
+    if (seen.has(`${p.tag}/${p.status}`)) throw new Error(`pool ${p.tag}: duplicate tag`);
+    seen.add(`${p.tag}/${p.status}`);
+  }
   const pools = all.filter((p) => (p.status ?? 'live') === 'live');
   return {
     otherPools: all.filter((p) => !pools.includes(p)),
-    degraded: j.degraded === true || j.roster?.degraded === true,
+    degraded: j.degraded === true || j.roster?.degraded === true || !j.roster || !j.abis,
     roster: j.roster ?? null,
     abis: j.abis ?? null,
     chainId: j.chainId,
@@ -106,7 +115,7 @@ function bakedRegistry(chainId: number): LiveRegistry {
     tokens: v.tokens,
     pools: v.pools,
     otherPools: [],
-    degraded: false,
+    degraded: true, // baked copy: no roster/abis, not live
     roster: null,
     abis: null,
     source: 'baked',
@@ -201,20 +210,43 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
   return { ...live, source: 'live', warnings: hard, info: soft };
 }
 
-export const fetchRoster = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
-  getJson(`/v1/roster?chainId=${chainId}`, o);
+const chainQ = (chainId: number): string => {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0)
+    throw new Error('chainId must be a positive integer');
+  return `?chainId=${chainId}`;
+};
 
-/** Roster for `chainId`: the one embedded in the registry when present, else `/v1/roster`. */
-export async function rosterFor(chainId: number, o: RegistryOpts = {}): Promise<unknown> {
+// biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
+const sameChain = (j: any, chainId: number, what: string): unknown => {
+  if (j && typeof j === 'object' && j.chainId !== undefined && j.chainId !== chainId)
+    throw new Error(`${what}: asked chain ${chainId}, got ${j.chainId}`);
+  return j;
+};
+
+export const fetchRoster = async (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
+  sameChain(await getJson(`/v1/roster${chainQ(chainId)}`, o), chainId, 'roster');
+
+/** Roster for `chainId`: the one embedded in the registry when present, else `/v1/roster`.
+ *  `degraded` is the registry's flag (a degraded roster is returned, not thrown on). */
+export async function rosterFor(
+  chainId: number,
+  o: RegistryOpts = {},
+): Promise<{ roster: unknown; degraded: boolean; source: 'registry' | 'roster' }> {
   const r = await fetchRegistry(chainId, o);
-  return r.roster ?? fetchRoster(chainId, o);
+  if (r.roster)
+    return {
+      roster: sameChain(r.roster, chainId, 'roster'),
+      degraded: r.degraded,
+      source: 'registry',
+    };
+  return { roster: await fetchRoster(chainId, o), degraded: true, source: 'roster' };
 }
 
 /** ABI index for a chain: `{chainId, generation, names, source, storageVersion}`. */
-export const fetchAbis = (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
-  getJson(`/v1/abis?chainId=${chainId}`, o);
+export const fetchAbis = async (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
+  sameChain(await getJson(`/v1/abis${chainQ(chainId)}`, o), chainId, 'abis');
 
 export const fetchAbi = (name: string, o: LiveOpts = {}, chainId?: number): Promise<unknown> => {
   if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`bad ABI name: ${name}`);
-  return getJson(`/v1/abis/${name}${chainId ? `?chainId=${chainId}` : ''}`, o);
+  return getJson(`/v1/abis/${name}${chainId === undefined ? '' : chainQ(chainId)}`, o);
 };
