@@ -6,6 +6,8 @@ TypeScript SDK for BTR — a thin client over the BTR backend.
 ships no contract source and no build pipeline for one: it talks to the deployed protocol through
 the backend API and standard EVM JSON-RPC.
 
+**Runtime:** the `btr` and `btr-mcp` bins have a bun shebang and need [bun](https://bun.sh) (`bunx @btr-protocol/sdk`); the library ships TypeScript source.
+
 ## ABIs come from the backend, pinned at build time
 
 The backend's getAbi service is the source of truth, and `bun run fetch-abis` bakes its answer

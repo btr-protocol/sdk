@@ -166,7 +166,7 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
   const id = chainId ?? defaultChainId();
   let live: ReturnType<typeof parseLive>;
   try {
-    live = parseLive(await getJson(`${REGISTRY_PATH}?chainId=${id}`, o));
+    live = parseLive(await getJson(`${REGISTRY_PATH}${chainQ(id)}`, o));
     if (live.chainId !== id) throw new Error(`asked chain ${id}, got ${live.chainId}`);
   } catch (e) {
     if (o.fallback !== 'baked')
@@ -246,7 +246,11 @@ export async function rosterFor(
 export const fetchAbis = async (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
   sameChain(await getJson(`/v1/abis${chainQ(chainId)}`, o), chainId, 'abis');
 
-export const fetchAbi = (name: string, o: LiveOpts = {}, chainId?: number): Promise<unknown> => {
+export const fetchLiveAbi = (
+  name: string,
+  o: LiveOpts = {},
+  chainId?: number,
+): Promise<unknown> => {
   if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`bad ABI name: ${name}`);
   return getJson(`/v1/abis/${name}${chainId === undefined ? '' : chainQ(chainId)}`, o);
 };

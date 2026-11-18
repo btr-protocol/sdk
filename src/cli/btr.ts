@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import {
   type RegistryOpts,
-  fetchAbi,
+  fetchLiveAbi,
   fetchAbis,
   fetchRegistry,
   rosterFor,
@@ -43,7 +43,7 @@ export async function run(
         err(USAGE);
         return 2;
       }
-      out(JSON.stringify(await fetchAbi(rest[0], opts, chain ?? defaultChainId())));
+      out(JSON.stringify(await fetchLiveAbi(rest[0], opts, chain ?? defaultChainId())));
       return 0;
     }
     if (cmd === 'abis') {

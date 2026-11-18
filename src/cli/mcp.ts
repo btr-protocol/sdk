@@ -3,7 +3,7 @@
 // No signing, no tx sending.
 import {
   type RegistryOpts,
-  fetchAbi,
+  fetchLiveAbi,
   fetchAbis,
   fetchRegistry,
   rosterFor,
@@ -54,7 +54,7 @@ function chainArg(a: Rec | undefined): number | undefined {
 
 async function call(name: unknown, a: Rec | undefined, o: RegistryOpts): Promise<unknown> {
   const chain = chainArg(a);
-  if (name === 'get_abi') return fetchAbi(String(a?.name), o, chain ?? defaultChainId());
+  if (name === 'get_abi') return fetchLiveAbi(String(a?.name), o, chain ?? defaultChainId());
   if (name === 'list_abis') return fetchAbis(chain ?? defaultChainId(), o);
   if (name === 'get_roster') return rosterFor(chain ?? defaultChainId(), o);
   if (name === 'get_registry' || name === 'list_pools') {
@@ -124,12 +124,20 @@ export async function handleLine(line: string, o: RegistryOpts = {}): Promise<un
   return handle(req, o);
 }
 
+/** Max bytes of one JSON-RPC line; larger input is dropped with -32700. */
+export const MAX_LINE = 1_048_576;
+
 if (import.meta.main) {
   let buf = '';
   let queue: Promise<void> = Promise.resolve(); // serial: responses keep request order
   process.stdin.setEncoding('utf8');
   const feed = (c: string, final = false) => {
     buf += final ? '\n' : c;
+    if (buf.length > MAX_LINE && buf.indexOf('\n') < 0) {
+      buf = '';
+      process.stdout.write(`${JSON.stringify(rpcErr(null, -32700, 'line too large'))}\n`);
+      return;
+    }
     let i = buf.indexOf('\n');
     while (i >= 0) {
       const line = buf.slice(0, i).trim();
