@@ -56,7 +56,7 @@ function addrMap(label: string, m: unknown): Record<string, Address> {
 
 /** Validate the live wire; throws on any malformed address. */
 // biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
-export function parseLive(j: any): Omit<LiveRegistry, 'source' | 'warnings'> {
+export function parseLive(j: any): Omit<LiveRegistry, 'source' | 'warnings' | 'info'> {
   if (!j || typeof j.chainId !== 'number') throw new Error('registry: no chainId');
   // biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
   const pools: LivePool[] = (j.pools ?? []).map((p: any) => {
