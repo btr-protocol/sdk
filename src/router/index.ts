@@ -121,6 +121,7 @@ export function assertServerFloor(
   if (!(tolPbps <= maxTolPbps)) {
     throw new Error(`server tol_pbps ${tolPbps} exceeds the requested ${maxTolPbps}`);
   }
+  if (minOut <= 0n) throw new Error('server floor is zero: nothing bounds the output');
   if (minOut > amountOut) {
     throw new Error(`server floor ${minOut} exceeds amount_out ${amountOut}`);
   }
@@ -128,6 +129,24 @@ export function assertServerFloor(
   const diff = expected > minOut ? expected - minOut : minOut - expected;
   if (diff > 1n) {
     throw new Error(`server floor ${minOut} != amount_out*(1e6-${tolPbps})/1e6 (=${expected})`);
+  }
+}
+
+/** The server's amount_out and floor are checked against the SDK's own quote for the same token:
+ *  amount_out must sit within the caller's tolerance of it either way, and the floor must not
+ *  fall below that tolerance of the own quote. Self-consistency alone lets the server author both. */
+function assertServerVsOwnQuote(
+  server: { amountOut: bigint; minOut: bigint },
+  own: bigint,
+  maxTolPbps: number,
+): void {
+  const lo = applyTolPbps(own, maxTolPbps);
+  const hi = (own * (1_000_000n + BigInt(maxTolPbps))) / 1_000_000n;
+  if (server.amountOut < lo || server.amountOut > hi) {
+    throw new Error(`server amount_out ${server.amountOut} deviates from own quote ${own}`);
+  }
+  if (server.minOut < lo) {
+    throw new Error(`server floor ${server.minOut} below own quote ${own} less ${maxTolPbps} pbps`);
   }
 }
 
@@ -349,6 +368,20 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     NonNullable<PlanLegOpts['serverFloors']>[string],
     { idx: number; q: bigint }[]
   >();
+  // The SDK's own quote per floored token spans EVERY ordered part, carved-away ones included:
+  // the server's amount_out covers them too.
+  const ownQuote = new Map<NonNullable<PlanLegOpts['serverFloors']>[string], bigint>();
+  for (const part of ordered) {
+    const last = part.route.legs.at(-1);
+    const out = last && opts.tokenOf(last.tokenOut);
+    const server = out && opts.serverFloors?.[out.address.toLowerCase()];
+    if (server) {
+      ownQuote.set(
+        server,
+        (ownQuote.get(server) ?? 0n) + toUnits(part.quote.amountOut, out.decimals),
+      );
+    }
+  }
   for (const [i, part] of parts.entries()) {
     const last = part.route.legs.at(-1);
     const out = last && opts.tokenOf(last.tokenOut);
@@ -370,6 +403,11 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       serverTolCeiling('planToLegs', opts),
     );
     const total = slices.reduce((s, x) => s + x.q, 0n);
+    assertServerVsOwnQuote(
+      server,
+      ownQuote.get(server) ?? 0n,
+      serverTolCeiling('planToLegs', opts),
+    );
     // Nothing quoted for a floored token: no slice can carry the floor. Fail closed.
     if (total <= 0n) return null;
     const shares = slices.map((x) => (server.minOut * x.q) / total);
@@ -895,6 +933,7 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
         server.minOut,
         serverTolCeiling('planToRouterPlan', opts),
       );
+      assertServerVsOwnQuote(server, amount, serverTolCeiling('planToRouterPlan', opts));
       floors.push({ token, minOut: server.minOut });
     } else if (opts.serverFloors) {
       // Floors supplied but none for this output: the plan delivers a token the server never

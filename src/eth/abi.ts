@@ -200,7 +200,7 @@ export function encode(
     const lo = base === 'uint' ? 0n : -(1n << (bits - 1n));
     const hi = base === 'uint' ? (1n << bits) - 1n : (1n << (bits - 1n)) - 1n;
     if (n < lo || n > hi) throw new Error(`encode ${type}: ${n} out of range [${lo}, ${hi}]`);
-    hex = numToHex(n < 0n ? n + (1n << bits) : n);
+    hex = numToHex(BigInt.asUintN(256, n)); // sign-extend to the full word
   } else {
     throw new Error(`encode: unsupported type ${type}`);
   }
@@ -342,8 +342,10 @@ export function decode(
   if (base === 'bool') return { val: val !== 0n, read: 64 };
   if (base === 'int') {
     const bits = BN(sizeStr || 256);
-    const mask = 1n << (bits - 1n);
-    return { val: val >= mask ? val - (1n << bits) : val, read: 64 };
+    const n = BigInt.asIntN(256, val);
+    if (n < -(1n << (bits - 1n)) || n >= 1n << (bits - 1n))
+      throw new Error(`abi decode: ${type} word out of range`);
+    return { val: n, read: 64 };
   }
   if (base === 'bytes')
     return { val: `0x${readWord(offset).slice(0, Number.parseInt(sizeStr ?? '') * 2)}`, read: 64 };

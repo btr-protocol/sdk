@@ -408,3 +408,41 @@ describe('decode refuses return data shorter than its type', () => {
     expect(() => decodeAbiParameters([{ type: 'bytes' }], data.slice(0, -60))).toThrow(/overruns/);
   });
 });
+
+describe('intN two-complement encoding (N < 256)', () => {
+  const word = (n: bigint) => BigInt.asUintN(256, n).toString(16).padStart(64, '0');
+  const enc = (t: string, v: bigint) => encodeAbiParameters([{ type: t, name: '' }], [v]);
+  const dec = (t: string, h: string) => decodeAbiParameters([{ type: t, name: '' }], h)[0];
+  const F = 'f'.repeat(64);
+
+  // Known ABI words (Solidity abi.encode): int8(-1) is the full-ones word, int8(-128) is ff..80.
+  test('known encodings', () => {
+    expect(enc('int8', -1n)).toBe(`0x${F}`);
+    expect(enc('int8', -128n)).toBe(`0x${'f'.repeat(62)}80`);
+    expect(enc('int8', 127n)).toBe(`0x${'0'.repeat(62)}7f`);
+    expect(enc('int24', -1n)).toBe(`0x${F}`);
+    expect(enc('int24', -8388608n)).toBe(`0x${'f'.repeat(58)}800000`);
+    expect(enc('int128', -1n)).toBe(`0x${F}`);
+    expect(enc('int128', -(1n << 127n))).toBe(`0x${'f'.repeat(32)}8${'0'.repeat(31)}`);
+    expect(enc('int128', (1n << 127n) - 1n)).toBe(`0x${'0'.repeat(32)}7${'f'.repeat(31)}`);
+  });
+
+  test('every N in 8..256: min, max, -1, 0 round-trip and match the sign-extended word', () => {
+    for (let n = 8; n <= 256; n += 8) {
+      const t = `int${n}`;
+      const min = -(1n << BigInt(n - 1));
+      const max = (1n << BigInt(n - 1)) - 1n;
+      for (const v of [min, max, -1n, 0n, 1n]) {
+        expect(enc(t, v)).toBe(`0x${word(v)}`);
+        expect(dec(t, enc(t, v))).toBe(v);
+      }
+      expect(() => enc(t, max + 1n)).toThrow();
+      expect(() => enc(t, min - 1n)).toThrow();
+    }
+  });
+
+  test('decode rejects a word that is not a sign-extended intN', () => {
+    expect(() => dec('int8', `0x${'0'.repeat(62)}ff`)).toThrow(/out of range/);
+    expect(dec('int8', `0x${F}`)).toBe(-1n);
+  });
+});

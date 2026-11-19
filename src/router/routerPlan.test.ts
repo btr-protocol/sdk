@@ -860,12 +860,9 @@ describe('planToLegs', () => {
     expect(legs.map((l) => l.minOut)).toEqual([e18(693n), e18(297n)]); // Σ === 990, each < 990
   });
 
-  test('an aggregate below the server floor is NOT lowered — it reverts instead', () => {
-    // Parts quote 900 in total; the server floor is 990. The floor is authoritative: the builder
-    // must not scale it down to the stale replica, so the encoded batch cannot meet it and reverts.
-    const legs = mustLegs(planToLegs(split7030(200), floor990(USDT)));
-    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(e18(990n));
-    for (const l of legs) expect(l.minOut).toBeGreaterThan(l.quotedOut);
+  test('an aggregate below the server floor is refused, never lowered or encoded', () => {
+    // Parts quote 900 in total; the server claims 1000 / floor 990: it deviates from the SDK's own quote.
+    expect(() => planToLegs(split7030(200), floor990(USDT))).toThrow(/deviates from own quote/);
   });
 
   test('a chained hop 2 carries its slice of the server floor, funded by hop 1', () => {
@@ -1023,5 +1020,38 @@ describe('plans bind to the requested pair', () => {
     const r = route([P1, P2], ['USDC', 'DAI', 'USDT']);
     r.legs[1].tokenIn = 'BNB';
     expect(planToLegs(plan(100, 99, [part(r, 1, 100, 99, [100, 99])]), bound)).toBeNull();
+  });
+});
+
+describe('server floor vs the SDK own quote — fail closed', () => {
+  const e18 = (n: bigint) => n * 10n ** 18n;
+  const single = plan(100, 100, [part(route([P1], ['USDC', 'USDT']), 1, 100, 100)]);
+  const tol = 10_000; // 1%
+  const mk = (amountOut: bigint, minOut: bigint, tolPbps = tol) => ({
+    ...O0,
+    amountInUnits: 100_000_000n,
+    maxTolPbps: tol,
+    serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
+  });
+  const floorOf = (out: bigint, t = tol) => (out * (1_000_000n - BigInt(t))) / 1_000_000n;
+  const both = (o: ReturnType<typeof mk>, re: RegExp) => {
+    expect(() => planToLegs(single, o)).toThrow(re);
+    expect(() => planToRouterPlan(single, o)).toThrow(re);
+  };
+
+  test('happy path: server agrees with own quote', () => {
+    const o = mk(e18(100n), floorOf(e18(100n)));
+    expect(planToLegs(single, o)?.[0].minOut).toBe(floorOf(e18(100n)));
+    expect(planToRouterPlan(single, o)?.floors[0].minOut).toBe(floorOf(e18(100n)));
+  });
+  test('zero floor is refused', () => {
+    both(mk(e18(100n), 0n), /floor is zero/);
+  });
+  test('inflated server amount_out is refused', () => {
+    both(mk(e18(150n), floorOf(e18(150n))), /deviates from own quote/);
+  });
+  test('floor below the caller tolerance of own quote is refused', () => {
+    // amount_out within tolerance and self-consistent, but its floor lands under own·(1 - tol)
+    both(mk(e18(995n) / 10n, floorOf(e18(995n) / 10n)), /below own quote/);
   });
 });
