@@ -8,6 +8,7 @@ import {
   type RouterPlan,
   type TokenMeta,
   assertServerFloor,
+  floorAgainstChain,
   buildRouterApprovalCalls,
   buildRouterCalls,
   buildRouterSwapExecCalls,
@@ -860,9 +861,12 @@ describe('planToLegs', () => {
     expect(legs.map((l) => l.minOut)).toEqual([e18(693n), e18(297n)]); // Σ === 990, each < 990
   });
 
-  test('an aggregate below the server floor is refused, never lowered or encoded', () => {
-    // Parts quote 900 in total; the server claims 1000 / floor 990: it deviates from the SDK's own quote.
-    expect(() => planToLegs(split7030(200), floor990(USDT))).toThrow(/deviates from own quote/);
+  test('an aggregate below the server floor is NOT lowered — it reverts instead', () => {
+    // Parts quote 900 in total; the server floor is 990. The floor is authoritative: the builder
+    // must not scale it down to the stale replica, so the encoded batch cannot meet it and reverts.
+    const legs = mustLegs(planToLegs(split7030(200), floor990(USDT)));
+    expect(legs.reduce((s, l) => s + l.minOut, 0n)).toBe(e18(990n));
+    for (const l of legs) expect(l.minOut).toBeGreaterThan(l.quotedOut);
   });
 
   test('a chained hop 2 carries its slice of the server floor, funded by hop 1', () => {
@@ -1023,35 +1027,47 @@ describe('plans bind to the requested pair', () => {
   });
 });
 
-describe('server floor vs the SDK own quote — fail closed', () => {
-  const e18 = (n: bigint) => n * 10n ** 18n;
+describe('zero floor and on-chain floor check', () => {
   const single = plan(100, 100, [part(route([P1], ['USDC', 'USDT']), 1, 100, 100)]);
+  const e18 = (n: bigint) => n * 10n ** 18n;
   const tol = 10_000; // 1%
-  const mk = (amountOut: bigint, minOut: bigint, tolPbps = tol) => ({
+  const f = (out: bigint, t = tol) => ({
+    amountOut: out,
+    minOut: (out * (1_000_000n - BigInt(t))) / 1_000_000n,
+    tolPbps: t,
+  });
+  const opts = (fl: ReturnType<typeof f>) => ({
     ...O0,
     amountInUnits: 100_000_000n,
     maxTolPbps: tol,
-    serverFloors: { [USDT.toLowerCase()]: { amountOut, minOut, tolPbps } },
+    serverFloors: { [USDT.toLowerCase()]: fl },
   });
-  const floorOf = (out: bigint, t = tol) => (out * (1_000_000n - BigInt(t))) / 1_000_000n;
-  const both = (o: ReturnType<typeof mk>, re: RegExp) => {
-    expect(() => planToLegs(single, o)).toThrow(re);
-    expect(() => planToRouterPlan(single, o)).toThrow(re);
-  };
 
-  test('happy path: server agrees with own quote', () => {
-    const o = mk(e18(100n), floorOf(e18(100n)));
-    expect(planToLegs(single, o)?.[0].minOut).toBe(floorOf(e18(100n)));
-    expect(planToRouterPlan(single, o)?.floors[0].minOut).toBe(floorOf(e18(100n)));
+  test('a zero floor is refused by both builders and by assertServerFloor', () => {
+    const z = { amountOut: e18(100n), minOut: 0n, tolPbps: tol };
+    expect(() => planToLegs(single, opts(z))).toThrow(/floor is zero/);
+    expect(() => planToRouterPlan(single, opts(z))).toThrow(/floor is zero/);
+    expect(() => assertServerFloor(e18(100n), tol, 0n, tol)).toThrow(/floor is zero/);
   });
-  test('zero floor is refused', () => {
-    both(mk(e18(100n), 0n), /floor is zero/);
+
+  test('chainOut just below the plan quote still passes within tolerance', () => {
+    const served = f(e18(100n));
+    const chainOut = e18(100n) - 1n; // adverse by one wei
+    expect(floorAgainstChain(chainOut, served, tol)).toEqual(served);
+    const chain2 = e18(995n) / 10n; // 0.5% adverse: served floor 99 still <= chain, kept
+    expect(floorAgainstChain(chain2, served, tol)).toEqual(served);
   });
-  test('inflated server amount_out is refused', () => {
-    both(mk(e18(150n), floorOf(e18(150n))), /deviates from own quote/);
+
+  test('a served floor above the chain output is refused', () => {
+    expect(floorAgainstChain(e18(98n), f(e18(100n)), tol)).toBeNull();
   });
-  test('floor below the caller tolerance of own quote is refused', () => {
-    // amount_out within tolerance and self-consistent, but its floor lands under own·(1 - tol)
-    both(mk(e18(995n) / 10n, floorOf(e18(995n) / 10n)), /below own quote/);
+
+  test('a served floor below the caller tolerance is lifted, and stays self-consistent', () => {
+    const loose = { amountOut: e18(100n), minOut: e18(50n), tolPbps: tol };
+    const lifted = floorAgainstChain(e18(100n), loose, tol);
+    expect(lifted).toEqual(f(e18(100n)));
+    expect(() =>
+      assertServerFloor(lifted!.amountOut, lifted!.tolPbps, lifted!.minOut, tol),
+    ).not.toThrow();
   });
 });

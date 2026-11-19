@@ -111,6 +111,11 @@ function applyTolPbps(amount: bigint, tolPbps: number): bigint {
  * leaving no floor at all, and the swap is sandwiched for almost the whole amount. `maxTolPbps` is
  * the caller's own tolerance, the one number in the exchange the server did not write, and it
  * bounds the tolerance the caller will encode.
+ *
+ * Neither check is independent of the server: it authors the quote AND the floor, so a plan's own
+ * `quote` cannot vouch for them either. The only independent bound is an on-chain quote of the
+ * encoded plan: re-price the exact input and pass the result to {@link floorAgainstChain}.
+ * A zero floor is refused outright: it bounds nothing.
  */
 export function assertServerFloor(
   amountOut: bigint,
@@ -132,22 +137,22 @@ export function assertServerFloor(
   }
 }
 
-/** The server's amount_out and floor are checked against the SDK's own quote for the same token:
- *  amount_out must sit within the caller's tolerance of it either way, and the floor must not
- *  fall below that tolerance of the own quote. Self-consistency alone lets the server author both. */
-function assertServerVsOwnQuote(
-  server: { amountOut: bigint; minOut: bigint },
-  own: bigint,
-  maxTolPbps: number,
-): void {
-  const lo = applyTolPbps(own, maxTolPbps);
-  const hi = (own * (1_000_000n + BigInt(maxTolPbps))) / 1_000_000n;
-  if (server.amountOut < lo || server.amountOut > hi) {
-    throw new Error(`server amount_out ${server.amountOut} deviates from own quote ${own}`);
-  }
-  if (server.minOut < lo) {
-    throw new Error(`server floor ${server.minOut} below own quote ${own} less ${maxTolPbps} pbps`);
-  }
+/**
+ * The floor to encode after an on-chain re-price of the exact input (`getSwapQuote` /
+ * `Router` quote): the served one, lifted to `ceilingPbps` below `chainOut` when it sits lower.
+ * A served minimum above what the chain pays would revert and returns null (fail closed). The
+ * lifted floor is self-consistent, so {@link assertServerFloor} still holds on it.
+ */
+export function floorAgainstChain(
+  chainOut: bigint,
+  floor: { amountOut: bigint; minOut: bigint; tolPbps: number },
+  ceilingPbps: number,
+): { amountOut: bigint; minOut: bigint; tolPbps: number } | null {
+  if (floor.minOut > chainOut) return null;
+  const tolPbps = Math.floor(ceilingPbps);
+  const lowest = applyTolPbps(chainOut, tolPbps);
+  if (floor.minOut >= lowest) return floor;
+  return { amountOut: chainOut, minOut: lowest, tolPbps };
 }
 
 export interface TokenMeta {
@@ -368,20 +373,6 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     NonNullable<PlanLegOpts['serverFloors']>[string],
     { idx: number; q: bigint }[]
   >();
-  // The SDK's own quote per floored token spans EVERY ordered part, carved-away ones included:
-  // the server's amount_out covers them too.
-  const ownQuote = new Map<NonNullable<PlanLegOpts['serverFloors']>[string], bigint>();
-  for (const part of ordered) {
-    const last = part.route.legs.at(-1);
-    const out = last && opts.tokenOf(last.tokenOut);
-    const server = out && opts.serverFloors?.[out.address.toLowerCase()];
-    if (server) {
-      ownQuote.set(
-        server,
-        (ownQuote.get(server) ?? 0n) + toUnits(part.quote.amountOut, out.decimals),
-      );
-    }
-  }
   for (const [i, part] of parts.entries()) {
     const last = part.route.legs.at(-1);
     const out = last && opts.tokenOf(last.tokenOut);
@@ -403,11 +394,6 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       serverTolCeiling('planToLegs', opts),
     );
     const total = slices.reduce((s, x) => s + x.q, 0n);
-    assertServerVsOwnQuote(
-      server,
-      ownQuote.get(server) ?? 0n,
-      serverTolCeiling('planToLegs', opts),
-    );
     // Nothing quoted for a floored token: no slice can carry the floor. Fail closed.
     if (total <= 0n) return null;
     const shares = slices.map((x) => (server.minOut * x.q) / total);
@@ -933,7 +919,6 @@ export function planToRouterPlan(plan: SwapPlan, opts: PlanLegOpts): RouterPlan 
         server.minOut,
         serverTolCeiling('planToRouterPlan', opts),
       );
-      assertServerVsOwnQuote(server, amount, serverTolCeiling('planToRouterPlan', opts));
       floors.push({ token, minOut: server.minOut });
     } else if (opts.serverFloors) {
       // Floors supplied but none for this output: the plan delivers a token the server never
