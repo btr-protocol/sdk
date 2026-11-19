@@ -1,4 +1,4 @@
-// `PoolStorage` layout v10 (`Pool.storageVersion() == 12`, the v2 pool, fresh fleets only): solc
+// `PoolStorage` layout v10 (`Pool.storageVersion() == 13`; slot 0 bytes 29/30 = `openGates`/`flagsLayout`), the v2 pool, fresh fleets only): solc
 // `storageLayout` of dex-evm `out/Pool.sol/Pool.json` (`forge inspect src/Pool.sol:Pool
 // storage-layout`, dex-evm main 1bfe04ed) plus the area constants of `PoolConstantsLib.sol`. No
 // generator script: regenerate by hand from that artifact; `storage.test.ts` pins the slots and
@@ -16,6 +16,8 @@ export const POOL_STORAGE_V10 = {
   protoSharePct: 0n,
   flowCooldownSecs: 0n,
   lastGoodCWad9: 0n,
+  openGates: 0n,
+  flagsLayout: 0n,
   wnative: 1n,
   treasury: 2n,
   factory: 3n,

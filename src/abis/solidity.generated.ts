@@ -34,6 +34,8 @@ export const OpType = {
   UPDATE_POOL_ADMIN: 13,
   UPDATE_CLASS_RISK: 14,
   UPDATE_SWAP_GATE: 15,
+  UPDATE_FEE_FLOOR: 16,
+  OPEN_GATES: 17,
 } as const;
 export type OpType = (typeof OpType)[keyof typeof OpType];
 
@@ -73,23 +75,30 @@ export const Tier = {
 export type Tier = (typeof Tier)[keyof typeof Tier];
 
 // `Asset.flags` / `RiskConfig.flags` bits and masks (PoolConstantsLib).
-export const COOP_ENABLED_BIT = 2048;
-export const DEPOSIT_GATED_BIT = 512;
-export const ENABLE_MASK = 2160;
+export const CLASS_ROWS_BIT = 128;
+export const COOP_ENABLED_BIT = 8;
+export const DEPEG_MASK = 7680;
+export const DEPEG_SHIFT = 9;
+export const ENABLE_MASK = 14;
 export const FEED_HALT_BIT = 1;
-export const FLASH_ENABLED_BIT = 64;
-export const GATE_MASK = 1536;
+export const FLAGS_LAYOUT = 1;
+export const FLASH_ENABLED_BIT = 4;
+export const GATE_ALL = 3;
+export const GATE_DEPOSITS = 2;
+export const GATE_SWAPS = 1;
 export const HALT_BIT = 1;
 export const HALT_MASK = 1;
 export const HALT_SETTABLE_MASK = 1;
 export const HOOK_FLAGS_MASK = 1;
 export const HOOK_PRE_OUTFLOW = 1;
-export const KNOWN_FLAGS_MASK = 65531;
-export const LIABILITY_SWAP_ENABLED_BIT = 32;
-export const PEGGED_BIT = 8;
-export const SWAP_ENABLED_BIT = 16;
-export const SWAP_GATED_BIT = 1024;
-export const TOKEN_EXOTIC_BIT = 256;
+export const KNEE_BIT = 256;
+export const KNOWN_FLAGS_MASK = 8191;
+export const LANE_COOP = 2048;
+export const LANE_DEPOSIT = 512;
+export const PEGGED_BIT = 32;
+export const STALE_GRACE_BIT = 16;
+export const SWAP_ENABLED_BIT = 2;
+export const TOKEN_EXOTIC_BIT = 64;
 
 // Pool wire constants (PoolConstantsLib).
 export const INDEX_REASON_DONATE = 0;
@@ -99,13 +108,14 @@ export const INDEX_REASON_YIELD = 1;
 export const MAX_CONFIDENCE_HALT_BPS = 1000;
 export const MAX_DISPERSION_PBPS = 900000;
 export const MIN_KAPPA_COV_BPS = 50;
-export const MIN_KAPPA_COV_BPS_PEGGED = 10;
+export const MIN_KAPPA_COV_BPS_PEGGED = 2;
 export const ORACLE_MODE_EXTERNAL = 0;
 export const ORACLE_MODE_INTERNAL = 1;
 export const QUOTE_UNIT_ANCHOR = 0;
 export const QUOTE_UNIT_UOA = 1;
 
 // Staleness (PricingLib).
+export const MAX_STALE_GRACE_FLAGGED_SECS = 10;
 export const MAX_STALE_GRACE_SECS = 3;
 export const STALE_Z = 472;
 

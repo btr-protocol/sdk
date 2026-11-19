@@ -498,6 +498,24 @@
   },
   {
     "type": "function",
+    "name": "adminSetGates",
+    "inputs": [
+      {
+        "name": "gates",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "open",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "adminSetPoolAdmin",
     "inputs": [
       {
@@ -736,6 +754,19 @@
   },
   {
     "type": "function",
+    "name": "depositGated",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "depositMin",
     "inputs": [
       {
@@ -836,6 +867,64 @@
   },
   {
     "type": "function",
+    "name": "flashFee",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "flashLoan",
+    "inputs": [
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "contract IERC3156FlashBorrower"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "flashSend",
     "inputs": [
       {
@@ -854,7 +943,13 @@
         "internalType": "address"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -1714,6 +1809,25 @@
   },
   {
     "type": "function",
+    "name": "maxFlashLoan",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "maxRedeem",
     "inputs": [
       {
@@ -1830,6 +1944,13 @@
   },
   {
     "type": "function",
+    "name": "remapFlags",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "resolve",
     "inputs": [
       {
@@ -1893,6 +2014,19 @@
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "swapGated",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2136,6 +2270,25 @@
   },
   {
     "type": "event",
+    "name": "DirectFlashLoan",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "IndexUpdated",
     "inputs": [
       {
@@ -2255,7 +2408,28 @@
   },
   {
     "type": "error",
+    "name": "NotFound",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint8",
+        "internalType": "enum ErrLib.Resource"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NotOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OperationFailed",
     "inputs": []
   },
   {
@@ -2293,6 +2467,19 @@
     "type": "error",
     "name": "ZeroValue",
     "inputs": []
+  },
+  {
+    "type": "event",
+    "name": "GatesUpdated",
+    "inputs": [
+      {
+        "name": "openGates",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -2414,22 +2601,6 @@
   {
     "type": "error",
     "name": "NotConfigured",
-    "inputs": [
-      {
-        "name": "resource",
-        "type": "uint8",
-        "internalType": "enum ErrLib.Resource"
-      },
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotFound",
     "inputs": [
       {
         "name": "resource",

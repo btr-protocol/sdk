@@ -59,8 +59,8 @@ interface ChainQuoteRequest {
   slippage: Slippage;
 }
 
-/** Quote: `swap_gated` = either endpoint carries SWAP_GATED (`swap` needs the caller in
- *  `Pool.swapGate`, v10+; `readSwapGateMember`); `open_path` = both endpoints admit a perm-less executor. */
+/** Quote: `swap_gated` = the pool's swap gate is closed (`Pool.swapGated()`: `swap` needs the
+ *  caller in `Pool.swapGate`; `readSwapGateMember`); `open_path` = both endpoints admit a perm-less executor. */
 export interface QuoteFlags extends GateFields {
   in: number;
   out: number;
@@ -117,7 +117,7 @@ export interface ChainLegFlags {
   word: number;
 }
 
-/** Route: `swap_gated` = a leg of `best` is gated (callers outside `Pool.swapGate` revert NotAuthorized);
+/** Route: `swap_gated` = a pool of `best` has its swap gate closed (callers outside `Pool.swapGate` revert NotAuthorized);
  *  `open_path` = every leg admits a perm-less executor, false with no `best`. */
 interface ChainRouteResponse extends GateFields {
   chain_id: number;

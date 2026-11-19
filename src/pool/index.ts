@@ -171,7 +171,6 @@ export {
   exitCap,
   exitValue,
   legCoverage,
-  liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
 } from './liability.js';

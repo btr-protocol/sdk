@@ -2,7 +2,7 @@
 // codec, the liability mirror and the storage layouts all read it, and none may import another.
 
 /** `Pool.storageVersion()` of the v2 pool (layout v10): the coverage words exist and are required. */
-export const STORAGE_V2 = 12;
+export const STORAGE_V2 = 13; // v13: pool-wide gates + renumbered `Asset.flags` (v12 retired)
 
 /** The v1 pools (layout v5, `storageVersion` 5..9): no coverage word exists on them. A WHITELIST: any
  *  other version, a future one included, or an unknown one, is not v1. */

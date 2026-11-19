@@ -331,7 +331,7 @@ describe('versioned readers', () => {
     );
     for (const [v, slot0] of [
       [5, v5],
-      [12, v10],
+      [13, v10],
     ] as const) {
       expect(await readSolvencyState(providerWith(v, new Map([[0n, slot0]])), POOL)).toEqual({
         lastGoodCWad: 970n * 10n ** 15n,
@@ -341,7 +341,7 @@ describe('versioned readers', () => {
       });
     }
     // the other layout's offset mis-reads: v10 shift on the v5 word sees the armed bit, not the rate
-    expect(await readSolvencyState(providerWith(12, new Map([[0n, v5]])), POOL)).not.toEqual({
+    expect(await readSolvencyState(providerWith(13, new Map([[0n, v5]])), POOL)).not.toEqual({
       lastGoodCWad: 970n * 10n ** 15n,
     });
     await expect(readSolvencyState(providerWith(4, new Map([[0n, v5]])), POOL)).rejects.toThrow(
@@ -366,7 +366,7 @@ describe('versioned readers', () => {
       await readSolvencyState(provider, pool);
       await readSolvencyState(provider, pool);
       expect(calls).toBe(1);
-      version = 12;
+      version = 13;
       clock.mockReturnValue(now + 29_000);
       await readSolvencyState(provider, pool);
       expect(calls).toBe(1);
@@ -461,8 +461,8 @@ describe('layout v5', () => {
       uoa: false,
       refBandBps: 150,
     });
-    // v10: oracleBits at byte 27, the depeg code in flags 12..15 (byte 23), covBits above.
-    const v10 = `0x${((0xdeadbeefn << 224n) | (BigInt(0x80 | 7) << 216n) | (BigInt((3 << 12) | 0xb0) << 184n)).toString(16).padStart(64, '0')}`;
+    // v10: oracleBits at byte 27, the depeg code in flags 9..12 (byte 23), covBits above.
+    const v10 = `0x${((0xdeadbeefn << 224n) | (BigInt(0x80 | 7) << 216n) | (BigInt((3 << 9) | 0xb0) << 184n)).toString(16).padStart(64, '0')}`;
     expect(decodeLegOracle(v10 as `0x${string}`, 10)).toEqual({
       lane: 7,
       internal: false,
@@ -549,10 +549,10 @@ describe('P8 mark store, wire 3 (storageVersion 12)', () => {
     const TOKEN = `0x${'bb'.repeat(20)}` as `0x${string}`;
     const pad = (h: string) => `0x${h.padStart(64, '0')}`;
     const slots = new Map<bigint, string>([
-      // v12 packing: oracleBits (lane 7 | UOA) at byte 27, depeg code 2 in flags 12..15 (byte 23)
+      // v12 packing: oracleBits (lane 7 | UOA) at byte 27, depeg code 2 in flags 9..12 (byte 23)
       [
         mappingBase(TOKEN, POOL_STORAGE_V10.unlisted) + 2n,
-        pad(((BigInt(0x80 | 7) << 216n) | (2n << 196n)).toString(16)),
+        pad(((BigInt(0x80 | 7) << 216n) | (2n << 193n)).toString(16)),
       ],
       [0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbcn, pad('cc'.repeat(20))],
       [MARK_STORE_V10.MS + 1n, P[1]],
@@ -561,7 +561,7 @@ describe('P8 mark store, wire 3 (storageVersion 12)', () => {
       request: async ({ method, params }: { method: string; params: unknown[] }) => {
         if (method === 'eth_call') {
           const { data } = params[0] as { data: string };
-          return data === '0x31e77853' ? CLASSES : pad('c');
+          return data === '0x31e77853' ? CLASSES : pad('d');
         }
         return slots.get(BigInt(params[1] as string)) ?? pad('0');
       },
@@ -588,7 +588,7 @@ describe('P8 mark store, wire 3 (storageVersion 12)', () => {
       ({
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method !== 'eth_call') return pad('0');
-          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('c');
+          return (params[0] as { data: string }).data === '0x31e77853' ? classes() : pad('d');
         },
       }) as unknown as Eip1193Provider;
     // right id, no lane classed: Pool's constructor rejects it, so no layout is known
@@ -783,10 +783,10 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
     ].join('')}` as `0x${string}`;
     for (const v of ['5', '9'])
       await expect(readMarks(at(v, v3Table), POOL, TOKEN)).rejects.toThrow('not a P8 table');
-    await expect(readMarks(at('c', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    await expect(readMarks(at('d', CLASSES), POOL, TOKEN)).rejects.toThrow('not a P8 table');
     // the retired p8.v3 id (release/pool-v2-rc2) is no wire at all
     const rc2 = `0x${v3Table.slice(2, 2 + 192)}${keccak256(new TextEncoder().encode('btr.markstore.p8.v3')).slice(2)}`;
-    await expect(readMarks(at('c', rc2), POOL, TOKEN)).rejects.toThrow('not a P8 table');
+    await expect(readMarks(at('d', rc2), POOL, TOKEN)).rejects.toThrow('not a P8 table');
   });
 });
 
@@ -798,14 +798,14 @@ describe('P8 mark store, wire 2 (storageVersion 5..9)', () => {
  * SSTORE2 code, so the v10 words must decode to that blob exactly.
  */
 describe('wire dispatch', () => {
-  test('5..9 = wire 2, 12 = wire 3, everything else refused (10 and 11 included)', () => {
+  test('5..9 = wire 2, 13 = wire 3, everything else refused (12 retired: flags v12) (10 and 11 included)', () => {
     for (const v of [5, 6, 7, 8, 9]) {
       expect(wireOf(v)).toBe(2);
       expect(markStoreOf(v)).toBe(MARK_STORE_V5);
     }
-    expect(wireOf(12)).toBe(3);
-    expect(markStoreOf(12)).toBe(MARK_STORE_V10);
-    for (const v of [0, 1, 2, 3, 4, 10, 11, 13]) expect(() => wireOf(v)).toThrow();
+    expect(wireOf(13)).toBe(3);
+    expect(markStoreOf(13)).toBe(MARK_STORE_V10);
+    for (const v of [0, 1, 2, 3, 4, 10, 11, 12]) expect(() => wireOf(v)).toThrow();
   });
 });
 
@@ -826,7 +826,7 @@ describe('layout v10', () => {
    *  c_max 1.20, κ⁻ 1536, κ⁺ 640). */
   const at8 = (v: bigint, byte: number) => v << BigInt(8 * byte);
   const USDT_COV = 40n | (10n << 6n) | (1n << 12n) | (3n << 15n) | (38n << 20n) | (33n << 26n);
-  const USDT_FLAGS = 0xb0n | 2n | (3n << 12n);
+  const USDT_FLAGS = (1n << 1n) | (1n << 7n) | (1n << 8n) | (3n << 9n); // v13: SWAP | CLASS_ROWS | KNEE | depeg 3
   const USDT_SLOT2 = `0x${(
     at8(10n ** 18n, 0) |
     at8(1000n, 9) |
@@ -886,11 +886,11 @@ describe('layout v10', () => {
   const words = (from: bigint, n: number) =>
     Array.from({ length: n }, (_, i) => BigInt(SLOTS.get(from + BigInt(i)) ?? ZERO));
 
-  test('dispatch is exact: 5..9 = v5, 12 = v10; 10, 11 and everything else throw', async () => {
+  test('dispatch is exact: 5..9 = v5, 13 = v10; 10, 11, 12 and everything else throw', async () => {
     for (const v of [5, 6, 7, 8, 9]) expect(layoutOf(v)).toBe(5);
-    expect(layoutOf(12)).toBe(10);
-    expect(poolStorageOf(12)).toBe(POOL_STORAGE_V10);
-    for (const v of [0, 1, 2, 3, 4, 10, 11, 13])
+    expect(layoutOf(13)).toBe(10);
+    expect(poolStorageOf(13)).toBe(POOL_STORAGE_V10);
+    for (const v of [0, 1, 2, 3, 4, 10, 11, 12])
       expect(() => layoutOf(v)).toThrow('unsupported storageVersion');
     const pool = `0x${'cc'.repeat(20)}` as `0x${string}`;
     await expect(readCurve(at(10), pool, 1)).rejects.toThrow('unsupported storageVersion');
@@ -899,9 +899,9 @@ describe('layout v10', () => {
 
   test('a v2 pool (storageVersion 12) decodes its records through layoutOf', async () => {
     const usdt = LEGS[1][0];
-    expect(layoutOf(12)).toBe(10);
-    expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
-    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
+    expect(layoutOf(13)).toBe(10);
+    expect(await readCustody(at(13), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    expect(await readOracleConfig(at(13), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
   });
 
   test('a v12 asset end-to-end: oracle, cov and knee bits off their v12 lanes', async () => {
@@ -912,7 +912,7 @@ describe('layout v10', () => {
       uoa: false,
       refBandBps: 750,
     });
-    expect(await readLegCov(at(12), POOL, usdt)).toEqual({
+    expect(await readLegCov(at(13), POOL, usdt)).toEqual({
       cMinBps: 8000,
       targetBps: 10_050,
       flatBps: 500,
@@ -925,11 +925,11 @@ describe('layout v10', () => {
     });
     // KNEE_BIT off: the knee word is not read
     const noKnee = new Map(SLOTS);
-    noKnee.set(146n, `0x${(BigInt(USDT_SLOT2) & ~at8(2n, 23)).toString(16).padStart(64, '0')}`);
-    expect(await readLegCov(at(12, noKnee), POOL, usdt)).toMatchObject({
+    noKnee.set(146n, `0x${(BigInt(USDT_SLOT2) & ~at8(256n, 23)).toString(16).padStart(64, '0')}`);
+    expect(await readLegCov(at(13, noKnee), POOL, usdt)).toMatchObject({
       kneeCovBps: 0,
       kappaKneeBps: 0,
-      flags: Number(USDT_FLAGS) & ~2,
+      flags: Number(USDT_FLAGS) & ~256,
     });
     // the v5 struct has no law terms
     await expect(readLegCov(at(5), POOL, usdt)).rejects.toThrow('no covBits');
@@ -1008,7 +1008,7 @@ describe('layout v10', () => {
       {
         request: async ({ method, params }: { method: string; params: unknown[] }) => {
           if (method === 'eth_getCode') throw new Error('v10 reads no code');
-          return at(12).request({ method, params } as never);
+          return at(13).request({ method, params } as never);
         },
       } as unknown as Eip1193Provider,
       POOL,
@@ -1016,14 +1016,14 @@ describe('layout v10', () => {
     );
     expect(v10).not.toBeNull();
     expect(v10).toEqual(await readCurve(at(5), `0x${'dd'.repeat(20)}`, 1));
-    expect(await readCurve(at(12), POOL, 2)).toBeNull();
+    expect(await readCurve(at(13), POOL, 2)).toBeNull();
   });
 
   test('records: Asset slot 2, Custody +4, ClassHead +5 with famRow', async () => {
     const usdt = LEGS[1][0];
-    expect(await readOracleConfig(at(12), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
-    expect(await readCustody(at(12), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
-    const head = await readClassHead(at(12), POOL, usdt);
+    expect(await readOracleConfig(at(13), POOL, usdt)).toEqual({ lane: 1, mode: 0, quoteUnit: 0 });
+    expect(await readCustody(at(13), POOL, usdt)).toEqual({ treasuryShares: 1n, invested: 0n });
+    const head = await readClassHead(at(13), POOL, usdt);
     expect(head).toEqual({ family: 1, row: 0n, famRow: 20n | (20n << 14n) | (500n << 23n) });
     expect(decodeClassHead(BigInt(SLOTS.get(149n)!))).toEqual(head);
     // an unlisted token falls back to `unlisted` at keccak(t, 4), its ClassHead at +5
@@ -1031,7 +1031,7 @@ describe('layout v10', () => {
     const u = mappingBase(t, 4n);
     const slots = new Map(SLOTS);
     slots.set(u + 5n, `0x${(3n | (7n << 8n)).toString(16).padStart(64, '0')}`);
-    expect(await readClassHead(at(12, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
+    expect(await readClassHead(at(13, slots), POOL, t)).toEqual({ family: 3, row: 7n, famRow: 0n });
   });
 });
 

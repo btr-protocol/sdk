@@ -36,5 +36,5 @@ export function hasZeroDelay(schedule: bigint): boolean {
   return false;
 }
 
-/** Does a `perms` word hold `lane` (a `PERM_*` role or a leg gate bit such as `SWAP_GATED_BIT`)? */
+/** Does a `perms` word hold `lane` (a `PERM_*` role or a pool-gate lane such as `LANE_DEPOSIT`)? */
 export const holds = (perms: bigint, lane: number): boolean => (perms & BigInt(lane)) !== 0n;

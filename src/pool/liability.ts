@@ -19,7 +19,6 @@
 // Charged as a swap: the quote's fee is already in `conv`; on-chain its LP slice raises the out
 // leg's index and its protocol slice books as treasury face at C. No reserves move.
 
-import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import type { PoolState } from '../amm/aimm.js';
 import { applySlip } from '../utils/maths.js';
 import { covWalls } from './covLaw.js';
@@ -75,10 +74,6 @@ export function feeCredit(fee: number, liab: number, c: number): number {
   const face = fee / Math.max(c, 1);
   return face > 0 && liab > 0 && face <= liab ? face : 0;
 }
-
-/** PoolIOLib.checkRiskFlags(asset.flags, LIABILITY_SWAP_ENABLED_BIT) as a predicate. */
-export const liabilitySwapEnabled = (flags: number): boolean =>
-  (flags & LIABILITY_SWAP_ENABLED_BIT) !== 0;
 
 /** `PoolSolvencyLib.solvency` over a `PoolState`: `C = Σ R·m / Σ L·m`, marks in base per token (the hub
  *  is the base, mark 1). Null is the chain's `ok == false`: a leg whose mark is unusable leaves no

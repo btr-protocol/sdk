@@ -533,7 +533,7 @@ describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => 
     legToQuoteBody(l, 1, true, 18, INTERIOR_ENDPOINT, ADDRS);
 
   test('the words read off the asset row go on the wire as read', () => {
-    const b = body(leg({ covBits: BITS, kneeBits: 3, storageVersion: 12 }));
+    const b = body(leg({ covBits: BITS, kneeBits: 3, storageVersion: 13 }));
     expect([b.cov_bits, b.knee_bits]).toEqual([BITS, 3]);
     const s = poolStateToWire('p', '0xp', state(), meta, 18);
     expect(s.spokes[0].pricing.cov_bits).toBe(0); // the fixture leg carries none: v1 reading
@@ -552,14 +552,14 @@ describe('coverage words on the wire: absent is v1 = 0, v2 = unquotable', () => 
     expect(() => hubEndpointWire({ ...HUB, storageVersion: undefined }, 6)).toThrow(CovWordMissing);
   });
   test('v2: an absent word is unquotable, never a 0 that prices no toll and no walls', () => {
-    expect(() => body(leg({ storageVersion: 12 }))).toThrow(CovWordMissing);
-    expect(() => body(leg({ covBits: BITS, storageVersion: 12 }))).toThrow(CovWordMissing);
+    expect(() => body(leg({ storageVersion: 13 }))).toThrow(CovWordMissing);
+    expect(() => body(leg({ covBits: BITS, storageVersion: 13 }))).toThrow(CovWordMissing);
     const v2 = state();
-    v2.legs.USDT = leg({ storageVersion: 12 });
+    v2.legs.USDT = leg({ storageVersion: 13 });
     expect(() => poolStateToWire('p', '0xp', v2, meta, 18)).toThrow(CovWordMissing);
-    expect(() => hubEndpointWire({ ...HUB, storageVersion: 12 }, 6)).toThrow(CovWordMissing);
+    expect(() => hubEndpointWire({ ...HUB, storageVersion: 13 }, 6)).toThrow(CovWordMissing);
     expect(
-      hubEndpointWire({ ...HUB, covBits: BITS, kneeBits: 0, storageVersion: 12 }, 6).cov_bits,
+      hubEndpointWire({ ...HUB, covBits: BITS, kneeBits: 0, storageVersion: 13 }, 6).cov_bits,
     ).toBe(BITS);
   });
 });

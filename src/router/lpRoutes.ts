@@ -31,7 +31,12 @@ export interface LpRouteOpts {
   /** The caller's effective tolerance, resolved at quote time (spread-based by default in the
    *  front). REQUIRED: the back end authors slippage, so none is picked here. */
   slippageFrac: number;
-  liabilityEnabled?: (symbol: string) => boolean;
+  /** `SWAP_ENABLED` on a leg (`getRiskFlags`): a liability swap or cross exit is a swap on both
+   *  legs, no own bit. Absent = enabled. */
+  swapEnabled?: (symbol: string) => boolean;
+  /** The pool's swap gate binds this caller: `Pool.swapGated() && !Pool.inSwapGate(caller)`. A
+   *  liability swap and a cross exit then revert; a same-asset exit never does. */
+  swapGated?: boolean;
   maxRedeem?: (symbol: string) => number;
   liquidityIndexWad?: (symbol: string) => number;
   /** Backend wire meta (required for any priced route): token addresses + decimals. */
@@ -253,9 +258,10 @@ const flagGate = (
   symbols: string[],
   opts: LpRouteOpts,
 ): RankedLpRoute | null => {
-  if (!symbols.every((s) => opts.liabilityEnabled?.(s) ?? true)) {
+  if (!symbols.every((s) => opts.swapEnabled?.(s) ?? true)) {
     return unfeasible(route, 'flag-disabled', route.out);
   }
+  if (opts.swapGated) return unfeasible(route, 'swap-gated', route.out);
   return null;
 };
 
@@ -492,6 +498,9 @@ async function crossExit(
   const fromLeg = liabLeg(holder, targetSym, opts);
   const toLeg = liabLeg(holder, outToken, opts);
   if (!fromLeg || !toLeg) return null;
+  // A cross `withdrawTo` is a swap: SWAP_ENABLED on both legs and the pool's swap gate.
+  const flagged = flagGate(CROSS_DEAD, [targetSym, outToken], opts);
+  if (flagged) return flagged;
 
   // Chain `ok` (second `poolSolvencyWad` word): degraded, `creditRate` settles at C's lower bound
   // with the lower-pass toll, neither of which the state's C or toll word carries. Unknown = pending.

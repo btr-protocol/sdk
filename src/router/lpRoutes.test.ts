@@ -184,7 +184,7 @@ describe('rankDeposit (routes A / B)', () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankDeposit(pools, 'AUDF', 'NZDF', 5_000, {
       ...BE,
-      liabilityEnabled: (s) => s !== 'NZDF',
+      swapEnabled: (s) => s !== 'NZDF',
     });
     expect(routes.find((r) => r.id === 'deposit-first')?.reason).toBe('flag-disabled');
     expect(best).toBeNull();
@@ -465,14 +465,25 @@ describe("rankRedeem (routes A' / B')", () => {
     expect(best).toBeNull();
   });
 
-  test("flag-disabled destination gates only B'", async () => {
+  test('a swap-disabled destination gates both cross routes', async () => {
     const pools = [healthyPool()];
     const { best, routes } = await rankRedeem(pools, 'NZDF', 'AUDF', 5_000, {
       ...BE,
-      liabilityEnabled: (s) => s !== 'AUDF',
+      swapEnabled: (s) => s !== 'AUDF',
     });
     expect(routes.find((r) => r.id === 'transfer-exit')?.reason).toBe('flag-disabled');
-    expect(best?.id).toBe('cross-exit');
+    // The cross exit is a swap too: SWAP_ENABLED off on AUDF shuts it, leaving no route.
+    expect(best).toBeNull();
+  });
+
+  test('a closed pool swap gate shuts the liability swap and cross exit for a non-member', async () => {
+    const pools = [healthyPool()];
+    const { best, routes } = await rankRedeem(pools, 'NZDF', 'AUDF', 5_000, {
+      ...BE,
+      swapGated: true,
+    });
+    for (const r of routes) expect(r.reason).toBe('swap-gated');
+    expect(best).toBeNull();
   });
 
   test('under-covered source leg: haircuts price both routes, floors stay below quotes', async () => {

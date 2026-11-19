@@ -40,7 +40,14 @@ function isNativeKey(token: Address): boolean {
  */
 import { MARK_STORE_ABI } from '../abis/MarkStore.js';
 import { MARK_STORE_ABI_V2 } from '../abis/MarkStore.v2.js';
-import { HOOK_FLAGS_MASK, HOOK_PRE_OUTFLOW } from '../abis/solidity.generated.js';
+import {
+  CLASS_ROWS_BIT,
+  DEPEG_MASK,
+  DEPEG_SHIFT,
+  HOOK_FLAGS_MASK,
+  HOOK_PRE_OUTFLOW,
+  KNEE_BIT,
+} from '../abis/solidity.generated.js';
 import type { Assert, FieldsMatch, OracleConfigFields } from '../abis/structs.generated.js';
 import { type CovTerms, type KneeTerms, decodeCovBits, decodeKneeBits } from './cov.js';
 import { POOL_STRUCTS } from './layout.generated.js';
@@ -93,7 +100,7 @@ function readStorageVersion(provider: Eip1193Provider, pool: Address): Promise<n
 }
 
 /** The layout family of a `Pool.storageVersion()`, as the back's core `PoolLayout::of` serves it
- *  (core/src/storage.rs): 5..=9 layout 5, 12 layout 10 (the v2 pool). Retired 2..4, 10, 11 and
+ *  (core/src/storage.rs): 5..=9 layout 5, 13 layout 10 (the v2 pool, flags v13). Retired 2..4, 10, 11 and
  *  anything else throw, so a pool is never read through another layout's slots. */
 export function layoutOf(storageVersion: number): 5 | 10 {
   if (isLegacyLayout(storageVersion)) return 5;
@@ -142,10 +149,8 @@ export interface HookSlot {
   lastCreditAt: number;
 }
 
-/** `PoolConstantsLib.CLASS_ROWS_BIT`: the leg has a peg family or a risk row (store-owned flag). */
-export const CLASS_ROWS_BIT = 1 << 7;
-/** `PoolConstantsLib.KNEE_BIT`: the leg carries a knee (`Asset.kneeBits`, κ₂ > 0); derived. */
-export const KNEE_BIT = 1 << 1;
+/** `PoolConstantsLib.CLASS_ROWS_BIT` / `KNEE_BIT` (flags layout v13), from the generated mirror. */
+export { CLASS_ROWS_BIT, KNEE_BIT };
 /** `PoolConstantsLib.MAX_FAMILY`: highest peg-family id and row key (0 = the leg's default row). */
 export const MAX_FAMILY = 4;
 
@@ -648,7 +653,7 @@ export function decodeLegOracle(
   const b = u8At(slot2, f.oracleBits[1]);
   const refBandBps =
     layout === 10
-      ? (u16At(slot2, f.flags[1]) >>> 12) * DEPEG_STEP_BPS
+      ? ((u16At(slot2, f.flags[1]) & DEPEG_MASK) >>> DEPEG_SHIFT) * DEPEG_STEP_BPS
       : u16At(slot2, POOL_STRUCTS.AssetV5.refBandBps[1]) & 0xfff; // 12..15 = depeg code
   return {
     lane: b & MARK_STORE_V10.LANE_MASK,

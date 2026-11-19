@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import { buildLegV1 as buildLeg } from '../../test/legFixture.js';
-import { LIABILITY_SWAP_ENABLED_BIT } from '../abis/solidity.generated.js';
 import type { PoolState } from '../amm/aimm.js';
 // bun test: pins the pool-level LP settlement mirror (LED-A) against the contract source:
 // PoolSolvencyLib.solvency/previewCap, PoolLiquidityLib.exitMu and swapLiability.
@@ -12,7 +11,6 @@ import {
   exitCap,
   exitValue,
   legCoverage,
-  liabilitySwapEnabled,
   minLpAmountOut,
   poolSolvency,
 } from './liability';
@@ -110,15 +108,6 @@ describe('the one off-chain replica of pool-level settlement', () => {
     // Claimless dark leg (c_k = ∞) and no usable claim: unbounded, exitMu pays c_leg.
     expect(exitCap(50, 0, [Number.POSITIVE_INFINITY])).toBe(Number.POSITIVE_INFINITY);
     expect(exitCap(0, 0, [0.4])).toBeCloseTo(0.4, 12);
-  });
-});
-
-describe('liabilitySwapEnabled (flag bit gate)', () => {
-  test('bit 5 of asset flags (PoolConstantsLib)', () => {
-    expect(LIABILITY_SWAP_ENABLED_BIT).toBe(1 << 5);
-    expect(liabilitySwapEnabled(1 << 5)).toBe(true);
-    expect(liabilitySwapEnabled(0b111111)).toBe(true);
-    expect(liabilitySwapEnabled(0b011111)).toBe(false);
   });
 });
 
@@ -514,7 +503,7 @@ describe('minLpAmountOut (applySlip semantics, rounds DOWN)', () => {
 describe('covBitsOf: what an absent coverage word means for a wall check', () => {
   test('as read; 0 only on a whitelisted v1 layout (5..9); null (refuse) on everything else', () => {
     expect(covBitsOf({ covBits: 45 })).toBe(45);
-    expect(covBitsOf({ covBits: 0, storageVersion: 12 })).toBe(0);
+    expect(covBitsOf({ covBits: 0, storageVersion: 13 })).toBe(0);
     for (const v of [5, 7, 9]) expect(covBitsOf({ storageVersion: v })).toBe(0);
     for (const v of [12, 13, 4, 10, 1, 0]) expect(covBitsOf({ storageVersion: v })).toBeNull();
     expect(covBitsOf({})).toBeNull();

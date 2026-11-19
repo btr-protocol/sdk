@@ -2,8 +2,8 @@
   "bundled": {
     "generation": "build-head",
     "pins": {
-      "Pool": "0xd6720b67ee25809ac6835f1f96b12d4d50c4b2cc9572a960ee098b1a577107f3",
-      "Admin": "0xbe546935a5417a74ccdc14bcd6ba2a0e7b839eef35bbe64fad24dedbac91085b",
+      "Pool": "0xceea2dfd361de7008172333ab8f5650e23ea05c4804298641d1d3e68bcb1afd5",
+      "Admin": "0xcfd3cc4c634a4a59235b7d480a78e8549c8458168cdffbe20e58bb41c2048969",
       "PoolFactory": "0x3b19d35c7f0287a41b91bd8f4943bb56e34fed2d260611732c86765f8f658375",
       "AccessControl": "0x9146809c3666b9ab3ec7382ae4b4e3ca3cbcb967fb193ce7f26aded1bc6fc06f",
       "Router": "0x0088080981cb0e9266e4303d6af714440ee9f8547874f0a9223d43f405b86acd",
