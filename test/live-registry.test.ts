@@ -72,7 +72,7 @@ test('mcp: parse error, invalid request, bad chainId, tools', async () => {
 test('cli: exit codes and roster', async () => {
   const lines: string[] = [];
   const out = (s: string) => lines.push(s);
-  expect(await run(['pools', '--chain', '143'], out, real)).toBe(0);
+  expect(await run(['pools', '--list', '--chain', '143'], out, real)).toBe(0);
   expect(lines[0]).toContain(fixture.pools[0]!.address);
   expect(await run(['pools', '--chain', '-5'], out, real)).toBe(2);
   expect(await run(['registry', '--chain', '143'], out, tampered())).toBe(1);
