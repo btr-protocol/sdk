@@ -157,6 +157,7 @@ export interface AssetProtocolMetrics extends AprLegs, AssetYield {
   skew: number | null;
   utilization: number | null;
   deployedRatio: number | null;
+  deployedUsd?: number | null;
   feeAvgBps: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
@@ -178,6 +179,7 @@ export interface PoolProtocolMetrics extends AprLegs {
   skew: number | null;
   utilization: number | null;
   deployedRatio: number | null;
+  deployedUsd?: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
@@ -208,6 +210,7 @@ export interface ProtocolKpis extends YieldRates {
   coverageAvg: number | null;
   utilization: number | null;
   deployedRatio: number | null;
+  deployedUsd?: number | null;
 }
 
 export interface ProtocolMetricsSummary {
