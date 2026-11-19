@@ -312,6 +312,15 @@ export function formatBps(bps: number | null | undefined, signed = false): strin
   return `${sign}${r.toFixed(abs < 10 && r < 10 ? 1 : 0)} bps`;
 }
 
+/** Legacy wrapper over `formatPercentSig`; front still imports it (11 call sites). Delete once they move to `formatRate`. */
+export function formatPercent(
+  n: number | null | undefined,
+  _decimals?: number,
+  signed = false,
+): string {
+  return formatPercentSig(n, 3, signed);
+}
+
 /** `formatBps` for a value held in PERCENT units (0.012 -> "1.2 bps", 2.4 -> "2.4%"). */
 export function formatRate(pct: number | null | undefined, signed = false): string {
   return formatBps(pct == null ? pct : pct * 100, signed);
