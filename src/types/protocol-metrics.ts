@@ -70,7 +70,7 @@ export type ProtocolTimeseriesMetric =
   | 'cov.c'
   | 'skew.bps'
   | 'util.liq'
-  | 'inv.ratio'
+  | 'deployed.ratio'
   | 'oracle.age'
   | 'mm.fee.paid'
   | 'mm.spread.avg'
@@ -143,7 +143,7 @@ export interface HookCurve {
   /** Band half-width: invest while liquid > L(1+w), pull while liquid < L(1-w). */
   wBps: number;
   /** Invested-book cap; null when uncapped. */
-  maxInvested: number | null;
+  maxDeployed: number | null;
 }
 
 export interface AssetProtocolMetrics extends AprLegs, AssetYield {
@@ -156,7 +156,7 @@ export interface AssetProtocolMetrics extends AprLegs, AssetYield {
   coverage: number | null;
   skew: number | null;
   utilization: number | null;
-  investedRatio: number | null;
+  deployedRatio: number | null;
   feeAvgBps: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
@@ -177,7 +177,7 @@ export interface PoolProtocolMetrics extends AprLegs {
   coverageAvg: number | null;
   skew: number | null;
   utilization: number | null;
-  investedRatio: number | null;
+  deployedRatio: number | null;
   lpFeesUsd: number | null;
   protoFeesUsd: number | null;
   /** Coverage toll, LP revenue outside `lpFeesUsd`. Absent from a back that predates it. */
@@ -207,7 +207,7 @@ export interface ProtocolKpis extends YieldRates {
   protocolSharePct?: number | null;
   coverageAvg: number | null;
   utilization: number | null;
-  investedRatio: number | null;
+  deployedRatio: number | null;
 }
 
 export interface ProtocolMetricsSummary {
@@ -340,14 +340,14 @@ export interface LegRiskParams {
   hook: {
     target: string;
     preOutflow: boolean;
-    /** `YieldHookLib.Curve`: target liquid share L(R), band L·(1±w); tMin, t0, maxInvested in token base units. */
+    /** `YieldHookLib.Curve`: target liquid share L(R), band L·(1±w); tMin, t0, maxDeployed in token base units. */
     curve: {
       tMin: string;
       t0: string;
       l0Bps: number;
       lMinBps: number;
       wBps: number;
-      maxInvested: string;
+      maxDeployed: string;
     } | null;
     /** Seconds the booked yield may age before a keeper `sync`; risk-steward set, on chain. */
     maxCacheAge: number | null;
@@ -364,17 +364,17 @@ export interface LegRiskParams {
     /** The leg's book in token units: `liquid` = reserves - invested. `idle` says why nothing is invested. */
     book: {
       reserves: number;
-      invested: number;
+      deployed: number;
       liquid: number;
       /** Shares of `reserves`; null when it is 0. */
-      investedRatio: number | null;
+      deployedRatio: number | null;
       liquidRatio: number | null;
       /** Venue NAV of the position. */
       nav: number | null;
       /** Reserves under this invest nothing: the curve holds the leg fully liquid. */
       tMin: number | null;
       /** Invested-book cap; null when uncapped or unread (see `uncapped`). */
-      maxInvested: number | null;
+      maxDeployed: number | null;
       /** null = the curve did not read. */
       uncapped: boolean | null;
       idle: 'belowTMin' | 'capZero' | null;
