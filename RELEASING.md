@@ -6,7 +6,7 @@ breaking change while 0.x, major once 1.0. Keep these in lockstep: `package.json
 
 1. On a clean `main`: `git fetch --prune && git status` (clean, not behind).
 2. Move CHANGELOG `Unreleased` to `## X.Y.Z - date`; bump the four version fields above.
-3. `bun install && bun run fetch-abis && bun run check`
+3. `bun install && bun run fetch-abis && BTR_DEX_EVM_SRC=<dex-evm checkout at the test.yml pin> bun run check`
 4. `npm pack --dry-run` (generated `src/abis/Pool.ts`, `Admin.ts` must be listed).
 5. Commit `chore(release): vX.Y.Z`, push, then signed tag: `git tag -s vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
 6. npm (2FA prompt): `npm publish --access public`

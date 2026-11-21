@@ -25,7 +25,8 @@ import {
   decodeClassRisk,
 } from '../src/pool/storage';
 
-const DEX = join(import.meta.dir, '..', '..', 'dex-evm');
+// BTR_DEX_EVM_SRC: dex-evm sources at the deployed release (the test.yml pin); no build needed.
+const DEX = process.env.BTR_DEX_EVM_SRC ?? join(import.meta.dir, '..', '..', 'dex-evm');
 const SHARED = join(import.meta.dir, '..', '..', 'shared');
 // HARD, not `describe.if`: this file exists to prove the committed mirror still matches the
 // Solidity, and a skip proved the opposite of what a green run looked like. CI clones both
