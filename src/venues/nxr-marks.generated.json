@@ -128,7 +128,8 @@
     },
     "usdc": {
       "symbol": "WBTC-USDC"
-    }
+    },
+    "root": "BTC"
   },
   "CBBTC": {
     "usd": {
@@ -136,7 +137,8 @@
     },
     "usdc": {
       "symbol": "CBBTC-USDC"
-    }
+    },
+    "root": "BTC"
   },
   "BNB": {
     "usd": {

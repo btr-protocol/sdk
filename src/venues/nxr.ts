@@ -66,6 +66,9 @@ interface NxrMark extends NxrPair {
   /** Market-data base when the display tape is the underlying, not `nxrSymbol`'s base (cbBTC charts
    *  on BTC: NXR has no CBBTC ticker). Never feeds the oracle mark. */
   mdBase?: string;
+  /** Underlying of a wrapped-basis asset: its live mid × the measured wrap basis values the leg
+   *  while the asset's own mark is dark (back valuation only; never the oracle mark). */
+  root?: string;
   /** Plausibility window for a seed mid, in units of `nxrSymbol`. A SCALE guard, deliberately wide:
    *  it catches a 1e3 fat-finger or an inverted pair, not a market move. Absent ⇒ the caller applies
    *  its peg band, so a non-peg asset MUST carry one or it fails at 0.98. */
@@ -133,9 +136,9 @@ export const NXR_MARKS: Record<string, NxrMark> = {
 
   // ── volatiles: native USDC CEX tape.
   WETH: { nxrSymbol: 'ETH-USDC', band: [500, 20_000], refUsd: 1915 },
-  WBTC: { nxrSymbol: 'WBTC-USDC', band: [20_000, 500_000], refUsd: 63_800 },
+  WBTC: { nxrSymbol: 'WBTC-USDC', root: 'BTC', band: [20_000, 500_000], refUsd: 63_800 },
   // Separate signed marks include the independently corroborated wrapper premium.
-  CBBTC: { nxrSymbol: 'CBBTC-USDC', mdBase: 'BTC', band: [20_000, 500_000], refUsd: 63_800 },
+  CBBTC: { nxrSymbol: 'CBBTC-USDC', mdBase: 'BTC', root: 'BTC', band: [20_000, 500_000], refUsd: 63_800 },
   BNB: { nxrSymbol: 'BNB-USDC', band: [100, 5_000], refUsd: 574 },
   XAUT: { nxrSymbol: 'XAUT-USDC', band: [1_500, 10_000], refUsd: 4030 },
   // Monad legs. MITCH ids per monad.manifest.json (probed 2026-09-29): WMON 457965716382941184 =

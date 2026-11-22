@@ -17,12 +17,13 @@ type Basis = { symbol: string; served?: string };
 
 /** `usd` is the denominated row (with `served` when NXR only carries the reciprocal); `usdc` is the declared USDC basis, absent when the asset has none. */
 export function marksJson(): Record<string, unknown> {
-  const out: Record<string, { usd: Basis; usdc?: Basis }> = {};
+  const out: Record<string, { usd: Basis; usdc?: Basis; root?: string }> = {};
   for (const [sym, m] of Object.entries(NXR_MARKS)) {
     const usdc = nxrPair(sym, 'USDC');
     out[sym] = {
       usd: m.nxrQuote ? { symbol: m.nxrSymbol, served: m.nxrQuote } : { symbol: m.nxrSymbol },
       ...(usdc && { usdc: { symbol: usdc.nxrSymbol } }),
+      ...(m.root && { root: m.root }),
     };
   }
   return {
