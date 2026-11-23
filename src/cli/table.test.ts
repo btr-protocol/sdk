@@ -84,6 +84,7 @@ describe('one table drives CLI and MCP', () => {
       'oracle_pushes',
       'safety_history',
       'safety_breakers',
+      'halts',
       'md_tickers',
       'md_price',
       'md_ohlc',

@@ -241,6 +241,15 @@ export const TABLE: Cmd[] = [
     "Automatic breakers: gates, trips, alarm hook (/v1/safety/breakers)",
     P.fetchSafetyBreakers,
   ),
+  {
+    name: "halts",
+    description:
+      'Halt history (/v1/halts/{aggregate|pool|asset|leg|feed}, params "from=..&to=..&grain=..&pool=..&limit=.."; not yet live)',
+    kind: "read",
+    pos: ["scope"],
+    args: PARAMS,
+    run: (a) => data(P.fetchHalts(a.chain, a.pos[0] as P.HaltScope, q(a), a.o)),
+  },
   get("health", "Feed gates and ingest integrity (/v1/health)", P.fetchHealth),
   get("assets", 'Asset metadata (/v1/assets, e.g. params "addresses=0x..,0x..")', P.fetchAssets),
   get("md-tickers", "Market-data tickers (/v1/md/tickers)", P.fetchMdTickers),

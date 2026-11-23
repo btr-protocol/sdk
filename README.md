@@ -126,6 +126,7 @@ Text views by default, `--json` for raw data. Exit 0 ok, 1 failure, 2 usage. Liv
 | `debt-swap-quote` | `<pool> <from-symbol> <to-symbol> <lp-raw> --from` | TO-leg shares minted now | read |
 | `lp-rows`, `quote-lp`, `quote-path`, `depth-book`, `timeseries-bulk`, `indicators` | `--body '<json>'` | Raw POST `/v1/*` response | read |
 | `timeseries`, `liquidity`, `activity`, `pool-assets`, `pool-metrics`, `oracle-pushes`, `safety-history`, `safety-breakers`, `health`, `assets`, `md-tickers` | `[--params 'k=v&..']` | Raw GET `/v1/*` response | read |
+| `halts <aggregate\|pool\|asset\|leg\|feed>` | `[--params 'from=..&to=..&grain=..&group=..&pool=..&asset=..&leg=..&feed=..&limit=..&before=..']` | Raw GET `/v1/halts/{scope}` (not yet live: 404 until the gateway route ships) | read |
 | `pool-params` | `<pool>` | Live risk parameters, every leg | read |
 | `density` | `<pair> [--params]` | Observed price density | read |
 | `oracle-push` | `<tx> [--params]` | One push: input + signers | read |
@@ -153,7 +154,7 @@ btr build-swap USDC WBTC 1000 --from 0xYou --json   # -> { chainId, from, floor,
 |---|---|
 | Views | `pools`, `metrics`, `risk`, `flow`, `keepers` |
 | Quotes | `quote`, `depth`, `lp_preview`, `debt_swap_quote`, `lp_rows`, `quote_lp`, `quote_path`, `depth_book` |
-| Wire reads | `timeseries`, `timeseries_bulk`, `liquidity`, `activity`, `pool_assets`, `pool_metrics`, `pool_params`, `density`, `oracle_pushes`, `oracle_push`, `safety_history`, `safety_breakers`, `health`, `assets`, `md_tickers`, `md_price`, `md_ohlc`, `indicators` |
+| Wire reads | `timeseries`, `timeseries_bulk`, `liquidity`, `activity`, `pool_assets`, `pool_metrics`, `pool_params`, `density`, `oracle_pushes`, `oracle_push`, `safety_history`, `safety_breakers`, `halts` (not yet live), `health`, `assets`, `md_tickers`, `md_price`, `md_ohlc`, `indicators` |
 | Registry | `registry`, `pool_list`, `roster`, `abi`, `abis` |
 | Builds (unsigned) | `build_swap`, `build_approve`, `build_deposit`, `build_withdraw`, `build_debt_swap` |
 
