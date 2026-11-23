@@ -638,6 +638,22 @@ export function depositCallData(token: Address, amount: bigint, minLpOut: bigint
   return encodeFn({ abi: POOL_ABI, functionName: 'depositMin', args: [token, amount, minLpOut] });
 }
 
+/** `swapLiability(from, to, lpAmountIn, minLpAmountOut, deadline)`: the one encoder every
+ *  liability-swap call goes through (deposit/redeem transfer routes, standalone debt swap). */
+export function swapLiabilityCallData(
+  from: Address,
+  to: Address,
+  lpAmountIn: bigint,
+  minLpAmountOut: bigint,
+  deadline: bigint,
+): Hex {
+  return encodeFn({
+    abi: POOL_ABI,
+    functionName: 'swapLiability',
+    args: [from, to, lpAmountIn, minLpAmountOut, deadline],
+  });
+}
+
 /** An LP floor of zero (or less) guards nothing: a bad quote value parsed to 0 would send the
  *  burn or the liability swap unfloored. Refuse it at the encoder, the one place every route passes. */
 const floored = (what: string, v: bigint): bigint => {
@@ -669,11 +685,13 @@ export function buildDepositCalls(
     },
     {
       to: pool,
-      data: encodeFn({
-        abi: POOL_ABI,
-        functionName: 'swapLiability',
-        args: [args.token, args.targetToken, args.lpAmountIn, args.minLpAmountOut, deadline],
-      }),
+      data: swapLiabilityCallData(
+        args.token,
+        args.targetToken,
+        args.lpAmountIn,
+        args.minLpAmountOut,
+        deadline,
+      ),
       value: 0n,
     },
   ];
@@ -728,11 +746,13 @@ export function buildRedeemCalls(
   return [
     {
       to: pool,
-      data: encodeFn({
-        abi: POOL_ABI,
-        functionName: 'swapLiability',
-        args: [args.tokenFrom, args.tokenTo, args.lpAmountIn, args.minLpAmountOut, deadline],
-      }),
+      data: swapLiabilityCallData(
+        args.tokenFrom,
+        args.tokenTo,
+        args.lpAmountIn,
+        args.minLpAmountOut,
+        deadline,
+      ),
       value: 0n,
     },
     {
@@ -747,25 +767,36 @@ export function buildRedeemCalls(
   ];
 }
 
+/** Standalone debt swap: [swapLiability]. Burns `lpAmountIn` of the `tokenFrom` leg's shares and
+ *  mints `tokenTo` shares, floored. No approvals (the burn needs none). */
+export function buildSwapLiabilityCalls(
+  pool: Address,
+  args: { tokenFrom: Address; tokenTo: Address; lpAmountIn: bigint; minLpAmountOut: bigint },
+  opts: Pick<BuildOpts, 'deadline'> = {},
+): ExecCall[] {
+  floored('minLpAmountOut', args.minLpAmountOut);
+  if (!(args.lpAmountIn > 0n))
+    throw new Error(`lpAmountIn must be positive, got ${args.lpAmountIn}`);
+  return [
+    {
+      to: pool,
+      data: swapLiabilityCallData(
+        args.tokenFrom,
+        args.tokenTo,
+        args.lpAmountIn,
+        args.minLpAmountOut,
+        swapDeadline(opts as BuildOpts),
+      ),
+      value: 0n,
+    },
+  ];
+}
+
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
-export type {
-  NamedPool,
-  Route,
-  LegFill,
-  RouteQuote,
-  SplitPart,
-  SwapPlan,
-} from './route.js';
+export type { NamedPool, Route, LegFill, RouteQuote, SplitPart, SwapPlan } from './route.js';
 export { poolHas, poolHolding } from './route.js';
-export type {
-  AggRow,
-  AggregateDepthOpts,
-  AggregatedDepthBook,
-} from './depth.js';
-export {
-  aggregateDepthCurvesAsync,
-  aggregatePairDepthAsync,
-} from './depth.js';
+export type { AggRow, AggregateDepthOpts, AggregatedDepthBook } from './depth.js';
+export { aggregateDepthCurvesAsync, aggregatePairDepthAsync } from './depth.js';
 export type { LpRouteOpts, RankedLpRoute, RankedLpPlan } from './lpRoutes.js';
 export {
   hexToF64,
