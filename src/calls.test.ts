@@ -13,6 +13,7 @@ import { getSelector } from './eth/abi.js';
 import type { Address, Eip1193Provider, Hex } from './eth/types.js';
 import { TxRevertedError, send } from './eth/send.js';
 import { POOL_ABI } from './abis/Pool.js';
+import { ADMIN_ABI } from './abis/Admin.js';
 
 const A = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address;
 const w = (v: bigint | number | string) =>
@@ -33,6 +34,7 @@ describe('call builders: exact calldata', () => {
       ],
       BatchOp.HALT,
       1,
+      ADMIN_ABI,
     );
     const sig = getSelector('batchRiskOp(address[],address[],uint8,uint16)');
     // head: offset(pools)=0x80, offset(tokens)=0x80+0x60, op, src; tails: len + items
@@ -46,7 +48,7 @@ describe('call builders: exact calldata', () => {
       claimTreasuryCalls(ADMIN, [
         { pool: P1, token: T1 },
         { pool: P2, token: T2 },
-      ]),
+      ], ADMIN_ABI),
     ).toEqual([
       { to: ADMIN, data: `${sig}${w(P1)}${w(T1)}` as Hex },
       { to: ADMIN, data: `${sig}${w(P2)}${w(T2)}` as Hex },

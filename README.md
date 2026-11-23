@@ -28,6 +28,19 @@ API base `https://api.btr.markets`: every client (data, registry, chain quotes, 
 
 Chain-mode quotes (`chainQuote`, `chainRoute`) are exported from the root.
 
+### Reads and writes: one path each
+
+- **API reads**: every `/v1/*` call goes through `btrFetchRaw` / `btrJson` / `btrApi` (`api.ts`):
+  one timeout, chain binding (`chainId` query), per-family 429 cooldown. Never `fetch()` the API directly.
+- **Chain reads**: `relayProvider(chainId)` (BTR `/v1/rpc` relay, memoized, JSON-RPC batch + dedupe)
+  with `multicall` / `readContract` on top: multicall first, a raw JSON-RPC batch only as last resort.
+  Security reads (deposit floor simulation, pre-sign quote re-price) pass `fresh: true` and never
+  reuse an in-flight answer.
+- **Writes**: builders return unsigned `TxCall {to, data, value}` (`calls.ts`, `calldata.ts`,
+  `/router`); `send(provider, calls, { expectedChainId, abis, label })` is the only signer path:
+  refuses a wrong chain, estimates (revert decoded, nothing sent on failure), sends with a buffered
+  gas limit, and throws `TxRevertedError` on a mined revert before the next call.
+
 ### Read pools / prices
 
 ```ts

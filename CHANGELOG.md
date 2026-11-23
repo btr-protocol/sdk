@@ -1,19 +1,51 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 - Unreleased
+
+The SDK is the single gateway for every BTR API read, chain read and write (front, CLI, MCP).
+
+### Added
+
+- `api.ts` request family: `btrFetchRaw(path, ApiOpts)` (result carries `headers`), `btrJson`,
+  `btrApi(path, chainId, o)`, `btrFetch(url, o)` (raw `Response` with the same 429/timeout
+  handling), `fetchJson`, `parseJson`, `HttpError`, `notServed`, `setFetchTimeoutMs`.
+- Per-family 429 cooldowns shared by API and chain reads: `familyOf`, `guard429`,
+  `noteHttp429`, `note429Error`, `http429Cooldown(family?)`, `http429RemainingMs(family?)`,
+  `resetHttp429(family?)`, `retryAfterMs`, `RETRY_AFTER_CAP_MS`.
+- `relayProvider(chainId, RelayOpts)` (`/eth`): the one read provider over BTR's `/v1/rpc` relay,
+  memoized per (root, chain), JSON-RPC batch + in-flight dedupe; `fresh: true` on a request
+  (deposit floor, pre-sign simulation) never joins a duplicate. Contract reads = `multicall` on it.
+- `send(provider, calls, SendOpts)` (`/eth`): the one writer (estimate -> buffered gas limit ->
+  `eth_sendTransaction` -> receipt), `TxCall`, `SendOpts`, `SendResult`, `TxRevertedError`;
+  `decodeRevert(abis, e, label)`.
+- Call builders returning `TxCall` (`calls.ts`, root export): `fnCall`, `PoolToken`,
+  `batchRiskOpCall`, `claimTreasuryCalls`, `faucetClaimCalls`, `faucetRegisterCall`, `poolExitCall`.
+- One encoder per pool write selector (`calldata.ts`): `approveCallData`, `depositCallData`,
+  `depositV1CallData`, `withdrawCallData`, `swapLiabilityCallData`.
+- `fetchHalts(chainId, scope: HaltScope, query?, o?)` + CLI `halts` / MCP `halts` (404 until the
+  gateway route ships).
+- `fetchPoolParams`, `fetchDensity`, `fetchOraclePush` take a wire type parameter `<R>`.
 
 ### Changed (breaking)
 
-- One API request path: `btrFetchRaw(path, ApiOpts)` (fetch/base/query/body/timeoutMs/signal; result
-  carries `headers`), `btrJson`, `btrApi` in `api.ts`. Registry, roster, ABIs, chain quotes and the
-  `/amm` wire client (`quotePath`, `route`, `depth`, `quoteLeg`) all go through it.
-- `btrFetch` removed (no callers): use `btrJson`. `btrFetchRaw` takes `ApiOpts`, not `RequestInit`.
-- `btrApi`, `ApiOpts`, `Query` move from `./protocol` to `./api` (still on the root export).
-- `LiveOpts` removed: live registry/roster/ABI fetchers take `ApiOpts`; their errors read
-  `BTR API <status> <path>`; default timeout 15 s (was 10 s).
+- `btrFetchRaw` takes `ApiOpts` (fetch/base/query/body/timeoutMs/signal + `RequestInit` fields),
+  not `RequestInit`. The old `btrFetch<T>(path, init)` JSON helper is gone: use `btrJson`;
+  `btrFetch` now takes a full URL and returns the `Response`.
+- `btrApi`, `ApiOpts`, `Query` move from `./protocol` to `./api` (still on the root export);
+  `protocol` `io`/`api` helpers removed.
+- `LiveOpts` removed: `fetchRoster`, `fetchAbis`, `fetchLiveAbi` and `RegistryOpts` take/extend
+  `ApiOpts`; errors read `BTR API <status> <path>`; default timeout 15 s (was 10 s).
 - `/amm` `backendBase()` defaults to `${getApiRoot()}/v1`: honours `setApiRoot()`/`BTR_API_URL`;
   env `BTR_API` is no longer read; import throws if `BTR_API` is set without `BTR_API_URL`.
-- `withChainId` throws on a non-positive/non-integer chain id (front: module-scope callers fail at load on a bad `ACTIVE_CHAIN_ID`).
+- `withChainId` throws on a non-positive/non-integer chain id (front: module-scope callers fail at
+  load on a bad `ACTIVE_CHAIN_ID`).
+- `createWalletClient`, `createPublicClient`, `writeContract`, `WriteOptions` removed: write with
+  `send()`, read with `relayProvider` + `multicall`/`readContract`.
+- `depositCallData`/`swapLiabilityCallData` now live in `calldata.ts` (still re-exported from
+  `/router` and the root).
+- `batchRiskOpCall` / `claimTreasuryCalls` take the Admin ABI as a required last argument (no
+  bundled default: keeps the 176 kB Admin ABI off pages that only build pool exits).
+- CLI `rpcProvider` is `relayProvider` (same relay queue as the front).
 
 ## 0.8.0 - 2026-11-23
 

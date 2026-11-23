@@ -1,10 +1,10 @@
 /**
  * Call builders for the writes the front, CLI and MCP make outside the swap/deposit/withdraw router
  * builders: one `TxCall` each, signed by `send` or handed out unsigned. ABIs that the backend
- * serves per pool generation are passed in (`abi`); the committed snapshot is the default.
+ * serves per pool generation are passed in (`abi`); the Pool snapshot is the default. The Admin ABI
+ * is required (176 kB raw: a default would put it on every page that builds a pool exit).
  */
 
-import { ADMIN_ABI } from './abis/Admin.js';
 import { FAUCET_ABI } from './abis/Faucet.js';
 import { POOL_ABI } from './abis/Pool.js';
 import type { BatchOp } from './abis/solidity.generated.js';
@@ -32,7 +32,7 @@ export const batchRiskOpCall = (
   pairs: readonly PoolToken[],
   op: BatchOp,
   src: number,
-  abi: Abi = ADMIN_ABI,
+  abi: Abi,
 ): TxCall =>
   fnCall(admin, abi, 'batchRiskOp', [pairs.map((p) => p.pool), pairs.map((p) => p.token), op, src]);
 
@@ -40,7 +40,7 @@ export const batchRiskOpCall = (
 export const claimTreasuryCalls = (
   admin: Address,
   pairs: readonly PoolToken[],
-  abi: Abi = ADMIN_ABI,
+  abi: Abi,
 ): TxCall[] => pairs.map((p) => fnCall(admin, abi, 'claimTreasury', [p.pool, p.token]));
 
 /** Testnet faucet `claim(token)`, one call per token. */
