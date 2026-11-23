@@ -7,21 +7,13 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { keccak256 } from './index';
 import { rlpEncode } from './rlp';
-import { estimateGas, ethCall, getChainId, getGasPrice, pendingNonce } from './rpc';
+import { estimateGas, getChainId, getGasPrice, pendingNonce } from './rpc';
 import { type TransportOpts, httpTransport } from './transport';
 import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
-
-export interface Client {
-  /** Answers `eth_accounts` with {@link account} and signs `eth_sendTransaction` locally, so the
-   *  one writer `send()` drives it like any wallet. */
-  provider: Eip1193Provider;
-  account: Address;
-  call: (to: Address, data: Hex) => Promise<Hex>;
-}
 
 // ─────────────────────────────────────────────────────────────
 // Private Key Client (Backend)
@@ -282,10 +274,11 @@ export async function signTransaction(
 }
 
 /**
- * Create a client from a private key (for backend use)
- * Can sign transactions without user approval
+ * A private-key wallet for bots: an EIP-1193 provider that answers `eth_accounts` with the key's
+ * address and signs `eth_sendTransaction` locally. Writes go through the one writer `send()`;
+ * reads through it go to the RPC.
  */
-export function createPrivateKeyClient(
+export function privateKeyProvider(
   rpcUrl: string,
   privateKey: Hex,
   /** Refuse to sign anything unless the endpoint reports THIS chain. The signing preimage carries
@@ -293,7 +286,7 @@ export function createPrivateKeyClient(
    *  produces a valid transaction for a chain the caller never meant to touch. Enforced inside
    *  `signTransaction` at the preimage; omit only for a caller that genuinely does not know. */
   expectedChainId?: number,
-): Client {
+): Eip1193Provider {
   // The same chain pins the transport: reads refuse a wrong-chain endpoint too, not only signing.
   const http = createHttpProvider(rpcUrl, { chainId: expectedChainId });
   const account = privateKeyToAddress(privateKey);
@@ -321,7 +314,7 @@ export function createPrivateKeyClient(
       throw e;
     }
   };
-  const provider: Eip1193Provider = {
+  return {
     request: (args) =>
       args.method === 'eth_accounts' || args.method === 'eth_requestAccounts'
         ? Promise.resolve([account])
@@ -329,5 +322,4 @@ export function createPrivateKeyClient(
           ? sign((args.params as TransactionRequest[])[0])
           : http.request(args),
   };
-  return { provider, account, call: (to, data) => ethCall(provider, to, data) };
 }

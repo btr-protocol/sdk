@@ -27,6 +27,8 @@ The SDK is the single gateway for every BTR API read, chain read and write (fron
 - `fetchPoolParams`, `fetchDensity`, `fetchOraclePush` take a wire type parameter `<R>`.
 
 ### Changed (breaking)
+- `send()` is the one writer for wallets too: `opts.stack` (a `SendStack`) carries a wallet UI's hooks (EIP-5792 `wallet_sendCalls` bundle with sequential fallback, preflight, per-call `sendOne` given the only `Broadcast`). `batchModeOf`, `canBundle`, `sendCallsParams`, `isBatchRefused`, `strandingNotice` move here from the front.
+- Removed `sendTransaction` (rpc) and `createPrivateKeyClient`/`Client`: use `send(privateKeyProvider(rpcUrl, key, chainId), calls)`.
 
 - `btrFetchRaw` takes `ApiOpts` (fetch/base/query/body/timeoutMs/signal + `RequestInit` fields),
   not `RequestInit`. The old `btrFetch<T>(path, init)` JSON helper is gone: use `btrJson`;

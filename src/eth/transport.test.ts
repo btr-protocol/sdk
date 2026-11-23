@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { createPrivateKeyClient } from './client';
+import { privateKeyProvider, privateKeyToAddress } from './client';
+import { ethCall } from './rpc';
 import { send } from './send';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
@@ -402,8 +403,8 @@ describe('httpTransport attests every endpoint before its first use', () => {
     // Signing checked the chain at the preimage; reads went through unchecked.
     byUrl({ 'http://x': '0x64' });
     const key = `0x${'11'.repeat(32)}` as `0x${string}`;
-    const c = createPrivateKeyClient('http://x', key, 1);
-    await expect(c.call('0x0000000000000000000000000000000000000001', '0x')).rejects.toBeInstanceOf(
+    const p = privateKeyProvider('http://x', key, 1);
+    await expect(ethCall(p, '0x0000000000000000000000000000000000000001', '0x')).rejects.toBeInstanceOf(
       RpcNetworkError,
     );
   });
@@ -465,8 +466,9 @@ describe('private-key client through send()', () => {
       const json = Array.isArray(body) ? body.map(one) : one(body);
       return new Response(JSON.stringify(json), { status: 200 });
     });
-    const c = createPrivateKeyClient('http://x', `0x${'11'.repeat(32)}`, 1);
-    const [r] = await send(c.provider, [{ to: c.account, data: '0x' }], {
+    const key = `0x${'11'.repeat(32)}` as const;
+    const p = privateKeyProvider('http://x', key, 1);
+    const [r] = await send(p, [{ to: privateKeyToAddress(key), data: '0x' }], {
       expectedChainId: 1,
       wait: false,
     });

@@ -69,9 +69,6 @@ export const ethCall = (p: Eip1193Provider, to: Address, data: Hex, block = 'lat
 export const estimateGas = (p: Eip1193Provider, tx: Partial<TransactionRequest>) =>
   cmd<string>(p, 'eth_estimateGas', [tx]).then(toBig);
 
-export const sendTransaction = (p: Eip1193Provider, tx: TransactionRequest) =>
-  cmd<Hex>(p, 'eth_sendTransaction', [tx]);
-
 // ─────────────────────────────────────────────────────────────
 // Signatures
 // ─────────────────────────────────────────────────────────────

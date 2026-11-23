@@ -95,7 +95,22 @@ export {
 export { ERC20_ABI } from './erc20';
 
 // Gas limit with the drift buffer (estimate × factor, capped)
-export { type TxCall, type SendOpts, type SendResult, TxRevertedError, send } from './send';
+export {
+  type TxCall,
+  type SendOpts,
+  type SendResult,
+  type SendStack,
+  type Broadcast,
+  type BatchMode,
+  type CapEntry,
+  TxRevertedError,
+  batchModeOf,
+  canBundle,
+  isBatchRefused,
+  send,
+  sendCallsParams,
+  strandingNotice,
+} from './send';
 export { GAS_BUFFER_FACTOR, GAS_LIMIT_CAP, estimateCallGas, gasWithBuffer } from './gas';
 
 // RPC
@@ -110,7 +125,6 @@ export {
   getCode,
   ethCall,
   estimateGas,
-  sendTransaction,
   signMessage,
   signTypedData,
   switchChain,
@@ -170,10 +184,9 @@ export type { RelayOpts } from './reader';
 export { relayProvider } from './reader';
 
 // Signing clients (bots / keepers)
-export type { Client } from './client';
 export {
   createHttpProvider,
-  createPrivateKeyClient,
+  privateKeyProvider,
   privateKeyToAddress,
 } from './client';
 
