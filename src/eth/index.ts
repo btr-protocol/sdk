@@ -95,6 +95,7 @@ export {
 export { ERC20_ABI } from './erc20';
 
 // Gas limit with the drift buffer (estimate × factor, capped)
+export { type TxCall, type SendOpts, type SendResult, TxRevertedError, send } from './send';
 export { GAS_BUFFER_FACTOR, GAS_LIMIT_CAP, estimateCallGas, gasWithBuffer } from './gas';
 
 // RPC
@@ -159,6 +160,7 @@ export type { WriteOptions } from './contract';
 export {
   Contract,
   ContractRevertError,
+  decodeRevert,
   readContract,
   writeContract,
 } from './contract';

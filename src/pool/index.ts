@@ -11,11 +11,9 @@ import type {
   SwapQuoteFields,
 } from '../abis/structs.generated.js';
 import type { PoolState } from '../amm/aimm.js';
-import { decodeErrorResult, decodeFn, encodeFn } from '../eth/abi';
-import { ContractRevertError } from '../eth/contract';
-import { estimateCallGas } from '../eth/gas';
+import { decodeFn, encodeFn } from '../eth/abi';
+import { send } from '../eth/send';
 import { multicallStrict } from '../eth/multicall';
-import { getAccounts, getChainId, rpcErrorData } from '../eth/rpc';
 import { type Address, type Eip1193Provider, type Hex, NATIVE_TOKEN } from '../eth/types';
 import { MAX_CLOCK_SKEW_S } from '../utils/constants';
 import { toAsset } from './asset.js';
@@ -175,10 +173,7 @@ export {
   minLpAmountOut,
   poolSolvency,
 } from './liability.js';
-export {
-  quoteSwapLiabilityAsync,
-  quoteSwapLiabilityCoreAsync,
-} from './liabilityQuote.js';
+export { quoteSwapLiabilityAsync, quoteSwapLiabilityCoreAsync } from './liabilityQuote.js';
 export type { Head, LegLpValue, LegMark } from './lpValue.js';
 export {
   LEGACY_LIQUIDITY_INDEX,
@@ -189,12 +184,7 @@ export {
   readLegLpValues,
   shareIndexWad,
 } from './lpValue.js';
-export type {
-  Custody,
-  HookSlot,
-  OracleConfig,
-  RiskConfig,
-} from './storage.js';
+export type { Custody, HookSlot, OracleConfig, RiskConfig } from './storage.js';
 export type { CovTerms, KneeTerms } from './cov.js';
 export { decodeCovBits, decodeKneeBits, kappaBps } from './cov.js';
 export {
@@ -428,68 +418,23 @@ interface WithdrawParams {
   expectedChainId?: number;
 }
 
-/** Pre-send chain guard: a wallet that switched networks after the quote would otherwise send
- *  the same calldata on the wrong chain. The front checks this too; the SDK refuses here so a
- *  direct caller is bound as well. Same wording as `signTransaction`'s `expectedChainId`. */
-async function checkExpectedChain(
-  provider: Eip1193Provider,
-  expectedChainId: number | undefined,
-): Promise<void> {
-  if (expectedChainId === undefined) return;
-  const chainId = await getChainId(provider);
-  if (chainId !== expectedChainId) {
-    throw new Error(`chain mismatch: endpoint reports ${chainId}, expected ${expectedChainId}`);
-  }
-}
-
-/** Send a pool call with its gas LIMIT = estimate × buffer (`gasWithBuffer`). The wallet would
- *  otherwise estimate on its own, with no margin: a pool call read one block later can need more
- *  gas than the estimate, and the revert still bills the limit. The estimate runs from the
- *  connected account, the sender the wallet will use. Fails closed: an estimate that errors (revert,
- *  timeout, node down, estimate above the cap) throws and nothing is sent. The front does not call
- *  this writer (it sends through its own wallet path, which sends unbuffered on a non-revert
- *  estimate failure), so the fail-closed rule binds direct sdk callers only. */
+/** A pool call through the SDK writer ({@link send}): chain bound when `expectedChainId` is set,
+ *  gas limit = estimate x buffer from the connected account, fail closed, the pool's own custom
+ *  error decoded. Returns the hash without waiting (the caller tracks the receipt). */
 async function sendPoolCall(
   provider: Eip1193Provider,
   to: Address,
   data: Hex,
-  value: Hex,
+  value: bigint,
+  expectedChainId?: number,
 ): Promise<Hex> {
-  const [from] = await getAccounts(provider);
-  if (!from) throw new Error('No account connected');
-  const tx = { from, to, data, value };
-  let gas: bigint;
-  try {
-    gas = await estimateCallGas(provider, tx);
-  } catch (e) {
-    throw decodePoolRevert(e);
-  }
-  return (await provider.request({
-    method: 'eth_sendTransaction',
-    params: [{ ...tx, gas: `0x${gas.toString(16)}` }],
-  })) as Hex;
-}
-
-/** An estimate that reverted names the pool's own custom error (`ThresholdViolation(...)`), the
- *  way `Contract` does, instead of an opaque "execution reverted". Anything else passes through. */
-function decodePoolRevert(e: unknown): unknown {
-  const data = rpcErrorData(e);
-  if (!data) return e;
-  let d: ReturnType<typeof decodeErrorResult>;
-  try {
-    d = decodeErrorResult(POOL_ABI, data);
-  } catch {
-    return e; // clipped revert data: the revert is still the answer, keep the transport's error
-  }
-  if (!d) return e;
-  const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
-  return new ContractRevertError(
-    d.name,
-    d.args,
-    `pool reverted: ${d.name}${args}`,
-    undefined,
-    data,
-  );
+  const [r] = await send(provider, [{ to, data, value }], {
+    expectedChainId,
+    abis: [POOL_ABI],
+    label: 'pool',
+    wait: false,
+  });
+  return r.hash;
 }
 
 /**
@@ -501,7 +446,6 @@ export async function swap(
   poolAddress: Address,
   params: SwapParams,
 ): Promise<Hex> {
-  await checkExpectedChain(provider, params.expectedChainId);
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'swap_qe',
@@ -515,7 +459,13 @@ export async function swap(
     ],
   });
 
-  return sendPoolCall(provider, poolAddress, calldata, txValue(params.tokenIn, params.amountIn));
+  return sendPoolCall(
+    provider,
+    poolAddress,
+    calldata,
+    isNative(params.tokenIn) ? params.amountIn : 0n,
+    params.expectedChainId,
+  );
 }
 
 /**
@@ -527,7 +477,6 @@ export async function deposit(
   poolAddress: Address,
   params: DepositParams,
 ): Promise<Hex> {
-  await checkExpectedChain(provider, params.expectedChainId);
   if (typeof params.minLpOut !== 'bigint' || params.minLpOut <= 0n)
     throw new Error('deposit: minLpOut must be a positive share floor');
   const calldata = encodeFn({
@@ -536,7 +485,13 @@ export async function deposit(
     args: [params.token, params.amount, params.minLpOut],
   });
 
-  return sendPoolCall(provider, poolAddress, calldata, txValue(params.token, params.amount));
+  return sendPoolCall(
+    provider,
+    poolAddress,
+    calldata,
+    isNative(params.token) ? params.amount : 0n,
+    params.expectedChainId,
+  );
 }
 
 export {
@@ -603,14 +558,13 @@ export async function withdraw(
   poolAddress: Address,
   params: WithdrawParams,
 ): Promise<Hex> {
-  await checkExpectedChain(provider, params.expectedChainId);
   const calldata = encodeFn({
     abi: POOL_ABI,
     functionName: 'withdraw',
     args: [params.token, params.lpAmount, params.minAmountOut, sendDeadline(params.deadline)],
   });
 
-  return sendPoolCall(provider, poolAddress, calldata, '0x0');
+  return sendPoolCall(provider, poolAddress, calldata, 0n, params.expectedChainId);
 }
 
 /** Same guard for the quote tuple; `routeHops`/`hopAmounts`/`hopPrices` are ABI fields too. */

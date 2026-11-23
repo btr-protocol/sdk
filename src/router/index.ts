@@ -19,6 +19,7 @@ import { ROUTER_ABI } from '../abis/Router.js';
 import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
 import { ERC20_ABI } from '../eth/erc20.js';
+import type { TxCall } from '../eth/send.js';
 import type { Address, Hex } from '../eth/types.js';
 import { sendDeadline } from '../pool/index.js';
 import { toUnits } from '../utils/format.js';
@@ -60,11 +61,7 @@ export interface ExecLeg {
   chained?: boolean;
 }
 
-interface ExecCall {
-  to: Address;
-  data: Hex;
-  value: bigint;
-}
+type ExecCall = Required<TxCall>;
 
 export interface BuildOpts {
   recipient: Address; // where tokenOut lands (usually the user)

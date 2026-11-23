@@ -5,7 +5,7 @@
 
 import type { Abi, AbiFunction } from './abi';
 import { decodeErrorResult, decodeFn, encodeFn } from './abi';
-import { estimateGas, ethCall, getChainId, sendTransaction } from './rpc';
+import { estimateGas, ethCall, getChainId, rpcErrorData, sendTransaction } from './rpc';
 import { RpcRevertError } from './transport';
 import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
@@ -61,30 +61,36 @@ export class ContractRevertError extends RpcRevertError {
   }
 }
 
-/** Re-throw a revert with its custom error decoded against `abi`; anything else passes through. */
-function withDecodedRevert(abi: Abi, fn: string, e: unknown): never {
-  if (e instanceof RpcRevertError && typeof e.data === 'string') {
-    // Clipped revert data (a selector with a partial word) throws in the decoder; the revert is
-    // still the answer, so keep it rather than surface a coder exception in its place.
+/** The one revert decoder: `e`'s revert data (any wrapper nest) decoded against the first of `abis`
+ *  that knows the selector, as a {@link ContractRevertError} labelled `${label} reverted: ...`.
+ *  Anything else (no data, unknown selector, clipped data) comes back as `e` itself. */
+export function decodeRevert(abis: readonly Abi[], e: unknown, label: string): unknown {
+  const data = rpcErrorData(e);
+  if (!data) return e;
+  for (const abi of abis) {
     let d: ReturnType<typeof decodeErrorResult>;
     try {
-      d = decodeErrorResult(abi, e.data);
+      d = decodeErrorResult(abi, data);
     } catch {
-      throw e;
+      return e; // clipped revert data: the revert is still the answer, keep the transport's error
     }
-    if (d) {
-      const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
-      throw new ContractRevertError(
-        d.name,
-        d.args,
-        `${fn} reverted: ${d.name}${args}`,
-        e.code,
-        e.data,
-      );
-    }
+    if (!d) continue;
+    const args = d.args.length ? `(${d.args.map(String).join(', ')})` : '';
+    const code = (e as { code?: number }).code;
+    return new ContractRevertError(
+      d.name,
+      d.args,
+      `${label} reverted: ${d.name}${args}`,
+      code,
+      data,
+    );
   }
-  throw e;
+  return e;
 }
+
+const withDecodedRevert = (abi: Abi, fn: string, e: unknown): never => {
+  throw decodeRevert([abi], e, fn);
+};
 
 export class Contract {
   readonly address: Address;
