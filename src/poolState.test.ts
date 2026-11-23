@@ -5,9 +5,7 @@ import {
   fetchPoolParamsBulk,
   fetchPoolState,
   legNeedsChain,
-  mergeActivity,
   parsePoolState,
-  poolStateCached,
   resetPoolStateStore,
 } from "./poolState.js";
 import { call } from "./cli/mcp.js";
@@ -83,6 +81,10 @@ describe("parsePoolState", () => {
     expect(legNeedsChain(s.pools[1])).toBe(false);
     expect(legNeedsChain(s.pools[1], s.pools[1].legs[0])).toBe(true);
   });
+  test("halted and retired pools read chain", () => {
+    const s = parsePoolState(body([pool({ status: "halted" }), pool({ status: "retired" })]));
+    expect(s.pools.map((p) => legNeedsChain(p))).toEqual([true, true]);
+  });
 });
 
 describe("fetchPoolState", () => {
@@ -99,7 +101,12 @@ describe("fetchPoolState", () => {
     const b = await fetchPoolState(143, undefined, { fetch: f, base: "http://t" });
     expect(seen).toEqual([null, '"x1"']);
     expect(b).toBe(a);
-    expect(poolStateCached(143, "http://t")).toBe(a);
+  });
+  test("a body for another chain is refused", async () => {
+    const f = (async () => new Response(JSON.stringify(body()))) as unknown as typeof fetch;
+    await expect(fetchPoolState(1, undefined, { fetch: f, base: "http://c" })).rejects.toThrow(
+      "chainId",
+    );
   });
   test("503 throws HttpError for the chain fallback", async () => {
     const f = (async () => new Response("{}", { status: 503 })) as unknown as typeof fetch;
@@ -124,11 +131,9 @@ test("fetchPoolParamsBulk: one call, sorted dedup addresses, <= 32", async () =>
   expect(() => fetchPoolParamsBulk(143, { tags: [] })).toThrow();
 });
 
-test("mergeActivity dedupes on txHash:logIndex, newest first", () => {
-  const r = (t: number, i: number) => ({ txHash: `0x${t}`, logIndex: i, block: t, t });
-  const m = mergeActivity([r(2, 0), r(1, 0)], [r(3, 1), r(2, 0)]);
-  expect(m.map((x) => x.t)).toEqual([3, 2, 1]);
-  expect(activityCursor(r(3, 1))).toBe("3:3:1");
+test("activityCursor is t:block:logIndex", () => {
+  const r = { txHash: "0x3", logIndex: 1, block: 3, t: 3 };
+  expect(activityCursor(r)).toBe("3:3:1");
 });
 
 test("MCP pools_state tool shares the store", async () => {
@@ -137,5 +142,9 @@ test("MCP pools_state tool shares the store", async () => {
     pools: unknown[];
   };
   expect(out.pools).toHaveLength(1);
-  expect(poolStateCached(143, "http://m")).toBe(out as never);
+  const again = await fetchPoolState(143, undefined, {
+    fetch: (async () => new Response(null, { status: 304 })) as unknown as typeof fetch,
+    base: "http://m",
+  });
+  expect(again).toBe(out as never);
 });

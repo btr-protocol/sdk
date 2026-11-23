@@ -110,12 +110,15 @@ function parseLeg(l: W): PoolLegState {
 }
 
 /** Wire -> typed snapshot. Throws on a malformed int: a half-parsed pool must not price anything. */
-export function parsePoolState(raw: unknown): PoolStateSnapshot {
+export function parsePoolState(raw: unknown, chainId?: number): PoolStateSnapshot {
   const r = raw as W;
   if (r?.v !== 1 || !Array.isArray(r.pools)) throw new Error("pool state: unknown version");
+  const got = int(r.chainId, "chainId");
+  if (chainId !== undefined && got !== chainId)
+    throw new Error(`pool state: chainId ${got} != ${chainId}`);
   return {
     v: 1,
-    chainId: int(r.chainId, "chainId"),
+    chainId: got,
     block: int(r.block, "block"),
     servedAt: int(r.servedAt, "servedAt"),
     pools: (r.pools as W[]).map((p) => {
@@ -148,13 +151,13 @@ export function parsePoolState(raw: unknown): PoolStateSnapshot {
   };
 }
 
-/** True when this leg (or its pool) must be read from chain instead of the snapshot. */
+/** True when this leg (or its pool) must be read from chain: stale, or any status but live
+ *  (superseded, halted, retired: a halt is when a fresh chain read matters most). */
 export const legNeedsChain = (p: PoolStateEntry, l?: PoolLegState): boolean =>
-  p.stale || p.status === "superseded" || !!l?.stale;
+  p.stale || p.status !== "live" || !!l?.stale;
 
 // ETag store: one entry per request URL, shared by every caller in the process.
 const store = new Map<string, { etag: string; snap: PoolStateSnapshot }>();
-const listeners = new Set<(chainId: number, s: PoolStateSnapshot) => void>();
 
 /** Pool selector: one pool by address or tag (a tag returns every generation). */
 export type PoolSel = { address: string } | { tag: string };
@@ -182,23 +185,11 @@ export async function fetchPoolState(
     if (!prev) throw new HttpError(304, "pool state: 304 without a stored snapshot");
     return prev.snap;
   }
-  const snap = parsePoolState(await parseJson<unknown>(res, url));
+  const snap = parsePoolState(await parseJson<unknown>(res, url), chainId);
   store.set(url, { etag: res.headers.get("etag") ?? "", snap });
-  if (!id) for (const f of listeners) f(chainId, snap);
   return snap;
 }
 
-/** Last full-chain snapshot fetched in this process (no request). */
-export const poolStateCached = (
-  chainId: number,
-  base = getApiRoot(),
-): PoolStateSnapshot | undefined =>
-  store.get(`${base}${withChainId("/v1/pools/state", chainId)}`)?.snap;
-/** Called after every full-chain fetch that returned a new body. */
-export function onPoolState(f: (chainId: number, s: PoolStateSnapshot) => void): () => void {
-  listeners.add(f);
-  return () => listeners.delete(f);
-}
 /** Test-only: forget stored snapshots. */
 export const resetPoolStateStore = (): void => store.clear();
 
@@ -260,16 +251,3 @@ export const fetchActivityAfter = <R extends ActivityRow = ActivityRow>(
   query: Record<string, string | number | undefined> = {},
   o?: Opt,
 ) => btrApi<ActivityPage<R>>("/v1/activity", chainId, { ...o, query: { ...query, after } });
-/** Merge new rows into a newest-first list, deduped on `txHash:logIndex`. */
-export function mergeActivity<R extends ActivityRow>(
-  prev: readonly R[],
-  add: readonly R[],
-  cap = 400,
-): R[] {
-  const key = (r: R) => `${r.txHash}:${r.logIndex}`;
-  const seen = new Map<string, R>();
-  for (const r of [...add, ...prev]) if (!seen.has(key(r))) seen.set(key(r), r);
-  return [...seen.values()]
-    .sort((a, b) => b.t - a.t || b.block - a.block || b.logIndex - a.logIndex)
-    .slice(0, cap);
-}
