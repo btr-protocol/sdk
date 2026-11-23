@@ -5,7 +5,7 @@ import * as P from "../protocol.js";
 import { type Rec, api, io, livePools, rate, rpcProvider, windowArg } from "./data.js";
 import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from "./fmt.js";
 import type { TreeAsset, TreePool } from "./fmt.js";
-import { floorFromPreview, lossBps, slippageBps } from "../pool/slippage.js";
+import { MAX_SLIPPAGE_BPS, floorFromPreview, lossBps, slippageBps } from "../pool/slippage.js";
 
 export interface Args {
   chain: number;
@@ -421,6 +421,54 @@ function recipientArg(
   return r;
 }
 
+type Hop = {
+  pool: string;
+  token_in: string;
+  token_out: string;
+  amount_in: string;
+  amount_out: string;
+};
+
+/** Route parts -> legs with slippage applied ONCE per part (as SDK `planToLegs`): every hop is
+ *  floored at its quoted out less `tol_pbps` and a chained hop spends the prior hop's floor, so the
+ *  final floor is the part's quoted end-to-end out less tol, never compounded. Refuses a server tol
+ *  wider than the request (`bps`) or the cap, and a part whose loss exceeds the cap. */
+export function chainLegs(
+  parts: { hops: Hop[] }[],
+  tolPbps: number,
+  bps: number,
+  cap = MAX_SLIPPAGE_BPS,
+) {
+  if (!(Number.isInteger(tolPbps) && tolPbps >= 0 && tolPbps <= bps * 100 && tolPbps <= cap * 100))
+    throw new Error(`server tol_pbps ${tolPbps} wider than --slippage-bps ${bps} (cap ${cap})`);
+  const tol = BigInt(tolPbps);
+  let loss = 0;
+  const legs = parts.flatMap((p) => {
+    let prevMin: bigint | null = null;
+    const out = p.hops.map((h, i) => {
+      const quotedOut = BigInt(h.amount_out);
+      const minOut = (quotedOut * (1_000_000n - tol)) / 1_000_000n;
+      if (!(minOut > 0n)) throw new Error(`zero floor on hop ${h.pool}`);
+      const amountIn: bigint = prevMin ?? BigInt(h.amount_in);
+      prevMin = minOut;
+      return {
+        pool: h.pool,
+        tokenIn: h.token_in,
+        tokenOut: h.token_out,
+        amountIn,
+        minOut,
+        quotedOut,
+        chained: i > 0,
+      };
+    });
+    const last = out.at(-1);
+    if (last) loss = Math.max(loss, lossBps(last.quotedOut, last.minOut));
+    return out;
+  });
+  if (loss > cap) throw new Error(`route loss ${loss} bps above the ${cap} bps cap`);
+  return { legs, lossBps: loss };
+}
+
 /** Quote -> exec legs for `from`. The server floor is checked by chainRoute; every pool and token the
  *  route names must be in the live registry. */
 async function swapLegs(a: Args) {
@@ -441,37 +489,24 @@ async function swapLegs(a: Args) {
     if (!t) throw new Error(`route names unknown token ${sym}`);
     return t;
   };
-  const tol = BigInt(r.best.floors[0].tol_pbps);
-  const legs = r.best.parts.flatMap((p) => {
-    let carry: { inn: bigint; out: bigint } | null = null; // previous hop: quoted out vs floor
-    return p.hops.map((h, i) => {
-      const quotedIn = BigInt(h.amount_in);
-      const quotedOut = BigInt(h.amount_out);
-      const amountIn = carry ? (quotedIn * carry.out) / carry.inn : quotedIn; // chained: spend prior floor
-      const outQ = (quotedOut * amountIn) / quotedIn;
-      const minOut = (outQ * (1_000_000n - tol)) / 1_000_000n;
-      carry = { inn: quotedOut, out: minOut };
-      return {
-        pool: poolOf(h.pool),
-        tokenIn: tokOf(h.token_in),
-        tokenOut: tokOf(h.token_out),
-        amountIn,
-        minOut,
-        quotedOut: outQ,
-        chained: i > 0,
-      };
-    });
-  });
+  const bp = slipArg(a);
+  const { legs, lossBps: loss } = chainLegs(r.best.parts, r.best.floors[0].tol_pbps, bp, a.cap);
+  const resolved = legs.map((l) => ({
+    ...l,
+    pool: poolOf(l.pool),
+    tokenIn: tokOf(l.tokenIn),
+    tokenOut: tokOf(l.tokenOut),
+  }));
   const opts = { recipient: recipient as `0x${string}`, sender: from as `0x${string}` };
   const head = {
     chainId: a.chain,
     from,
     recipient,
     floor: r.best.floors[0],
-    lossBps: lossBps(BigInt(r.best.floors[0].amount_out), BigInt(r.best.floors[0].min_out)),
+    lossBps: loss,
     swapGated: r.swap_gated ?? null,
   };
-  return { legs: legs as never, opts, head };
+  return { legs: resolved as never, opts, head };
 }
 
 /** `btr build-swap`: unsigned approve + swap_qe calls; `recipient` receives the output. */

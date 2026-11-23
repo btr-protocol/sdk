@@ -17,6 +17,9 @@ export const lossBps = (preview: bigint, min: bigint): number =>
 
 /** `--slippage-bps` value: integer in (0, 10000) and at most `cap`; else throws. */
 export function slippageBps(v: string | number | undefined, cap = MAX_SLIPPAGE_BPS): number {
+  // Digits only: Number() also takes '0x1f4', '5e2' and ' 500 '.
+  if (typeof v === 'string' && !/^\d+$/.test(v))
+    throw new Error('--slippage-bps must be an integer in (0, 10000)');
   const bp = v === undefined ? DEFAULT_SLIPPAGE_BPS : Number(v);
   if (!(Number.isInteger(bp) && bp > 0 && bp < 10_000))
     throw new Error('--slippage-bps must be an integer in (0, 10000)');

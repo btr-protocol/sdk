@@ -335,3 +335,37 @@ describe('build-swap recipient', () => {
     expect(errs.join('\n')).not.toContain('--recipient');
   });
 });
+
+describe("chainLegs: slippage once per part", () => {
+  const hop = (i: string, o: string, ai: bigint, ao: bigint) => ({
+    pool: "p",
+    token_in: i,
+    token_out: o,
+    amount_in: String(ai),
+    amount_out: String(ao),
+  });
+  const e = 10n ** 18n;
+  test("2- and 3-hop at 500 bps lose <= 500 bps end-to-end", async () => {
+    const { chainLegs } = await import("./cmds.js");
+    const two = [hop("A", "B", 1000n * e, 990n * e), hop("B", "C", 990n * e, 980n * e)];
+    const three = [...two, hop("C", "D", 980n * e, 970n * e)];
+    for (const hops of [two, three]) {
+      const { legs, lossBps } = chainLegs([{ hops }], 50_000, 500, 500);
+      expect(lossBps).toBeLessThanOrEqual(500);
+      const last = legs.at(-1)!;
+      expect(last.minOut).toBe((BigInt(hops.at(-1)!.amount_out) * 95n) / 100n);
+      for (let k = 1; k < legs.length; k++) expect(legs[k].amountIn).toBe(legs[k - 1].minOut);
+    }
+  });
+  test("server tol wider than request or cap refused", async () => {
+    const { chainLegs } = await import("./cmds.js");
+    const hops = [hop("A", "B", 1000n, 990n)];
+    expect(() => chainLegs([{ hops }], 50_001, 500, 9990)).toThrow(/tol_pbps/);
+    expect(() => chainLegs([{ hops }], 60_000, 600, 500)).toThrow(/tol_pbps/);
+  });
+  test("non-digit --slippage-bps refused", async () => {
+    const { slippageBps } = await import("../pool/slippage.js");
+    for (const v of ["0x1f4", "5e2", " 500 ", "500.0"]) expect(() => slippageBps(v)).toThrow();
+    expect(slippageBps("500")).toBe(500);
+  });
+});

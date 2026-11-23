@@ -68,7 +68,7 @@ const calls = buildSwapCalls(legs, opts);          // deduplicated [...approvals
 await wallet.request({ method: 'wallet_sendCalls', params: [{ from: user, chainId: '0x8f', calls }] });
 ```
 
-`btr build-swap` (below) is the reference for mapping `r.best.parts` hops to legs (pools and tokens resolved from the live registry, chained hops floored).
+`btr build-swap` (below) is the reference for mapping `r.best.parts` hops to legs (pools and tokens resolved from the live registry; slippage applied once per part: each hop floored at its quote less `tol_pbps`, a chained hop spends the prior floor, so the final floor is the end-to-end quote less tol; a server `tol_pbps` wider than `--slippage-bps` or the cap is refused).
 
 ### Deposit
 
