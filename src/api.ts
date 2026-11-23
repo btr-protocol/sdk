@@ -7,6 +7,10 @@ export const BTR_API: string =
   (typeof process !== 'undefined' && (process.env as Record<string, string>).BTR_API_URL) ||
   'https://api.btr.markets';
 
+// Pre-0.9 `BTR_API` (with `/v1`) is not read; fail loud rather than silently hit prod.
+if (typeof process !== 'undefined' && process.env?.BTR_API && !process.env.BTR_API_URL)
+  throw new Error('BTR_API is no longer read: set BTR_API_URL (root, without /v1)');
+
 let _api = BTR_API;
 export function setApiRoot(url: string) {
   _api = url.replace(/\/$/, '');

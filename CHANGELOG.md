@@ -12,8 +12,8 @@
 - `LiveOpts` removed: live registry/roster/ABI fetchers take `ApiOpts`; their errors read
   `BTR API <status> <path>`; default timeout 15 s (was 10 s).
 - `/amm` `backendBase()` defaults to `${getApiRoot()}/v1`: honours `setApiRoot()`/`BTR_API_URL`;
-  env `BTR_API` is no longer read.
-- `withChainId` refuses a non-positive or non-integer chain id.
+  env `BTR_API` is no longer read; import throws if `BTR_API` is set without `BTR_API_URL`.
+- `withChainId` throws on a non-positive/non-integer chain id (front: module-scope callers fail at load on a bad `ACTIVE_CHAIN_ID`).
 
 ## 0.8.0 - 2026-11-23
 
