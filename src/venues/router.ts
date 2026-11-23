@@ -5,7 +5,6 @@
 import { decodeErrorResult, getFunctionSignature, getSelector } from '../eth/abi.js';
 import {
   type Address,
-  ERC20_ABI,
   type Eip1193Provider,
   type Hex,
   RpcRevertError,
@@ -13,6 +12,7 @@ import {
   zeroAddress,
 } from '../eth/index.js';
 import { type MulticallResult, multicall } from '../eth/multicall.js';
+import { approveCallData } from '../calldata.js';
 import { POOL_ABI, type SwapQuote, defaultDeadline, sendDeadline } from '../pool/index.js';
 import { type VenueKind, eqAddr, hasToken, staticVenuePools } from './registry.js';
 
@@ -223,7 +223,7 @@ const MAX_UINT256 = (1n << 256n) - 1n;
 function approveCall(token: Address, spender: Address, amount: bigint): VenueExecCall {
   return {
     to: token,
-    data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [spender, amount] }),
+    data: approveCallData(spender, amount),
   };
 }
 

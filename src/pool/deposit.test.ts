@@ -60,7 +60,7 @@ describe('depositMin plumbing', () => {
     for (const bad of [undefined, 0n]) {
       await expect(
         deposit(provider as never, POOL, { token: TOK, amount: 5n, minLpOut: bad as never }),
-      ).rejects.toThrow(/positive share floor/);
+      ).rejects.toThrow(/positive floor/);
     }
     expect(sent.length).toBe(1);
   });

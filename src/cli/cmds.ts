@@ -615,14 +615,10 @@ async function previewWithdraw(a: Args, pool: string, token: string, lp: bigint)
 /** `btr build-deposit`: [approve, depositMin]; the shares mint to `--from`. */
 export async function buildDeposit(a: Args): Promise<Res> {
   const { t, amount, from, head } = await lpArgs(a, "build-deposit");
-  const [{ encodeFn }, { ERC20_ABI }, { depositCallData }, { simulateDeposit }] = await Promise.all(
-    [
-      import("../eth/abi.js"),
-      import("../eth/erc20.js"),
-      import("../router/index.js"),
-      import("../pool/index.js"),
-    ],
-  );
+  const [{ approveCallData, depositCallData }, { simulateDeposit }] = await Promise.all([
+    import("../calldata.js"),
+    import("../pool/index.js"),
+  ]);
   const pool = t.pool.address;
   const f = await lpFloor(
     a,
@@ -639,7 +635,7 @@ export async function buildDeposit(a: Args): Promise<Res> {
   const calls = [
     {
       to: t.address,
-      data: encodeFn({ abi: ERC20_ABI, functionName: "approve", args: [pool, amount] }),
+      data: approveCallData(pool as `0x${string}`, amount),
       value: 0n,
     },
     { to: pool, data: depositCallData(t.address as `0x${string}`, amount, f.floor), value: 0n },
@@ -714,7 +710,7 @@ async function debtArgs(a: Args, kind: string) {
 async function simDebtSwap(a: Args, d: Awaited<ReturnType<typeof debtArgs>>): Promise<bigint> {
   const [{ swapLiabilityCallData }, { decodeFn }, { POOL_ABI }, { sendDeadline }] =
     await Promise.all([
-      import("../router/index.js"),
+      import("../calldata.js"),
       import("../eth/abi.js"),
       import("../abis/Pool.js"),
       import("../pool/index.js"),

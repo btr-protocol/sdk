@@ -20,7 +20,7 @@ import {
   depositCallData,
   swapLiabilityCallData,
   withdrawCallData,
-} from '../calls.js';
+} from '../calldata.js';
 import { ROUTER_ABI } from '../abis/Router.js';
 import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
@@ -805,8 +805,6 @@ export function buildSwapLiabilityCalls(
     },
   ];
 }
-
-export { depositCallData, swapLiabilityCallData } from '../calls.js';
 
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
 export type { NamedPool, Route, LegFill, RouteQuote, SplitPart, SwapPlan } from './route.js';

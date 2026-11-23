@@ -4,6 +4,7 @@
  */
 
 import { POOL_ABI } from '../abis/Pool.js';
+import { depositCallData, withdrawCallData } from '../calldata.js';
 import type {
   Assert,
   AssetFields,
@@ -477,13 +478,7 @@ export async function deposit(
   poolAddress: Address,
   params: DepositParams,
 ): Promise<Hex> {
-  if (typeof params.minLpOut !== 'bigint' || params.minLpOut <= 0n)
-    throw new Error('deposit: minLpOut must be a positive share floor');
-  const calldata = encodeFn({
-    abi: POOL_ABI,
-    functionName: 'depositMin',
-    args: [params.token, params.amount, params.minLpOut],
-  });
+  const calldata = depositCallData(params.token, params.amount, params.minLpOut);
 
   return sendPoolCall(
     provider,
@@ -558,11 +553,12 @@ export async function withdraw(
   poolAddress: Address,
   params: WithdrawParams,
 ): Promise<Hex> {
-  const calldata = encodeFn({
-    abi: POOL_ABI,
-    functionName: 'withdraw',
-    args: [params.token, params.lpAmount, params.minAmountOut, sendDeadline(params.deadline)],
-  });
+  const calldata = withdrawCallData(
+    params.token,
+    params.lpAmount,
+    params.minAmountOut,
+    sendDeadline(params.deadline),
+  );
 
   return sendPoolCall(provider, poolAddress, calldata, 0n, params.expectedChainId);
 }
