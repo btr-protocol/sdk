@@ -50,7 +50,10 @@ export * from './chain/errors.js';
 export { AbiUnknownGenerationError, type AbiWithMeta, fetchAbiWithMeta } from './abis/fetch.js';
 
 // Base URL for the thin HTTP client (`setApiRoot`); the chain client reads it.
-export { getApiRoot, setApiRoot, withChainId } from './api.js';
+export { btrFetch, btrFetchRaw, getApiRoot, setApiRoot, withChainId } from './api.js';
+
+// Typed `/v1/*` read fetchers (one generic `btrApi`) + `/v1/lp-rows`
+export * from './protocol.js';
 
 // Deployed-venue registry + on-chain exact-in router
 export * from './venues/index.js';
