@@ -462,6 +462,46 @@ describe('chainLegs: SDK planToLegs on the wire route', () => {
       chainLegs({ parts: [{ hops: three }], floors: [floor(970n * e, 50_000)] }, opts(1000n * e)),
     ).rejects.toThrow(/refused/);
   });
+  test('negative part offsetting an overspend refused (approve never above request)', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const req = 1000n * e;
+    const x = 1_000_000n * e;
+    const parts = [
+      { hops: [hop('p3', 'A', 'C', req + x, 985n * e)] },
+      { hops: [hop('p1', 'A', 'C', -x, 0n)] },
+    ];
+    await expect(
+      chainLegs({ parts, floors: [floor(985n * e, 50_000)] }, opts(req)),
+    ).rejects.toThrow(/refused/);
+  });
+  test('zero part refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const parts = [
+      { hops: [hop('p3', 'A', 'C', 1000n * e, 985n * e)] },
+      { hops: [hop('p1', 'A', 'C', 0n, 0n)] },
+    ];
+    await expect(
+      chainLegs({ parts, floors: [floor(985n * e, 50_000)] }, opts(1000n * e)),
+    ).rejects.toThrow(/refused/);
+  });
+  test('leg spending above the request refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const parts = [{ hops: [hop('p3', 'A', 'C', 1001n * e, 985n * e)] }];
+    await expect(
+      chainLegs({ parts, floors: [floor(985n * e, 50_000)] }, opts(1000n * e)),
+    ).rejects.toThrow(/refused/);
+  });
+  test('honest split: approvals sum to the request', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const R = await import('../router/index.js');
+    const parts = [
+      { hops: [hop('p3', 'A', 'C', 600n * e, 590n * e)] },
+      { hops: [hop('p1', 'A', 'C', 400n * e, 395n * e)] },
+    ];
+    const { legs } = await chainLegs({ parts, floors: [floor(985n * e, 50_000)] }, opts(1000n * e));
+    expect(legs.reduce((s, l) => s + l.amountIn, 0n)).toBe(1000n * e);
+    expect(R.buildApprovalCalls(legs, { recipient: USER } as never)).toHaveLength(2);
+  });
   test('server tol wider than request or cap refused', async () => {
     const { chainLegs } = await import('./cmds.js');
     await expect(

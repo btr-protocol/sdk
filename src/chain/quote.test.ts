@@ -562,6 +562,27 @@ describe('chain route shape', () => {
     ['a single at another size', body([AB], [[hop('btr-stable', 'A', 'B', IN * 2n)]])],
     ['a floor on another token', body([AB], [AB], TIN)],
     [
+      'a negative part offsetting an overspend',
+      body(
+        [
+          [hop('btr-stable', 'A', 'B', IN + 10n ** 24n)],
+          [{ ...hop('btr-crypto', 'A', 'B'), amount_in: String(-(10n ** 24n)) }],
+        ],
+        [],
+      ),
+    ],
+    [
+      'a zero-amount part',
+      body(
+        [[hop('btr-stable', 'A', 'B', IN)], [{ ...hop('btr-crypto', 'A', 'B'), amount_in: '0x0' }]],
+        [],
+      ),
+    ],
+    [
+      'a zero amount_out hop',
+      body([[{ ...hop('btr-stable', 'A', 'B', IN), amount_out: '0x0' }]], []),
+    ],
+    [
       'a non-integer amount',
       body(
         [[hop('btr-stable', 'A', 'B')]].map((p) => p.map((h) => ({ ...h, amount_in: 'x' }))),

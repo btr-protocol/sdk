@@ -425,6 +425,11 @@ function checkRouteShape(req: ChainRouteRequest, raw: ChainRouteResponse): void 
       return bad(`carries a non-integer amount ${v}`);
     }
   };
+  const pos = (v: string): bigint => {
+    const n = big(v);
+    if (n <= 0n) bad(`carries a non-positive amount ${v}`);
+    return n;
+  };
   const want = BigInt(req.amount_in);
   const parts = raw.best?.parts ?? [];
   const all = [...parts, ...(raw.singles ?? [])];
@@ -433,6 +438,11 @@ function checkRouteShape(req: ChainRouteRequest, raw: ChainRouteResponse): void 
   for (const p of all) {
     const hops = p?.hops ?? [];
     if (hops.length === 0) bad('carries an empty part');
+    // A negative or zero hop lets a sibling overspend while Σ amount_in still equals the request.
+    for (const h of hops) {
+      pos(h.amount_in);
+      pos(h.amount_out);
+    }
     for (let h = 1; h < hops.length; h++) {
       if (hops[h].token_in !== hops[h - 1].token_out) bad('carries a disjoint part');
     }

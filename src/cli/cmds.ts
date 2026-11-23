@@ -433,7 +433,7 @@ type Tok = { address: string; decimals: number };
 
 /** `/v1/chain/route` best -> exec legs through SDK `planToLegs` (the front's builder): exact wire
  *  units, server floor allocated across parts, entry/exit bound to the requested pair, >2-hop parts
- *  refused. `lossBps` is the encoded Σ floor against the server's `amount_out`; above `cap` refused. */
+ *  refused. `lossBps` is the encoded Σ floor against the server's `amount_out`; above min(bps, cap) refused. */
 export async function chainLegs(
   best: { parts: { hops: Hop[] }[]; floors: Floor[] },
   o: {
@@ -477,6 +477,8 @@ export async function chainLegs(
       quote: { route: route as never, amountIn, amountOut, fills },
     };
   });
+  // Trust: a pool is official iff the live registry (`poolOf`) names its tag; a compromised
+  // registry is out of scope here, and the route's pools are bound to it, not to the server.
   const official = new Set(
     best.parts.flatMap((p) => p.hops.map((h) => o.poolOf(h.pool)?.toLowerCase())),
   );
@@ -504,7 +506,8 @@ export async function chainLegs(
   // A part's final leg is the one not followed by its chained hop 2.
   const minOut = legs.reduce((s, l, i) => (legs[i + 1]?.chained ? s : s + l.minOut), 0n);
   const loss = lossBps(BigInt(f.amount_out), minOut);
-  if (loss > cap) throw new Error(`route loss ${loss} bps above the ${cap} bps cap`);
+  const limit = Math.min(o.bps, cap);
+  if (loss > limit) throw new Error(`route loss ${loss} bps above the ${limit} bps limit`);
   return { legs, lossBps: loss };
 }
 
@@ -527,6 +530,7 @@ async function swapLegs(a: Args) {
       const address = tin.reg.tokens[sym.toUpperCase()];
       return address ? { address, decimals: 0 } : undefined;
     },
+    // Registry trust: `tin.reg` (live registry) is the sole authority for pool/token addresses.
     poolOf: (tag) => tin.reg.pools.find((x) => x.tag === tag)?.address,
   });
   const opts = { recipient: recipient as `0x${string}`, sender: from as `0x${string}` };

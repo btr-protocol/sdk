@@ -350,6 +350,13 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   // EXACT MODE: every fill carries its wire units. Parts are then sized at the server's own
   // `amount_in`, chained hops must join to the wei, and the floors below are checked against the
   // server's per-part `amount_out` (a part quoting less than its floor's share is refused).
+  // A non-positive fill lets a sibling part overspend while Σ still matches: refuse the plan.
+  for (const p of ordered) {
+    for (const f of p.quote.fills) {
+      if ((f.amountIn !== undefined && !(f.amountIn > 0)) || !(f.amountOut > 0)) return null;
+      if (f.units && (f.units.amountIn <= 0n || f.units.amountOut <= 0n)) return null;
+    }
+  }
   const exact =
     ordered.length > 0 &&
     ordered.every((p) => p.quote.fills.length > 0 && p.quote.fills.every((f) => f.units));
@@ -377,7 +384,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     const tout = last && opts.tokenOf(last.tokenOut);
     if (!tin || !tout || !boundEnds(tin.address, tout.address, opts)) return null;
     const amountIn = carve(part.fraction, i, tin.decimals);
-    if (amountIn <= 0n) continue;
+    if (amountIn < 0n || (exact && amountIn === 0n)) return null;
+    if (amountIn === 0n) continue; // fraction mode: dust carved to 0 wei is dropped
+    if (opts.amountInUnits && amountIn > opts.amountInUnits) return null;
     parts.push(part);
     partIn.push(amountIn);
   }
@@ -505,6 +514,12 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
         chained: true,
       });
     }
+  }
+  // Funded (non-chained) legs are what the wallet is debited and approved for: never above the total.
+  if (opts.amountInUnits) {
+    const funded = legs.filter((l) => !l.chained);
+    if (funded.some((l) => l.amountIn <= 0n || l.amountIn > opts.amountInUnits!)) return null;
+    if (funded.reduce((s, l) => s + l.amountIn, 0n) !== opts.amountInUnits) return null;
   }
   return legs;
 }
