@@ -270,8 +270,9 @@ describe('wire bytes', () => {
     };
     await send(p, [swap], { wait: false });
     const sent = wire.find((w) => w.method === 'eth_sendTransaction');
+    // 21000 x 1.25 = 26250
     expect(sent?.params).toEqual([
-      { from: T, to: T, data: '0xdeadbeef', value: '0x0', gas: (sent?.params as { gas: Hex }[])[0].gas },
+      { from: T, to: T, data: '0xdeadbeef', value: '0x0', gas: '0x668a' },
     ]);
     expect(wire.map((w) => w.method)).toEqual(['eth_accounts', 'eth_estimateGas', 'eth_sendTransaction']);
   });
