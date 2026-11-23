@@ -567,6 +567,7 @@ export async function simulatePoolCall<T>(
   const result = (await provider.request({
     method: 'eth_call',
     params: [{ from, to: poolAddress, data, value }, 'latest'],
+    fresh: true,
   })) as Hex;
   return decodeFn<T>({ abi: POOL_ABI, functionName, data: result });
 }

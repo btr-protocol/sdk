@@ -82,6 +82,8 @@ export interface TransportOpts {
   // body would otherwise grow the caller's heap until the tab or process dies; over the cap the
   // read is cancelled and refused (not retried: the same endpoint would send it again).
   maxResponseBytes?: number;
+  // Injected fetch (tests, proxies); default global fetch.
+  fetch?: typeof fetch;
 }
 
 type Waiter = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
@@ -130,6 +132,7 @@ export function httpTransport(
   const maxBatch = batch?.max ?? 100;
   const maxBytes = batch?.maxBytes ?? Number.POSITIVE_INFINITY;
   const maxResponseBytes = opts.maxResponseBytes ?? 32 * 1024 * 1024;
+  const doFetch = opts.fetch ?? ((u: string, i: RequestInit) => fetch(u, i));
 
   let id = 0;
   let queue: Pending[] = [];
@@ -154,7 +157,7 @@ export function httpTransport(
     // clears the `inflight` dedupe entry, so a hung read wedges every later same-key call.
     const t = setTimeout(() => ctrl.abort(), timeout);
     try {
-      const res = await fetch(url, {
+      const res = await doFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -321,10 +324,13 @@ export function httpTransport(
     flush();
   };
 
+  // `fresh`: never join an in-flight duplicate (it may have been sent before the caller's state
+  // changed); security reads (pre-sign simulation, floors) set it.
   const request = ({
     method,
     params = [],
-  }: { method: string; params?: unknown[] }): Promise<unknown> => {
+    fresh,
+  }: { method: string; params?: unknown[]; fresh?: boolean }): Promise<unknown> => {
     if (!batchOn) {
       return post({ jsonrpc: '2.0', id: ++id, method, params }).then((j: RpcResponse) => {
         if (j?.error) throw rpcErr(j.error);
@@ -332,7 +338,7 @@ export function httpTransport(
       });
     }
     return new Promise((resolve, reject) => {
-      if (DEDUPE.has(method)) {
+      if (DEDUPE.has(method) && !fresh) {
         const key = method + JSON.stringify(params);
         const lead = inflight.get(key);
         if (lead) {
