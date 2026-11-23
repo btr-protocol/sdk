@@ -76,3 +76,4 @@ export {
   createPrivateKeyClient,
   privateKeyToAddress,
 } from "./eth/client.js";
+export * from "./calls.js";
