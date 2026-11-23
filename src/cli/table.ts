@@ -344,9 +344,9 @@ export const TABLE: Cmd[] = [
   {
     name: "build-withdraw",
     description:
-      "Unsigned withdraw of LP shares (amount in token units); floor = previewWithdraw less slippage; --from receives the tokens",
+      "Unsigned withdraw of lp-raw LP shares; floor = previewWithdraw less slippage; --from receives the tokens",
     kind: "build",
-    pos: ["pool", "symbol", "amount"],
+    pos: ["pool", "symbol", "lp-raw"],
     args: { ...FROM, ...SLIP, ...MIN },
     run: view("buildWithdraw"),
   },

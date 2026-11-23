@@ -2,14 +2,18 @@
 // MCP server over stdio (newline-delimited JSON-RPC 2.0), bun only. Tools = the shared command
 // table (./table.ts): reads + unsigned builds. No keys, no signing, no tx sending.
 import pkg from '../../package.json' with { type: 'json' };
+import { MAX_SLIPPAGE_BPS, MCP_MAX_SLIPPAGE_BPS } from '../pool/slippage.js';
 import type { RegistryOpts } from '../venues/live.js';
 import { CHAIN, type Cmd, TABLE, defaultChain, toJson, toolName } from './table.js';
 
 const PROTOCOL = '2024-11-05';
+// No human confirms an MCP build, so slippage and min-out are capped tighter than the CLI's.
+const capped = (d: string) => d.replaceAll(String(MAX_SLIPPAGE_BPS), String(MCP_MAX_SLIPPAGE_BPS));
+const CAP_NOTE = ` (MCP: slippage-bps and min-out capped at ${MCP_MAX_SLIPPAGE_BPS} bps below the preview; output lossBps)`;
 /** One tool per command-table entry: the CLI's exact capability set. */
 export const TOOLS = TABLE.map((c) => ({
   name: toolName(c),
-  description: `[${c.kind}] ${c.description}`,
+  description: `[${c.kind}] ${c.description}${c.kind === 'build' && c.args?.['slippage-bps'] ? CAP_NOTE : ''}`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -18,7 +22,7 @@ export const TOOLS = TABLE.map((c) => ({
       ...Object.fromEntries(
         Object.entries(c.args ?? {}).map(([k, v]) => [
           k,
-          { type: v.type, description: v.description },
+          { type: v.type, description: capped(v.description) },
         ]),
       ),
     },
@@ -53,7 +57,13 @@ export async function call(name: unknown, a: Rec = {}, o: RegistryOpts = {}): Pr
     flags.set(k, def.type === 'object' && typeof v !== 'string' ? JSON.stringify(v) : String(v));
   }
   return (
-    await cmd.run({ chain: (c as number | undefined) ?? (await defaultChain()), flags, pos, o })
+    await cmd.run({
+      chain: (c as number | undefined) ?? (await defaultChain()),
+      flags,
+      pos,
+      o,
+      cap: MCP_MAX_SLIPPAGE_BPS,
+    })
   ).data;
 }
 

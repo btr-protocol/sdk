@@ -242,12 +242,12 @@ describe('build calldata = SDK builders', () => {
     ]);
     expect(d.minRaw).toBe(((PREVIEW.debt * 9_950n) / 10_000n).toString());
   });
-  test('build-withdraw encodes Pool.withdraw floored off previewWithdraw', async () => {
+  test('build-withdraw takes lp-raw shares, floored off previewWithdraw', async () => {
     const r = await build([
       'build-withdraw',
       'btr-core',
       'USDC',
-      '1',
+      '1000000',
       '--from',
       FROM,
       '--chain',
@@ -262,6 +262,42 @@ describe('build calldata = SDK builders', () => {
         args: [await tok('USDC'), 1_000_000n, (PREVIEW.withdraw * 9_950n) / 10_000n, dl],
       }),
     );
+    expect(r.lpRaw).toBe('1000000');
+    expect(r.lossBps).toBe(50);
+    const bad = ['build-withdraw', 'btr-core', 'USDC', '1.5', '--from', FROM, '--chain', '143'];
+    expect((await fail(bad)).code).not.toBe(0);
+  });
+  test('MCP caps slippage at 500 bps; CLI keeps the front cap', async () => {
+    const args = { chain: 143, pool: 'btr-core', symbol: 'USDC', amount: '2.5', from: FROM };
+    type B = { lossBps: number; minRaw: string };
+    const ok = (await call('build_deposit', { ...args, 'slippage-bps': '500' }, o)) as B;
+    expect([ok.lossBps, ok.minRaw]).toEqual([500, '950']);
+    await expect(call('build_deposit', { ...args, 'slippage-bps': '501' }, o)).rejects.toThrow(
+      '500 cap',
+    );
+    // preview 1000: MCP lowest min-out is 950
+    const edge = (await call('build_deposit', { ...args, 'min-out': '950' }, o)) as B;
+    expect(edge.lossBps).toBe(500);
+    await expect(call('build_deposit', { ...args, 'min-out': '949' }, o)).rejects.toThrow(
+      '500 bps cap',
+    );
+    expect((await build([...DEP, '--slippage-bps', '9000'])).lossBps).toBe(9000);
+    expect((await build([...DEP, '--min-out', '949'])).lossBps).toBe(510);
+  });
+});
+
+describe('MCP tool schema', () => {
+  test('build tools state the 500 bps cap', async () => {
+    const { TOOLS } = await import('./mcp.ts');
+    const t = TOOLS.find((x) => x.name === 'build_withdraw');
+    expect(t?.description).toContain('500 bps');
+    expect(JSON.stringify(t?.inputSchema)).not.toContain('9990');
+    expect(t?.inputSchema.required).toContain('lp-raw');
+  });
+  test('lossBps', async () => {
+    const { lossBps } = await import('../pool/slippage.js');
+    expect(lossBps(10_000n, 9_950n)).toBe(50);
+    expect(lossBps(3n, 2n)).toBe(3333);
   });
 });
 

@@ -5,13 +5,15 @@ import * as P from "../protocol.js";
 import { type Rec, api, io, livePools, rate, rpcProvider, windowArg } from "./data.js";
 import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from "./fmt.js";
 import type { TreeAsset, TreePool } from "./fmt.js";
-import { floorFromPreview, slippageBps } from "../pool/slippage.js";
+import { floorFromPreview, lossBps, slippageBps } from "../pool/slippage.js";
 
 export interface Args {
   chain: number;
   flags: Map<string, string>;
   pos: string[];
   o: RegistryOpts;
+  /** Slippage cap in bps (default the front's); MCP passes its tighter one. */
+  cap?: number;
 }
 /** What every command returns: `data` (CLI `--json`, MCP result) and, for views, the text lines. */
 export interface Res {
@@ -336,7 +338,7 @@ async function resolve(a: Args, sym: string, poolHint?: string) {
 }
 
 function slipArg(a: Args): number {
-  return slippageBps(flag(a, "slippage-bps"));
+  return slippageBps(flag(a, "slippage-bps"), a.cap);
 }
 
 /** Positive raw integer, else a usage error (BigInt alone throws a bare SyntaxError). */
@@ -466,6 +468,7 @@ async function swapLegs(a: Args) {
     from,
     recipient,
     floor: r.best.floors[0],
+    lossBps: lossBps(BigInt(r.best.floors[0].amount_out), BigInt(r.best.floors[0].min_out)),
     swapGated: r.swap_gated ?? null,
   };
   return { legs: legs as never, opts, head };
@@ -501,7 +504,7 @@ async function lpFloor(a: Args, preview: () => Promise<bigint>, hint = "") {
   } catch (e) {
     throw new Error(`on-chain preview failed${hint}: ${(e as Error).message}`);
   }
-  return { floor: floorFromPreview(p, bp, minOut), preview: p, slippageBps: bp };
+  return { floor: floorFromPreview(p, bp, minOut, a.cap), preview: p, slippageBps: bp };
 }
 
 async function lpArgs(a: Args, kind: string) {
@@ -578,11 +581,21 @@ const lpHead = (f: { floor: bigint; preview: bigint; slippageBps: number }) => (
   previewRaw: f.preview.toString(),
   minRaw: f.floor.toString(),
   slippageBps: f.slippageBps,
+  lossBps: lossBps(f.preview, f.floor),
 });
 
-/** `btr build-withdraw`: [withdraw] burning `amount` shares of the leg, floored; pays `--from`. */
+/** `btr build-withdraw <pool-tag> <SYM> <lp-raw>`: [withdraw] burning `lp-raw` shares of the leg,
+ *  floored; pays `--from`. */
 export async function buildWithdraw(a: Args): Promise<Res> {
-  const { t, amount, from, head } = await lpArgs(a, "build-withdraw");
+  const [tag, sym, raw] = a.pos;
+  if (!tag || !sym || !raw)
+    throw new Error(
+      "usage: btr build-withdraw <pool-tag> <SYMBOL> <lp-raw> --from 0x.. [--slippage-bps 50] [--min-out <raw>]",
+    );
+  const from = addrArg(a, "from");
+  slipArg(a);
+  const t = await resolve(a, sym, tag);
+  const lp = rawArg(raw, "lp-raw");
   const [{ encodeFn }, { POOL_ABI }, { sendDeadline }] = await Promise.all([
     import("../eth/abi.js"),
     import("../abis/Pool.js"),
@@ -590,16 +603,20 @@ export async function buildWithdraw(a: Args): Promise<Res> {
   ]);
   const f = await lpFloor(
     a,
-    async () => (await previewWithdraw(a, t.pool.address, t.address, amount))[0],
+    async () => (await previewWithdraw(a, t.pool.address, t.address, lp))[0],
   );
   const data = encodeFn({
     abi: POOL_ABI,
     functionName: "withdraw",
-    args: [t.address, amount, f.floor, sendDeadline()],
+    args: [t.address, lp, f.floor, sendDeadline()],
   });
   return {
     data: {
-      ...head,
+      chainId: a.chain,
+      from,
+      pool: t.pool.tag,
+      token: sym.toUpperCase(),
+      lpRaw: lp.toString(),
       ...lpHead(f),
       kind: "withdraw",
       calls: fromCalls(from, [{ to: t.pool.address, data, value: 0n }]),

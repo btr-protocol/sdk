@@ -545,6 +545,8 @@ export {
   slippageBps,
   DEFAULT_SLIPPAGE_BPS,
   MAX_SLIPPAGE_BPS,
+  MCP_MAX_SLIPPAGE_BPS,
+  lossBps,
 } from './slippage';
 
 /**

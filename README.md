@@ -135,10 +135,10 @@ Text views by default, `--json` for raw data. Exit 0 ok, 1 failure, 2 usage. Liv
 | `build-swap` | `<in> <out> <amount> --from [--recipient] [--slippage-bps]` | Unsigned approve + `swap_qe` calls | build |
 | `build-approve` | `<in> <out> <amount> --from [--slippage-bps]` | Unsigned approvals only | build |
 | `build-deposit` | `<pool> <symbol> <amount> --from [--slippage-bps] [--min-out <raw>]` | Unsigned approve + `depositMin` | build |
-| `build-withdraw` | `<pool> <symbol> <amount> --from [--slippage-bps] [--min-out <raw>]` | Unsigned `withdraw` | build |
+| `build-withdraw` | `<pool> <symbol> <lp-raw> --from [--slippage-bps] [--min-out <raw>]` | Unsigned `withdraw` | build |
 | `build-debt-swap` | `<pool> <from-symbol> <to-symbol> <lp-raw> --from [--slippage-bps] [--min-out <raw>]` | Unsigned `swapLiability` | build |
 
-`--window` is `24h | 7d | 30d`. `--from` is the signing wallet: every call is emitted as `{from, to, data, value}`, so a wallet refuses another signer. LP builds pay `--from` (the contracts take no recipient); `build-swap` pays `--recipient` (default `--from`; zero, pool and token addresses refused). `--slippage-bps` is an integer in (0, 10000), default 50, cap 9990. LP builds floor off the chain: `build-deposit` simulates the deposit from `--from` (needs balance and a mined approval), `build-withdraw` reads `Pool.previewWithdraw`, `build-debt-swap` simulates `swapLiability`; floor = preview less `--slippage-bps`. An explicit `--min-out` (raw) must sit between the preview less the 9990 bps cap and the preview, else it is refused.
+`--window` is `24h | 7d | 30d`. `--from` is the signing wallet: every call is emitted as `{from, to, data, value}`, so a wallet refuses another signer. LP builds pay `--from` (the contracts take no recipient); `build-swap` pays `--recipient` (default `--from`; zero, pool and token addresses refused). `--slippage-bps` is an integer in (0, 10000), default 50, cap 9990. LP builds floor off the chain: `build-deposit` simulates the deposit from `--from` (needs balance and a mined approval), `build-withdraw` reads `Pool.previewWithdraw`, `build-debt-swap` simulates `swapLiability`; floor = preview less `--slippage-bps`. An explicit `--min-out` (raw) must sit between the preview less the 9990 bps cap and the preview, else it is refused. Every build returns `lossBps` = (preview − min) / preview in bps. MCP builds have no human confirm step, so there `--slippage-bps` and `--min-out` are capped at 500 bps below the preview.
 
 ```bash
 btr quote USDC WBTC 1000
