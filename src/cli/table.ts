@@ -208,6 +208,24 @@ export const TABLE: Cmd[] = [
   get("pool-assets", "Deployed pools and their asset rosters (/v1/pools)", P.fetchPools),
   get("pool-metrics", "Per-pool APR and its primitives (/v1/pools/metrics)", P.fetchPoolMetrics),
   {
+    name: "pools-state",
+    description:
+      "Back-cached pool state, every generation (/v1/pools/state; --pool address|tag for one); ints as decimal strings, stale/superseded entries need a chain read",
+    kind: "read",
+    args: { pool: str("0x pool address or tag (default: every pool)") },
+    run: async (a) => {
+      const { fetchPoolState } = await import("../poolState.js");
+      const p = a.flags.get("pool");
+      return data(
+        fetchPoolState(
+          a.chain,
+          p ? (p.startsWith("0x") ? { address: p } : { tag: p }) : undefined,
+          a.o,
+        ),
+      );
+    },
+  },
+  {
     name: "pool-params",
     description: "One pool's live risk parameters, every leg (/v1/pools/{tag}/params)",
     kind: "read",

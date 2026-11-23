@@ -63,6 +63,8 @@ export {
 
 // Typed `/v1/*` read fetchers (one generic `btrApi`) + `/v1/lp-rows`
 export * from "./protocol.js";
+// Back-cached pool state (ETag), bulk params, activity cursor: the store front/CLI/MCP share
+export * from "./poolState.js";
 
 // Deployed-venue registry + on-chain exact-in router
 export * from "./venues/index.js";
