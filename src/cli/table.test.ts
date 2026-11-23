@@ -336,36 +336,147 @@ describe('build-swap recipient', () => {
   });
 });
 
-describe("chainLegs: slippage once per part", () => {
-  const hop = (i: string, o: string, ai: bigint, ao: bigint) => ({
-    pool: "p",
+describe('chainLegs: SDK planToLegs on the wire route', () => {
+  const A = '0x00000000000000000000000000000000000000a1';
+  const B = '0x00000000000000000000000000000000000000b2';
+  const C = '0x00000000000000000000000000000000000000c3';
+  const D = '0x00000000000000000000000000000000000000d4';
+  const P1 = '0x0000000000000000000000000000000000000f01';
+  const P2 = '0x0000000000000000000000000000000000000f02';
+  const P3 = '0x0000000000000000000000000000000000000f03';
+  const toks: Record<string, string> = { A, B, C, D };
+  const pools: Record<string, string> = { p1: P1, p2: P2, p3: P3 };
+  const USER = '0x0000000000000000000000000000000000000abc' as const;
+  const e = 10n ** 18n;
+  const hop = (pool: string, i: string, o: string, ai: bigint, ao: bigint) => ({
+    pool,
     token_in: i,
     token_out: o,
     amount_in: String(ai),
     amount_out: String(ao),
   });
-  const e = 10n ** 18n;
-  test("2- and 3-hop at 500 bps lose <= 500 bps end-to-end", async () => {
-    const { chainLegs } = await import("./cmds.js");
-    const two = [hop("A", "B", 1000n * e, 990n * e), hop("B", "C", 990n * e, 980n * e)];
-    const three = [...two, hop("C", "D", 980n * e, 970n * e)];
-    for (const hops of [two, three]) {
-      const { legs, lossBps } = chainLegs([{ hops }], 50_000, 500, 500);
+  const floor = (out: bigint, tol: number) => ({
+    token: C,
+    amount_out: String(out),
+    tol_pbps: tol,
+    min_out: String((out * BigInt(1_000_000 - tol)) / 1_000_000n),
+  });
+  const opts = (amountIn: bigint, bps = 500) => ({
+    tin: { address: A, decimals: 18 },
+    tout: { address: C, decimals: 18 },
+    amountIn,
+    bps,
+    cap: 500,
+    tokenOf: (s: string) => (toks[s] ? { address: toks[s], decimals: 18 } : undefined),
+    poolOf: (t: string) => pools[t],
+  });
+  const two = [hop('p1', 'A', 'B', 1000n * e, 990n * e), hop('p2', 'B', 'C', 990n * e, 980n * e)];
+  const one = [hop('p3', 'A', 'C', 1000n * e, 985n * e)];
+
+  test('honest 1/2-hop routes: same calldata as SDK planToLegs + buildSwapCalls', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const R = await import('../router/index.js');
+    for (const hops of [one, two]) {
+      const out = BigInt(hops.at(-1)!.amount_out);
+      const { legs, lossBps } = await chainLegs(
+        { parts: [{ hops }], floors: [floor(out, 50_000)] },
+        opts(1000n * e),
+      );
       expect(lossBps).toBeLessThanOrEqual(500);
-      const last = legs.at(-1)!;
-      expect(last.minOut).toBe((BigInt(hops.at(-1)!.amount_out) * 95n) / 100n);
+      expect(legs.at(-1)!.minOut).toBe((out * 95n) / 100n);
       for (let k = 1; k < legs.length; k++) expect(legs[k].amountIn).toBe(legs[k - 1].minOut);
+      const rl = hops.map((h) => ({
+        poolTag: h.pool,
+        poolAddr: pools[h.pool],
+        tokenIn: h.token_in,
+        tokenOut: h.token_out,
+      }));
+      const route = { legs: rl, tokens: ['A', ...rl.map((l) => l.tokenOut)], hops: rl.length };
+      const sdk = R.planToLegs(
+        {
+          amountIn: 1000,
+          amountOut: Number(out / e),
+          isSplit: false,
+          parts: [
+            {
+              route,
+              fraction: 1,
+              quote: {
+                route,
+                amountIn: 1000,
+                amountOut: Number(out / e),
+                fills: hops.map((h, k) => ({
+                  leg: rl[k],
+                  amountIn: Number(BigInt(h.amount_in) / e),
+                  amountOut: Number(BigInt(h.amount_out) / e),
+                })),
+              },
+            },
+          ],
+        },
+        {
+          slippageFrac: 0.05,
+          tokenOf: (s) =>
+            toks[s] ? { address: toks[s] as `0x${string}`, decimals: 18 } : undefined,
+          isOfficialPool: () => true,
+          amountInUnits: 1000n * e,
+          serverFloors: { [C]: { amountOut: out, minOut: (out * 95n) / 100n, tolPbps: 50_000 } },
+          maxTolPbps: 50_000,
+        },
+      )!;
+      const o = { recipient: USER, sender: USER, deadline: 1n } as never;
+      expect(R.buildSwapCalls(legs, o)).toEqual(R.buildSwapCalls(sdk, o));
     }
   });
-  test("server tol wider than request or cap refused", async () => {
-    const { chainLegs } = await import("./cmds.js");
-    const hops = [hop("A", "B", 1000n, 990n)];
-    expect(() => chainLegs([{ hops }], 50_001, 500, 9990)).toThrow(/tol_pbps/);
-    expect(() => chainLegs([{ hops }], 60_000, 600, 500)).toThrow(/tol_pbps/);
+  test('deflated last-hop amount_out refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const bad = [two[0], hop('p2', 'B', 'C', 990n * e, 900n * e)];
+    await expect(
+      chainLegs({ parts: [{ hops: bad }], floors: [floor(980n * e, 50_000)] }, opts(1000n * e)),
+    ).rejects.toThrow(/refused/);
   });
-  test("non-digit --slippage-bps refused", async () => {
-    const { slippageBps } = await import("../pool/slippage.js");
-    for (const v of ["0x1f4", "5e2", " 500 ", "500.0"]) expect(() => slippageBps(v)).toThrow();
-    expect(slippageBps("500")).toBe(500);
+  test('chained hop spending more than the prior hop delivered refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const bad = [two[0], hop('p2', 'B', 'C', 995n * e, 980n * e)];
+    await expect(
+      chainLegs({ parts: [{ hops: bad }], floors: [floor(980n * e, 50_000)] }, opts(1000n * e)),
+    ).rejects.toThrow(/refused/);
+  });
+  test('wrong entry/exit token refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const entry = [hop('p3', 'D', 'C', 1000n * e, 985n * e)];
+    const exit = [hop('p3', 'A', 'D', 1000n * e, 985n * e)];
+    for (const hops of [entry, exit])
+      await expect(
+        chainLegs({ parts: [{ hops }], floors: [floor(985n * e, 50_000)] }, opts(1000n * e)),
+      ).rejects.toThrow(/refused/);
+  });
+  test('3-leg part refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    const three = [
+      hop('p1', 'A', 'B', 1000n * e, 990n * e),
+      hop('p2', 'B', 'D', 990n * e, 980n * e),
+      hop('p3', 'D', 'C', 980n * e, 970n * e),
+    ];
+    await expect(
+      chainLegs({ parts: [{ hops: three }], floors: [floor(970n * e, 50_000)] }, opts(1000n * e)),
+    ).rejects.toThrow(/refused/);
+  });
+  test('server tol wider than request or cap refused', async () => {
+    const { chainLegs } = await import('./cmds.js');
+    await expect(
+      chainLegs({ parts: [{ hops: one }], floors: [floor(985n * e, 50_001)] }, opts(1000n * e)),
+    ).rejects.toThrow(/tol_pbps/);
+    await expect(
+      chainLegs(
+        { parts: [{ hops: one }], floors: [floor(985n * e, 40_000)] },
+        opts(1000n * e, 300),
+      ),
+    ).rejects.toThrow(/tol_pbps/);
+  });
+  test('non-digit --slippage-bps refused', async () => {
+    const { slippageBps } = await import('../pool/slippage.js');
+    for (const v of ['0x1f4', '5e2', ' 500 ', '500.0']) expect(() => slippageBps(v)).toThrow();
+    expect(slippageBps('500')).toBe(500);
   });
 });

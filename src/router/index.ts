@@ -347,7 +347,28 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
   // Carved BEFORE the floors are allocated: a part floored to 0 wei is dropped, as
   // `planToRouterPlan` drops it (a 0-wei `Pool.swap` reverts `ZeroValue`), and the server floor
   // is then spread over the parts that are funded, so Σ leg floors still equals it.
-  const carve = inputCarver(plan, ordered.length, opts.amountInUnits);
+  // EXACT MODE: every fill carries its wire units. Parts are then sized at the server's own
+  // `amount_in`, chained hops must join to the wei, and the floors below are checked against the
+  // server's per-part `amount_out` (a part quoting less than its floor's share is refused).
+  const exact =
+    ordered.length > 0 &&
+    ordered.every((p) => p.quote.fills.length > 0 && p.quote.fills.every((f) => f.units));
+  if (exact) {
+    for (const p of ordered) {
+      const f = p.quote.fills;
+      if (f.length !== p.route.legs.length) return null;
+      for (let h = 1; h < f.length; h++) {
+        if (f[h].units?.amountIn !== f[h - 1].units?.amountOut) return null;
+      }
+    }
+    const spent = ordered.reduce((s, p) => s + (p.quote.fills[0].units?.amountIn ?? 0n), 0n);
+    if (opts.amountInUnits !== undefined && spent !== opts.amountInUnits) return null;
+  }
+  const carveF = inputCarver(plan, ordered.length, opts.amountInUnits);
+  const carve = (fraction: number, i: number, decimals: number): bigint =>
+    exact ? (ordered[i].quote.fills[0].units?.amountIn ?? 0n) : carveF(fraction, i, decimals);
+  const finalOut = (part: SwapPlan['parts'][number], decimals: number): bigint =>
+    part.quote.fills.at(-1)?.units?.amountOut ?? toUnits(part.quote.amountOut, decimals);
   const parts: SwapPlan['parts'] = [];
   const partIn: bigint[] = [];
   for (const [i, part] of ordered.entries()) {
@@ -383,7 +404,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     if (!server) continue;
     byFloor.set(server, [
       ...(byFloor.get(server) ?? []),
-      { idx: i, q: toUnits(part.quote.amountOut, out.decimals) },
+      { idx: i, q: finalOut(part, out.decimals) },
     ]);
   }
   for (const [server, slices] of byFloor) {
@@ -396,12 +417,16 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
     const total = slices.reduce((s, x) => s + x.q, 0n);
     // Nothing quoted for a floored token: no slice can carry the floor. Fail closed.
     if (total <= 0n) return null;
+    // The floor was derived from the SUM of the parts' terminal outputs: a part reporting a
+    // deflated (or inflated) last hop no longer adds up to it, so the plan is not the one floored.
+    if (exact && total !== server.amountOut) return null;
     const shares = slices.map((x) => (server.minOut * x.q) / total);
     // The division residual (≤ slices.length wei) rides on the LARGEST slice: it has the most
     // headroom, where adding it to a chained slice could floor hop 2 a wei above what hop 1 funds.
     const best = slices.reduce((b, x, k) => (x.q > slices[b].q ? k : b), 0);
     shares[best] += server.minOut - shares.reduce((s, x) => s + x, 0n);
     slices.forEach((x, k) => serverFloorByPart.set(x.idx, shares[k]));
+    if (shares.reduce((s, x) => s + x, 0n) < server.minOut) return null;
   }
   for (const [i, part] of parts.entries()) {
     const rl = part.route.legs;
@@ -417,7 +442,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       const tout = opts.tokenOf(rl[0].tokenOut);
       if (!rl[0].poolAddr || !tin || !tout) return null;
       if (!opts.isOfficialPool(rl[0].poolAddr as Address)) return null;
-      const quotedOut = toUnits(part.quote.amountOut, tout.decimals);
+      const quotedOut = finalOut(part, tout.decimals);
       legs.push({
         pool: rl[0].poolAddr as Address,
         tokenIn: tin.address,
@@ -442,7 +467,9 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       ) {
         return null;
       }
-      const leg1Quoted = toUnits(part.quote.fills[0].amountOut, tmid.decimals);
+      const leg1Quoted =
+        part.quote.fills[0].units?.amountOut ??
+        toUnits(part.quote.fills[0].amountOut, tmid.decimals);
       // A zero first-hop quote cannot fund hop 2: `leg1MinOut` is 0, so hop 2 would be encoded
       // with `amountIn: 0n` and a floor that scales to 0 (`ThresholdViolation`/`ZeroValue`), the
       // whole point of planning being to never emit a leg with no floor. Fail closed.
@@ -455,7 +482,7 @@ export function planToLegs(plan: SwapPlan, opts: PlanLegOpts): ExecLeg[] | null 
       // floor; fail closed and let the caller fetch `/v1/chain/route`.
       if (!server || leg2MinOut === undefined) return null;
       const leg1MinOut = applyTolPbps(leg1Quoted, server.tolPbps);
-      const leg2Quoted = toUnits(part.quote.amountOut, t2out.decimals);
+      const leg2Quoted = finalOut(part, t2out.decimals);
       // LEG 2 IS FUNDED BY LEG 1'S FLOOR, NOT LEG 1'S QUOTE, and floored at this part's allocated
       // slice of the end-to-end server floor (`serverFloorByPart`), never the whole floor.
       legs.push({

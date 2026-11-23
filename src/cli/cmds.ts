@@ -428,43 +428,82 @@ type Hop = {
   amount_in: string;
   amount_out: string;
 };
+type Floor = { token: string; amount_out: string; tol_pbps: number; min_out: string };
+type Tok = { address: string; decimals: number };
 
-/** Route parts -> legs with slippage applied ONCE per part (as SDK `planToLegs`): every hop is
- *  floored at its quoted out less `tol_pbps` and a chained hop spends the prior hop's floor, so the
- *  final floor is the part's quoted end-to-end out less tol, never compounded. Refuses a server tol
- *  wider than the request (`bps`) or the cap, and a part whose loss exceeds the cap. */
-export function chainLegs(
-  parts: { hops: Hop[] }[],
-  tolPbps: number,
-  bps: number,
-  cap = MAX_SLIPPAGE_BPS,
+/** `/v1/chain/route` best -> exec legs through SDK `planToLegs` (the front's builder): exact wire
+ *  units, server floor allocated across parts, entry/exit bound to the requested pair, >2-hop parts
+ *  refused. `lossBps` is the encoded Σ floor against the server's `amount_out`; above `cap` refused. */
+export async function chainLegs(
+  best: { parts: { hops: Hop[] }[]; floors: Floor[] },
+  o: {
+    tin: Tok;
+    tout: Tok;
+    amountIn: bigint;
+    bps: number;
+    cap?: number;
+    tokenOf: (sym: string) => Tok | undefined;
+    poolOf: (tag: string) => string | undefined;
+  },
 ) {
-  if (!(Number.isInteger(tolPbps) && tolPbps >= 0 && tolPbps <= bps * 100 && tolPbps <= cap * 100))
-    throw new Error(`server tol_pbps ${tolPbps} wider than --slippage-bps ${bps} (cap ${cap})`);
-  const tol = BigInt(tolPbps);
-  let loss = 0;
-  const legs = parts.flatMap((p) => {
-    let prevMin: bigint | null = null;
-    const out = p.hops.map((h, i) => {
-      const quotedOut = BigInt(h.amount_out);
-      const minOut = (quotedOut * (1_000_000n - tol)) / 1_000_000n;
-      if (!(minOut > 0n)) throw new Error(`zero floor on hop ${h.pool}`);
-      const amountIn: bigint = prevMin ?? BigInt(h.amount_in);
-      prevMin = minOut;
-      return {
-        pool: h.pool,
-        tokenIn: h.token_in,
-        tokenOut: h.token_out,
-        amountIn,
-        minOut,
-        quotedOut,
-        chained: i > 0,
-      };
-    });
-    const last = out.at(-1);
-    if (last) loss = Math.max(loss, lossBps(last.quotedOut, last.minOut));
-    return out;
+  const { planToLegs } = await import("../router/index.js");
+  const cap = o.cap ?? MAX_SLIPPAGE_BPS;
+  const f = best.floors[0];
+  if (!f || best.floors.length !== 1) throw new Error("route must carry exactly one floor");
+  const parts = best.parts.map((p) => {
+    const legs = p.hops.map((h) => ({
+      poolTag: h.pool,
+      poolAddr: o.poolOf(h.pool),
+      tokenIn: h.token_in,
+      tokenOut: h.token_out,
+    }));
+    const route = {
+      legs,
+      tokens: [legs[0]?.tokenIn, ...legs.map((l) => l.tokenOut)],
+      hops: legs.length,
+    };
+    const fills = p.hops.map((h, k) => ({
+      leg: legs[k],
+      amountIn: Number(h.amount_in),
+      amountOut: Number(h.amount_out),
+      units: { amountIn: BigInt(h.amount_in), amountOut: BigInt(h.amount_out) },
+    }));
+    const amountIn = Number(p.hops[0]?.amount_in ?? 0);
+    const amountOut = Number(p.hops.at(-1)?.amount_out ?? 0);
+    return {
+      route: route as never,
+      fraction:
+        Number((BigInt(p.hops[0]?.amount_in ?? 0) * 1_000_000_000_000n) / o.amountIn) / 1e12,
+      quote: { route: route as never, amountIn, amountOut, fills },
+    };
   });
+  const official = new Set(
+    best.parts.flatMap((p) => p.hops.map((h) => o.poolOf(h.pool)?.toLowerCase())),
+  );
+  const legs = planToLegs(
+    { amountIn: 0, amountOut: 0, parts, isSplit: parts.length > 1 },
+    {
+      slippageFrac: Math.min(o.bps, cap) / 10_000,
+      tokenOf: o.tokenOf as never,
+      isOfficialPool: (a) => official.has(a.toLowerCase()),
+      amountInUnits: o.amountIn,
+      expectedIn: o.tin.address as `0x${string}`,
+      expectedOut: o.tout.address as `0x${string}`,
+      serverFloors: {
+        [o.tout.address.toLowerCase()]: {
+          amountOut: BigInt(f.amount_out),
+          minOut: BigInt(f.min_out),
+          tolPbps: f.tol_pbps,
+        },
+      },
+      maxTolPbps: Math.min(o.bps, cap) * 100,
+    },
+  );
+  if (!legs)
+    throw new Error("route refused: parts do not match the requested pair, floor or hop limit");
+  // A part's final leg is the one not followed by its chained hop 2.
+  const minOut = legs.reduce((s, l, i) => (legs[i + 1]?.chained ? s : s + l.minOut), 0n);
+  const loss = lossBps(BigInt(f.amount_out), minOut);
   if (loss > cap) throw new Error(`route loss ${loss} bps above the ${cap} bps cap`);
   return { legs, lossBps: loss };
 }
@@ -475,28 +514,21 @@ async function swapLegs(a: Args) {
   const from = addrArg(a, "from");
   const { fetchRegistry } = await import("../venues/live.js");
   const recipient = recipientArg(a, from, await fetchRegistry(a.chain, a.o));
-  const { r, tin, si, so } = await route(a);
+  const { r, tin, tout, amountIn, si, so } = await route(a);
   if (!r.best) throw new Error(`no route ${si} -> ${so}`);
-  const official = new Set(tin.reg.pools.map((p) => p.address.toLowerCase()));
-  const poolOf = (tag: string) => {
-    const p = tin.reg.pools.find((x) => x.tag === tag);
-    if (!p || !official.has(p.address.toLowerCase()))
-      throw new Error(`route names unknown pool ${tag}`);
-    return p.address;
-  };
-  const tokOf = (sym: string) => {
-    const t = tin.reg.tokens[sym.toUpperCase()];
-    if (!t) throw new Error(`route names unknown token ${sym}`);
-    return t;
-  };
-  const bp = slipArg(a);
-  const { legs, lossBps: loss } = chainLegs(r.best.parts, r.best.floors[0].tol_pbps, bp, a.cap);
-  const resolved = legs.map((l) => ({
-    ...l,
-    pool: poolOf(l.pool),
-    tokenIn: tokOf(l.tokenIn),
-    tokenOut: tokOf(l.tokenOut),
-  }));
+  const { legs, lossBps: loss } = await chainLegs(r.best, {
+    tin,
+    tout,
+    amountIn,
+    bps: slipArg(a),
+    cap: a.cap,
+    // Decimals are unread on the exact (wire-units) path; only the address binds.
+    tokenOf: (sym) => {
+      const address = tin.reg.tokens[sym.toUpperCase()];
+      return address ? { address, decimals: 0 } : undefined;
+    },
+    poolOf: (tag) => tin.reg.pools.find((x) => x.tag === tag)?.address,
+  });
   const opts = { recipient: recipient as `0x${string}`, sender: from as `0x${string}` };
   const head = {
     chainId: a.chain,
@@ -506,7 +538,7 @@ async function swapLegs(a: Args) {
     lossBps: loss,
     swapGated: r.swap_gated ?? null,
   };
-  return { legs: resolved as never, opts, head };
+  return { legs, opts, head };
 }
 
 /** `btr build-swap`: unsigned approve + swap_qe calls; `recipient` receives the output. */

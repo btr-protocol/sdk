@@ -36,6 +36,9 @@ export interface LegFill {
   leg: RouteLeg;
   amountIn: number;
   amountOut: number;
+  /** Exact wire amounts in base units (`/v1/chain/route` hops). When EVERY fill of a plan carries
+   *  them, `planToLegs` sizes and floors from these, never from the f64 fields. */
+  units?: { amountIn: bigint; amountOut: bigint };
 }
 
 export interface RouteQuote {
