@@ -15,12 +15,17 @@
 // calls must originate from the user account. `Router` is not subject to this: it holds the pull
 // itself, which is the point of deploying it.
 import { POOL_ABI } from '../abis/Pool.js';
+import {
+  approveCallData,
+  depositCallData,
+  swapLiabilityCallData,
+  withdrawCallData,
+} from '../calls.js';
 import { ROUTER_ABI } from '../abis/Router.js';
 import { encodeFn } from '../eth/abi.js';
 import type { Abi } from '../eth/abi.js';
-import { ERC20_ABI } from '../eth/erc20.js';
 import type { TxCall } from '../eth/send.js';
-import type { Address, Hex } from '../eth/types.js';
+import type { Address } from '../eth/types.js';
 import { sendDeadline } from '../pool/index.js';
 import { toUnits } from '../utils/format.js';
 import { applySlip } from '../utils/maths.js';
@@ -270,11 +275,7 @@ function approveCalls(
 }
 
 function approveCall(token: Address, spender: Address, amount: bigint): ExecCall {
-  return {
-    to: token,
-    data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [spender, amount] }),
-    value: 0n,
-  };
+  return { to: token, data: approveCallData(spender, amount), value: 0n };
 }
 
 function wrapDepositCall(wnative: Address, value: bigint): ExecCall {
@@ -671,28 +672,6 @@ interface TransferMintArgs {
   minLpOut: bigint;
 }
 
-/** `depositMin(token, amount, minLpOut)`. A zero or missing floor guards nothing: refused. */
-export function depositCallData(token: Address, amount: bigint, minLpOut: bigint): Hex {
-  if (!(minLpOut > 0n)) throw new Error(`minLpOut must be a positive floor, got ${minLpOut}`);
-  return encodeFn({ abi: POOL_ABI, functionName: 'depositMin', args: [token, amount, minLpOut] });
-}
-
-/** `swapLiability(from, to, lpAmountIn, minLpAmountOut, deadline)`: the one encoder every
- *  liability-swap call goes through (deposit/redeem transfer routes, standalone debt swap). */
-export function swapLiabilityCallData(
-  from: Address,
-  to: Address,
-  lpAmountIn: bigint,
-  minLpAmountOut: bigint,
-  deadline: bigint,
-): Hex {
-  return encodeFn({
-    abi: POOL_ABI,
-    functionName: 'swapLiability',
-    args: [from, to, lpAmountIn, minLpAmountOut, deadline],
-  });
-}
-
 /** An LP floor of zero (or less) guards nothing: a bad quote value parsed to 0 would send the
  *  burn or the liability swap unfloored. Refuse it at the encoder, the one place every route passes. */
 const floored = (what: string, v: bigint): bigint => {
@@ -796,11 +775,7 @@ export function buildRedeemCalls(
     },
     {
       to: pool,
-      data: encodeFn({
-        abi: POOL_ABI,
-        functionName: 'withdraw',
-        args: [args.tokenTo, args.lpWithdraw, args.minAmountOut, deadline],
-      }),
+      data: withdrawCallData(args.tokenTo, args.lpWithdraw, args.minAmountOut, deadline),
       value: 0n,
     },
   ];
@@ -830,6 +805,8 @@ export function buildSwapLiabilityCalls(
     },
   ];
 }
+
+export { depositCallData, swapLiabilityCallData } from '../calls.js';
 
 // Dual-route LP mint/redeem ranking + plans (spec §2); builders above turn them into batches.
 export type { NamedPool, Route, LegFill, RouteQuote, SplitPart, SwapPlan } from './route.js';
