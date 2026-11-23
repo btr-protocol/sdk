@@ -1,15 +1,9 @@
 /** Lean SDK: canonical `api.btr.markets`. All BTR data via `api.btr.markets/v1/*` (single subdomain, versioned). Override with `setApiRoot()`. */
 export const BTR_API: string =
   (typeof import.meta !== "undefined" &&
-    (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_BTR_API) ||
-  (typeof import.meta !== "undefined" &&
     (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API) ||
   (typeof process !== "undefined" && (process.env as Record<string, string>).BTR_API_URL) ||
   "https://api.btr.markets";
-
-// Pre-0.9 `BTR_API` (with `/v1`) is not read; fail loud rather than silently hit prod.
-if (typeof process !== "undefined" && process.env?.BTR_API && !process.env.BTR_API_URL)
-  throw new Error("BTR_API is no longer read: set BTR_API_URL (root, without /v1)");
 
 let _api = BTR_API;
 export function setApiRoot(url: string) {
@@ -31,7 +25,7 @@ export function setFetchTimeoutMs(ms: number) {
 export function withChainId(path: string, chainId: number): string {
   if (!Number.isSafeInteger(chainId) || chainId <= 0)
     throw new Error("chainId must be a positive integer");
-  return `${path}${path.includes("?") ? "&" : "?"}chainId=${chainId}`;
+  return qs(path, { chainId });
 }
 
 export type Query = Record<string, string | number | boolean | undefined | null>;
