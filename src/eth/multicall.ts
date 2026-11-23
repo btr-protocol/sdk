@@ -22,7 +22,7 @@
 
 import { type Abi, decodeFn, encodeFn } from './abi';
 import { getMulticall3 } from './chains';
-import { getBlockNumber } from './rpc';
+import { ethCall, getBlockNumber } from './rpc';
 import type { Address, Eip1193Provider, Hex } from './types';
 
 export const MC3_ADDR = '0xcA11bde05977b3631167028862bE2a173976CA11';
@@ -79,8 +79,6 @@ interface MulticallOpt {
   chainId?: number;
   block?: string;
   chunkSize?: number;
-  /** Security read: rides its own aggregate3 and never joins an in-flight duplicate. */
-  fresh?: boolean;
 }
 
 // ── coalescing scheduler ─────────────────────────────────────────────────────────────────────
@@ -98,7 +96,6 @@ interface Batch {
   /** Pinned block for the whole batch; undefined = latest (chunk splits pin one lazily). */
   block?: string;
   chunkSize?: number;
-  fresh?: boolean;
   calls: Call[];
   waiters: Waiter[];
   scheduled: boolean;
@@ -117,7 +114,7 @@ export async function multicall(
 
   // Use explicit addr > chainId override > default.
   const addr = opt.addr || (opt.chainId !== undefined ? getMulticall3(opt.chainId) : MC3_ADDR);
-  const key = `${addr.toLowerCase()}@${opt.block ?? 'latest'}${opt.fresh ? '!' : ''}`;
+  const key = `${addr.toLowerCase()}@${opt.block ?? 'latest'}`;
 
   let byKey = schedulers.get(p);
   if (!byKey) schedulers.set(p, (byKey = new Map()));
@@ -129,7 +126,6 @@ export async function multicall(
         addr,
         block: opt.block,
         chunkSize: opt.chunkSize,
-        fresh: opt.fresh,
         calls: [],
         waiters: [],
         scheduled: false,
@@ -215,10 +211,10 @@ async function runBatch(p: Eip1193Provider, entry: Batch): Promise<void> {
       for (let i = 0; i < entry.calls.length; i += chunk)
         parts.push(entry.calls.slice(i, i + chunk));
       results = (
-        await Promise.all(parts.map((c) => execAggregate3(p, c, entry.addr, block, entry.fresh)))
+        await Promise.all(parts.map((c) => execAggregate3(p, c, entry.addr, block)))
       ).flat();
     } else {
-      results = await execAggregate3(p, entry.calls, entry.addr, entry.block, entry.fresh);
+      results = await execAggregate3(p, entry.calls, entry.addr, entry.block);
     }
     for (const w of entry.waiters) w.resolve(results.slice(w.start, w.start + w.count));
   } catch (e) {
@@ -233,8 +229,7 @@ async function execAggregate3(
   p: Eip1193Provider,
   calls: Call[],
   addr: Address,
-  block = 'latest',
-  fresh?: boolean,
+  block?: string,
 ): Promise<MulticallResult[]> {
   const inputs = calls.map((c) => ({
     t: c.address,
@@ -243,11 +238,7 @@ async function execAggregate3(
   }));
 
   const data = encodeFn({ abi: MC3_ABI, functionName: 'aggregate3', args: [inputs] });
-  const raw = (await p.request({
-    method: 'eth_call',
-    params: [{ to: addr, data }, block],
-    ...(fresh && { fresh }),
-  })) as Hex;
+  const raw = await ethCall(p, addr, data, block);
 
   // decodeFn returns the single output value directly: an array of
   // component-named objects [{s: bool, r: bytes}, ...]

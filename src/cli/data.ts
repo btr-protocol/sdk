@@ -8,7 +8,7 @@ export type Rec = Record<string, any>; // untyped wire JSON
 /** Read-only JSON-RPC relay (`/v1/rpc`): the SDK's one read provider, the front's too.
  *  10M gas: the relay refuses an anonymous eth_call without `gas` (its anon cap). */
 export const rpcProvider = (chain: number, o: RegistryOpts): Eip1193Provider =>
-  relayProvider(chain, { base: o.base, fetch: o.fetch, callGas: "0x989680" });
+  relayProvider(chain, { base: o.base, fetch: o.fetch, timeout: o.timeoutMs, callGas: "0x989680" });
 
 export const WINDOWS = ["24h", "7d", "30d"];
 export function windowArg(v: string | undefined): string {

@@ -166,8 +166,8 @@ export {
 // Multicall
 export type { Call } from './multicall';
 export { MC3_ADDR, multicall, multicallStrict } from './multicall';
-export type { ReadOpts, Reader, RelayOpts } from './reader';
-export { createReader, relayProvider } from './reader';
+export type { RelayOpts } from './reader';
+export { relayProvider } from './reader';
 
 // Signing clients (bots / keepers)
 export type { Client } from './client';
