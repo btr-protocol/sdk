@@ -50,8 +50,12 @@ export { AbiUnknownGenerationError, type AbiWithMeta, fetchAbiWithMeta } from ".
 export {
   type ApiOpts,
   btrApi,
+  btrFetch,
   btrJson,
+  fetchJson,
   getApiRoot,
+  HttpError,
+  notServed,
   type Query,
   setApiRoot,
   withChainId,
@@ -69,9 +73,5 @@ export * from "./oracle/index.js";
 // Eth utilities and clients
 export * from "./eth/index.js";
 export type { Client } from "./eth/client.js";
-export {
-  createHttpProvider,
-  createPrivateKeyClient,
-  privateKeyToAddress,
-} from "./eth/client.js";
+export { createHttpProvider, createPrivateKeyClient, privateKeyToAddress } from "./eth/client.js";
 export * from "./calls.js";

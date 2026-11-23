@@ -37,7 +37,7 @@ test('allowlisted contract missing live throws; non-allowlisted live drift ignor
 });
 
 test('fetch failure throws unless fallback baked; bad address throws', async () => {
-  await expect(fetchRegistry(143, { fetch: mock({}, 500) })).rejects.toThrow('BTR API 500');
+  await expect(fetchRegistry(143, { fetch: mock({}, 500) })).rejects.toThrow('backend-error 500');
   const r = await fetchRegistry(143, { fetch: mock({}, 500), fallback: 'baked' });
   expect(r.source).toBe('baked');
   expect(r.warnings[0]).toContain('live fetch failed');
