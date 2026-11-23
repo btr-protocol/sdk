@@ -11,14 +11,15 @@ import type {
 type Rec = Record<string, unknown>;
 type Opt = Omit<ApiOpts, "query" | "body">;
 const seg = encodeURIComponent;
+// `R` narrows a wire typed `Rec` here to the shape the caller reads.
 const get =
   <T>(path: string) =>
-  (chainId: number, query?: Query, o?: Opt) =>
-    btrApi<T>(path, chainId, { ...o, query });
+  <R = T>(chainId: number, query?: Query, o?: Opt) =>
+    btrApi<R>(path, chainId, { ...o, query });
 const post =
   <T, B = unknown>(path: string) =>
-  (chainId: number, body: B, o?: Opt) =>
-    btrApi<T>(path, chainId, { ...o, body });
+  <R = T>(chainId: number, body: B, o?: Opt) =>
+    btrApi<R>(path, chainId, { ...o, body });
 
 export const fetchSummary = (chainId: number, window: string, o?: Opt) =>
   btrApi<ProtocolMetricsSummary>("/v1/summary", chainId, { ...o, query: { window } });
@@ -28,13 +29,13 @@ export const fetchLiquidity = get<ProtocolLiquidityHistory>("/v1/liquidity");
 export const fetchActivity = get<Rec>("/v1/activity");
 export const fetchPools = get<Rec>("/v1/pools");
 export const fetchPoolMetrics = get<Rec>("/v1/pools/metrics");
-export const fetchPoolParams = (chainId: number, tag: string, o?: Opt) =>
-  btrApi<PoolRiskParams>(`/v1/pools/${seg(tag)}/params`, chainId, o);
-export const fetchDensity = (chainId: number, pair: string, query?: Query, o?: Opt) =>
-  btrApi<Rec>(`/v1/pools/${seg(pair)}/density`, chainId, { ...o, query });
+export const fetchPoolParams = <R = PoolRiskParams>(chainId: number, tag: string, o?: Opt) =>
+  btrApi<R>(`/v1/pools/${seg(tag)}/params`, chainId, o);
+export const fetchDensity = <R = Rec>(chainId: number, pair: string, query?: Query, o?: Opt) =>
+  btrApi<R>(`/v1/pools/${seg(pair)}/density`, chainId, { ...o, query });
 export const fetchOraclePushes = get<Rec>("/v1/oracle/pushes");
-export const fetchOraclePush = (chainId: number, tx: string, query?: Query, o?: Opt) =>
-  btrApi<Rec>(`/v1/oracle/pushes/${seg(tx)}`, chainId, { ...o, query });
+export const fetchOraclePush = <R = Rec>(chainId: number, tx: string, query?: Query, o?: Opt) =>
+  btrApi<R>(`/v1/oracle/pushes/${seg(tx)}`, chainId, { ...o, query });
 export const fetchSafetyHistory = get<Rec>("/v1/safety/history");
 export const fetchSafetyBreakers = get<Rec>("/v1/safety/breakers");
 export const fetchHealth = get<Rec>("/v1/health");
