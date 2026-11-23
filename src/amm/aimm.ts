@@ -8,6 +8,7 @@
 //   premiumBps) + the integer curve codec (evalQ/areaQ/scaleY/buildCurve + caps,
 //   owned by the storage readers) + thin async fetchers over `POST /v1/quote|route|depth`.
 
+import { btrFetchRaw, getApiRoot, type RawResponse } from '../api.js';
 import { MAX_DISPERSION_PBPS } from '../abis/solidity.generated.js';
 import { isLegacyLayout } from '../pool/storageVersion.js';
 
@@ -567,18 +568,9 @@ export interface DepthRequestWire {
   step?: number;
 }
 
-const DEFAULT_BASE = 'https://api.btr.markets/v1';
-
-/** A base may carry `?chainId=` (`withChainId`): the one back serves every chain. */
+/** The quote API root: `explicit` (may carry `?chainId=`, see `withChainId`), else `${getApiRoot()}/v1`. */
 export function backendBase(explicit?: string): string {
-  if (explicit) return explicit.replace(/\/(?=\?|$)/, '');
-  try {
-    const envBase = typeof process !== 'undefined' ? process.env?.BTR_API : undefined;
-    if (envBase) return envBase.replace(/\/$/, '');
-  } catch {
-    // no process in browsers: fall through to the default host
-  }
-  return DEFAULT_BASE;
+  return explicit ? explicit.replace(/\/(?=\?|$)/, '') : `${getApiRoot()}/v1`;
 }
 
 let quote429Until = 0;
@@ -605,35 +597,31 @@ async function post<T>(
   body: unknown,
 ): Promise<T> {
   guardQuote429(path);
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 10_000);
-  let res: Response;
+  // The path goes before a base's query, so `/api/v1?chainId=56` posts to `/api/v1/quote?chainId=56`.
+  const [root, query] = base.split('?');
+  let res: RawResponse;
   try {
-    // The path goes before a base's query, so `/api/v1?chainId=56` posts to `/api/v1/quote?chainId=56`.
-    const [root, query] = base.split('?');
-    res = await fetch(`${root}${path}${query ? `?${query}` : ''}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
+    res = await btrFetchRaw(`${path}${query ? `?${query}` : ''}`, {
+      base: root,
+      body,
+      timeoutMs: 10_000,
     });
   } catch (e) {
     noteQuote429Error(e);
     throw e;
-  } finally {
-    clearTimeout(t);
   }
   noteQuote429Status(res.status);
   if (!res.ok) {
     // A 422 names WHY there is no answer (`{"error":"no_route","reason":"capacity"}`); keep the
     // reason on the error so a caller can tell "too big" from "broken".
-    const reason = await res
-      .json()
-      .then((b: { reason?: unknown }) => (typeof b?.reason === 'string' ? ` ${b.reason}` : ''))
-      .catch(() => '');
+    let reason = '';
+    try {
+      const r = (JSON.parse(res.body) as { reason?: unknown })?.reason;
+      if (typeof r === 'string') reason = ` ${r}`;
+    } catch {}
     throw new Error(`btr-quote HTTP ${res.status} ${path}${reason}`);
   }
-  return (await res.json()) as T;
+  return JSON.parse(res.body) as T;
 }
 
 /** The backend said the pools cannot fill this size (HTTP 422, reason `capacity`). */

@@ -78,7 +78,7 @@ function stub(
     const extra = Object.fromEntries((o.tolls ?? []).map((k) => [k, '0x0']));
     return {
       ok: true,
-      json: async () => ({
+      headers: new Headers(), text: async () => JSON.stringify(({
         amount_out: hex(out),
         gross_out: hex(out),
         avg_price: WAD_HEX,
@@ -89,7 +89,7 @@ function stub(
         proto_fee: '0x0',
         lp_fee: hex(o.lpFee ? o.lpFee(out) : 0n),
         ...extra,
-      }),
+      })),
     };
   };
   return sent;
@@ -352,7 +352,7 @@ describe('F4: raw-unit payout never above the chain integer law', () => {
         chain = out - cT - dT;
         return {
           ok: true,
-          json: async () => ({
+          headers: new Headers(), text: async () => JSON.stringify(({
             amount_out: hex(out),
             gross_out: hex(out),
             avg_price: WAD_HEX,
@@ -364,7 +364,7 @@ describe('F4: raw-unit payout never above the chain integer law', () => {
             lp_fee: '0x0',
             c_toll: hex(cT),
             debit_toll: hex(dT),
-          }),
+          })),
         };
       };
       const lp = 1_000 + rand() * 90_000;

@@ -1,18 +1,9 @@
 import type { Eip1193Provider } from "../eth/types.js";
 // Data layer for the `btr` CLI: live API reads only (/v1/summary, /v1/roster, ...), no keys, no sends.
-import { btrApi } from "../protocol.js";
+import { btrApi } from "../api.js";
 import type { RegistryOpts } from "../venues/live.js";
 
 export type Rec = Record<string, any>; // untyped wire JSON
-
-/** One `/v1/*` call through the SDK's generic (`btrApi`), honouring the CLI's injected fetch/base. */
-export const io = (o: RegistryOpts) => ({
-  fetch: o.fetch as typeof fetch | undefined,
-  base: o.base,
-  timeoutMs: o.timeoutMs,
-});
-export const api = (path: string, chain: number, o: RegistryOpts, body?: unknown): Promise<Rec> =>
-  btrApi(path, chain, { ...io(o), body });
 
 const CALL_GAS = "0x989680"; // 10M: the relay's anonymous eth_call cap
 
@@ -28,7 +19,10 @@ export function rpcProvider(chain: number, o: RegistryOpts): Eip1193Provider {
         method === "eth_call" && call && call.gas === undefined
           ? [{ ...call, gas: CALL_GAS }, ...ps.slice(1)]
           : ps;
-      const j = await api("/v1/rpc", chain, o, { jsonrpc: "2.0", id: ++id, method, params: sent });
+      const j = await btrApi<Rec>("/v1/rpc", chain, {
+        ...o,
+        body: { jsonrpc: "2.0", id: ++id, method, params: sent },
+      });
       if (j.error) throw new Error(`rpc ${method}: ${j.error.message ?? "error"}`);
       return j.result;
     },

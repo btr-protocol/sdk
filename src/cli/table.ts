@@ -2,9 +2,8 @@
 // capability exists in both or in neither. `read` entries only read; `build` entries return unsigned
 // `{to, data, value}` calls. Nothing here holds a key, signs or sends.
 import * as P from "../protocol.js";
-import type { Query } from "../protocol.js";
+import type { ApiOpts, Query } from "../api.js";
 import type { Args, Res } from "./cmds.js";
-import { io } from "./data.js";
 
 export interface Arg {
   type: "string" | "number" | "boolean" | "object";
@@ -92,24 +91,24 @@ const view =
 const get = (
   name: string,
   description: string,
-  fn: (c: number, q: Query, o: ReturnType<typeof io>) => Promise<unknown>,
+  fn: (c: number, q: Query, o: ApiOpts) => Promise<unknown>,
 ): Cmd => ({
   name,
   description,
   kind: "read",
   args: PARAMS,
-  run: (a) => data(fn(a.chain, q(a), io(a.o))),
+  run: (a) => data(fn(a.chain, q(a), a.o)),
 });
 const postCmd = (
   name: string,
   description: string,
-  fn: (c: number, b: never, o: ReturnType<typeof io>) => Promise<unknown>,
+  fn: (c: number, b: never, o: ApiOpts) => Promise<unknown>,
 ): Cmd => ({
   name,
   description,
   kind: "read",
   args: BODY,
-  run: (a) => data(fn(a.chain, body(a) as never, io(a.o))),
+  run: (a) => data(fn(a.chain, body(a) as never, a.o)),
 });
 
 export const TABLE: Cmd[] = [
@@ -213,7 +212,7 @@ export const TABLE: Cmd[] = [
     description: "One pool's live risk parameters, every leg (/v1/pools/{tag}/params)",
     kind: "read",
     pos: ["pool"],
-    run: (a) => data(P.fetchPoolParams(a.chain, a.pos[0], io(a.o))),
+    run: (a) => data(P.fetchPoolParams(a.chain, a.pos[0], a.o)),
   },
   {
     name: "density",
@@ -221,7 +220,7 @@ export const TABLE: Cmd[] = [
     kind: "read",
     pos: ["pair"],
     args: PARAMS,
-    run: (a) => data(P.fetchDensity(a.chain, a.pos[0], q(a), io(a.o))),
+    run: (a) => data(P.fetchDensity(a.chain, a.pos[0], q(a), a.o)),
   },
   get(
     "oracle-pushes",
@@ -234,7 +233,7 @@ export const TABLE: Cmd[] = [
     kind: "read",
     pos: ["tx"],
     args: PARAMS,
-    run: (a) => data(P.fetchOraclePush(a.chain, a.pos[0], q(a), io(a.o))),
+    run: (a) => data(P.fetchOraclePush(a.chain, a.pos[0], q(a), a.o)),
   },
   get("safety-history", "Safeguard history (/v1/safety/history)", P.fetchSafetyHistory),
   get(
@@ -250,7 +249,7 @@ export const TABLE: Cmd[] = [
     description: "Market-data price (/v1/md/price/{symbol})",
     kind: "read",
     pos: ["symbol"],
-    run: (a) => data(P.fetchMdPrice(a.chain, a.pos[0], io(a.o))),
+    run: (a) => data(P.fetchMdPrice(a.chain, a.pos[0], a.o)),
   },
   {
     name: "md-ohlc",
@@ -258,7 +257,7 @@ export const TABLE: Cmd[] = [
     kind: "read",
     pos: ["symbol"],
     args: PARAMS,
-    run: (a) => data(P.fetchMdOhlc(a.chain, a.pos[0], q(a), io(a.o))),
+    run: (a) => data(P.fetchMdOhlc(a.chain, a.pos[0], q(a), a.o)),
   },
   postCmd("indicators", "TA series over caller bars (POST /v1/indicators)", P.fetchIndicators),
   // ── registry ──

@@ -101,12 +101,12 @@ function installStub() {
       if (empty) {
         return {
           ok: true,
-          json: async () => ({
+          headers: new Headers(), text: async () => JSON.stringify(({
             best_amount_out: '0x0',
             best_is_split: false,
             best_parts: [],
             singles: [],
-          }),
+          })),
         };
       }
       const out = raw6(amt);
@@ -121,12 +121,12 @@ function installStub() {
       ];
       return {
         ok: true,
-        json: async () => ({
+        headers: new Headers(), text: async () => JSON.stringify(({
           best_amount_out: out,
           best_is_split: false,
           best_parts: [{ legs, fraction: WAD_HEX, amount_out: out }],
           singles: [{ legs, amount_in: body.amount_in, amount_out: out }],
-        }),
+        })),
       };
     }
     // A path body carries its input on the first hop; a leg body carries it at the top.
@@ -134,7 +134,7 @@ function installStub() {
     const mid = `0x${(10n ** 18n).toString(16)}`;
     return {
       ok: true,
-      json: async () => ({
+      headers: new Headers(), text: async () => JSON.stringify(({
         amount_out: amountIn,
         gross_out: amountIn,
         avg_price: mid,
@@ -146,7 +146,7 @@ function installStub() {
         lp_fee: '0x0',
         debit_toll: '0x0',
         credit_toll: '0x0',
-      }),
+      })),
     };
   };
 }
@@ -207,7 +207,7 @@ describe('crossExit degenerate quotes', () => {
       const out = o.out ?? amountIn;
       return {
         ok: true,
-        json: async () => ({
+        headers: new Headers(), text: async () => JSON.stringify(({
           amount_out: out,
           gross_out: out,
           avg_price: wad(o.mid),
@@ -219,7 +219,7 @@ describe('crossExit degenerate quotes', () => {
           lp_fee: '0x0',
           debit_toll: '0x0',
           credit_toll: '0x0',
-        }),
+        })),
       };
     };
   };
@@ -362,7 +362,7 @@ describe('crossExit claim law: the from-leg debit', () => {
       const hex = (v: bigint) => `0x${v.toString(16)}`;
       return {
         ok: true,
-        json: async () => ({
+        headers: new Headers(), text: async () => JSON.stringify(({
           amount_out: hex(fair),
           gross_out: hex(fair),
           avg_price: WAD_HEX,
@@ -373,7 +373,7 @@ describe('crossExit claim law: the from-leg debit', () => {
           proto_fee: '0x0',
           lp_fee: '0x0',
           debit_toll: hex(debit),
-        }),
+        })),
       };
     };
   };
@@ -740,7 +740,7 @@ describe('crossExit exit toll + keeper floor', () => {
       const out = BigInt(b.amount_in);
       return {
         ok: true,
-        json: async () => ({
+        headers: new Headers(), text: async () => JSON.stringify(({
           amount_out: `0x${out.toString(16)}`,
           gross_out: `0x${out.toString(16)}`,
           avg_price: WAD_HEX,
@@ -753,7 +753,7 @@ describe('crossExit exit toll + keeper floor', () => {
           debit_toll: '0x0',
           credit_toll: '0x0',
           c_toll: `0x${(out / 20n).toString(16)}`,
-        }),
+        })),
       };
     };
   };

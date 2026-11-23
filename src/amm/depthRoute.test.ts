@@ -35,7 +35,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (url: string) => {
       path = String(url);
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], {
       base: 'https://q.example/v1',
@@ -51,7 +51,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (_u: string, init: { body: string }) => {
       bodies.push(JSON.parse(init.body));
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], { invert: true });
     expect(bodies[0].from).toBe('USDT');
@@ -66,7 +66,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (_u: string, init: { body: string }) => {
       bodies.push(JSON.parse(init.body));
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
     await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], { step: 0.0002 });
@@ -81,7 +81,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => {
       calls++;
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     for (const step of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1e-4]) {
       await expect(
@@ -106,7 +106,7 @@ describe('aggregatePairDepthAsync', () => {
       ],
     };
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => bad });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(bad) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
     expect(book?.bids).toEqual([{ price: 0.99, size: 1, cum: 1 }]);
   });
@@ -122,7 +122,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (_u: string, init: { body: string }) => {
       bodies.push(JSON.parse(init.body));
-      return { ok: true, json: async () => raw };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(raw) };
     };
     const w = await aggregateDepthCurvesAsync(pools(), 'USDC', 'USDT', [], { invert: true });
     expect(bodies[0]).toMatchObject({ from: 'USDT', to: 'USDC' });
@@ -158,8 +158,7 @@ describe('aggregatePairDepthAsync', () => {
       bodies.push(b);
       return {
         ok: true,
-        json: async () =>
-          b.from === 'USDC' ? book(1.0001, [0.0001, 0.0002], 0.0002) : book(0.9999, [0.5, 1], 1),
+        headers: new Headers(), text: async () => JSON.stringify(b.from === 'USDC' ? book(1.0001, [0.0001, 0.0002], 0.0002) : book(0.9999, [0.5, 1], 1)),
       };
     };
     const fwd = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
@@ -195,7 +194,7 @@ describe('aggregatePairDepthAsync', () => {
       ask_end: { price: 1.1, size: 1 },
     };
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => bad });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(bad) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
     expect(book?.bids[0]).toEqual({ price: 0.9, size: 1, cum: 1 });
     expect(book?.bid_end).toBeUndefined();
@@ -203,7 +202,7 @@ describe('aggregatePairDepthAsync', () => {
     expect(book?.steps).toEqual([0.0001, 0.0002]);
     for (const steps of ['x', [0.1, 'a'], [0, 1], { 0: 1 }]) {
       // @ts-expect-error stub fetch
-      globalThis.fetch = async () => ({ ok: true, json: async () => ({ ...bad, steps }) });
+      globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(({ ...bad, steps })) });
       const b = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
       expect(b?.steps).toBeUndefined();
     }
@@ -211,14 +210,14 @@ describe('aggregatePairDepthAsync', () => {
 
   test('empty steps: kept as the marker', async () => {
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => ({ ...wire, steps: [] }) });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(({ ...wire, steps: [] })) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', []);
     expect(book?.steps).toEqual([]);
   });
 
   test('old back: no steps, no ends', async () => {
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => wire });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], {});
     expect(book?.steps).toBeUndefined();
     expect(book?.bid_end).toBeUndefined();
@@ -228,7 +227,7 @@ describe('aggregatePairDepthAsync', () => {
   test('gate fields carry through, plain and inverted', async () => {
     const gated = { ...wire, swap_gated: true, open_path: false, reason: 'future_reason' };
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => gated });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(gated) });
     for (const invert of [false, true]) {
       const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], { invert });
       expect(book?.swap_gated).toBe(true);
@@ -239,7 +238,7 @@ describe('aggregatePairDepthAsync', () => {
 
   test('older back: gate fields absent, reason null', async () => {
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => wire });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) });
     const book = await aggregatePairDepthAsync(pools(), 'USDC', 'USDT', [], {});
     expect(book?.swap_gated).toBeUndefined();
     expect(book?.open_path).toBeUndefined();
@@ -251,7 +250,7 @@ describe('aggregatePairDepthAsync', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => {
       called = true;
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     expect(await aggregatePairDepthAsync(pools(), 'USDC', 'USDC', [])).toBeNull();
     expect(called).toBe(false);

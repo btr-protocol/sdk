@@ -294,7 +294,7 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (url: string, init: { body?: string }) => {
       calls.push({ url: String(url), body: JSON.parse(init.body ?? '{}') });
-      return { ok: true, json: async () => quoteWire(5_000_000_000n) };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(quoteWire(5_000_000_000n)) };
     };
     try {
       const state = balancedState();
@@ -334,7 +334,7 @@ describe('quoteSwapLiabilityAsync (backend POST /v1/quote-path)', () => {
 
   test('an under-covered in-leg in a whole pool settles at C = 1, not at its own 60%', async () => {
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: true, json: async () => quoteWire(9_990_000_000n) });
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), text: async () => JSON.stringify(quoteWire(9_990_000_000n)) });
     try {
       const state = balancedState(); // C = 1 across the pool
       const inLeg = legOf('AUDF', 600_000, 1_000_000); // the leg alone is 40% short
@@ -405,7 +405,7 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
       calls.push(JSON.parse(init.body ?? '{}'));
       return {
         ok: true,
-        json: async () => ({
+        headers: new Headers(), text: async () => JSON.stringify(({
           amount_out: hex(outRaw),
           gross_out: hex(outRaw),
           avg_price: wad(1),
@@ -415,7 +415,7 @@ describe('backendConvert: one pool-shaped /quote-path per pair', () => {
           cov_toll: '0x0',
           proto_fee: '0x0',
           lp_fee: '0x0',
-        }),
+        })),
       };
     };
     try {

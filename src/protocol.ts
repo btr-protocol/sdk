@@ -1,53 +1,12 @@
 // Typed fetchers for every public `/v1/*` read the front makes. One generic (`btrApi`) does the
 // request; each fetcher is a one-line path + type. Reads only: no keys, no signing, no sends.
-import { getApiRoot, withChainId } from './api.js';
+import { type ApiOpts, btrApi, type Query } from './api.js';
 import type {
   PoolRiskParams,
   ProtocolLiquidityHistory,
   ProtocolMetricsSummary,
   ProtocolMetricsTimeseries,
 } from './types/protocol-metrics.js';
-
-export type Query = Record<string, string | number | boolean | undefined | null>;
-export interface ApiOpts {
-  /** Querystring; unset values are skipped. */
-  query?: Query;
-  /** JSON body: sent as POST. */
-  body?: unknown;
-  /** Injected fetch (tests, proxies); default global fetch. */
-  fetch?: typeof fetch;
-  /** API root override; default `getApiRoot()`. */
-  base?: string;
-  timeoutMs?: number;
-}
-
-function qs(q: Query = {}): string {
-  const p = new URLSearchParams();
-  for (const [k, v] of Object.entries(q))
-    if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
-  const s = p.toString();
-  return s ? `?${s}` : '';
-}
-
-/** `GET` (or `POST` with `body`) `path` on the API for `chainId`. Throws on non-2xx. */
-export async function btrApi<T = unknown>(
-  path: string,
-  chainId: number,
-  o: ApiOpts = {},
-): Promise<T> {
-  const post = o.body !== undefined;
-  const res = await (o.fetch ?? fetch)(
-    `${o.base ?? getApiRoot()}${withChainId(`${path}${qs(o.query)}`, chainId)}`,
-    {
-      method: post ? 'POST' : 'GET',
-      headers: post ? { 'content-type': 'application/json' } : undefined,
-      body: post ? JSON.stringify(o.body) : undefined,
-      signal: AbortSignal.timeout(o.timeoutMs ?? 15_000),
-    },
-  );
-  if (!res.ok) throw new Error(`BTR API ${res.status} ${path}`);
-  return (await res.json()) as T;
-}
 
 type Rec = Record<string, unknown>;
 type Opt = Omit<ApiOpts, 'query' | 'body'>;

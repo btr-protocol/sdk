@@ -110,11 +110,11 @@ let current: Core | null = null;
 const stubFetch = () => {
   // @ts-expect-error stub fetch
   globalThis.fetch = async () => {
-    if (!current) return { ok: false, status: 422, json: async () => ({ reason: 'refused' }) };
+    if (!current) return { ok: false, status: 422, headers: new Headers(), text: async () => JSON.stringify(({ reason: 'refused' })) };
     const c = current;
     return {
       ok: true,
-      json: async () => ({
+      headers: new Headers(), text: async () => JSON.stringify(({
         amount_out: c.amountOut,
         gross_out: c.grossOut,
         debit_toll: c.debitToll,
@@ -126,7 +126,7 @@ const stubFetch = () => {
         cov_toll: '0x0',
         proto_fee: '0x0',
         lp_fee: '0x0',
-      }),
+      })),
     };
   };
 };

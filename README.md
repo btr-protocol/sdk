@@ -8,7 +8,7 @@ bunx jsr add @btr-protocol/sdk     # jsr
 ```
 
 Runtime: [bun](https://bun.sh) >= 1.1. The package ships TypeScript source; both bins have a bun shebang.
-API base `https://api.btr.markets`: the data, registry and chain-quote clients read `BTR_API_URL` once at import and `setApiRoot()` at runtime; the `/amm` wire client (`quotePath`, `route`, `depth`) reads `BTR_API` (base including `/v1`) or its explicit `base` argument and ignores `setApiRoot()`. Agent docs: https://btr.markets/llms.txt
+API base `https://api.btr.markets`: every client (data, registry, chain quotes, `/amm` wire) reads `BTR_API_URL` once at import and `setApiRoot()` at runtime; the `/amm` wire calls also take an explicit `base` (including `/v1`). Agent docs: https://btr.markets/llms.txt
 
 **Nothing here holds a key, signs or broadcasts.** Every build returns `{ to, data, value }` calls; the user's wallet sends them (sequentially or via EIP-5792 `wallet_sendCalls`).
 

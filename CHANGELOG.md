@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Changed (breaking)
+
+- One API request path: `btrFetchRaw(path, ApiOpts)` (fetch/base/query/body/timeoutMs/signal; result
+  carries `headers`), `btrJson`, `btrApi` in `api.ts`. Registry, roster, ABIs, chain quotes and the
+  `/amm` wire client (`quotePath`, `route`, `depth`, `quoteLeg`) all go through it.
+- `btrFetch` removed (no callers): use `btrJson`. `btrFetchRaw` takes `ApiOpts`, not `RequestInit`.
+- `btrApi`, `ApiOpts`, `Query` move from `./protocol` to `./api` (still on the root export).
+- `LiveOpts` removed: live registry/roster/ABI fetchers take `ApiOpts`; their errors read
+  `BTR API <status> <path>`; default timeout 15 s (was 10 s).
+- `/amm` `backendBase()` defaults to `${getApiRoot()}/v1`: honours `setApiRoot()`/`BTR_API_URL`;
+  env `BTR_API` is no longer read.
+- `withChainId` refuses a non-positive or non-integer chain id.
+
 ## 0.8.0 - 2026-11-23
 
 ### Added

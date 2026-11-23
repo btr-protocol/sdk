@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { btrApi, fetchPoolParams, lpRows } from './protocol.js';
+import { btrApi } from './api.js';
+import { fetchPoolParams, lpRows } from './protocol.js';
 
 const seen: Array<{ url: string; init: RequestInit }> = [];
 const f = (async (url: string, init: RequestInit) => {

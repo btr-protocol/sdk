@@ -8,7 +8,7 @@ import accessControl from '../../abis/generations/pool-v2-s12e/AccessControl.jso
 import admin from '../../abis/generations/pool-v2-s12e/Admin.json' with { type: 'json' };
 import pool from '../../abis/generations/pool-v2-s12e/Pool.json' with { type: 'json' };
 import poolFactory from '../../abis/generations/pool-v2-s12e/PoolFactory.json' with { type: 'json' };
-import { getApiRoot } from '../api.js';
+import { btrFetchRaw, getApiRoot } from '../api.js';
 import type { Abi } from '../eth/abi.js';
 import { ABI_GENERATION } from './generation.js';
 import { abiHash } from './hash.js';
@@ -109,9 +109,7 @@ async function load(
   const key = `${getApiRoot()}:${chainId}:${selected}:${canonical.toLowerCase()}`;
   const cached = hot.get(key);
   if (cached) return cached;
-  const res = await fetch(getAbiUrl(canonical, chainId, selected), {
-    signal: AbortSignal.timeout(10_000),
-  });
+  const res = await btrFetchRaw(abiPath(canonical, chainId, selected), { timeoutMs: 10_000 });
   if (res.status === 400) throw new AbiUnknownGenerationError(canonical, chainId, selected);
   if (!res.ok) throw new Error(`BTR ABI ${res.status} ${canonical} on chain ${chainId}`);
   const generation = res.headers.get('x-btr-abi-generation');
@@ -119,7 +117,7 @@ async function load(
     throw new Error('ABI response generation differs from requested generation');
   if (generation === null && requireGeneration)
     throw new Error('ABI response generation differs from requested generation');
-  const abi = await res.json();
+  const abi = JSON.parse(res.body);
   if (!Array.isArray(abi)) throw new Error('invalid ABI response');
   const pins = chains[String(chainId)]?.pins;
   const pin = pins && Object.hasOwn(pins, canonical) ? pins[canonical] : undefined;
@@ -132,10 +130,12 @@ async function load(
 export function resetFetchAbiCacheForTest(): void {
   hot.clear();
 }
-export function getAbiUrl(name: string, chainId: number, generation: string) {
+const abiPath = (name: string, chainId: number, generation: string): string => {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('invalid ABI chain id');
-  return `${getApiRoot()}/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}&generation=${encodeURIComponent(generation)}`;
-}
+  return `/v1/abis/${encodeURIComponent(name)}?chain_id=${chainId}&generation=${encodeURIComponent(generation)}`;
+};
+export const getAbiUrl = (name: string, chainId: number, generation: string): string =>
+  `${getApiRoot()}${abiPath(name, chainId, generation)}`;
 // Source mirror only; this URL does not establish a deployment generation.
 export function getAbiGithubUrl(name: string) {
   return `https://github.com/btr-protocol/abis/blob/main/${name}.json`;

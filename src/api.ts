@@ -20,54 +20,74 @@ export function getApiRoot() {
  * The chain is required: the SDK never picks one, and an absent param would get the back's default.
  */
 export function withChainId(path: string, chainId: number): string {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0)
+    throw new Error('chainId must be a positive integer');
   return `${path}${path.includes('?') ? '&' : '?'}chainId=${chainId}`;
 }
 
-/** A response that keeps the status and `Retry-After` instead of collapsing to an `Error`. */
-interface RawResponse {
+export type Query = Record<string, string | number | boolean | undefined | null>;
+/** Options of the one API request path (`btrFetchRaw` and everything built on it). */
+export interface ApiOpts {
+  /** Querystring; unset values are skipped. */
+  query?: Query;
+  /** JSON body: sent as POST. */
+  body?: unknown;
+  /** Injected fetch (tests, proxies); default global fetch. */
+  fetch?: typeof fetch;
+  /** API root override; default `getApiRoot()`. */
+  base?: string;
+  /** Default 15 s. */
+  timeoutMs?: number;
+  /** Caller cancellation, merged with the timeout. */
+  signal?: AbortSignal;
+}
+
+function qs(path: string, q: Query = {}): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(q))
+    if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
+  const s = p.toString();
+  return s ? `${path}${path.includes('?') ? '&' : '?'}${s}` : path;
+}
+
+/** A response that keeps the status and headers instead of collapsing to an `Error`. */
+export interface RawResponse {
   ok: boolean;
   status: number;
+  headers: Headers;
   retryAfterSecs: number | undefined;
   body: string;
 }
 
-/**
- * Like `btrFetch`, but the caller decides what a non-2xx means. The chain client needs the status and
- * the countdown to build its typed union (`ChainError`), which the throwing helper threw away.
- */
-export async function btrFetchRaw(
-  path: string,
-  init?: RequestInit & { timeoutMs?: number },
-): Promise<RawResponse> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), init?.timeoutMs ?? 15_000);
-  const caller = init?.signal;
-  if (caller?.aborted) {
-    clearTimeout(t);
-    throw caller.reason instanceof Error ? caller.reason : new Error('aborted');
-  }
-  const onCallerAbort = (): void => ctrl.abort(caller?.reason);
-  caller?.addEventListener('abort', onCallerAbort, { once: true });
-  try {
-    const res = await fetch(`${getApiRoot()}${path}`, { ...init, signal: ctrl.signal });
-    const body = await res.text();
-    const ra = res.headers.get('retry-after');
-    const n = ra === null ? Number.NaN : Number(ra);
-    return {
-      ok: res.ok,
-      status: res.status,
-      retryAfterSecs: Number.isFinite(n) ? n : undefined,
-      body,
-    };
-  } finally {
-    caller?.removeEventListener('abort', onCallerAbort);
-    clearTimeout(t);
-  }
+/** The one HTTP path to the API: the caller decides what a non-2xx means. */
+export async function btrFetchRaw(path: string, o: ApiOpts = {}): Promise<RawResponse> {
+  const post = o.body !== undefined;
+  const timeout = AbortSignal.timeout(o.timeoutMs ?? 15_000);
+  const res = await (o.fetch ?? fetch)(`${o.base ?? getApiRoot()}${qs(path, o.query)}`, {
+    method: post ? 'POST' : 'GET',
+    headers: post ? { 'content-type': 'application/json' } : undefined,
+    body: post ? JSON.stringify(o.body) : undefined,
+    signal: o.signal ? AbortSignal.any([o.signal, timeout]) : timeout,
+  });
+  const body = await res.text();
+  const ra = res.headers.get('retry-after');
+  const n = ra === null ? Number.NaN : Number(ra);
+  return {
+    ok: res.ok,
+    status: res.status,
+    headers: res.headers,
+    retryAfterSecs: Number.isFinite(n) ? n : undefined,
+    body,
+  };
 }
 
-/** Generic fetch helper: 10s timeout, throws on non-2xx, typed JSON. */
-export async function btrFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await btrFetchRaw(path, { timeoutMs: 10_000, ...init });
+/** `GET` (or `POST` with `body`) `path`, typed JSON. Throws `BTR API <status> <path>` on non-2xx. */
+export async function btrJson<T = unknown>(path: string, o: ApiOpts = {}): Promise<T> {
+  const res = await btrFetchRaw(path, o);
   if (!res.ok) throw new Error(`BTR API ${res.status} ${path}`);
   return JSON.parse(res.body) as T;
 }
+
+/** `btrJson` on `path` for `chainId`: every chain-scoped read. */
+export const btrApi = <T = unknown>(path: string, chainId: number, o: ApiOpts = {}): Promise<T> =>
+  btrJson<T>(withChainId(qs(path, o.query), chainId), { ...o, query: undefined });

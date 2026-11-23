@@ -114,7 +114,7 @@ describe('backend aliases + guards', () => {
 describe('outage vs no-liquidity', () => {
   beforeEach(() => {
     // @ts-expect-error stub fetch
-    globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+    globalThis.fetch = async () => ({ ok: false, status: 500, headers: new Headers(), text: async () => JSON.stringify(({})) });
   });
   afterEach(() => {
     // @ts-expect-error restore the real fetch

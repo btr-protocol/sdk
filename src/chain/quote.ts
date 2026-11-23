@@ -172,13 +172,7 @@ function acceptBlock(key: string, number: number): void {
 async function post(path: string, body: unknown, opts: ChainClientOpts): Promise<unknown> {
   let res: Awaited<ReturnType<typeof btrFetchRaw>>;
   try {
-    res = await btrFetchRaw(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: opts.signal,
-      timeoutMs: opts.timeoutMs,
-    });
+    res = await btrFetchRaw(path, { body, signal: opts.signal, timeoutMs: opts.timeoutMs });
   } catch (e) {
     // A network failure is not a price and not a verdict: `transport`, retryable.
     throw new ChainError('transport', e instanceof Error ? e.message : 'chain request failed');

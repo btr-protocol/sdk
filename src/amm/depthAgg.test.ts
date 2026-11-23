@@ -26,7 +26,7 @@ describe('aggregateDepthCurvesAsync (backend SSOT)', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async (url: string) => {
       path = String(url);
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     const pools = [
       {
@@ -62,7 +62,7 @@ describe('aggregateDepthCurvesAsync (backend SSOT)', () => {
     // @ts-expect-error stub fetch
     globalThis.fetch = async () => {
       called = true;
-      return { ok: true, json: async () => wire };
+      return { ok: true, headers: new Headers(), text: async () => JSON.stringify(wire) };
     };
     const pools = [{ tag: 'stable', state: { base: 'USDC', legs: {} } }];
     expect(await aggregateDepthCurvesAsync(pools, 'FOO', 'BAR', [])).toBeNull();

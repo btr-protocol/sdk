@@ -1,7 +1,7 @@
 // Live registry client: reads deployments from the API, falls back to the baked record.
 // Live wins on disagreement (warning returned). Read-only; no signing.
 
-import { getApiRoot } from '../api.js';
+import { type ApiOpts, btrJson, withChainId } from '../api.js';
 import { type Address, isAddress } from '../eth/types.js';
 import { type ChainVenue, DEPLOYED_VENUES } from './deployments.generated.js';
 import { chainVenue, defaultChainId, eqAddr } from './registry.js';
@@ -38,22 +38,6 @@ export interface LiveRegistry {
   warnings: string[];
   /** Baked keys the server does not serve (not an error). */
   info: string[];
-}
-
-type Fetch = typeof fetch;
-export interface LiveOpts {
-  fetch?: Fetch;
-  base?: string;
-  timeoutMs?: number;
-}
-
-async function getJson(path: string, o: LiveOpts): Promise<unknown> {
-  const f = o.fetch ?? fetch;
-  const res = await f(`${o.base ?? getApiRoot()}${path}`, {
-    signal: AbortSignal.timeout(o.timeoutMs ?? 10_000),
-  });
-  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-  return res.json();
 }
 
 function addrMap(label: string, m: unknown): Record<string, Address> {
@@ -150,7 +134,7 @@ function diff(live: Record<string, string>, baked: Record<string, string>, what:
   return { hard, soft };
 }
 
-export interface RegistryOpts extends LiveOpts {
+export interface RegistryOpts extends ApiOpts {
   /** Accept live data that disagrees with the baked record (warnings still returned). */
   trustLive?: boolean;
   /** Only way to get baked data: return it, with a warning, when the live fetch fails. */
@@ -166,7 +150,7 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
   const id = chainId ?? defaultChainId();
   let live: ReturnType<typeof parseLive>;
   try {
-    live = parseLive(await getJson(`${REGISTRY_PATH}${chainQ(id)}`, o));
+    live = parseLive(await btrJson(withChainId(REGISTRY_PATH, id), o));
     if (live.chainId !== id) throw new Error(`asked chain ${id}, got ${live.chainId}`);
   } catch (e) {
     if (o.fallback !== 'baked')
@@ -210,12 +194,6 @@ export async function fetchRegistry(chainId?: number, o: RegistryOpts = {}): Pro
   return { ...live, source: 'live', warnings: hard, info: soft };
 }
 
-const chainQ = (chainId: number): string => {
-  if (!Number.isSafeInteger(chainId) || chainId <= 0)
-    throw new Error('chainId must be a positive integer');
-  return `?chainId=${chainId}`;
-};
-
 // biome-ignore lint/suspicious/noExplicitAny: untyped JSON wire
 const sameChain = (j: any, chainId: number, what: string): unknown => {
   if (j && typeof j === 'object' && j.chainId !== undefined && j.chainId !== chainId)
@@ -223,8 +201,8 @@ const sameChain = (j: any, chainId: number, what: string): unknown => {
   return j;
 };
 
-export const fetchRoster = async (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
-  sameChain(await getJson(`/v1/roster${chainQ(chainId)}`, o), chainId, 'roster');
+export const fetchRoster = async (chainId: number, o: ApiOpts = {}): Promise<unknown> =>
+  sameChain(await btrJson(withChainId('/v1/roster', chainId), o), chainId, 'roster');
 
 /** Roster for `chainId`: the one embedded in the registry when present, else `/v1/roster`.
  *  `degraded` is the registry's flag (a degraded roster is returned, not thrown on). */
@@ -243,14 +221,13 @@ export async function rosterFor(
 }
 
 /** ABI index for a chain: `{chainId, generation, names, source, storageVersion}`. */
-export const fetchAbis = async (chainId: number, o: LiveOpts = {}): Promise<unknown> =>
-  sameChain(await getJson(`/v1/abis${chainQ(chainId)}`, o), chainId, 'abis');
+export const fetchAbis = async (chainId: number, o: ApiOpts = {}): Promise<unknown> =>
+  sameChain(await btrJson(withChainId('/v1/abis', chainId), o), chainId, 'abis');
 
-export const fetchLiveAbi = (
-  name: string,
-  o: LiveOpts = {},
-  chainId?: number,
-): Promise<unknown> => {
+export const fetchLiveAbi = (name: string, o: ApiOpts = {}, chainId?: number): Promise<unknown> => {
   if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`bad ABI name: ${name}`);
-  return getJson(`/v1/abis/${name}${chainId === undefined ? '' : chainQ(chainId)}`, o);
+  return btrJson(
+    chainId === undefined ? `/v1/abis/${name}` : withChainId(`/v1/abis/${name}`, chainId),
+    o,
+  );
 };

@@ -1,8 +1,8 @@
 // `btr` command bodies. Imported lazily per command by btr.ts so startup stays flat.
 // Read-only except `swap` / `lp`, which only BUILD unsigned call JSON: no key, no signing, no send.
-import type { RegistryOpts } from "../venues/live.js";
+import { type RegistryOpts, fetchRoster } from "../venues/live.js";
 import * as P from "../protocol.js";
-import { type Rec, api, io, livePools, rate, rpcProvider, windowArg } from "./data.js";
+import { type Rec, livePools, rate, rpcProvider, windowArg } from "./data.js";
 import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from "./fmt.js";
 import type { TreeAsset, TreePool } from "./fmt.js";
 import { MAX_SLIPPAGE_BPS, floorFromPreview, lossBps, slippageBps } from "../pool/slippage.js";
@@ -71,7 +71,7 @@ async function positions(
 }
 
 export async function pools(a: Args): Promise<Res> {
-  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), a.o)) as Rec;
   const user = flag(a, "address");
   if (user && !ADDR.test(user)) throw new Error("--address must be a 0x address");
   let tokens: Record<string, string> = {};
@@ -116,7 +116,7 @@ export async function pools(a: Args): Promise<Res> {
 }
 
 export async function metrics(a: Args): Promise<Res> {
-  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), a.o)) as Rec;
   const k = s.protocol as Rec;
   const text = [
     `chain ${s.chainId}  window ${s.window}  TVL ${usd(k.tvlUsd)}  volume ${usd(k.volumeUsd)}  swaps ${num(k.swapCount)}  fees ${usd(k.feesUsd)}  protocol share ${pct(k.protocolSharePct)}`,
@@ -200,7 +200,7 @@ export function riskTiles(legs: Rec[]) {
 }
 
 export async function risk(a: Args): Promise<Res> {
-  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), a.o)) as Rec;
   const all: Rec[] = livePools(s).flatMap((p) =>
     (p.assets as Rec[]).map((x) => ({ ...x, pool: p.tag })),
   );
@@ -256,7 +256,7 @@ export async function flow(a: Args): Promise<Res> {
   const j = (await P.fetchLiquidity(
     a.chain,
     { from: String(from), to: String(to) },
-    io(a.o),
+    a.o,
   )) as unknown as Rec;
   const buckets = (j.buckets ?? []) as Rec[];
   const agg = new Map<string, { dep: number; wd: number; n: number }>();
@@ -294,11 +294,11 @@ export async function flow(a: Args): Promise<Res> {
 
 export async function keepers(a: Args): Promise<Res> {
   const [r, h, s] = await Promise.all([
-    api("/v1/roster", a.chain, a.o),
-    (P.fetchHealth(a.chain, undefined, io(a.o)) as Promise<Rec>).catch((e: Error) => ({
+    fetchRoster(a.chain, a.o) as Promise<Rec>,
+    (P.fetchHealth(a.chain, undefined, a.o) as Promise<Rec>).catch((e: Error) => ({
       status: `unreadable (${e.message})`,
     })),
-    (P.fetchSummary(a.chain, "24h", io(a.o)) as Promise<Rec>).catch(() => null),
+    (P.fetchSummary(a.chain, "24h", a.o) as Promise<Rec>).catch(() => null),
   ]);
   const ages = s
     ? livePools(s).flatMap((p) => (p.assets as Rec[]).map((x) => num(x.oracleAgeSec)))
