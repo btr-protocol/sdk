@@ -520,3 +520,13 @@ describe('chainLegs: SDK planToLegs on the wire route', () => {
     expect(slippageBps('500')).toBe(500);
   });
 });
+
+test('CLI + MCP reach the API only through SDK fns (the one raw path is the /v1/rpc relay)', () => {
+  const dir = `${import.meta.dir}`;
+  for (const f of ['btr.ts', 'cmds.ts', 'data.ts', 'fmt.ts', 'mcp.ts', 'table.ts']) {
+    const src = require('node:fs').readFileSync(`${dir}/${f}`, 'utf8') as string;
+    expect([f, src.match(/\bfetch\(/g)]).toEqual([f, null]);
+    const raw = [...src.matchAll(/["']\/v1\/[a-z-]+/g)].map((m) => m[0].slice(1));
+    expect([f, raw]).toEqual([f, f === 'data.ts' ? ['/v1/rpc'] : []]);
+  }
+});
