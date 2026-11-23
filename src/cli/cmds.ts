@@ -606,6 +606,7 @@ async function previewWithdraw(a: Args, pool: string, token: string, lp: bigint)
   const data = encodeFn({ abi: POOL_ABI, functionName: "previewWithdraw", args: [token, lp] });
   const ret = (await rpcProvider(a.chain, a.o).request({
     method: "eth_call",
+    fresh: true,
     params: [{ to: pool, data }, "latest"],
   })) as string;
   return decodeFn<[bigint, bigint]>({ abi: POOL_ABI, functionName: "previewWithdraw", data: ret });
@@ -727,6 +728,7 @@ async function simDebtSwap(a: Args, d: Awaited<ReturnType<typeof debtArgs>>): Pr
   );
   const ret = (await rpcProvider(a.chain, a.o).request({
     method: "eth_call",
+    fresh: true,
     params: [{ from: d.from, to: d.pool, data }, "latest"],
   })) as string;
   return decodeFn<bigint>({ abi: POOL_ABI, functionName: "swapLiability", data: ret });

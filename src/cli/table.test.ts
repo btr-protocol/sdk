@@ -142,10 +142,16 @@ const replies: Record<string, string> = {
 };
 const fetchMock = (async (url: string, init?: RequestInit) => {
   if (!String(url).includes('/v1/rpc')) return new Response('', { status: 500 });
-  const data = (JSON.parse(String(init?.body ?? '{}')).params?.[0]?.data ?? '') as string;
-  return new Response(
-    JSON.stringify({ jsonrpc: '2.0', id: 1, result: replies[data.slice(0, 10)] ?? asset }),
-  );
+  const body = JSON.parse(String(init?.body ?? '{}'));
+  const one = (r: { id: number; method: string; params?: { data?: string }[] }) => ({
+    jsonrpc: '2.0',
+    id: r.id,
+    result:
+      r.method === 'eth_chainId'
+        ? '0x8f'
+        : (replies[(r.params?.[0]?.data ?? '').slice(0, 10)] ?? asset),
+  });
+  return new Response(JSON.stringify(Array.isArray(body) ? body.map(one) : one(body)));
 }) as unknown as typeof fetch;
 const o = { fetch: fetchMock, base: 'http://x', fallback: 'baked' as const };
 const build = async (argv: string[]) => {
@@ -521,12 +527,12 @@ describe('chainLegs: SDK planToLegs on the wire route', () => {
   });
 });
 
-test('CLI + MCP reach the API only through SDK fns (the one raw path is the /v1/rpc relay)', () => {
+test('CLI + MCP reach the API only through SDK fns', () => {
   const dir = `${import.meta.dir}`;
   for (const f of ['btr.ts', 'cmds.ts', 'data.ts', 'fmt.ts', 'mcp.ts', 'table.ts']) {
     const src = require('node:fs').readFileSync(`${dir}/${f}`, 'utf8') as string;
     expect([f, src.match(/\bfetch\(/g)]).toEqual([f, null]);
     const raw = [...src.matchAll(/["']\/v1\/[a-z-]+/g)].map((m) => m[0].slice(1));
-    expect([f, raw]).toEqual([f, f === 'data.ts' ? ['/v1/rpc'] : []]);
+    expect([f, raw]).toEqual([f, []]);
   }
 });

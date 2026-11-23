@@ -1,33 +1,14 @@
 import type { Eip1193Provider } from "../eth/types.js";
 // Data layer for the `btr` CLI: live API reads only (/v1/summary, /v1/roster, ...), no keys, no sends.
-import { btrApi } from "../api.js";
+import { relayProvider } from "../eth/reader.js";
 import type { RegistryOpts } from "../venues/live.js";
 
 export type Rec = Record<string, any>; // untyped wire JSON
 
-const CALL_GAS = "0x989680"; // 10M: the relay's anonymous eth_call cap
-
-/** Read-only JSON-RPC relay (`/v1/rpc`): the same one the front uses. */
-export function rpcProvider(chain: number, o: RegistryOpts): Eip1193Provider {
-  let id = 0;
-  return {
-    async request({ method, params }) {
-      const ps = (params ?? []) as unknown[];
-      // The relay refuses an anonymous eth_call without `gas` (and over its anon cap, 10M).
-      const call = ps[0] as Rec | undefined;
-      const sent =
-        method === "eth_call" && call && call.gas === undefined
-          ? [{ ...call, gas: CALL_GAS }, ...ps.slice(1)]
-          : ps;
-      const j = await btrApi<Rec>("/v1/rpc", chain, {
-        ...o,
-        body: { jsonrpc: "2.0", id: ++id, method, params: sent },
-      });
-      if (j.error) throw new Error(`rpc ${method}: ${j.error.message ?? "error"}`);
-      return j.result;
-    },
-  };
-}
+/** Read-only JSON-RPC relay (`/v1/rpc`): the SDK's one read provider, the front's too.
+ *  10M gas: the relay refuses an anonymous eth_call without `gas` (its anon cap). */
+export const rpcProvider = (chain: number, o: RegistryOpts): Eip1193Provider =>
+  relayProvider(chain, { base: o.base, fetch: o.fetch, callGas: "0x989680" });
 
 export const WINDOWS = ["24h", "7d", "30d"];
 export function windowArg(v: string | undefined): string {
