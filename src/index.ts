@@ -22,52 +22,49 @@
  */
 
 // Re-export from utils
-export {
-  BPS_PRECISION,
-  PRECISION_1E18,
-} from './utils/constants.js';
-export * from './utils/typing.js';
-export * from './utils/safe.js';
-export * from './utils/maths.js';
-export * from './utils/format.js';
-export * from './utils/encoding.js';
+export { BPS_PRECISION, PRECISION_1E18 } from "./utils/constants.js";
+export * from "./utils/typing.js";
+export * from "./utils/safe.js";
+export * from "./utils/maths.js";
+export * from "./utils/format.js";
+export * from "./utils/encoding.js";
 
 // Shared types (TimeFrame enum + helpers)
-export * from './types/index.js';
+export * from "./types/index.js";
 
 // Pool data and transactions (canonical source for POOL_ABI, SwapQuote, PoolAsset)
-export * from './pool/index.js';
-export * from './router/index.js';
+export * from "./pool/index.js";
+export * from "./router/index.js";
 
 // Off-chain AIMM adapter: state assembly + backend fetchers (POST /v1/quote|route|depth)
-export * from './amm/index.js';
+export * from "./amm/index.js";
 
 // Chain-mode `/v1/chain/*` client: typed errors, monotonic block, server-authored floors
-export * from './chain/quote.js';
-export * from './chain/errors.js';
+export * from "./chain/quote.js";
+export * from "./chain/errors.js";
 
 // ABI fetch with the served generation (`x-btr-abi-generation`, null when the back omits it)
-export { AbiUnknownGenerationError, type AbiWithMeta, fetchAbiWithMeta } from './abis/fetch.js';
+export { AbiUnknownGenerationError, type AbiWithMeta, fetchAbiWithMeta } from "./abis/fetch.js";
 
 // Base URL for the thin HTTP client (`setApiRoot`); the chain client reads it.
-export { btrFetch, btrFetchRaw, getApiRoot, setApiRoot, withChainId } from './api.js';
+export { getApiRoot, setApiRoot, withChainId } from "./api.js";
 
 // Typed `/v1/*` read fetchers (one generic `btrApi`) + `/v1/lp-rows`
-export * from './protocol.js';
+export * from "./protocol.js";
 
 // Deployed-venue registry + on-chain exact-in router
-export * from './venues/index.js';
+export * from "./venues/index.js";
 
 // Signed-quote oracle verification (decode/digest/recover/quorum for batchPushSigned)
-export * from './oracle/index.js';
+export * from "./oracle/index.js";
 
 // Eth utilities and clients
-export * from './eth/index.js';
-export type { Client } from './eth/client.js';
+export * from "./eth/index.js";
+export type { Client } from "./eth/client.js";
 export {
   createWalletClient,
   createPublicClient,
   createHttpProvider,
   createPrivateKeyClient,
   privateKeyToAddress,
-} from './eth/client.js';
+} from "./eth/client.js";

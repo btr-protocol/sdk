@@ -1,9 +1,10 @@
 // `btr` command bodies. Imported lazily per command by btr.ts so startup stays flat.
 // Read-only except `swap` / `lp`, which only BUILD unsigned call JSON: no key, no signing, no send.
-import type { RegistryOpts } from '../venues/live.js';
-import { type Rec, api, livePools, rate, rpcProvider, summary, windowArg } from './data.js';
-import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from './fmt.js';
-import type { TreeAsset, TreePool } from './fmt.js';
+import type { RegistryOpts } from "../venues/live.js";
+import * as P from "../protocol.js";
+import { type Rec, api, io, livePools, rate, rpcProvider, windowArg } from "./data.js";
+import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from "./fmt.js";
+import type { TreeAsset, TreePool } from "./fmt.js";
 
 export interface Args {
   chain: number;
@@ -16,7 +17,7 @@ export interface Res {
   data: unknown;
   text?: string[];
 }
-const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const flag = (a: Args, k: string): string | undefined => a.flags.get(k);
 const need = (a: Args, k: string): string => {
   const v = flag(a, k);
@@ -41,9 +42,9 @@ async function positions(
   syms: string[],
 ) {
   const [{ getAsset, getLPBalance }, { readLegLpValues }, { formatUnits }] = await Promise.all([
-    import('../pool/index.js'),
-    import('../pool/lpValue.js'),
-    import('../utils/format.js'),
+    import("../pool/index.js"),
+    import("../pool/lpValue.js"),
+    import("../utils/format.js"),
   ]);
   const prov = rpcProvider(a.chain, a.o);
   const list = syms.filter((s) => tokens[s.toUpperCase()]);
@@ -67,11 +68,11 @@ async function positions(
 }
 
 export async function pools(a: Args): Promise<Res> {
-  const s = await summary(a.chain, windowArg(flag(a, 'window')), a.o);
-  const user = flag(a, 'address');
-  if (user && !ADDR.test(user)) throw new Error('--address must be a 0x address');
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
+  const user = flag(a, "address");
+  if (user && !ADDR.test(user)) throw new Error("--address must be a 0x address");
   let tokens: Record<string, string> = {};
-  if (user) tokens = (await (await import('../venues/live.js')).fetchRegistry(a.chain, a.o)).tokens;
+  if (user) tokens = (await (await import("../venues/live.js")).fetchRegistry(a.chain, a.o)).tokens;
   const rows: TreePool[] = [];
   for (const p of livePools(s)) {
     const pos = user
@@ -112,7 +113,7 @@ export async function pools(a: Args): Promise<Res> {
 }
 
 export async function metrics(a: Args): Promise<Res> {
-  const s = await summary(a.chain, windowArg(flag(a, 'window')), a.o);
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
   const k = s.protocol as Rec;
   const text = [
     `chain ${s.chainId}  window ${s.window}  TVL ${usd(k.tvlUsd)}  volume ${usd(k.volumeUsd)}  swaps ${num(k.swapCount)}  fees ${usd(k.feesUsd)}  protocol share ${pct(k.protocolSharePct)}`,
@@ -132,21 +133,21 @@ export async function metrics(a: Args): Promise<Res> {
   for (const p of livePools(s)) {
     rows.push(line(p.tag, p));
     (p.assets as Rec[]).forEach((x, i, arr) =>
-      rows.push(line(`  ${i === arr.length - 1 ? '└─' : '├─'} ${x.symbol}`, x)),
+      rows.push(line(`  ${i === arr.length - 1 ? "└─" : "├─"} ${x.symbol}`, x)),
     );
   }
   text.push(
     ...table(
       [
-        'POOL / ASSET',
-        'APY',
-        'FEE APR',
-        'HOOK APR',
-        'TOLL APR',
-        'VENUE',
-        'DEPLOYED',
-        'TVL',
-        'VOLUME',
+        "POOL / ASSET",
+        "APY",
+        "FEE APR",
+        "HOOK APR",
+        "TOLL APR",
+        "VENUE",
+        "DEPLOYED",
+        "TVL",
+        "VOLUME",
       ],
       rows,
     ),
@@ -196,7 +197,7 @@ export function riskTiles(legs: Rec[]) {
 }
 
 export async function risk(a: Args): Promise<Res> {
-  const s = await summary(a.chain, windowArg(flag(a, 'window')), a.o);
+  const s = (await P.fetchSummary(a.chain, windowArg(flag(a, "window")), io(a.o))) as Rec;
   const all: Rec[] = livePools(s).flatMap((p) =>
     (p.assets as Rec[]).map((x) => ({ ...x, pool: p.tag })),
   );
@@ -207,27 +208,27 @@ export async function risk(a: Args): Promise<Res> {
     served: s.risk ?? null,
   };
   const tiles: string[][] = [
-    ['Coverage', `${t.coverage.toFixed(3)}x`],
-    ['Worst-leg coverage', `${t.worstLegCoverage.toFixed(3)}x`],
-    ['Legs below par', `${t.legsBelowPar}/${t.legs}`],
-    ['Worst-leg shortfall', bps(t.worstShortfallBps)],
-    ['Abs skew (liab-weighted)', `${bps(t.absSkewBps.lw)}  median ${bps(t.absSkewBps.median)}`],
+    ["Coverage", `${t.coverage.toFixed(3)}x`],
+    ["Worst-leg coverage", `${t.worstLegCoverage.toFixed(3)}x`],
+    ["Legs below par", `${t.legsBelowPar}/${t.legs}`],
+    ["Worst-leg shortfall", bps(t.worstShortfallBps)],
+    ["Abs skew (liab-weighted)", `${bps(t.absSkewBps.lw)}  median ${bps(t.absSkewBps.median)}`],
     [
-      'Oracle age (median)',
+      "Oracle age (median)",
       `${secs(t.oracleAgeSec.p50)}  p95 ${secs(t.oracleAgeSec.p95)}  max ${secs(t.oracleAgeSec.max)}`,
     ],
-    ['Deployed', pct(t.deployedRatio)],
-    ['TVL', usd(t.tvlUsd)],
+    ["Deployed", pct(t.deployedRatio)],
+    ["TVL", usd(t.tvlUsd)],
   ];
   const m = (s.risk ?? s.riskTotal)?.markout; // served by newer backs only
   if (m)
     tiles.splice(
       6,
       0,
-      ['Oracle lag at fill (vw)', bps(m.lagBps?.vw)],
-      ['Markout 60s (median / p05)', `${bps(m.h60?.p50)} / ${bps(m.h60?.p05)}`],
+      ["Oracle lag at fill (vw)", bps(m.lagBps?.vw)],
+      ["Markout 60s (median / p05)", `${bps(m.h60?.p50)} / ${bps(m.h60?.p05)}`],
     );
-  const text = [...table(['RISK', 'NOW'], tiles), ''];
+  const text = [...table(["RISK", "NOW"], tiles), ""];
   const rows = all.map((x) => [
     `${x.pool}/${x.symbol}`,
     covBar(x.coverage),
@@ -236,21 +237,30 @@ export async function risk(a: Args): Promise<Res> {
     pct(x.investedRatio, 0),
     usd(x.tvlUsd),
   ]);
-  text.push(...table(['LEG', 'COVERAGE', 'SKEW', 'ORACLE AGE', 'DEPLOYED', 'TVL'], rows));
+  text.push(...table(["LEG", "COVERAGE", "SKEW", "ORACLE AGE", "DEPLOYED", "TVL"], rows));
   return { data, text };
 }
 
 // ── flow ───────────────────────────────────────────────────────────────────────
 
+const WINDOW_MS: Record<string, number> = { "24h": 864e5, "7d": 7 * 864e5, "30d": 30 * 864e5 };
+
 export async function flow(a: Args): Promise<Res> {
-  const w = windowArg(flag(a, 'window'));
-  const j = await api(`/v1/liquidity?window=${w}`, a.chain, a.o);
+  const w = windowArg(flag(a, "window"));
+  // The liquidity route takes from/to (ms), not window: convert so the span matches the header.
+  const to = Date.now();
+  const from = to - WINDOW_MS[w];
+  const j = (await P.fetchLiquidity(
+    a.chain,
+    { from: String(from), to: String(to) },
+    io(a.o),
+  )) as unknown as Rec;
   const buckets = (j.buckets ?? []) as Rec[];
   const agg = new Map<string, { dep: number; wd: number; n: number }>();
   for (const b of buckets) {
     const k = `${b.poolTag}/${b.symbol}`;
     const r = agg.get(k) ?? { dep: 0, wd: 0, n: 0 };
-    if (b.side === 'deposit') r.dep += num(b.amountUsd);
+    if (b.side === "deposit") r.dep += num(b.amountUsd);
     else r.wd += num(b.amountUsd);
     r.n += num(b.eventCount);
     agg.set(k, r);
@@ -262,7 +272,7 @@ export async function flow(a: Args): Promise<Res> {
   const sum = (f: (r: { dep: number; wd: number }) => number) =>
     [...agg.values()].reduce((t, r) => t + f(r), 0);
   rows.push([
-    'TOTAL',
+    "TOTAL",
     usd(sum((r) => r.dep)),
     usd(sum((r) => r.wd)),
     usd(sum((r) => r.dep - r.wd)),
@@ -272,7 +282,7 @@ export async function flow(a: Args): Promise<Res> {
     data: j,
     text: [
       `liquidity flow ${w}`,
-      ...table(['POOL / ASSET', 'DEPOSITS', 'WITHDRAWALS', 'NET', 'EVENTS'], rows),
+      ...table(["POOL / ASSET", "DEPOSITS", "WITHDRAWALS", "NET", "EVENTS"], rows),
     ],
   };
 }
@@ -281,23 +291,25 @@ export async function flow(a: Args): Promise<Res> {
 
 export async function keepers(a: Args): Promise<Res> {
   const [r, h, s] = await Promise.all([
-    api('/v1/roster', a.chain, a.o),
-    api('/v1/health', a.chain, a.o).catch((e: Error) => ({ status: `unreadable (${e.message})` })),
-    summary(a.chain, '24h', a.o).catch(() => null),
+    api("/v1/roster", a.chain, a.o),
+    (P.fetchHealth(a.chain, undefined, io(a.o)) as Promise<Rec>).catch((e: Error) => ({
+      status: `unreadable (${e.message})`,
+    })),
+    (P.fetchSummary(a.chain, "24h", io(a.o)) as Promise<Rec>).catch(() => null),
   ]);
   const ages = s
     ? livePools(s).flatMap((p) => (p.assets as Rec[]).map((x) => num(x.oracleAgeSec)))
     : [];
   const text = [
-    `chain ${r.chainId}  health ${h.status}${r.degraded ? '  roster degraded' : ''}${ages.length ? `  oracle age max ${secs(Math.max(...ages))}` : ''}`,
+    `chain ${r.chainId}  health ${h.status}${r.degraded ? "  roster degraded" : ""}${ages.length ? `  oracle age max ${secs(Math.max(...ages))}` : ""}`,
   ];
   const rows = (r.safes as Rec[]).map((x) => [
     x.role,
     `${x.threshold}/${(x.owners as string[]).length}`,
-    x.drift ? 'DRIFT' : 'ok',
+    x.drift ? "DRIFT" : "ok",
     x.address,
   ]);
-  text.push(...table(['ROLE', 'QUORUM', 'STATE', 'ADDRESS'], rows));
+  text.push(...table(["ROLE", "QUORUM", "STATE", "ADDRESS"], rows));
   if (r.refuel) text.push(`refuel ${JSON.stringify(r.refuel)}`);
   return { data: { roster: r, health: h }, text };
 }
@@ -308,40 +320,52 @@ const hex = (v: bigint) => `0x${v.toString(16)}`;
 
 /** Resolve symbol -> address and decimals from the live registry + chain (no baked values). */
 async function resolve(a: Args, sym: string, poolHint?: string) {
-  const reg = await (await import('../venues/live.js')).fetchRegistry(a.chain, a.o);
+  const reg = await (await import("../venues/live.js")).fetchRegistry(a.chain, a.o);
   const address = reg.tokens[sym.toUpperCase()];
   if (!address) throw new Error(`unknown token ${sym}`);
-  const pool = reg.pools.find((p) =>
-    poolHint
-      ? p.tag === poolHint
-      : p.symbols.map((x) => x.toUpperCase()).includes(sym.toUpperCase()),
+  const pool = reg.pools.find(
+    (p) =>
+      (poolHint ? p.tag === poolHint : true) &&
+      p.symbols.map((x) => x.toUpperCase()).includes(sym.toUpperCase()),
   );
-  if (!pool) throw new Error(`no live pool lists ${sym}`);
-  const { getAsset } = await import('../pool/index.js');
+  if (!pool) throw new Error(`no live pool${poolHint ? ` ${poolHint}` : ""} lists ${sym}`);
+  const { getAsset } = await import("../pool/index.js");
   const { decimals } = await getAsset(rpcProvider(a.chain, a.o), pool.address, address);
   return { reg, address, decimals, pool };
+}
+
+function slipArg(a: Args): number {
+  const bp = Number(flag(a, "slippage-bps") ?? 50);
+  if (!(bp > 0 && bp < 10_000)) throw new Error("--slippage-bps must be in (0, 10000)");
+  return bp;
+}
+
+/** Positive raw integer, else a usage error (BigInt alone throws a bare SyntaxError). */
+function rawArg(v: string, name: string): bigint {
+  if (!/^\d+$/.test(v.trim()) || !(BigInt(v.trim()) > 0n))
+    throw new Error(`${name} must be a positive raw integer`);
+  return BigInt(v.trim());
 }
 
 async function route(a: Args) {
   const [si, so, amt] = a.pos;
   if (!si || !so || !amt)
-    throw new Error('usage: btr quote <IN> <OUT> <amount> [--slippage-bps 50]');
-  const bp = Number(flag(a, 'slippage-bps') ?? 50);
-  if (!(bp > 0 && bp < 10_000)) throw new Error('--slippage-bps must be in (0, 10000)');
+    throw new Error("usage: btr quote <IN> <OUT> <amount> [--slippage-bps 50]");
+  const bp = slipArg(a);
   const [{ parseUnits }, { chainRoute }] = await Promise.all([
-    import('../utils/format.js'),
-    import('../chain/quote.js'),
+    import("../utils/format.js"),
+    import("../chain/quote.js"),
   ]);
   const tin = await resolve(a, si);
   const tout = await resolve(a, so);
   const amountIn = parseUnits(amt, tin.decimals);
-  if (!(amountIn > 0n)) throw new Error('amount must be positive');
+  if (!(amountIn > 0n)) throw new Error("amount must be positive");
   const r = await chainRoute({
     chain_id: a.chain,
     token_in: tin.address,
     token_out: tout.address,
     amount_in: hex(amountIn),
-    slippage: { mode: 'relative', pbps: Math.round(bp * 100) },
+    slippage: { mode: "relative", pbps: Math.round(bp * 100) },
   });
   return { r, tin, tout, amountIn, si: si.toUpperCase(), so: so.toUpperCase() };
 }
@@ -350,10 +374,10 @@ export async function quote(a: Args): Promise<Res> {
   const { r, tin, tout, amountIn, si, so } = await route(a);
   if (!r.best)
     throw new Error(
-      `no route ${si} -> ${so}${r.refused.length ? ` (refused: ${r.refused.map((x) => x.name).join(',')})` : ''}`,
+      `no route ${si} -> ${so}${r.refused.length ? ` (refused: ${r.refused.map((x) => x.name).join(",")})` : ""}`,
     );
   const f = r.best.floors[0];
-  const { formatUnits } = await import('../utils/format.js');
+  const { formatUnits } = await import("../utils/format.js");
   const view = {
     in: `${formatUnits(amountIn, tin.decimals)} ${si}`,
     out: `${formatUnits(BigInt(f.amount_out), tout.decimals)} ${so}`,
@@ -361,14 +385,14 @@ export async function quote(a: Args): Promise<Res> {
     tolPbps: f.tol_pbps,
     block: r.block.number,
     parts: r.best.parts.map((p) =>
-      p.hops.map((h) => `${h.pool}:${h.token_in}>${h.token_out}`).join(' , '),
+      p.hops.map((h) => `${h.pool}:${h.token_in}>${h.token_out}`).join(" , "),
     ),
     swapGated: r.swap_gated ?? null,
   };
   return {
     data: { ...view, floors: r.best.floors },
     text: Object.entries(view).map(
-      ([k, v]) => `${k.padEnd(10)}${Array.isArray(v) ? v.join(' | ') : v}`,
+      ([k, v]) => `${k.padEnd(10)}${Array.isArray(v) ? v.join(" | ") : v}`,
     ),
   };
 }
@@ -376,7 +400,7 @@ export async function quote(a: Args): Promise<Res> {
 /** Quote -> exec legs for `from`. The server floor is checked by chainRoute; every pool and token the
  *  route names must be in the live registry. */
 async function swapLegs(a: Args) {
-  const from = addrArg(a, 'from');
+  const from = addrArg(a, "from");
   const { r, tin, si, so } = await route(a);
   if (!r.best) throw new Error(`no route ${si} -> ${so}`);
   const official = new Set(tin.reg.pools.map((p) => p.address.toLowerCase()));
@@ -420,30 +444,30 @@ async function swapLegs(a: Args) {
 /** `btr build-swap`: unsigned approve + swap_qe calls. */
 export async function buildSwap(a: Args): Promise<Res> {
   const { legs, opts, head } = await swapLegs(a);
-  const { buildSwapCalls } = await import('../router/index.js');
+  const { buildSwapCalls } = await import("../router/index.js");
   return { data: { ...head, calls: buildSwapCalls(legs, opts) } };
 }
 
 /** `btr build-approve`: only the approvals the swap phase spends (send ahead of `build-swap`). */
 export async function buildApprove(a: Args): Promise<Res> {
   const { legs, opts, head } = await swapLegs(a);
-  const { buildApprovalCalls } = await import('../router/index.js');
+  const { buildApprovalCalls } = await import("../router/index.js");
   return { data: { ...head, calls: buildApprovalCalls(legs, opts) } };
 }
 
 // ── lp build / preview ─────────────────────────────────────────────────────────
 
-const LP_USAGE = '<pool-tag> <SYMBOL> <amount> --from 0x.. --min-out <raw>';
+const LP_USAGE = "<pool-tag> <SYMBOL> <amount> --from 0x.. --min-out <raw>";
 
 async function lpArgs(a: Args, kind: string) {
   const [tag, sym, amt] = a.pos;
   if (!tag || !sym || !amt) throw new Error(`usage: btr ${kind} ${LP_USAGE}`);
-  const from = addrArg(a, 'from');
+  const from = addrArg(a, "from");
   const t = await resolve(a, sym, tag);
-  const { parseUnits } = await import('../utils/format.js');
+  const { parseUnits } = await import("../utils/format.js");
   const amount = parseUnits(amt, t.decimals);
-  const floor = BigInt(need(a, 'min-out'));
-  if (!(amount > 0n) || !(floor > 0n)) throw new Error('amount and --min-out must be positive');
+  const floor = rawArg(need(a, "min-out"), "--min-out");
+  if (!(amount > 0n)) throw new Error("amount must be positive");
   const head = {
     chainId: a.chain,
     from,
@@ -457,38 +481,38 @@ async function lpArgs(a: Args, kind: string) {
 
 /** `btr build-deposit`: [approve, depositMin]. */
 export async function buildDeposit(a: Args): Promise<Res> {
-  const { t, amount, floor, head } = await lpArgs(a, 'build-deposit');
+  const { t, amount, floor, head } = await lpArgs(a, "build-deposit");
   const [{ encodeFn }, { ERC20_ABI }, { depositCallData }] = await Promise.all([
-    import('../eth/abi.js'),
-    import('../eth/erc20.js'),
-    import('../router/index.js'),
+    import("../eth/abi.js"),
+    import("../eth/erc20.js"),
+    import("../router/index.js"),
   ]);
   const pool = t.pool.address;
   const calls = [
     {
       to: t.address,
-      data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [pool, amount] }),
+      data: encodeFn({ abi: ERC20_ABI, functionName: "approve", args: [pool, amount] }),
       value: 0n,
     },
     { to: pool, data: depositCallData(t.address as `0x${string}`, amount, floor), value: 0n },
   ];
-  return { data: { ...head, kind: 'deposit', calls } };
+  return { data: { ...head, kind: "deposit", calls } };
 }
 
 /** `btr build-withdraw`: [withdraw] burning `amount` shares of the leg, floored. */
 export async function buildWithdraw(a: Args): Promise<Res> {
-  const { t, amount, floor, head } = await lpArgs(a, 'build-withdraw');
+  const { t, amount, floor, head } = await lpArgs(a, "build-withdraw");
   const [{ encodeFn }, { POOL_ABI }, { sendDeadline }] = await Promise.all([
-    import('../eth/abi.js'),
-    import('../abis/Pool.js'),
-    import('../pool/index.js'),
+    import("../eth/abi.js"),
+    import("../abis/Pool.js"),
+    import("../pool/index.js"),
   ]);
   const data = encodeFn({
     abi: POOL_ABI,
-    functionName: 'withdraw',
+    functionName: "withdraw",
     args: [t.address, amount, floor, sendDeadline()],
   });
-  return { data: { ...head, kind: 'withdraw', calls: [{ to: t.pool.address, data, value: 0n }] } };
+  return { data: { ...head, kind: "withdraw", calls: [{ to: t.pool.address, data, value: 0n }] } };
 }
 
 /** `<pool-tag> <FROM> <TO> <lp-raw>`: both legs resolved in the named pool. */
@@ -496,19 +520,20 @@ async function debtArgs(a: Args, kind: string) {
   const [tag, sf, st, raw] = a.pos;
   if (!tag || !sf || !st || !raw)
     throw new Error(`usage: btr ${kind} <pool-tag> <FROM> <TO> <lp-raw> --from 0x..`);
-  const from = addrArg(a, 'from');
+  const from = addrArg(a, "from");
   const tf = await resolve(a, sf, tag);
   const tt = await resolve(a, st, tag);
-  const lp = BigInt(raw);
-  if (!(lp > 0n)) throw new Error('lp-raw must be positive');
+  if (tf.address.toLowerCase() === tt.address.toLowerCase())
+    throw new Error("FROM and TO must differ");
+  const lp = rawArg(raw, "lp-raw");
   return { from, tf, tt, lp, pool: tf.pool.address as `0x${string}` };
 }
 
 /** `btr build-debt-swap`: [swapLiability] FROM-leg shares -> TO-leg shares, floored. */
 export async function buildDebtSwap(a: Args): Promise<Res> {
-  const { from, tf, tt, lp, pool } = await debtArgs(a, 'build-debt-swap');
-  const floor = BigInt(need(a, 'min-out'));
-  const { buildSwapLiabilityCalls } = await import('../router/index.js');
+  const { from, tf, tt, lp, pool } = await debtArgs(a, "build-debt-swap");
+  const floor = rawArg(need(a, "min-out"), "--min-out");
+  const { buildSwapLiabilityCalls } = await import("../router/index.js");
   const calls = buildSwapLiabilityCalls(pool, {
     tokenFrom: tf.address as `0x${string}`,
     tokenTo: tt.address as `0x${string}`,
@@ -521,13 +546,13 @@ export async function buildDebtSwap(a: Args): Promise<Res> {
 /** `btr debt-swap-quote`: the swapLiability simulated by eth_call from `--from` (floor 1): the
  *  TO-leg shares the chain would mint now. Read only. */
 export async function debtSwapQuote(a: Args): Promise<Res> {
-  const { from, tf, tt, lp, pool } = await debtArgs(a, 'debt-swap-quote');
+  const { from, tf, tt, lp, pool } = await debtArgs(a, "debt-swap-quote");
   const [{ swapLiabilityCallData }, { decodeFn }, { POOL_ABI }, { sendDeadline }] =
     await Promise.all([
-      import('../router/index.js'),
-      import('../eth/abi.js'),
-      import('../abis/Pool.js'),
-      import('../pool/index.js'),
+      import("../router/index.js"),
+      import("../eth/abi.js"),
+      import("../abis/Pool.js"),
+      import("../pool/index.js"),
     ]);
   const data = swapLiabilityCallData(
     tf.address as `0x${string}`,
@@ -537,10 +562,10 @@ export async function debtSwapQuote(a: Args): Promise<Res> {
     sendDeadline(),
   );
   const ret = (await rpcProvider(a.chain, a.o).request({
-    method: 'eth_call',
-    params: [{ from, to: pool, data }, 'latest'],
+    method: "eth_call",
+    params: [{ from, to: pool, data }, "latest"],
   })) as string;
-  const out = decodeFn<bigint>({ abi: POOL_ABI, functionName: 'swapLiability', data: ret });
+  const out = decodeFn<bigint>({ abi: POOL_ABI, functionName: "swapLiability", data: ret });
   const view = { pool: tf.pool.tag, lpInRaw: lp.toString(), lpOutRaw: out.toString() };
   return { data: view, text: [`${view.pool}: lp in ${view.lpInRaw} -> lp out ${view.lpOutRaw}`] };
 }
@@ -549,29 +574,30 @@ export async function debtSwapQuote(a: Args): Promise<Res> {
  *  return words, unlabelled as in the ABI), read only. */
 export async function lpPreview(a: Args): Promise<Res> {
   const [tag, sym, raw] = a.pos;
-  if (!tag || !sym || !raw) throw new Error('usage: btr lp-preview <pool-tag> <SYMBOL> <lp-raw>');
+  if (!tag || !sym || !raw) throw new Error("usage: btr lp-preview <pool-tag> <SYMBOL> <lp-raw>");
   const t = await resolve(a, sym, tag);
+  const lp = rawArg(raw, "lp-raw");
   const [{ encodeFn, decodeFn }, { POOL_ABI }] = await Promise.all([
-    import('../eth/abi.js'),
-    import('../abis/Pool.js'),
+    import("../eth/abi.js"),
+    import("../abis/Pool.js"),
   ]);
   const ret = (await rpcProvider(a.chain, a.o).request({
-    method: 'eth_call',
+    method: "eth_call",
     params: [
       {
         to: t.pool.address,
         data: encodeFn({
           abi: POOL_ABI,
-          functionName: 'previewWithdraw',
-          args: [t.address, BigInt(raw)],
+          functionName: "previewWithdraw",
+          args: [t.address, lp],
         }),
       },
-      'latest',
+      "latest",
     ],
   })) as string;
   const [out, second] = decodeFn<[bigint, bigint]>({
     abi: POOL_ABI,
-    functionName: 'previewWithdraw',
+    functionName: "previewWithdraw",
     data: ret,
   });
   const view = {
@@ -587,12 +613,12 @@ export async function lpPreview(a: Args): Promise<Res> {
 /** `btr depth <IN> <OUT> --amounts 1,10,100`: chain-mode quote at each size (one `/v1/chain/quote`). */
 export async function depth(a: Args): Promise<Res> {
   const [si, so] = a.pos;
-  if (!si || !so) throw new Error('usage: btr depth <IN> <OUT> --amounts 1,10,100');
-  const sizes = need(a, 'amounts').split(',');
-  const bp = Number(flag(a, 'slippage-bps') ?? 50);
+  if (!si || !so) throw new Error("usage: btr depth <IN> <OUT> --amounts 1,10,100");
+  const sizes = need(a, "amounts").split(",");
+  const bp = slipArg(a);
   const [{ parseUnits, formatUnits }, { chainQuote, isRefused }] = await Promise.all([
-    import('../utils/format.js'),
-    import('../chain/quote.js'),
+    import("../utils/format.js"),
+    import("../chain/quote.js"),
   ]);
   const tin = await resolve(a, si);
   const tout = await resolve(a, so);
@@ -601,7 +627,7 @@ export async function depth(a: Args): Promise<Res> {
     token_in: tin.address,
     token_out: tout.address,
     amounts_in: sizes.map((x) => hex(parseUnits(x.trim(), tin.decimals))),
-    slippage: { mode: 'relative', pbps: Math.round(bp * 100) },
+    slippage: { mode: "relative", pbps: Math.round(bp * 100) },
   });
   const rows = r.amounts.map((x, i) =>
     isRefused(x)
@@ -617,7 +643,7 @@ export async function depth(a: Args): Promise<Res> {
     data: r,
     text: [
       `${si.toUpperCase()} -> ${so.toUpperCase()}  block ${r.block.number}`,
-      ...table([`IN ${si.toUpperCase()}`, `OUT ${so.toUpperCase()}`, 'MIN OUT', 'TOL PBPS'], rows),
+      ...table([`IN ${si.toUpperCase()}`, `OUT ${so.toUpperCase()}`, "MIN OUT", "TOL PBPS"], rows),
     ],
   };
 }
