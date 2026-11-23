@@ -18,6 +18,11 @@ export function setApiRoot(url: string) {
 export function getApiRoot() {
   return _api;
 }
+let _timeoutMs = 15_000;
+/** Default `timeoutMs` for every call that sets none (a browser app wants a shorter cap). */
+export function setFetchTimeoutMs(ms: number) {
+  _timeoutMs = ms;
+}
 
 /**
  * `path` with `chainId=<id>` appended: the one back deployment serves every chain and routes on it.
@@ -40,7 +45,7 @@ export interface ApiOpts extends Omit<RequestInit, "body" | "signal"> {
   fetch?: typeof fetch;
   /** API root override for path-based calls; default `getApiRoot()`. */
   base?: string;
-  /** Default 15 s; bounds the body read too. */
+  /** Default `setFetchTimeoutMs` (15 s); bounds the body read too. */
   timeoutMs?: number;
   /** Caller cancellation, merged with the timeout. */
   signal?: AbortSignal;
@@ -94,14 +99,13 @@ export function retryAfterMs(h: string | null | undefined, now = Date.now()): nu
   const ms = Number.isFinite(secs) ? secs * 1000 : Date.parse(h) - now;
   return Number.isFinite(ms) && ms > 0 ? Math.min(ms, RETRY_AFTER_CAP_MS) : undefined;
 }
-/** TEST ONLY: forget every cooldown (test files share this module state). */
-export const resetHttp429 = (): void => cooldowns.clear();
+/** Forget `family`'s cooldown, or every one (tests share this module state). */
+export const resetHttp429 = (family?: string): void => {
+  if (family === undefined) cooldowns.clear();
+  else cooldowns.delete(family);
+};
 export function noteHttp429(family: string, ms = 20_000): void {
   cooldowns.set(family, Math.max(cooldowns.get(family) ?? 0, Date.now() + ms));
-}
-/** Arm a family's cooldown from an error another client threw (a 429 worded in its message). */
-export function note429Error(e: unknown, family: string): void {
-  if (e instanceof Error && /(^| )429[ :]|HTTP 429/.test(e.message)) noteHttp429(family);
 }
 
 /** A non-2xx reply, carrying the status so callers can tell a dead session from a broken server. */
@@ -155,7 +159,7 @@ export async function btrFetch(url: string, o: ApiOpts = {}): Promise<Response> 
     body,
     fetch: f,
     base: _b,
-    timeoutMs = 15_000,
+    timeoutMs = _timeoutMs,
     signal,
     guard429: budget,
     headers,
@@ -211,13 +215,12 @@ export interface RawResponse {
 export async function btrFetchRaw(path: string, o: ApiOpts = {}): Promise<RawResponse> {
   const res = await btrFetch(`${o.base ?? getApiRoot()}${path}`, o);
   const body = await res.text();
-  const ra = res.headers.get("retry-after");
-  const n = ra === null ? Number.NaN : Number(ra);
+  const ra = retryAfterMs(res.headers.get("retry-after"));
   return {
     ok: res.ok,
     status: res.status,
     headers: res.headers,
-    retryAfterSecs: Number.isFinite(n) ? n : undefined,
+    retryAfterSecs: ra === undefined ? undefined : Math.ceil(ra / 1000),
     body,
   };
 }

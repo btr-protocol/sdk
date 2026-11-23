@@ -11,7 +11,7 @@ import {
 } from "./api.js";
 
 // The cooldown is module state shared with other test files: start and leave it clean.
-beforeEach(resetHttp429);
+beforeEach(() => resetHttp429());
 const T0 = Date.UTC(2000, 0, 1);
 const realFetch = globalThis.fetch;
 afterAll(() => {

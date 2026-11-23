@@ -13,7 +13,7 @@
  */
 
 import type { GateFields, QuoteBaseWire } from '../amm/aimm.js';
-import { btrFetchRaw, withChainId } from '../api.js';
+import { btrFetchRaw, http429RemainingMs, noteHttp429, resetHttp429, withChainId } from '../api.js';
 import { assertServerFloor } from '../router/index.js';
 import { ChainError, type ChainErrorFields, parseChainError } from './errors.js';
 
@@ -133,32 +133,29 @@ interface ChainRouteResponse extends GateFields {
 interface ChainClientOpts {
   signal?: AbortSignal;
   timeoutMs?: number;
-  /** Injectable clock (tests); defaults to `Date.now`. */
-  now?: () => number;
 }
 
 // ── process-wide policy state ────────────────────────────────────────────────
 //
-// One cooldown for the whole client: a 429 is the edge telling every caller to slow down, so a
-// per-request cooldown would just re-hit the limiter. The monotonic block is per pair: two
+// One `chain` 429 family (api.ts) for every chain call: a per-request cooldown would just re-hit
+// the limiter. The monotonic block is per pair: two
 // replicas can answer from different heads, and the older answer must never overwrite the newer.
 
-let cooldownUntilMs = 0;
 const lastBlock = new Map<string, number>();
 
 /** Reset the cooldown and block guards (tests, and a deliberate retry after a cooldown). */
 export function resetChainClientState(): void {
-  cooldownUntilMs = 0;
+  resetHttp429('chain');
   lastBlock.clear();
 }
 
-function cooldown(now: number): void {
-  if (cooldownUntilMs > now) {
+function cooldown(): void {
+  const ms = http429RemainingMs('chain');
+  if (ms > 0)
     throw new ChainError('rate_limited', 'chain rate limited', {
       status: 429,
-      retryAfterSecs: Math.max(1, Math.ceil((cooldownUntilMs - now) / 1000)),
+      retryAfterSecs: Math.max(1, Math.ceil(ms / 1000)),
     });
-  }
 }
 
 function acceptBlock(key: string, number: number): void {
@@ -180,8 +177,7 @@ async function post(path: string, body: unknown, opts: ChainClientOpts): Promise
   if (!res.ok) {
     const err = parseChainError(res.status, res.body, res.retryAfterSecs);
     if (err.kind === 'rate_limited' || err.kind === 'rpc_unavailable') {
-      const secs = err.retryAfterSecs ?? 1;
-      cooldownUntilMs = (opts.now ?? Date.now)() + secs * 1000;
+      noteHttp429('chain', (err.retryAfterSecs ?? 1) * 1000);
     }
     throw err;
   }
@@ -354,7 +350,7 @@ export async function chainQuote(
   opts: ChainClientOpts = {},
 ): Promise<ChainQuoteResponse> {
   validateSlippage(req.slippage);
-  cooldown((opts.now ?? Date.now)());
+  cooldown();
   const raw = (await post(
     withChainId('/v1/chain/quote', req.chain_id),
     { ...req, slippage: wireSlippage(req.slippage) },
@@ -381,7 +377,7 @@ export async function chainRoute(
   opts: ChainClientOpts = {},
 ): Promise<ChainRouteResponse> {
   validateSlippage(req.slippage);
-  cooldown((opts.now ?? Date.now)());
+  cooldown();
   const raw = (await post(
     withChainId('/v1/chain/route', req.chain_id),
     { ...req, slippage: wireSlippage(req.slippage) },
