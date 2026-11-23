@@ -5,6 +5,7 @@ import * as P from "../protocol.js";
 import { type Rec, api, io, livePools, rate, rpcProvider, windowArg } from "./data.js";
 import { DASH, bps, covBar, pct, poolTree, secs, table, usd } from "./fmt.js";
 import type { TreeAsset, TreePool } from "./fmt.js";
+import { floorFromPreview, slippageBps } from "../pool/slippage.js";
 
 export interface Args {
   chain: number;
@@ -335,9 +336,7 @@ async function resolve(a: Args, sym: string, poolHint?: string) {
 }
 
 function slipArg(a: Args): number {
-  const bp = Number(flag(a, "slippage-bps") ?? 50);
-  if (!(bp > 0 && bp < 10_000)) throw new Error("--slippage-bps must be in (0, 10000)");
-  return bp;
+  return slippageBps(flag(a, "slippage-bps"));
 }
 
 /** Positive raw integer, else a usage error (BigInt alone throws a bare SyntaxError). */
@@ -397,10 +396,35 @@ export async function quote(a: Args): Promise<Res> {
   };
 }
 
+/** Every call carries `from` = `--from`, so a wallet refuses a mismatched signer. */
+const fromCalls = <C extends object>(from: string, calls: C[]) =>
+  calls.map((c) => ({ from, ...c }));
+
+/** `--recipient` (default `--from`): never the zero address, a pool or a token of the registry. */
+function recipientArg(
+  a: Args,
+  from: string,
+  reg: { pools: { address: string }[]; tokens: Record<string, string> },
+) {
+  const r = flag(a, "recipient") === undefined ? from : addrArg(a, "recipient");
+  const bad = new Set(
+    [
+      "0x0000000000000000000000000000000000000000",
+      ...reg.pools.map((p) => p.address),
+      ...Object.values(reg.tokens),
+    ].map((x) => x.toLowerCase()),
+  );
+  if (bad.has(r.toLowerCase()))
+    throw new Error("--recipient must not be the zero address, a pool or a token");
+  return r;
+}
+
 /** Quote -> exec legs for `from`. The server floor is checked by chainRoute; every pool and token the
  *  route names must be in the live registry. */
 async function swapLegs(a: Args) {
   const from = addrArg(a, "from");
+  const { fetchRegistry } = await import("../venues/live.js");
+  const recipient = recipientArg(a, from, await fetchRegistry(a.chain, a.o));
   const { r, tin, si, so } = await route(a);
   if (!r.best) throw new Error(`no route ${si} -> ${so}`);
   const official = new Set(tin.reg.pools.map((p) => p.address.toLowerCase()));
@@ -436,37 +460,58 @@ async function swapLegs(a: Args) {
       };
     });
   });
-  const opts = { recipient: from as `0x${string}`, sender: from as `0x${string}` };
-  const head = { chainId: a.chain, from, floor: r.best.floors[0], swapGated: r.swap_gated ?? null };
+  const opts = { recipient: recipient as `0x${string}`, sender: from as `0x${string}` };
+  const head = {
+    chainId: a.chain,
+    from,
+    recipient,
+    floor: r.best.floors[0],
+    swapGated: r.swap_gated ?? null,
+  };
   return { legs: legs as never, opts, head };
 }
 
-/** `btr build-swap`: unsigned approve + swap_qe calls. */
+/** `btr build-swap`: unsigned approve + swap_qe calls; `recipient` receives the output. */
 export async function buildSwap(a: Args): Promise<Res> {
   const { legs, opts, head } = await swapLegs(a);
   const { buildSwapCalls } = await import("../router/index.js");
-  return { data: { ...head, calls: buildSwapCalls(legs, opts) } };
+  return { data: { ...head, calls: fromCalls(head.from, buildSwapCalls(legs, opts)) } };
 }
 
 /** `btr build-approve`: only the approvals the swap phase spends (send ahead of `build-swap`). */
 export async function buildApprove(a: Args): Promise<Res> {
   const { legs, opts, head } = await swapLegs(a);
   const { buildApprovalCalls } = await import("../router/index.js");
-  return { data: { ...head, calls: buildApprovalCalls(legs, opts) } };
+  return { data: { ...head, calls: fromCalls(head.from, buildApprovalCalls(legs, opts)) } };
 }
 
 // ── lp build / preview ─────────────────────────────────────────────────────────
 
-const LP_USAGE = "<pool-tag> <SYMBOL> <amount> --from 0x.. --min-out <raw>";
+const LP_USAGE = "<pool-tag> <SYMBOL> <amount> --from 0x.. [--slippage-bps 50] [--min-out <raw>]";
+
+/** The floor every LP build signs: the on-chain `preview` less `--slippage-bps`, or a `--min-out`
+ *  inside the cap (`floorFromPreview`). A preview that cannot be read refuses. */
+async function lpFloor(a: Args, preview: () => Promise<bigint>, hint = "") {
+  const bp = slipArg(a);
+  const m = flag(a, "min-out");
+  const minOut = m === undefined ? undefined : rawArg(m, "--min-out");
+  let p: bigint;
+  try {
+    p = await preview();
+  } catch (e) {
+    throw new Error(`on-chain preview failed${hint}: ${(e as Error).message}`);
+  }
+  return { floor: floorFromPreview(p, bp, minOut), preview: p, slippageBps: bp };
+}
 
 async function lpArgs(a: Args, kind: string) {
   const [tag, sym, amt] = a.pos;
   if (!tag || !sym || !amt) throw new Error(`usage: btr ${kind} ${LP_USAGE}`);
   const from = addrArg(a, "from");
+  slipArg(a);
   const t = await resolve(a, sym, tag);
   const { parseUnits } = await import("../utils/format.js");
   const amount = parseUnits(amt, t.decimals);
-  const floor = rawArg(need(a, "min-out"), "--min-out");
   if (!(amount > 0n)) throw new Error("amount must be positive");
   const head = {
     chainId: a.chain,
@@ -474,45 +519,92 @@ async function lpArgs(a: Args, kind: string) {
     pool: t.pool.tag,
     token: sym.toUpperCase(),
     amountRaw: amount.toString(),
-    minRaw: floor.toString(),
   };
-  return { t, amount, floor, head };
+  return { t, amount, from, head };
 }
 
-/** `btr build-deposit`: [approve, depositMin]. */
-export async function buildDeposit(a: Args): Promise<Res> {
-  const { t, amount, floor, head } = await lpArgs(a, "build-deposit");
-  const [{ encodeFn }, { ERC20_ABI }, { depositCallData }] = await Promise.all([
+/** `Pool.previewWithdraw(token, lp)`: [token out, aux]. */
+async function previewWithdraw(a: Args, pool: string, token: string, lp: bigint) {
+  const [{ encodeFn, decodeFn }, { POOL_ABI }] = await Promise.all([
     import("../eth/abi.js"),
-    import("../eth/erc20.js"),
-    import("../router/index.js"),
+    import("../abis/Pool.js"),
   ]);
+  const data = encodeFn({ abi: POOL_ABI, functionName: "previewWithdraw", args: [token, lp] });
+  const ret = (await rpcProvider(a.chain, a.o).request({
+    method: "eth_call",
+    params: [{ to: pool, data }, "latest"],
+  })) as string;
+  return decodeFn<[bigint, bigint]>({ abi: POOL_ABI, functionName: "previewWithdraw", data: ret });
+}
+
+/** `btr build-deposit`: [approve, depositMin]; the shares mint to `--from`. */
+export async function buildDeposit(a: Args): Promise<Res> {
+  const { t, amount, from, head } = await lpArgs(a, "build-deposit");
+  const [{ encodeFn }, { ERC20_ABI }, { depositCallData }, { simulateDeposit }] = await Promise.all(
+    [
+      import("../eth/abi.js"),
+      import("../eth/erc20.js"),
+      import("../router/index.js"),
+      import("../pool/index.js"),
+    ],
+  );
   const pool = t.pool.address;
+  const f = await lpFloor(
+    a,
+    () =>
+      simulateDeposit(
+        rpcProvider(a.chain, a.o),
+        pool as `0x${string}`,
+        from as `0x${string}`,
+        t.address as `0x${string}`,
+        amount,
+      ),
+    " (deposit simulates from --from: it needs the balance and the approval mined first)",
+  );
   const calls = [
     {
       to: t.address,
       data: encodeFn({ abi: ERC20_ABI, functionName: "approve", args: [pool, amount] }),
       value: 0n,
     },
-    { to: pool, data: depositCallData(t.address as `0x${string}`, amount, floor), value: 0n },
+    { to: pool, data: depositCallData(t.address as `0x${string}`, amount, f.floor), value: 0n },
   ];
-  return { data: { ...head, kind: "deposit", calls } };
+  return {
+    data: { ...head, ...lpHead(f), kind: "deposit", calls: fromCalls(from, calls) },
+  };
 }
 
-/** `btr build-withdraw`: [withdraw] burning `amount` shares of the leg, floored. */
+const lpHead = (f: { floor: bigint; preview: bigint; slippageBps: number }) => ({
+  previewRaw: f.preview.toString(),
+  minRaw: f.floor.toString(),
+  slippageBps: f.slippageBps,
+});
+
+/** `btr build-withdraw`: [withdraw] burning `amount` shares of the leg, floored; pays `--from`. */
 export async function buildWithdraw(a: Args): Promise<Res> {
-  const { t, amount, floor, head } = await lpArgs(a, "build-withdraw");
+  const { t, amount, from, head } = await lpArgs(a, "build-withdraw");
   const [{ encodeFn }, { POOL_ABI }, { sendDeadline }] = await Promise.all([
     import("../eth/abi.js"),
     import("../abis/Pool.js"),
     import("../pool/index.js"),
   ]);
+  const f = await lpFloor(
+    a,
+    async () => (await previewWithdraw(a, t.pool.address, t.address, amount))[0],
+  );
   const data = encodeFn({
     abi: POOL_ABI,
     functionName: "withdraw",
-    args: [t.address, amount, floor, sendDeadline()],
+    args: [t.address, amount, f.floor, sendDeadline()],
   });
-  return { data: { ...head, kind: "withdraw", calls: [{ to: t.pool.address, data, value: 0n }] } };
+  return {
+    data: {
+      ...head,
+      ...lpHead(f),
+      kind: "withdraw",
+      calls: fromCalls(from, [{ to: t.pool.address, data, value: 0n }]),
+    },
+  };
 }
 
 /** `<pool-tag> <FROM> <TO> <lp-raw>`: both legs resolved in the named pool. */
@@ -529,24 +621,8 @@ async function debtArgs(a: Args, kind: string) {
   return { from, tf, tt, lp, pool: tf.pool.address as `0x${string}` };
 }
 
-/** `btr build-debt-swap`: [swapLiability] FROM-leg shares -> TO-leg shares, floored. */
-export async function buildDebtSwap(a: Args): Promise<Res> {
-  const { from, tf, tt, lp, pool } = await debtArgs(a, "build-debt-swap");
-  const floor = rawArg(need(a, "min-out"), "--min-out");
-  const { buildSwapLiabilityCalls } = await import("../router/index.js");
-  const calls = buildSwapLiabilityCalls(pool, {
-    tokenFrom: tf.address as `0x${string}`,
-    tokenTo: tt.address as `0x${string}`,
-    lpAmountIn: lp,
-    minLpAmountOut: floor,
-  });
-  return { data: { chainId: a.chain, from, pool: tf.pool.tag, lpRaw: lp.toString(), calls } };
-}
-
-/** `btr debt-swap-quote`: the swapLiability simulated by eth_call from `--from` (floor 1): the
- *  TO-leg shares the chain would mint now. Read only. */
-export async function debtSwapQuote(a: Args): Promise<Res> {
-  const { from, tf, tt, lp, pool } = await debtArgs(a, "debt-swap-quote");
+/** `swapLiability` simulated by eth_call from `from` (floor 1): the TO-leg shares minted now. */
+async function simDebtSwap(a: Args, d: Awaited<ReturnType<typeof debtArgs>>): Promise<bigint> {
   const [{ swapLiabilityCallData }, { decodeFn }, { POOL_ABI }, { sendDeadline }] =
     await Promise.all([
       import("../router/index.js"),
@@ -555,18 +631,49 @@ export async function debtSwapQuote(a: Args): Promise<Res> {
       import("../pool/index.js"),
     ]);
   const data = swapLiabilityCallData(
-    tf.address as `0x${string}`,
-    tt.address as `0x${string}`,
-    lp,
+    d.tf.address as `0x${string}`,
+    d.tt.address as `0x${string}`,
+    d.lp,
     1n,
     sendDeadline(),
   );
   const ret = (await rpcProvider(a.chain, a.o).request({
     method: "eth_call",
-    params: [{ from, to: pool, data }, "latest"],
+    params: [{ from: d.from, to: d.pool, data }, "latest"],
   })) as string;
-  const out = decodeFn<bigint>({ abi: POOL_ABI, functionName: "swapLiability", data: ret });
-  const view = { pool: tf.pool.tag, lpInRaw: lp.toString(), lpOutRaw: out.toString() };
+  return decodeFn<bigint>({ abi: POOL_ABI, functionName: "swapLiability", data: ret });
+}
+
+/** `btr build-debt-swap`: [swapLiability] FROM-leg shares -> TO-leg shares of `--from`, floored. */
+export async function buildDebtSwap(a: Args): Promise<Res> {
+  slipArg(a);
+  const d = await debtArgs(a, "build-debt-swap");
+  const f = await lpFloor(a, () => simDebtSwap(a, d));
+  const { buildSwapLiabilityCalls } = await import("../router/index.js");
+  const calls = buildSwapLiabilityCalls(d.pool, {
+    tokenFrom: d.tf.address as `0x${string}`,
+    tokenTo: d.tt.address as `0x${string}`,
+    lpAmountIn: d.lp,
+    minLpAmountOut: f.floor,
+  });
+  return {
+    data: {
+      chainId: a.chain,
+      from: d.from,
+      pool: d.tf.pool.tag,
+      lpRaw: d.lp.toString(),
+      ...lpHead(f),
+      calls: fromCalls(d.from, calls),
+    },
+  };
+}
+
+/** `btr debt-swap-quote`: the swapLiability simulated by eth_call from `--from` (floor 1): the
+ *  TO-leg shares the chain would mint now. Read only. */
+export async function debtSwapQuote(a: Args): Promise<Res> {
+  const d = await debtArgs(a, "debt-swap-quote");
+  const out = await simDebtSwap(a, d);
+  const view = { pool: d.tf.pool.tag, lpInRaw: d.lp.toString(), lpOutRaw: out.toString() };
   return { data: view, text: [`${view.pool}: lp in ${view.lpInRaw} -> lp out ${view.lpOutRaw}`] };
 }
 
@@ -577,29 +684,7 @@ export async function lpPreview(a: Args): Promise<Res> {
   if (!tag || !sym || !raw) throw new Error("usage: btr lp-preview <pool-tag> <SYMBOL> <lp-raw>");
   const t = await resolve(a, sym, tag);
   const lp = rawArg(raw, "lp-raw");
-  const [{ encodeFn, decodeFn }, { POOL_ABI }] = await Promise.all([
-    import("../eth/abi.js"),
-    import("../abis/Pool.js"),
-  ]);
-  const ret = (await rpcProvider(a.chain, a.o).request({
-    method: "eth_call",
-    params: [
-      {
-        to: t.pool.address,
-        data: encodeFn({
-          abi: POOL_ABI,
-          functionName: "previewWithdraw",
-          args: [t.address, lp],
-        }),
-      },
-      "latest",
-    ],
-  })) as string;
-  const [out, second] = decodeFn<[bigint, bigint]>({
-    abi: POOL_ABI,
-    functionName: "previewWithdraw",
-    data: ret,
-  });
+  const [out, second] = await previewWithdraw(a, t.pool.address, t.address, lp);
   const view = {
     pool: t.pool.tag,
     token: sym.toUpperCase(),

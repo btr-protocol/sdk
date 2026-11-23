@@ -129,10 +129,24 @@ const asset = encodeAbiParameters(outputs, [
     kneeBits: 0n,
   },
 ]);
-const fetchMock = (async (url: string) =>
-  String(url).includes('/v1/rpc')
-    ? new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: asset }))
-    : new Response('', { status: 500 })) as unknown as typeof fetch;
+const sel = (functionName: string, args: unknown[]) =>
+  encodeFn({ abi: POOL_ABI, functionName, args }).slice(0, 10);
+const Z = '0x0000000000000000000000000000000000000000';
+/** On-chain previews the builds floor off: deposit mints 1000, previewWithdraw pays 2000, swapLiability 3000. */
+const PREVIEW = { deposit: 1000n, withdraw: 2000n, debt: 3000n };
+const word = (v: bigint) => `0x${v.toString(16).padStart(64, '0')}`;
+const replies: Record<string, string> = {
+  [sel('deposit', [Z, 0n])]: word(PREVIEW.deposit) + word(0n).slice(2) + word(0n).slice(2),
+  [sel('previewWithdraw', [Z, 0n])]: word(PREVIEW.withdraw) + word(0n).slice(2),
+  [sel('swapLiability', [Z, Z, 0n, 0n, 0n])]: word(PREVIEW.debt),
+};
+const fetchMock = (async (url: string, init?: RequestInit) => {
+  if (!String(url).includes('/v1/rpc')) return new Response('', { status: 500 });
+  const data = (JSON.parse(String(init?.body ?? '{}')).params?.[0]?.data ?? '') as string;
+  return new Response(
+    JSON.stringify({ jsonrpc: '2.0', id: 1, result: replies[data.slice(0, 10)] ?? asset }),
+  );
+}) as unknown as typeof fetch;
 const o = { fetch: fetchMock, base: 'http://x', fallback: 'baked' as const };
 const build = async (argv: string[]) => {
   const lines: string[] = [];
@@ -143,37 +157,51 @@ const build = async (argv: string[]) => {
 const tok = async (s: string) =>
   (await (await import('../venues/live.js')).fetchRegistry(143, o)).tokens[s] as Address;
 
+const fail = async (argv: string[]) => {
+  const lines: string[] = [];
+  const code = await run(argv, (s) => lines.push(s), o);
+  return { code, out: lines.join('\n') };
+};
+const DEP = ['build-deposit', 'btr-core', 'USDC', '2.5', '--from', FROM, '--chain', '143'];
+
 describe('build calldata = SDK builders', () => {
-  test('build-deposit', async () => {
-    const r = await build([
-      'build-deposit',
-      'btr-core',
-      'USDC',
-      '2.5',
-      '--from',
-      FROM,
-      '--min-out',
-      '7',
-      '--chain',
-      '143',
-    ]);
+  test('build-deposit: floor = simulated mint less default 50 bps', async () => {
+    const r = await build(DEP);
     const usdc = await tok('USDC');
+    const floor = (PREVIEW.deposit * 9_950n) / 10_000n;
+    expect(r.minRaw).toBe(floor.toString());
     expect(r.calls).toEqual([
       {
+        from: FROM,
         to: usdc,
         data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [POOL, 2_500_000n] }),
         value: '0',
       },
-      { to: POOL, data: depositCallData(usdc, 2_500_000n, 7n), value: '0' },
+      { from: FROM, to: POOL, data: depositCallData(usdc, 2_500_000n, floor), value: '0' },
     ]);
     const m = (await call(
       'build_deposit',
-      { chain: 143, pool: 'btr-core', symbol: 'USDC', amount: '2.5', from: FROM, 'min-out': '7' },
+      { chain: 143, pool: 'btr-core', symbol: 'USDC', amount: '2.5', from: FROM },
       o,
     )) as { calls: unknown[] };
     expect(
       JSON.parse(JSON.stringify(m.calls, (_, x) => (typeof x === 'bigint' ? x.toString() : x))),
     ).toEqual(r.calls);
+  });
+  test('honest --min-out inside the cap is encoded unchanged', async () => {
+    const r = await build([...DEP, '--min-out', '990']);
+    expect(r.calls[1].data).toBe(depositCallData(await tok('USDC'), 2_500_000n, 990n));
+  });
+  test('--slippage-bps sets the floor; out of range or above the cap refused', async () => {
+    expect((await build([...DEP, '--slippage-bps', '100'])).minRaw).toBe('990');
+    for (const bp of ['0', '10000', '9991', '-1', '1.5'])
+      expect((await fail([...DEP, '--slippage-bps', bp])).code).not.toBe(0);
+  });
+  test('--min-out below preview less the cap, or above the preview, refused', async () => {
+    // cap 9990 bps of 1000 -> lowest 1
+    expect((await fail([...DEP, '--min-out', '1'])).code).toBe(0);
+    expect((await fail([...DEP, '--min-out', '1001'])).code).not.toBe(0);
+    expect((await fail([...DEP, '--min-out', '0'])).code).not.toBe(0);
   });
   test('build-debt-swap', async () => {
     const r = await build([
@@ -185,7 +213,7 @@ describe('build calldata = SDK builders', () => {
       '--from',
       FROM,
       '--min-out',
-      '990',
+      '2990',
       '--chain',
       '143',
     ]);
@@ -196,12 +224,25 @@ describe('build calldata = SDK builders', () => {
       tokenFrom: usdc,
       tokenTo: ausd,
       lpAmountIn: 1000n,
-      minLpAmountOut: 990n,
+      minLpAmountOut: 2990n,
     });
+    expect(r.calls[0].from).toBe(FROM);
     expect(r.calls[0].to).toBe(POOL);
     expect(r.calls[0].data.slice(0, -64)).toBe(sdk[0].data.slice(0, -64));
+    const d = await build([
+      'build-debt-swap',
+      'btr-core',
+      'USDC',
+      'AUSD',
+      '1000',
+      '--from',
+      FROM,
+      '--chain',
+      '143',
+    ]);
+    expect(d.minRaw).toBe(((PREVIEW.debt * 9_950n) / 10_000n).toString());
   });
-  test('build-withdraw encodes Pool.withdraw', async () => {
+  test('build-withdraw encodes Pool.withdraw floored off previewWithdraw', async () => {
     const r = await build([
       'build-withdraw',
       'btr-core',
@@ -209,18 +250,52 @@ describe('build calldata = SDK builders', () => {
       '1',
       '--from',
       FROM,
-      '--min-out',
-      '5',
       '--chain',
       '143',
     ]);
     const dl = BigInt(`0x${r.calls[0].data.slice(-64)}`);
+    expect(r.calls[0].from).toBe(FROM);
     expect(r.calls[0].data).toBe(
       encodeFn({
         abi: POOL_ABI,
         functionName: 'withdraw',
-        args: [await tok('USDC'), 1_000_000n, 5n, dl],
+        args: [await tok('USDC'), 1_000_000n, (PREVIEW.withdraw * 9_950n) / 10_000n, dl],
       }),
     );
+  });
+});
+
+describe('floorFromPreview', () => {
+  test('derivation, cap, zero refusal', async () => {
+    const { floorFromPreview, MAX_SLIPPAGE_BPS } = await import('../pool/slippage.js');
+    expect(floorFromPreview(10_000n, 50)).toBe(9_950n);
+    expect(floorFromPreview(10_000n, 50, 9_000n)).toBe(9_000n);
+    expect(floorFromPreview(10_000n, 50, 10n)).toBe(10n); // exactly preview less the cap
+    expect(() => floorFromPreview(10_000n, 50, 9n)).toThrow('cap');
+    expect(() => floorFromPreview(10_000n, 50, 10_001n)).toThrow('above');
+    expect(() => floorFromPreview(0n, 50)).toThrow('zero');
+    expect(() => floorFromPreview(1n, MAX_SLIPPAGE_BPS)).toThrow('zero');
+  });
+});
+
+describe('build-swap recipient', () => {
+  const SW = ['build-swap', 'USDC', 'AUSD', '1', '--from', FROM, '--chain', '143'];
+  test('zero, pool and token recipients refused before any quote', async () => {
+    for (const r of [Z, POOL, await tok('USDC')]) {
+      const f = await fail([...SW, '--recipient', r]);
+      expect(f.code).not.toBe(0);
+    }
+  });
+  test('default recipient = --from passes the check (fails later on the mocked quote)', async () => {
+    const lines: string[] = [];
+    const errs: string[] = [];
+    const orig = console.error;
+    console.error = (m: unknown) => void errs.push(String(m));
+    try {
+      await run(SW, (s) => lines.push(s), o);
+    } finally {
+      console.error = orig;
+    }
+    expect(errs.join('\n')).not.toContain('--recipient');
   });
 });

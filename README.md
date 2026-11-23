@@ -8,7 +8,7 @@ bunx jsr add @btr-protocol/sdk     # jsr
 ```
 
 Runtime: [bun](https://bun.sh) >= 1.1. The package ships TypeScript source; both bins have a bun shebang.
-API base `https://api.btr.markets` (override with `BTR_API_URL` or `setApiRoot()`). Agent docs: https://btr.markets/llms.txt
+API base `https://api.btr.markets`: the data, registry and chain-quote clients read `BTR_API_URL` once at import and `setApiRoot()` at runtime; the `/amm` wire client (`quotePath`, `route`, `depth`) reads `BTR_API` (base including `/v1`) or its explicit `base` argument and ignores `setApiRoot()`. Agent docs: https://btr.markets/llms.txt
 
 **Nothing here holds a key, signs or broadcasts.** Every build returns `{ to, data, value }` calls; the user's wallet sends them (sequentially or via EIP-5792 `wallet_sendCalls`).
 
@@ -41,8 +41,9 @@ const px = await fetchMdPrice(143, 'BTC');
 ### Quote
 
 ```ts
-import { chainRoute } from '@btr-protocol/sdk';
+import { chainRoute, fetchRegistry } from '@btr-protocol/sdk';
 
+const reg = await fetchRegistry(143);
 const r = await chainRoute({
   chain_id: 143,
   token_in: reg.tokens.USDC,
@@ -84,6 +85,7 @@ const calls = [
 ### Withdraw
 
 ```ts
+import { encodeFn } from '@btr-protocol/sdk/eth';
 import { POOL_ABI, sendDeadline } from '@btr-protocol/sdk/pool';
 
 const data = encodeFn({ abi: POOL_ABI, functionName: 'withdraw', args: [token, lpAmount, minOut, sendDeadline()] });
@@ -130,13 +132,13 @@ Text views by default, `--json` for raw data. Exit 0 ok, 1 failure, 2 usage. Liv
 | `md-price` / `md-ohlc` | `<symbol>` (`[--params]`) | Market-data price / OHLC | read |
 | `registry`, `pool-list`, `roster`, `abis` | | Contracts, tokens, pools, roster, ABI index | read |
 | `abi` | `<name>` | ABI JSON | read |
-| `build-swap` | `<in> <out> <amount> --from [--slippage-bps]` | Unsigned approve + `swap_qe` calls | build |
+| `build-swap` | `<in> <out> <amount> --from [--recipient] [--slippage-bps]` | Unsigned approve + `swap_qe` calls | build |
 | `build-approve` | `<in> <out> <amount> --from [--slippage-bps]` | Unsigned approvals only | build |
-| `build-deposit` | `<pool> <symbol> <amount> --from --min-out <raw>` | Unsigned approve + `depositMin` | build |
-| `build-withdraw` | `<pool> <symbol> <amount> --from --min-out <raw>` | Unsigned `withdraw` | build |
-| `build-debt-swap` | `<pool> <from-symbol> <to-symbol> <lp-raw> --from --min-out <raw>` | Unsigned `swapLiability` | build |
+| `build-deposit` | `<pool> <symbol> <amount> --from [--slippage-bps] [--min-out <raw>]` | Unsigned approve + `depositMin` | build |
+| `build-withdraw` | `<pool> <symbol> <amount> --from [--slippage-bps] [--min-out <raw>]` | Unsigned `withdraw` | build |
+| `build-debt-swap` | `<pool> <from-symbol> <to-symbol> <lp-raw> --from [--slippage-bps] [--min-out <raw>]` | Unsigned `swapLiability` | build |
 
-`--window` is `24h | 7d | 30d`. `--from` is the signing wallet: sender and recipient of every output. `--min-out` is a raw positive integer and the only slippage guard on LP builds; derive it from `lp-preview` / `debt-swap-quote` / `quote`.
+`--window` is `24h | 7d | 30d`. `--from` is the signing wallet: every call is emitted as `{from, to, data, value}`, so a wallet refuses another signer. LP builds pay `--from` (the contracts take no recipient); `build-swap` pays `--recipient` (default `--from`; zero, pool and token addresses refused). `--slippage-bps` is an integer in (0, 10000), default 50, cap 9990. LP builds floor off the chain: `build-deposit` simulates the deposit from `--from` (needs balance and a mined approval), `build-withdraw` reads `Pool.previewWithdraw`, `build-debt-swap` simulates `swapLiability`; floor = preview less `--slippage-bps`. An explicit `--min-out` (raw) must sit between the preview less the 9990 bps cap and the preview, else it is refused.
 
 ```bash
 btr quote USDC WBTC 1000

@@ -43,15 +43,21 @@ const BODY = {
 };
 const FROM = {
   from: str(
-    "0x signing wallet: sender AND recipient of every output; never a third party (never signed here)",
+    "0x signing wallet: every call is emitted with this `from`, so a wallet refuses another signer; LP outputs (shares, withdrawn tokens) go to it",
     true,
   ),
 };
-const SLIP = { "slippage-bps": str("slippage tolerance in bps (default 50)") };
+const SLIP = {
+  "slippage-bps": str("slippage tolerance in bps, integer in (0, 10000), cap 9990 (default 50)"),
+};
+const RECIPIENT = {
+  recipient: str(
+    "0x address that RECEIVES the swap output (default --from); never the zero address, a pool or a token",
+  ),
+};
 const MIN = {
   "min-out": str(
-    "raw minimum out (token or LP units): the only slippage guard; derive it from lp-preview / debt-swap-quote / quote, never a token value like 1",
-    true,
+    "optional raw minimum out; default = on-chain preview less --slippage-bps. Refused below preview less the 9990 bps cap or above the preview",
   ),
 };
 
@@ -311,10 +317,11 @@ export const TABLE: Cmd[] = [
   // ── unsigned builds ──
   {
     name: "build-swap",
-    description: "Unsigned approve + swap_qe calls for a routed swap",
+    description:
+      "Unsigned approve + swap_qe calls for a routed swap; --recipient (default --from) receives the output",
     kind: "build",
     pos: ["in", "out", "amount"],
-    args: { ...FROM, ...SLIP },
+    args: { ...FROM, ...SLIP, ...RECIPIENT },
     run: view("buildSwap"),
   },
   {
@@ -327,26 +334,29 @@ export const TABLE: Cmd[] = [
   },
   {
     name: "build-deposit",
-    description: "Unsigned approve + depositMin for a pool leg",
+    description:
+      "Unsigned approve + depositMin for a pool leg; floor = simulated mint less slippage; --from receives the shares",
     kind: "build",
     pos: ["pool", "symbol", "amount"],
-    args: { ...FROM, ...MIN },
+    args: { ...FROM, ...SLIP, ...MIN },
     run: view("buildDeposit"),
   },
   {
     name: "build-withdraw",
-    description: "Unsigned withdraw of LP shares (amount in token units) from a pool leg",
+    description:
+      "Unsigned withdraw of LP shares (amount in token units); floor = previewWithdraw less slippage; --from receives the tokens",
     kind: "build",
     pos: ["pool", "symbol", "amount"],
-    args: { ...FROM, ...MIN },
+    args: { ...FROM, ...SLIP, ...MIN },
     run: view("buildWithdraw"),
   },
   {
     name: "build-debt-swap",
-    description: "Unsigned swapLiability: FROM-leg shares -> TO-leg shares",
+    description:
+      "Unsigned swapLiability FROM-leg -> TO-leg shares; floor = simulated swap less slippage; --from receives the shares",
     kind: "build",
     pos: ["pool", "from-symbol", "to-symbol", "lp-raw"],
-    args: { ...FROM, ...MIN },
+    args: { ...FROM, ...SLIP, ...MIN },
     run: view("buildDebtSwap"),
   },
 ];

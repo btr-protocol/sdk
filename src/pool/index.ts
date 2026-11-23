@@ -539,7 +539,13 @@ export async function deposit(
   return sendPoolCall(provider, poolAddress, calldata, txValue(params.token, params.amount));
 }
 
-export { minLpOut } from './slippage';
+export {
+  minLpOut,
+  floorFromPreview,
+  slippageBps,
+  DEFAULT_SLIPPAGE_BPS,
+  MAX_SLIPPAGE_BPS,
+} from './slippage';
 
 /**
  * `functionName(args)` on the pool as `from` would run it right now: an `eth_call` of the real
