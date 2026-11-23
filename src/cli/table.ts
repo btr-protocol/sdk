@@ -244,7 +244,7 @@ export const TABLE: Cmd[] = [
   {
     name: "halts",
     description:
-      'Halt history (/v1/halts/{aggregate|pool|asset|leg|feed}, params "from=..&to=..&grain=..&pool=..&limit=.."; not yet live)',
+      'Halt history (/v1/halts/{aggregate|pool|asset|leg|feed}, params "from=..&to=..&grain=..&pool=..&limit=..")',
     kind: "read",
     pos: ["scope"],
     args: PARAMS,

@@ -42,8 +42,8 @@ export const fetchHealth = get<Rec>("/v1/health");
 /** Halt history scopes of `GET /v1/halts/{scope}`. */
 export type HaltScope = "aggregate" | "pool" | "asset" | "leg" | "feed";
 /**
- * `GET /v1/halts/{scope}` (query: from, to, grain, group, pool, asset, leg, feed, limit, before).
- * NOT YET LIVE: the gateway route is pending; until it ships this answers 404 (`notServed`).
+ * `GET /v1/halts/{scope}` (query: from, to, grain, group, pool, asset, leg, feed, limit, before);
+ * an unknown scope is a 404.
  */
 export const fetchHalts = (chainId: number, scope: HaltScope, query?: Query, o?: Opt) =>
   btrApi<Rec>(`/v1/halts/${seg(scope)}`, chainId, { ...o, query });

@@ -73,4 +73,5 @@ export * from "./oracle/index.js";
 // Eth utilities and clients
 export * from "./eth/index.js";
 export { createHttpProvider, privateKeyProvider, privateKeyToAddress } from "./eth/client.js";
+export * from "./calldata.js";
 export * from "./calls.js";
