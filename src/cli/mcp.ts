@@ -1,76 +1,60 @@
 #!/usr/bin/env bun
-// Read-only MCP server over stdio (newline-delimited JSON-RPC 2.0), bun only.
-// No signing, no tx sending.
+// MCP server over stdio (newline-delimited JSON-RPC 2.0), bun only. Tools = the shared command
+// table (./table.ts): reads + unsigned builds. No keys, no signing, no tx sending.
 import pkg from '../../package.json' with { type: 'json' };
-import {
-  type RegistryOpts,
-  fetchLiveAbi,
-  fetchAbis,
-  fetchRegistry,
-  rosterFor,
-} from '../venues/live.js';
-import { defaultChainId } from '../venues/registry.js';
+import type { RegistryOpts } from '../venues/live.js';
+import { CHAIN, type Cmd, TABLE, defaultChain, toJson, toolName } from './table.js';
 
 const PROTOCOL = '2024-11-05';
-const chainProp = {
-  chainId: { type: 'number', description: 'EVM chain id (default: baked default)' },
-};
-export const TOOLS = [
-  {
-    name: 'get_registry',
-    description: 'BTR contracts, tokens and pools for a chain (live API, verified against baked)',
-    inputSchema: { type: 'object', properties: chainProp },
+/** One tool per command-table entry: the CLI's exact capability set. */
+export const TOOLS = TABLE.map((c) => ({
+  name: toolName(c),
+  description: `[${c.kind}] ${c.description}`,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      chain: CHAIN,
+      ...Object.fromEntries((c.pos ?? []).map((p) => [p, { type: 'string', description: p }])),
+      ...Object.fromEntries(
+        Object.entries(c.args ?? {}).map(([k, v]) => [
+          k,
+          { type: v.type, description: v.description },
+        ]),
+      ),
+    },
+    required: [
+      ...(c.pos ?? []),
+      ...Object.entries(c.args ?? {})
+        .filter(([, v]) => v.required)
+        .map(([k]) => k),
+    ],
   },
-  {
-    name: 'get_abi',
-    description: 'ABI JSON for a BTR contract by name (e.g. Pool, Admin)',
-    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
-  },
-  {
-    name: 'list_pools',
-    description: 'Deployed BTR pools for a chain',
-    inputSchema: { type: 'object', properties: chainProp },
-  },
-  {
-    name: 'list_abis',
-    description: 'Index of ABI names served for a chain',
-    inputSchema: { type: 'object', properties: chainProp },
-  },
-  {
-    name: 'get_roster',
-    description: 'Keeper/signer roster for a chain',
-    inputSchema: { type: 'object', properties: chainProp },
-  },
-];
+}));
+const BY_TOOL = new Map<string, Cmd>(TABLE.map((c) => [toolName(c), c]));
 
 type Rec = Record<string, unknown>;
 
-function chainArg(a: Rec | undefined): number | undefined {
-  const c = a?.chainId;
-  if (c === undefined) return undefined;
-  if (typeof c !== 'number' || !Number.isInteger(c) || c <= 0)
-    throw new Error('chainId must be a positive integer');
-  return c;
-}
-
-async function call(name: unknown, a: Rec | undefined, o: RegistryOpts): Promise<unknown> {
-  const chain = chainArg(a);
-  if (name === 'get_abi') return fetchLiveAbi(String(a?.name), o, chain ?? defaultChainId());
-  if (name === 'list_abis') return fetchAbis(chain ?? defaultChainId(), o);
-  if (name === 'get_roster') return rosterFor(chain ?? defaultChainId(), o);
-  if (name === 'get_registry' || name === 'list_pools') {
-    const r = await fetchRegistry(chain, o);
-    return name === 'list_pools'
-      ? {
-          pools: r.pools,
-          otherPools: r.otherPools,
-          degraded: r.degraded,
-          source: r.source,
-          warnings: r.warnings,
-        }
-      : r;
+/** MCP arguments -> the CLI's `Args` shape, then the shared handler. */
+export async function call(name: unknown, a: Rec = {}, o: RegistryOpts = {}): Promise<unknown> {
+  const cmd = BY_TOOL.get(String(name));
+  if (!cmd) throw new Error(`unknown tool ${String(name)}`);
+  const c = a.chain;
+  if (c !== undefined && (typeof c !== 'number' || !Number.isInteger(c) || c <= 0))
+    throw new Error('chain must be a positive integer');
+  const pos = (cmd.pos ?? []).map((p) => {
+    const v = a[p];
+    if (v === undefined || v === null || v === '') throw new Error(`${p} is required`);
+    return String(v);
+  });
+  const flags = new Map<string, string>();
+  for (const [k, def] of Object.entries(cmd.args ?? {})) {
+    const v = a[k];
+    if (v === undefined || v === null || v === false) continue;
+    flags.set(k, def.type === 'object' && typeof v !== 'string' ? JSON.stringify(v) : String(v));
   }
-  throw new Error(`unknown tool ${String(name)}`);
+  return (
+    await cmd.run({ chain: (c as number | undefined) ?? (await defaultChain()), flags, pos, o })
+  ).data;
 }
 
 const isObj = (x: unknown): x is Rec => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -102,7 +86,7 @@ export async function handle(req: unknown, o: RegistryOpts = {}): Promise<unknow
           isObj(params.arguments) ? params.arguments : undefined,
           o,
         );
-        return ok({ content: [{ type: 'text', text: JSON.stringify(r) }] });
+        return ok({ content: [{ type: 'text', text: toJson(r) }] });
       } catch (e) {
         return ok({ isError: true, content: [{ type: 'text', text: (e as Error).message }] });
       }

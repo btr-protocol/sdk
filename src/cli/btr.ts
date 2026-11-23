@@ -1,23 +1,30 @@
 #!/usr/bin/env bun
-// `btr` CLI (bun only): the front's features in a terminal. Read-only views of the live API, plus
-// `swap` / `lp` that only BUILD unsigned call JSON. No keys, no signing, no broadcast.
-// Each command is imported on demand so startup stays flat. Data goes to `out`; usage, warnings and
-// errors go to stderr; exit 0 ok, 1 failure, 2 usage.
+// `btr` CLI (bun only): every entry of the shared command table (./table.ts), the same set `btr-mcp`
+// serves. Reads hit the live API; `build-*` only BUILD unsigned call JSON. No keys, no signing, no
+// broadcast. Data goes to `out`; usage, warnings and errors go to stderr; exit 0 ok, 1 failure, 2 usage.
 import type { RegistryOpts } from '../venues/live.js';
+import { TABLE, byName, defaultChain, toJson } from './table.js';
 
-const USAGE = `btr pools [--window 24h|7d|30d] [--address 0x..] [--json]   pool tree: APY, coverage, volume, TVL, position
-btr metrics [--window w] [--json]                           APR split (fee/hook/toll), deployed, TVL, volume
-btr risk [--window w] [--json]                              coverage, skew, oracle age, deployed, per-leg
-btr flow [--window w] [--json]                              LP deposits/withdrawals per leg
-btr keepers [--json]                                        role Safes, health, oracle age
-btr quote <IN> <OUT> <amount> [--slippage-bps 50] [--json] routed quote with server floor
-btr swap <IN> <OUT> <amount> --from 0x.. [--slippage-bps 50]   unsigned approve+swap calls (JSON)
-btr lp deposit|withdraw <pool-tag> <SYM> <amount> --from 0x.. --min-out <raw>   unsigned LP calls (JSON)
-btr pools --list [--json]                                   registry pool list (tag, address, symbols)
-btr registry [--json] | roster | abi <Name> | abis
-common: --chain <id>, --trust-live, --fallback-baked`;
+const usage = () =>
+  [
+    ...TABLE.map((c) => {
+      const pos = (c.pos ?? []).map((p) => `<${p}>`).join(' ');
+      const args = Object.entries(c.args ?? {})
+        .map(([k, v]) => (v.required ? `--${k} ..` : `[--${k} ..]`))
+        .join(' ');
+      return `btr ${[c.name, pos, args].filter(Boolean).join(' ')}\n    ${c.description}`;
+    }),
+    'common: --chain <id>, --json, --trust-live, --fallback-baked',
+  ].join('\n');
 
-const VALUE = new Set(['chain', 'window', 'address', 'from', 'slippage-bps', 'min-out']);
+const VALUE = new Set([
+  'chain',
+  ...TABLE.flatMap((c) =>
+    Object.entries(c.args ?? {})
+      .filter(([, v]) => v.type !== 'boolean')
+      .map(([k]) => k),
+  ),
+]);
 const err = (s: string) => console.error(s);
 
 export async function run(
@@ -26,7 +33,12 @@ export async function run(
   o: RegistryOpts = {},
 ): Promise<number> {
   try {
-    const [cmd, ...rest] = argv;
+    const [name, ...rest] = argv;
+    const cmd = name ? byName(name) : undefined;
+    if (!cmd) {
+      err(usage());
+      return 2;
+    }
     const flags = new Map<string, string>();
     const pos: string[] = [];
     for (let i = 0; i < rest.length; i++) {
@@ -38,67 +50,26 @@ export async function run(
         flags.set(t.slice(2), v);
       } else flags.set(t.slice(2), '1');
     }
-    const flag = (n: string) => flags.has(n);
     const chain = flags.has('chain') ? Number(flags.get('chain')) : undefined;
     if (chain !== undefined && !(Number.isInteger(chain) && chain > 0)) {
       err('--chain must be a positive integer');
       return 2;
     }
+    if (pos.length < (cmd.pos ?? []).length) {
+      err(usage());
+      return 2;
+    }
     const opts: RegistryOpts = {
       ...o,
-      trustLive: o.trustLive ?? flag('trust-live'),
-      fallback: o.fallback ?? (flag('fallback-baked') ? 'baked' : undefined),
+      trustLive: o.trustLive ?? flags.has('trust-live'),
+      fallback: o.fallback ?? (flags.has('fallback-baked') ? 'baked' : undefined),
     };
-    const reg = await import('../venues/registry.js');
-    const id = chain ?? reg.defaultChainId();
-    const a = { chain: id, flags, pos, o: opts, out };
-    if (cmd === 'pools' && flag('list')) {
-      // registry listing: tag, address, symbols (no metrics)
-      const r = await (await import('../venues/live.js')).fetchRegistry(chain, opts);
-      for (const w of r.warnings) err(`warning: ${w}`);
-      if (flag('json')) out(JSON.stringify(r.pools, null, 2));
-      else for (const p of r.pools) out(`${p.tag}\t${p.address}\t${p.symbols.join(',')}`);
-      return 0;
-    }
-    switch (cmd) {
-      case 'pools':
-      case 'metrics':
-      case 'risk':
-      case 'flow':
-      case 'keepers':
-      case 'quote':
-      case 'swap':
-      case 'lp':
-        return await (await import('./cmds.js'))[cmd](a);
-      case 'abi':
-      case 'abis':
-      case 'roster':
-      case 'registry': {
-        const live = await import('../venues/live.js');
-        if (cmd === 'abi') {
-          if (!pos[0]) {
-            err(USAGE);
-            return 2;
-          }
-          out(JSON.stringify(await live.fetchLiveAbi(pos[0], opts, id)));
-        } else if (cmd === 'abis') out(JSON.stringify(await live.fetchAbis(id, opts), null, 2));
-        else if (cmd === 'roster') out(JSON.stringify(await live.rosterFor(id, opts), null, 2));
-        else {
-          const r = await live.fetchRegistry(chain, opts);
-          for (const w of r.warnings) err(`warning: ${w}`);
-          if (r.degraded) err('warning: registry reports degraded (roster/abis may be missing)');
-          if (flag('json')) out(JSON.stringify(r, null, 2));
-          else {
-            out(`chain ${r.chainId} (${r.source})`);
-            for (const [k, v] of Object.entries(r.contracts)) out(`${k}\t${v}`);
-          }
-        }
-        return 0;
-      }
-      default:
-        err(USAGE);
-        return 2;
-    }
+    const r = await cmd.run({ chain: chain ?? (await defaultChain()), flags, pos, o: opts });
+    const w = (r.data as { warnings?: unknown })?.warnings;
+    if (Array.isArray(w)) for (const x of w) err(`warning: ${x}`);
+    if (r.text && !flags.has('json')) for (const l of r.text) out(l);
+    else out(toJson(r.data, 2));
+    return 0;
   } catch (e) {
     err(`btr: ${(e as Error).message}`);
     return 1;

@@ -146,6 +146,6 @@ describe('commands (mock API)', () => {
   test('usage + bad args', async () => {
     expect((await exec(['nope'], {})).code).toBe(2);
     expect((await exec(['pools', '--window', '9y'], routes)).code).toBe(1);
-    expect((await exec(['lp', 'deposit'], {})).code).toBe(1);
+    expect((await exec(['build-deposit'], {})).code).toBe(2);
   });
 });

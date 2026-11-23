@@ -58,21 +58,21 @@ test('mcp: parse error, invalid request, bad chainId, tools', async () => {
   expect(await handle([1])).toMatchObject({ id: null, error: { code: -32600 } });
   expect(await handle('x')).toMatchObject({ error: { code: -32600 } });
   const call = (args: unknown) =>
-    handle({ id: 2, method: 'tools/call', params: { name: 'list_pools', arguments: args } }, real);
-  expect(await call({ chainId: -1 })).toMatchObject({ result: { isError: true } });
-  expect(await call({ chainId: '143' })).toMatchObject({ result: { isError: true } });
-  const ok: any = await call({ chainId: 143 });
+    handle({ id: 2, method: 'tools/call', params: { name: 'pool_list', arguments: args } }, real);
+  expect(await call({ chain: -1 })).toMatchObject({ result: { isError: true } });
+  expect(await call({ chain: '143' })).toMatchObject({ result: { isError: true } });
+  const ok: any = await call({ chain: 143 });
   expect(JSON.parse(ok.result.content[0].text).source).toBe('live');
   const init: any = await handle({ id: 1, method: 'initialize', params: { protocolVersion: '1' } });
   expect(init.result.protocolVersion).toBe('2024-11-05');
   const list: any = await handle({ id: 3, method: 'tools/list' });
-  expect(list.result.tools.map((t: any) => t.name)).toContain('get_roster');
+  expect(list.result.tools.map((t: any) => t.name)).toContain('roster');
 });
 
 test('cli: exit codes and roster', async () => {
   const lines: string[] = [];
   const out = (s: string) => lines.push(s);
-  expect(await run(['pools', '--list', '--chain', '143'], out, real)).toBe(0);
+  expect(await run(['pool-list', '--chain', '143'], out, real)).toBe(0);
   expect(lines[0]).toContain(fixture.pools[0]!.address);
   expect(await run(['pools', '--chain', '-5'], out, real)).toBe(2);
   expect(await run(['registry', '--chain', '143'], out, tampered())).toBe(1);
@@ -115,13 +115,13 @@ test('degraded with null roster/abis does not throw', async () => {
   expect(r.degraded).toBe(true);
   expect(r.roster).toBeNull();
   expect(r.abis).toBeNull();
-  // get_roster falls back to /v1/roster when nothing is embedded
+  // roster falls back to /v1/roster when nothing is embedded
   const f = (async (u: string) =>
     new Response(
       JSON.stringify(String(u).includes('/v1/roster') ? { safes: ['x'] } : j),
     )) as unknown as typeof fetch;
   const res: any = await handle(
-    { id: 1, method: 'tools/call', params: { name: 'get_roster', arguments: { chainId: 143 } } },
+    { id: 1, method: 'tools/call', params: { name: 'roster', arguments: { chain: 143 } } },
     { fetch: f },
   );
   expect(JSON.parse(res.result.content[0].text)).toMatchObject({
@@ -130,14 +130,14 @@ test('degraded with null roster/abis does not throw', async () => {
   });
 });
 
-test('mcp list_abis and requests hit /v1/registry', async () => {
+test('mcp abis and requests hit /v1/registry', async () => {
   const urls: string[] = [];
   const f = (async (u: string) => {
     urls.push(String(u));
     return new Response(JSON.stringify(String(u).includes('/v1/abis') ? abisIndex : fixture));
   }) as unknown as typeof fetch;
   const res: any = await handle(
-    { id: 1, method: 'tools/call', params: { name: 'list_abis', arguments: { chainId: 143 } } },
+    { id: 1, method: 'tools/call', params: { name: 'abis', arguments: { chain: 143 } } },
     { fetch: f },
   );
   expect(JSON.parse(res.result.content[0].text).names).toContain('Pool');
@@ -149,7 +149,7 @@ test('mcp list_abis and requests hit /v1/registry', async () => {
 test('wrong-chain roster/abis and duplicate pool tags are refused', async () => {
   const wrong = { ...fixture, roster: { ...fixture.roster, chainId: 1 } };
   const res: any = await handle(
-    { id: 1, method: 'tools/call', params: { name: 'get_roster', arguments: { chainId: 143 } } },
+    { id: 1, method: 'tools/call', params: { name: 'roster', arguments: { chain: 143 } } },
     { fetch: mock(wrong) },
   );
   expect(res.result.isError).toBe(true);

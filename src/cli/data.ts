@@ -1,35 +1,34 @@
-// Data layer for the `btr` CLI: live API reads only (/v1/summary, /v1/roster, ...), no keys, no sends.
-import { getApiRoot, withChainId } from '../api.js';
 import type { Eip1193Provider } from '../eth/types.js';
+// Data layer for the `btr` CLI: live API reads only (/v1/summary, /v1/roster, ...), no keys, no sends.
+import { btrApi } from '../protocol.js';
 import type { RegistryOpts } from '../venues/live.js';
 
 export type Rec = Record<string, any>; // untyped wire JSON
 
-export async function api(
-  path: string,
-  chain: number,
-  o: RegistryOpts,
-  init?: RequestInit,
-): Promise<any> {
-  const f = o.fetch ?? fetch;
-  const res = await f(`${o.base ?? getApiRoot()}${withChainId(path, chain)}`, {
-    ...init,
-    signal: AbortSignal.timeout(o.timeoutMs ?? 15_000),
-  });
-  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-  return res.json();
-}
+/** One `/v1/*` call through the SDK's generic (`btrApi`), honouring the CLI's injected fetch/base. */
+export const io = (o: RegistryOpts) => ({
+  fetch: o.fetch as typeof fetch | undefined,
+  base: o.base,
+  timeoutMs: o.timeoutMs,
+});
+export const api = (path: string, chain: number, o: RegistryOpts, body?: unknown): Promise<Rec> =>
+  btrApi(path, chain, { ...io(o), body });
+
+const CALL_GAS = '0x989680'; // 10M: the relay's anonymous eth_call cap
 
 /** Read-only JSON-RPC relay (`/v1/rpc`): the same one the front uses. */
 export function rpcProvider(chain: number, o: RegistryOpts): Eip1193Provider {
   let id = 0;
   return {
     async request({ method, params }) {
-      const j = await api('/v1/rpc', chain, o, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params: params ?? [] }),
-      });
+      const ps = (params ?? []) as unknown[];
+      // The relay refuses an anonymous eth_call without `gas` (and over its anon cap, 10M).
+      const call = ps[0] as Rec | undefined;
+      const sent =
+        method === 'eth_call' && call && call.gas === undefined
+          ? [{ ...call, gas: CALL_GAS }, ...ps.slice(1)]
+          : ps;
+      const j = await api('/v1/rpc', chain, o, { jsonrpc: '2.0', id: ++id, method, params: sent });
       if (j.error) throw new Error(`rpc ${method}: ${j.error.message ?? 'error'}`);
       return j.result;
     },

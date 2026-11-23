@@ -1,0 +1,226 @@
+import { afterAll, describe, expect, test } from 'bun:test';
+import { POOL_ABI } from '../abis/Pool.js';
+import { type AbiParameter, encodeAbiParameters, encodeFn } from '../eth/abi.js';
+import { ERC20_ABI } from '../eth/erc20.js';
+import type { Address } from '../eth/types.js';
+import { buildSwapLiabilityCalls, depositCallData } from '../router/index.js';
+import { run } from './btr.ts';
+import { call, handle } from './mcp.ts';
+import { TABLE, toolName } from './table.ts';
+
+const FROM = '0x00000000000000000000000000000000000000aa';
+const dummy = (p: string) => (p === 'amount' || p === 'lp-raw' ? '1' : `x-${p}`);
+const cliArgv = (c: (typeof TABLE)[number]) => [
+  c.name,
+  ...(c.pos ?? []).map(dummy),
+  ...Object.entries(c.args ?? {})
+    .filter(([, v]) => v.required)
+    .flatMap(([k, v]) => [`--${k}`, v.type === 'object' ? '{}' : '1']),
+];
+const mcpArgs = (c: (typeof TABLE)[number]) => ({
+  ...Object.fromEntries((c.pos ?? []).map((p) => [p, dummy(p)])),
+  ...Object.fromEntries(
+    Object.entries(c.args ?? {})
+      .filter(([, v]) => v.required)
+      .map(([k, v]) => [k, v.type === 'object' ? {} : '1']),
+  ),
+});
+
+describe('one table drives CLI and MCP', () => {
+  const real = TABLE.map((c) => c.run);
+  afterAll(() => TABLE.forEach((c, i) => (c.run = real[i])));
+  for (const c of TABLE)
+    c.run = async (a) => ({ data: { hit: c.name, pos: a.pos, flags: [...a.flags] } });
+
+  test('every entry is a CLI command', async () => {
+    for (const c of TABLE) {
+      const lines: string[] = [];
+      expect(await run([...cliArgv(c), '--chain', '143'], (s) => lines.push(s))).toBe(0);
+      expect(JSON.parse(lines.join('\n')).hit).toBe(c.name);
+    }
+  });
+  test('every entry is an MCP tool with the same handler and args', async () => {
+    const list = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' })) as {
+      result: { tools: { name: string; inputSchema: { required: string[] } }[] };
+    };
+    expect(list.result.tools.map((t) => t.name)).toEqual(TABLE.map(toolName));
+    for (const c of TABLE) {
+      const r = (await call(toolName(c), { chain: 143, ...mcpArgs(c) })) as {
+        hit: string;
+        pos: string[];
+      };
+      expect(r.hit).toBe(c.name);
+      expect(r.pos).toEqual((c.pos ?? []).map(dummy));
+    }
+  });
+  test('required capabilities present; builds are the only build kind', () => {
+    const names = TABLE.map(toolName);
+    for (const n of [
+      'pools',
+      'metrics',
+      'risk',
+      'flow',
+      'keepers',
+      'quote',
+      'depth',
+      'lp_preview',
+      'debt_swap_quote',
+      'lp_rows',
+      'build_swap',
+      'build_approve',
+      'build_deposit',
+      'build_withdraw',
+      'build_debt_swap',
+      'registry',
+      'pool_list',
+      'roster',
+      'abi',
+      'abis',
+      'timeseries',
+      'liquidity',
+      'activity',
+      'pool_params',
+      'density',
+      'oracle_pushes',
+      'safety_history',
+      'safety_breakers',
+      'md_tickers',
+      'md_price',
+      'md_ohlc',
+      'assets',
+      'pool_assets',
+      'pool_metrics',
+      'indicators',
+    ])
+      expect(names).toContain(n);
+    expect(TABLE.filter((c) => c.kind === 'build').every((c) => c.name.startsWith('build-'))).toBe(
+      true,
+    );
+  });
+  test('missing positional: CLI usage 2, MCP error', async () => {
+    expect(await run(['build-deposit'], () => {})).toBe(2);
+    await expect(call('build_deposit', {})).rejects.toThrow('required');
+  });
+});
+
+// ── builders: CLI/MCP output equals the SDK builders ────────────────────────────
+const POOL = '0xbbbbbbbd7060b1CED79c381eAD40d73FcB9Ae0C6' as Address;
+const outputs = (POOL_ABI as readonly { name?: string; outputs?: AbiParameter[] }[]).find(
+  (f) => f.name === 'getAsset',
+)?.outputs as AbiParameter[];
+const asset = encodeAbiParameters(outputs, [
+  {
+    reserves: 0n,
+    liabilities: 0n,
+    anchor: '0x0000000000000000000000000000000000000000',
+    minLiquidity: 0n,
+    liquidityIndexWad: 10n ** 18n,
+    minDispersionPbps: 0n,
+    curveId: 0n,
+    minFeePbps: 0n,
+    vegaBps: 0n,
+    depositCapCode: 0n,
+    decimals: 6n,
+    deadSeedPow10: 0n,
+    flags: 0n,
+    maxLiabWeightBps: 0n,
+    oracleBits: 0n,
+    covBits: 0n,
+    kneeBits: 0n,
+  },
+]);
+const fetchMock = (async (url: string) =>
+  String(url).includes('/v1/rpc')
+    ? new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: asset }))
+    : new Response('', { status: 500 })) as unknown as typeof fetch;
+const o = { fetch: fetchMock, base: 'http://x', fallback: 'baked' as const };
+const build = async (argv: string[]) => {
+  const lines: string[] = [];
+  const code = await run(argv, (s) => lines.push(s), o);
+  expect(code).toBe(0);
+  return JSON.parse(lines.join('\n'));
+};
+const tok = async (s: string) =>
+  (await (await import('../venues/live.js')).fetchRegistry(143, o)).tokens[s] as Address;
+
+describe('build calldata = SDK builders', () => {
+  test('build-deposit', async () => {
+    const r = await build([
+      'build-deposit',
+      'btr-core',
+      'USDC',
+      '2.5',
+      '--from',
+      FROM,
+      '--min-out',
+      '7',
+      '--chain',
+      '143',
+    ]);
+    const usdc = await tok('USDC');
+    expect(r.calls).toEqual([
+      {
+        to: usdc,
+        data: encodeFn({ abi: ERC20_ABI, functionName: 'approve', args: [POOL, 2_500_000n] }),
+        value: '0',
+      },
+      { to: POOL, data: depositCallData(usdc, 2_500_000n, 7n), value: '0' },
+    ]);
+    const m = (await call(
+      'build_deposit',
+      { chain: 143, pool: 'btr-core', symbol: 'USDC', amount: '2.5', from: FROM, 'min-out': '7' },
+      o,
+    )) as { calls: unknown[] };
+    expect(
+      JSON.parse(JSON.stringify(m.calls, (_, x) => (typeof x === 'bigint' ? x.toString() : x))),
+    ).toEqual(r.calls);
+  });
+  test('build-debt-swap', async () => {
+    const r = await build([
+      'build-debt-swap',
+      'btr-core',
+      'USDC',
+      'AUSD',
+      '1000',
+      '--from',
+      FROM,
+      '--min-out',
+      '990',
+      '--chain',
+      '143',
+    ]);
+    expect(r.calls).toHaveLength(1);
+    const [usdc, ausd] = [await tok('USDC'), await tok('AUSD')];
+    // deadline is read at build time: compare everything but the last word
+    const sdk = buildSwapLiabilityCalls(POOL, {
+      tokenFrom: usdc,
+      tokenTo: ausd,
+      lpAmountIn: 1000n,
+      minLpAmountOut: 990n,
+    });
+    expect(r.calls[0].to).toBe(POOL);
+    expect(r.calls[0].data.slice(0, -64)).toBe(sdk[0].data.slice(0, -64));
+  });
+  test('build-withdraw encodes Pool.withdraw', async () => {
+    const r = await build([
+      'build-withdraw',
+      'btr-core',
+      'USDC',
+      '1',
+      '--from',
+      FROM,
+      '--min-out',
+      '5',
+      '--chain',
+      '143',
+    ]);
+    const dl = BigInt(`0x${r.calls[0].data.slice(-64)}`);
+    expect(r.calls[0].data).toBe(
+      encodeFn({
+        abi: POOL_ABI,
+        functionName: 'withdraw',
+        args: [await tok('USDC'), 1_000_000n, 5n, dl],
+      }),
+    );
+  });
+});
