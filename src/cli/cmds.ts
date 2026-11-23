@@ -664,20 +664,15 @@ export async function buildWithdraw(a: Args): Promise<Res> {
   slipArg(a);
   const t = await resolve(a, sym, tag);
   const lp = rawArg(raw, "lp-raw");
-  const [{ encodeFn }, { POOL_ABI }, { sendDeadline }] = await Promise.all([
-    import("../eth/abi.js"),
-    import("../abis/Pool.js"),
+  const [{ withdrawCallData }, { sendDeadline }] = await Promise.all([
+    import("../calldata.js"),
     import("../pool/index.js"),
   ]);
   const f = await lpFloor(
     a,
     async () => (await previewWithdraw(a, t.pool.address, t.address, lp))[0],
   );
-  const data = encodeFn({
-    abi: POOL_ABI,
-    functionName: "withdraw",
-    args: [t.address, lp, f.floor, sendDeadline()],
-  });
+  const data = withdrawCallData(t.address, lp, f.floor, sendDeadline());
   return {
     data: {
       chainId: a.chain,

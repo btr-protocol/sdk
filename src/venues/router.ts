@@ -8,11 +8,10 @@ import {
   type Eip1193Provider,
   type Hex,
   RpcRevertError,
-  encodeFn,
   zeroAddress,
 } from '../eth/index.js';
 import { type MulticallResult, multicall } from '../eth/multicall.js';
-import { approveCallData } from '../calldata.js';
+import { approveCallData, swapQeCallData } from '../calldata.js';
 import { POOL_ABI, type SwapQuote, defaultDeadline, sendDeadline } from '../pool/index.js';
 import { type VenueKind, eqAddr, hasToken, staticVenuePools } from './registry.js';
 
@@ -169,24 +168,11 @@ export async function quoteAllExactIn(opts: QuoteBestOpts): Promise<VenueLegQuot
         tokenOut,
         amountIn,
         amountOut: q.amountOut,
-        calldata: swapCalldata(tokenIn, tokenOut, amountIn, minOut, recipient),
+        calldata: swapQeCallData(tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()),
       },
     ];
   });
 }
-
-const swapCalldata = (
-  tokenIn: Address,
-  tokenOut: Address,
-  amountIn: bigint,
-  minOut: bigint,
-  recipient: Address,
-): Hex =>
-  encodeFn({
-    abi: POOL_ABI,
-    functionName: 'swap_qe',
-    args: [tokenIn, tokenOut, amountIn, minOut, recipient, defaultDeadline()],
-  });
 
 /** Selector and byte length of `swap_qe(address,address,uint256,uint256,address,uint256)`. */
 const SWAP_SELECTOR = getSelector(

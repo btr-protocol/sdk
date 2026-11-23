@@ -14,35 +14,23 @@
 // under `Multicall3.aggregate3` is the Multicall3 contract (no funds, no allowance) → revert. The
 // calls must originate from the user account. `Router` is not subject to this: it holds the pull
 // itself, which is the point of deploying it.
-import { POOL_ABI } from '../abis/Pool.js';
 import {
   approveCallData,
   depositCallData,
+  routerSwapCallData,
   swapLiabilityCallData,
+  swapQeCallData,
+  unwrapCallData,
   withdrawCallData,
+  withdrawToCallData,
+  wrapCallData,
 } from '../calldata.js';
-import { ROUTER_ABI } from '../abis/Router.js';
-import { encodeFn } from '../eth/abi.js';
-import type { Abi } from '../eth/abi.js';
 import type { TxCall } from '../eth/send.js';
 import type { Address } from '../eth/types.js';
 import { sendDeadline } from '../pool/index.js';
 import { toUnits } from '../utils/format.js';
 import { applySlip } from '../utils/maths.js';
 import { type SwapPlan, assertSlip } from './route.js';
-
-/** WETH9 wrap/unwrap. The pool NEVER sees the gas token: it is wrapped and unwrapped by the user's
- *  own account inside the same batch, so no pool-side native path (and no contract change) is used. */
-const WNATIVE_ABI: Abi = [
-  { name: 'deposit', type: 'function', stateMutability: 'payable', inputs: [], outputs: [] },
-  {
-    name: 'withdraw',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'wad', type: 'uint256' }],
-    outputs: [],
-  },
-];
 
 /** One executable swap leg. For a split, pass several (parallel, each funded from the user's tokenIn).
  *  For a cross-pool 2-hop the caller passes two legs where leg2.amountIn is set conservatively to
@@ -279,13 +267,13 @@ function approveCall(token: Address, spender: Address, amount: bigint): ExecCall
 }
 
 function wrapDepositCall(wnative: Address, value: bigint): ExecCall {
-  return { to: wnative, data: encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' }), value };
+  return { to: wnative, data: wrapCallData(), value };
 }
 
 function unwrapCall(wnative: Address, amount: bigint): ExecCall {
   return {
     to: wnative,
-    data: encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [amount] }),
+    data: unwrapCallData(amount),
     value: 0n,
   };
 }
@@ -628,11 +616,14 @@ export function buildSwapExecCalls(legs: ExecLeg[], opts: BuildOpts): ExecCall[]
   const deadline = swapDeadline(opts);
   const swaps: ExecCall[] = legs.map((leg) => ({
     to: leg.pool,
-    data: encodeFn({
-      abi: POOL_ABI,
-      functionName: 'swap_qe',
-      args: [leg.tokenIn, leg.tokenOut, leg.amountIn, leg.minOut, opts.recipient, deadline],
-    }),
+    data: swapQeCallData(
+      leg.tokenIn,
+      leg.tokenOut,
+      leg.amountIn,
+      leg.minOut,
+      opts.recipient,
+      deadline,
+    ),
     value: 0n,
   }));
   const unwrap: ExecCall[] =
@@ -750,11 +741,13 @@ export function buildRedeemCalls(
     return [
       {
         to: pool,
-        data: encodeFn({
-          abi: POOL_ABI,
-          functionName: 'withdrawTo',
-          args: [args.tokenFrom, args.tokenTo, args.lpAmount, args.minAmountOut, deadline],
-        }),
+        data: withdrawToCallData(
+          args.tokenFrom,
+          args.tokenTo,
+          args.lpAmount,
+          args.minAmountOut,
+          deadline,
+        ),
         value: 0n,
       },
     ];
@@ -1051,11 +1044,7 @@ export function buildRouterSwapExecCalls(
   const calls: ExecCall[] = [
     {
       to: router,
-      data: encodeFn({
-        abi: ROUTER_ABI,
-        functionName: 'swap',
-        args: [rp.parts, rp.floors, opts.recipient, deadline],
-      }),
+      data: routerSwapCallData(rp.parts, rp.floors, opts.recipient, deadline),
       value: 0n,
     },
   ];

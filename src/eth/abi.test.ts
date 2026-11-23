@@ -86,7 +86,7 @@ describe('no hand-maintained mirrors of on-chain signatures', () => {
       'eth/erc7540.ts',
       'eth/layerzero-oft.ts',
       'eth/abi.ts', // type declarations, not fragments
-      'router/index.ts', // WNATIVE_ABI (WETH9 wrap/unwrap)
+      'eth/weth.ts', // WETH9 wrap/unwrap
     ]);
     const src = new URL('..', import.meta.url).pathname;
     const offenders = [...new Bun.Glob('**/*.ts').scanSync({ cwd: src })]

@@ -4,8 +4,10 @@
  */
 
 import { POOL_ABI } from './abis/Pool.js';
+import { ROUTER_ABI } from './abis/Router.js';
 import { type Abi, encodeFn } from './eth/abi.js';
 import { ERC20_ABI } from './eth/erc20.js';
+import { WNATIVE_ABI } from './eth/weth.js';
 import type { Address, Hex } from './eth/types.js';
 
 /** `approve(spender, amount)`: the one ERC-20 approve encoder (router legs, pool deposits, front). */
@@ -51,3 +53,45 @@ export const withdrawCallData = (
     functionName: 'withdraw',
     args: [token, lpAmount, minAmountOut, deadline],
   });
+
+/** `swap_qe(tokenIn, tokenOut, amountIn, minOut, recipient, deadline)`: the one pool swap encoder. */
+export const swapQeCallData = (
+  tokenIn: Address,
+  tokenOut: Address,
+  amountIn: bigint,
+  minOut: bigint,
+  recipient: Address,
+  deadline: bigint,
+): Hex =>
+  encodeFn({
+    abi: POOL_ABI,
+    functionName: 'swap_qe',
+    args: [tokenIn, tokenOut, amountIn, minOut, recipient, deadline],
+  });
+
+/** `withdrawTo(tokenFrom, tokenTo, lpAmount, minAmountOut, deadline)`: the one cross-leg exit encoder. */
+export const withdrawToCallData = (
+  tokenFrom: Address,
+  tokenTo: Address,
+  lpAmount: bigint,
+  minAmountOut: bigint,
+  deadline: bigint,
+): Hex =>
+  encodeFn({
+    abi: POOL_ABI,
+    functionName: 'withdrawTo',
+    args: [tokenFrom, tokenTo, lpAmount, minAmountOut, deadline],
+  });
+
+/** Router `swap(parts, floors, recipient, deadline)`. */
+export const routerSwapCallData = (
+  parts: readonly unknown[],
+  floors: readonly unknown[],
+  recipient: Address,
+  deadline: bigint,
+): Hex =>
+  encodeFn({ abi: ROUTER_ABI, functionName: 'swap', args: [parts, floors, recipient, deadline] });
+
+export const wrapCallData = (): Hex => encodeFn({ abi: WNATIVE_ABI, functionName: 'deposit' });
+export const unwrapCallData = (amount: bigint): Hex =>
+  encodeFn({ abi: WNATIVE_ABI, functionName: 'withdraw', args: [amount] });
