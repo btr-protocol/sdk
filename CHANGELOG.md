@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.0 - 2026-11-23
+
+### Added
+
+- Full front parity across SDK, CLI and MCP: typed `/v1` read fetchers (summary, timeseries, activity,
+  liquidity, pool params/metrics, density, oracle pushes, safety, assets, md tickers/price/ohlc,
+  indicators), `lpRows`, standalone `buildSwapLiabilityCalls`, root `btrFetch`/`btrFetchRaw`/`btrApi`.
+- One command table drives both `btr` and `btr-mcp` (41 tools). Builds (`build-swap`, `build-approve`,
+  `build-deposit`, `build-withdraw`, `build-debt-swap`) return unsigned `{from,to,data,value}` only.
+- LP and debt-swap floors derive from an on-chain preview; `--slippage-bps` (front default/cap),
+  MCP cap 500 bps; every build reports `lossBps`.
+
+### Changed (breaking)
+
+- CLI `swap`, `lp deposit|withdraw`, `pools --list` -> `build-swap`, `build-deposit`, `build-withdraw`,
+  `pool-list`. MCP `get_registry`, `list_pools`, `get_roster`, `get_abi`, `list_abis` -> `registry`,
+  `pool_list`, `roster`, `abi`, `abis`; MCP arg `chainId` -> `chain`. `build-withdraw` takes raw LP shares.
+
+### Fixed
+
+- Route checks refuse non-positive hop amounts, chained-hop amount mismatches and any leg or approval
+  above the requested input; swap slippage applies once per route, not per hop.
+- CLI RPC calls send `gas` (relay refuses anonymous `eth_call` without it).
+
 ## 0.7.0 - 2026-11-22
 
 ### Added

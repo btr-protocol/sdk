@@ -4,13 +4,13 @@
   "title": "BTR",
   "description": "Read-only BTR DEX MCP server: registry, pools, keeper roster and ABIs. No signing.",
   "repository": { "url": "https://github.com/btr-protocol/sdk", "source": "github" },
-  "version": "0.7.0",
+  "version": "0.8.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@btr-protocol/sdk",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "runtimeHint": "bunx",
       "transport": { "type": "stdio" }
     }
