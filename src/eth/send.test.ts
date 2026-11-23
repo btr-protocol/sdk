@@ -6,6 +6,7 @@ import {
   type SendOpts,
   type SendStack,
   batchModeOf,
+  broadcast,
   canBundle,
   isBatchRefused,
   send,
@@ -253,7 +254,7 @@ describe('wire bytes', () => {
       ]),
     );
   });
-  test('a stack broadcasts exactly the request its sendOne built', async () => {
+  test('broadcast() sends exactly the request it is given', async () => {
     const wire: unknown[] = [];
     const p: Eip1193Provider = {
       request: async (a) => {
@@ -262,9 +263,7 @@ describe('wire bytes', () => {
       },
     };
     const tx = { from: T, to: T, data: '0xdeadbeef', gas: '0x5208', chainId: '0x8f' };
-    const { d } = rig(false, null, { sendOne: (_c, _i, _n, b) => b(tx) });
-    const [r] = await send(p, [swap], { stack: d });
-    expect(r.hash).toBe('0xabc');
+    expect(await broadcast(p)(tx)).toBe('0xabc');
     expect(wire).toEqual([{ method: 'eth_sendTransaction', params: [tx] }]);
   });
   test('no stack: estimate, then eth_sendTransaction with the buffered gas', async () => {

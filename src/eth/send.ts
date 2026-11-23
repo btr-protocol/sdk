@@ -23,31 +23,35 @@ export interface TxCall {
 }
 
 export interface SendOpts<C extends TxCall = TxCall> {
-  /** Refuse (nothing sent) when the wallet is on another chain. */
+  /** Refuse (nothing sent) when the wallet is on another chain. Checked on both paths. */
   expectedChainId?: number;
-  /** ABIs whose custom errors an estimate revert is decoded against. */
+  /** ABIs whose custom errors an estimate revert is decoded against. Plain path only. */
   abis?: readonly Abi[];
-  /** Prefix of a decoded revert's message: `${label} reverted: Name(args)`. */
+  /** Prefix of a decoded revert's message: `${label} reverted: Name(args)`. Plain path only. */
   label?: string;
-  /** false: return after each send, no receipt wait. */
+  /** false: return after each send, no receipt wait. Plain path only. */
   wait?: boolean;
+  /** Receipt wait, ms. Plain path only. */
   timeout?: number;
   /** A wallet's send stack (EIP-5792 bundle, simulation, prompts). Omitted: one plain
    *  estimate + `eth_sendTransaction` + receipt per call, never a bundle. */
   stack?: SendStack<C>;
-  /** Partial execution strands funds: an atomic bundle when the stack allows it, else sequential. */
+  /** Stack only. Partial execution strands funds: an atomic bundle when the stack allows it, else sequential. */
   requireAtomic?: boolean;
-  /** Ignore `stack.eip5792` (a swap UX preference, not a policy for a treasury claim). */
+  /** Stack only. Ignore `stack.eip5792` (a swap UX preference, not a policy for a treasury claim). */
   ignoreSetting?: boolean;
-  /** The calls go one at a time: awaited before any prompt (throw to abort, nothing sent). */
+  /** Stack only. The calls go one at a time: awaited before any prompt (throw to abort, nothing sent). */
   onSequential?: () => void | Promise<void>;
-  /** Each sequential leg's hash as soon as it is known (a later leg may still fail). */
+  /** Stack only. Each sequential leg's hash as soon as it is known (a later leg may still fail). */
   onHash?: (h: Hex) => void;
 }
 
-/** The one raw broadcast: `eth_sendTransaction` of the final request, nothing added. A stack's
- *  `sendOne` gets it as its only way to reach the wallet. */
+/** The one raw broadcast: `eth_sendTransaction` of the final request, nothing added. */
 export type Broadcast = (tx: Record<string, unknown>) => Promise<Hex>;
+export const broadcast =
+  (provider: Eip1193Provider): Broadcast =>
+  (tx) =>
+    provider.request({ method: 'eth_sendTransaction', params: [tx] }) as Promise<Hex>;
 
 /** What a wallet UI plugs into {@link send}: every hook it needs, no default policy hidden. */
 export interface SendStack<C extends TxCall = TxCall> {
@@ -61,7 +65,7 @@ export interface SendStack<C extends TxCall = TxCall> {
   sendBundle: (calls: C[]) => Promise<Hex[]>;
   /** Head-pinned simulation of the full plan, before the first prompt. */
   preflight: () => Promise<void>;
-  sendOne: (c: C, i: number, n: number, broadcast: Broadcast) => Promise<Hex>;
+  sendOne: (c: C, i: number, n: number) => Promise<Hex>;
   notify: (msg: string) => void;
   /** Undo the overlay's prompt count after a bundle was refused. */
   rewind: () => void;
@@ -183,10 +187,15 @@ export async function send<C extends TxCall>(
   calls: readonly C[],
   opts: SendOpts<C> = {},
 ): Promise<SendResult[]> {
-  const broadcast: Broadcast = (tx) =>
-    provider.request({ method: 'eth_sendTransaction', params: [tx] }) as Promise<Hex>;
+  if (opts.expectedChainId !== undefined) {
+    const chainId = await getChainId(provider);
+    if (chainId !== opts.expectedChainId)
+      throw new Error(
+        `chain mismatch: endpoint reports ${chainId}, expected ${opts.expectedChainId}`,
+      );
+  }
   const d = opts.stack;
-  if (!d) return sendPlain(provider, calls, opts, broadcast);
+  if (!d) return sendPlain(provider, calls, opts);
   const setting = opts.ignoreSetting ? undefined : d.eip5792;
   const mode = setting === false ? null : await d.resolveMode();
   const probe = !!opts.requireAtomic && d.isWalletConnect;
@@ -206,7 +215,7 @@ export async function send<C extends TxCall>(
   const out: SendResult[] = [];
   for (let i = 0; i < calls.length; i++) {
     try {
-      const hash = await d.sendOne(calls[i], i, calls.length, broadcast);
+      const hash = await d.sendOne(calls[i], i, calls.length);
       out.push({ hash });
       opts.onHash?.(hash);
     } catch (e) {
@@ -223,15 +232,7 @@ async function sendPlain(
   provider: Eip1193Provider,
   calls: readonly TxCall[],
   opts: Omit<SendOpts, 'stack'>,
-  broadcast: Broadcast,
 ): Promise<SendResult[]> {
-  if (opts.expectedChainId !== undefined) {
-    const chainId = await getChainId(provider);
-    if (chainId !== opts.expectedChainId)
-      throw new Error(
-        `chain mismatch: endpoint reports ${chainId}, expected ${opts.expectedChainId}`,
-      );
-  }
   const [from] = await getAccounts(provider);
   if (!from) throw new Error('No account connected');
   const out: SendResult[] = [];
@@ -243,7 +244,7 @@ async function sendPlain(
     } catch (e) {
       throw decodeRevert(opts.abis ?? [], e, opts.label ?? 'call');
     }
-    const hash = await broadcast({ ...tx, gas: hex(gas) });
+    const hash = await broadcast(provider)({ ...tx, gas: hex(gas) });
     if (opts.wait === false) {
       out.push({ hash });
       continue;

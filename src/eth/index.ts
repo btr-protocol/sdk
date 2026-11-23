@@ -101,6 +101,7 @@ export {
   type SendResult,
   type SendStack,
   type Broadcast,
+  broadcast,
   type BatchMode,
   type CapEntry,
   TxRevertedError,
