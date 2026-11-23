@@ -20,10 +20,15 @@ The SDK is the single gateway for every BTR API read, chain read and write (fron
   `decodeRevert(abis, e, label)`.
 - Call builders returning `TxCall` (`calls.ts`, root export): `fnCall`, `PoolToken`,
   `batchRiskOpCall`, `claimTreasuryCalls`, `faucetClaimCalls`, `faucetRegisterCall`, `poolExitCall`.
-- One encoder per pool write selector (`calldata.ts`): `approveCallData`, `depositCallData`,
-  `depositV1CallData`, `withdrawCallData`, `swapLiabilityCallData`.
-- `fetchHalts(chainId, scope: HaltScope, query?, o?)` + CLI `halts` / MCP `halts` (404 until the
-  gateway route ships).
+- One encoder per write selector (`calldata.ts`): `approveCallData`, `depositCallData`,
+  `depositV1CallData`, `withdrawCallData`, `withdrawToCallData`, `swapQeCallData`,
+  `routerSwapCallData`, `swapLiabilityCallData`, `wrapCallData`, `unwrapCallData`; router, venue
+  router and CLI `build-withdraw` encode through them (no inline write encodes left).
+- `broadcast` (`/eth`): the one raw `eth_sendTransaction`.
+- `fetchHalts(chainId, scope: HaltScope, query?, o?)` + CLI `halts` / MCP `halts` over the live
+  `GET /v1/halts/{scope}`.
+- `fetchActivity` passes the live `after=<tsMs>:<block>:<logIndex>` forward cursor (rows carry
+  `block`, replies `nextAfter`).
 - `fetchPoolParams`, `fetchDensity`, `fetchOraclePush` take a wire type parameter `<R>`.
 
 ### Changed (breaking)
@@ -38,13 +43,13 @@ The SDK is the single gateway for every BTR API read, chain read and write (fron
 - `LiveOpts` removed: `fetchRoster`, `fetchAbis`, `fetchLiveAbi` and `RegistryOpts` take/extend
   `ApiOpts`; errors read `BTR API <status> <path>`; default timeout 15 s (was 10 s).
 - `/amm` `backendBase()` defaults to `${getApiRoot()}/v1`: honours `setApiRoot()`/`BTR_API_URL`;
-  env `BTR_API` is no longer read; import throws if `BTR_API` is set without `BTR_API_URL`.
+  env `BTR_API` and `VITE_BTR_API` are no longer read (use `BTR_API_URL` / `VITE_API`).
 - `withChainId` throws on a non-positive/non-integer chain id (front: module-scope callers fail at
   load on a bad `ACTIVE_CHAIN_ID`).
 - `createWalletClient`, `createPublicClient`, `writeContract`, `WriteOptions` removed: write with
   `send()`, read with `relayProvider` + `multicall`/`readContract`.
-- `depositCallData`/`swapLiabilityCallData` now live in `calldata.ts` (still re-exported from
-  `/router` and the root).
+- `depositCallData`/`swapLiabilityCallData` now live in `calldata.ts`, exported from the root (no
+  longer from `/router`).
 - `batchRiskOpCall` / `claimTreasuryCalls` take the Admin ABI as a required last argument (no
   bundled default: keeps the 176 kB Admin ABI off pages that only build pool exits).
 - CLI `rpcProvider` is `relayProvider` (same relay queue as the front).

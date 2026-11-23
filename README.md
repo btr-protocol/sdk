@@ -20,9 +20,10 @@ API base `https://api.btr.markets`: every client (data, registry, chain quotes, 
 | `.` (protocol reads) | Typed `/v1/*` reads: `fetchSummary`, `fetchLiquidity`, `fetchHealth`, `fetchPools`, `fetchMdPrice`, `lpRows`, ... |
 | `/venues` | `fetchRegistry` (live, checked against baked), `rosterFor`, `fetchLiveAbi`, `fetchAbis` |
 | `/pool` | Single-pool chain reads + helpers: `getAsset`, `getLPBalance`, `getSwapQuote`, `sendDeadline` |
-| `/router` | Call builders: `buildApprovalCalls`, `buildSwapCalls`, `depositCallData`, `buildSwapLiabilityCalls`, `planToLegs` |
+| `/router` | Call builders: `buildApprovalCalls`, `buildSwapCalls`, `buildSwapLiabilityCalls`, `planToLegs` |
+| `calldata`, `calls` (root) | One encoder per write selector (`approveCallData`, `depositCallData`, `withdrawCallData`, `withdrawToCallData`, `swapQeCallData`, `routerSwapCallData`, `swapLiabilityCallData`, `wrapCallData`/`unwrapCallData`) and `TxCall` builders |
 | `/amm` | AIMM types + book-mode fetchers (`/v1/quote`, `/v1/route`, `/v1/depth`) |
-| `/eth` | Dependency-free JSON-RPC client (`createHttpProvider`), ABI codec (`encodeFn`), ERC-20, multicall |
+| `/eth` | `relayProvider` (the one chain reader), `send` (the one writer), `createHttpProvider`, ABI codec, ERC-20, multicall |
 | `/abis` | Pinned ABIs (`POOL_ABI`, ...) and `fetchAbi` |
 | `/oracle`, `/governance`, `/utils`, `/types` | Signed-quote verification, governance helpers, formatting/math |
 
@@ -37,9 +38,30 @@ Chain-mode quotes (`chainQuote`, `chainRoute`) are exported from the root.
   Security reads (deposit floor simulation, pre-sign quote re-price) pass `fresh: true` and never
   reuse an in-flight answer.
 - **Writes**: builders return unsigned `TxCall {to, data, value}` (`calls.ts`, `calldata.ts`,
-  `/router`); `send(provider, calls, { expectedChainId, abis, label })` is the only signer path:
-  refuses a wrong chain, estimates (revert decoded, nothing sent on failure), sends with a buffered
-  gas limit, and throws `TxRevertedError` on a mined revert before the next call.
+  `/router`); no module encodes a write selector inline. `send(provider, calls, opts)` is the only
+  signer path. It refuses a wrong chain (`expectedChainId`, checked first on every path). Plain path
+  (keys, scripts): estimate (revert decoded against `abis`, nothing sent on failure), buffered gas
+  limit, `eth_sendTransaction`, receipt; a mined revert throws `TxRevertedError` before the next call.
+  Wallet path (`stack: SendStack`): EIP-5792 `wallet_sendCalls` bundle when the wallet supports it
+  (`requireAtomic` refuses a non-atomic one), else sequential through the stack's `sendOne` and the
+  one raw `broadcast`.
+
+```ts
+import { relayProvider, send, privateKeyProvider } from '@btr-protocol/sdk/eth';
+import { withdrawCallData } from '@btr-protocol/sdk';
+
+const reader = relayProvider(143); // shared, memoized; multicall on top
+await send(privateKeyProvider(rpcUrl, key, 143), [{ to: pool, data: withdrawCallData(token, lp, min, deadline) }], {
+  expectedChainId: 143,
+  label: 'withdraw',
+});
+```
+
+- **Halts**: `fetchHalts(chainId, scope, query)` reads `GET /v1/halts/{aggregate|pool|asset|leg|feed}`:
+  intervals newest first (page with `before=nextBefore` while `truncated`), summary, buckets, coverage.
+  CLI `btr halts <scope> --params '..'`, MCP `halts`.
+- **Activity tail**: `fetchActivity(chainId, { after: nextAfter })` returns events strictly after the
+  `<tsMs>:<block>:<logIndex>` cursor, oldest first (seed `0:0:0`); `before` pages backwards.
 
 ### Read pools / prices
 
@@ -139,7 +161,7 @@ Text views by default, `--json` for raw data. Exit 0 ok, 1 failure, 2 usage. Liv
 | `debt-swap-quote` | `<pool> <from-symbol> <to-symbol> <lp-raw> --from` | TO-leg shares minted now | read |
 | `lp-rows`, `quote-lp`, `quote-path`, `depth-book`, `timeseries-bulk`, `indicators` | `--body '<json>'` | Raw POST `/v1/*` response | read |
 | `timeseries`, `liquidity`, `activity`, `pool-assets`, `pool-metrics`, `oracle-pushes`, `safety-history`, `safety-breakers`, `health`, `assets`, `md-tickers` | `[--params 'k=v&..']` | Raw GET `/v1/*` response | read |
-| `halts <aggregate\|pool\|asset\|leg\|feed>` | `[--params 'from=..&to=..&grain=..&group=..&pool=..&asset=..&leg=..&feed=..&limit=..&before=..']` | Raw GET `/v1/halts/{scope}` (not yet live: 404 until the gateway route ships) | read |
+| `halts <aggregate\|pool\|asset\|leg\|feed>` | `[--params 'from=..&to=..&grain=..&group=..&pool=..&asset=..&leg=..&feed=..&limit=..&before=..']` | Raw GET `/v1/halts/{scope}` | read |
 | `pool-params` | `<pool>` | Live risk parameters, every leg | read |
 | `density` | `<pair> [--params]` | Observed price density | read |
 | `oracle-push` | `<tx> [--params]` | One push: input + signers | read |
@@ -167,7 +189,7 @@ btr build-swap USDC WBTC 1000 --from 0xYou --json   # -> { chainId, from, floor,
 |---|---|
 | Views | `pools`, `metrics`, `risk`, `flow`, `keepers` |
 | Quotes | `quote`, `depth`, `lp_preview`, `debt_swap_quote`, `lp_rows`, `quote_lp`, `quote_path`, `depth_book` |
-| Wire reads | `timeseries`, `timeseries_bulk`, `liquidity`, `activity`, `pool_assets`, `pool_metrics`, `pool_params`, `density`, `oracle_pushes`, `oracle_push`, `safety_history`, `safety_breakers`, `halts` (not yet live), `health`, `assets`, `md_tickers`, `md_price`, `md_ohlc`, `indicators` |
+| Wire reads | `timeseries`, `timeseries_bulk`, `liquidity`, `activity`, `pool_assets`, `pool_metrics`, `pool_params`, `density`, `oracle_pushes`, `oracle_push`, `safety_history`, `safety_breakers`, `halts`, `health`, `assets`, `md_tickers`, `md_price`, `md_ohlc`, `indicators` |
 | Registry | `registry`, `pool_list`, `roster`, `abi`, `abis` |
 | Builds (unsigned) | `build_swap`, `build_approve`, `build_deposit`, `build_withdraw`, `build_debt_swap` |
 
