@@ -2,7 +2,16 @@
 // combination of the Batch approve + tx setting and the wallet's advertised capability, the refusal
 // fallback, the stranding notices, and byte-identical wire requests for the plain and bundle paths.
 import { describe, expect, test } from 'bun:test';
-import { type SendOpts, type SendStack, sendCallsParams, send, strandingNotice } from './send';
+import {
+  type SendOpts,
+  type SendStack,
+  batchModeOf,
+  canBundle,
+  isBatchRefused,
+  send,
+  sendCallsParams,
+  strandingNotice,
+} from './send';
 import type { Address, Eip1193Provider, Hex } from './types';
 
 type Deps = SendStack;
@@ -275,5 +284,69 @@ describe('wire bytes', () => {
       { from: T, to: T, data: '0xdeadbeef', value: '0x0', gas: '0x668a' },
     ]);
     expect(wire.map((w) => w.method)).toEqual(['eth_accounts', 'eth_estimateGas', 'eth_sendTransaction']);
+  });
+});
+
+const A1 = '0x0000000000000000000000000000000000000001' as Address;
+
+describe('canBundle: the setting gates wallet_sendCalls', () => {
+  test('off never bundles, whatever the wallet claims', () => {
+    for (const m of ['atomic', 'batch', 'unknown', null] as const)
+      for (const probe of [false, true]) expect(canBundle(false, m, probe)).toBe(false);
+  });
+  test('on bundles only an advertised atomic wallet; unanswered is sequential unless probed', () => {
+    expect(canBundle(true, 'atomic')).toBe(true);
+    expect(canBundle(undefined, 'atomic')).toBe(true);
+    expect(canBundle(true, 'unknown')).toBe(false);
+    expect(canBundle(true, 'unknown', true)).toBe(true);
+    expect(canBundle(true, 'batch', true)).toBe(false);
+    expect(canBundle(true, null, true)).toBe(false);
+  });
+});
+
+describe('isBatchRefused: codes only, never message text', () => {
+  test('4200, -32601, 5760 fall back; text and other codes do not', () => {
+    for (const code of [4200, -32601, 5760, '5760']) expect(isBatchRefused({ code })).toBe(true);
+    expect(isBatchRefused({ code: 4001, message: 'unsupported' })).toBe(false);
+    expect(isBatchRefused(new Error('chain unsupported'))).toBe(false);
+    expect(isBatchRefused(new Error('Method wallet_sendCalls not approved'))).toBe(false);
+  });
+});
+
+describe('batchModeOf: capabilities -> mode', () => {
+  test('atomic only when the wallet says so', () => {
+    expect(batchModeOf({ '0x38': { atomic: { status: 'supported' } } }, '0x38')).toBe('atomic');
+    expect(batchModeOf({ '0x38': { atomic: { status: 'ready' } } }, '0x38')).toBe('atomic');
+    expect(batchModeOf({ '0x38': { atomicBatch: { supported: true } } }, '0x38')).toBe('atomic');
+  });
+  test('unsupported atomic is a non-atomic bundle; no entry is no batching', () => {
+    expect(batchModeOf({ '0x38': { atomic: { status: 'unsupported' } } }, '0x38')).toBe('batch');
+    expect(batchModeOf({ '0x38': { atomicBatch: { supported: false } } }, '0x38')).toBe(null);
+    expect(batchModeOf({}, '0x38')).toBe(null);
+    expect(batchModeOf(undefined, '0x38')).toBe(null);
+  });
+  test('falls back to the global 0x0 entry', () => {
+    expect(batchModeOf({ '0x0': { atomic: { status: 'supported' } } }, '0x38')).toBe('atomic');
+  });
+});
+
+describe('sendCallsParams: payload shape', () => {
+  test('v2, hex chain, atomicRequired, every call carries a hex value', () => {
+    const calls = [
+      { to: A1, data: '0xaa' as Hex },
+      { to: A1, data: '0xbb' as Hex, value: 255n },
+    ];
+    expect(sendCallsParams(A1, '0x38', true, calls)).toEqual([
+      {
+        version: '2.0.0',
+        from: A1,
+        chainId: '0x38',
+        atomicRequired: true,
+        calls: [
+          { to: A1, data: '0xaa', value: '0x0' },
+          { to: A1, data: '0xbb', value: '0xff' },
+        ],
+      },
+    ]);
   });
 });

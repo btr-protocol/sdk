@@ -22,7 +22,7 @@ export interface TxCall {
   value?: bigint;
 }
 
-export interface SendOpts {
+export interface SendOpts<C extends TxCall = TxCall> {
   /** Refuse (nothing sent) when the wallet is on another chain. */
   expectedChainId?: number;
   /** ABIs whose custom errors an estimate revert is decoded against. */
@@ -34,7 +34,7 @@ export interface SendOpts {
   timeout?: number;
   /** A wallet's send stack (EIP-5792 bundle, simulation, prompts). Omitted: one plain
    *  estimate + `eth_sendTransaction` + receipt per call, never a bundle. */
-  stack?: SendStack;
+  stack?: SendStack<C>;
   /** Partial execution strands funds: an atomic bundle when the stack allows it, else sequential. */
   requireAtomic?: boolean;
   /** Ignore `stack.eip5792` (a swap UX preference, not a policy for a treasury claim). */
@@ -50,7 +50,7 @@ export interface SendOpts {
 export type Broadcast = (tx: Record<string, unknown>) => Promise<Hex>;
 
 /** What a wallet UI plugs into {@link send}: every hook it needs, no default policy hidden. */
-export interface SendStack {
+export interface SendStack<C extends TxCall = TxCall> {
   /** The "Batch approve + tx" setting: only an explicit false disables bundling. */
   eip5792: boolean | undefined;
   resolveMode: () => Promise<BatchMode>;
@@ -58,10 +58,10 @@ export interface SendStack {
    *  that MUST be atomic. */
   isWalletConnect: boolean;
   /** One `wallet_sendCalls`, atomicRequired. */
-  sendBundle: (calls: TxCall[]) => Promise<Hex[]>;
+  sendBundle: (calls: C[]) => Promise<Hex[]>;
   /** Head-pinned simulation of the full plan, before the first prompt. */
   preflight: () => Promise<void>;
-  sendOne: (c: TxCall, i: number, n: number, broadcast: Broadcast) => Promise<Hex>;
+  sendOne: (c: C, i: number, n: number, broadcast: Broadcast) => Promise<Hex>;
   notify: (msg: string) => void;
   /** Undo the overlay's prompt count after a bundle was refused. */
   rewind: () => void;
@@ -181,7 +181,7 @@ const hex = (v: bigint): Hex => `0x${v.toString(16)}`;
 export async function send<C extends TxCall>(
   provider: Eip1193Provider,
   calls: readonly C[],
-  opts: SendOpts = {},
+  opts: SendOpts<C> = {},
 ): Promise<SendResult[]> {
   const broadcast: Broadcast = (tx) =>
     provider.request({ method: 'eth_sendTransaction', params: [tx] }) as Promise<Hex>;
@@ -222,7 +222,7 @@ export async function send<C extends TxCall>(
 async function sendPlain(
   provider: Eip1193Provider,
   calls: readonly TxCall[],
-  opts: SendOpts,
+  opts: Omit<SendOpts, 'stack'>,
   broadcast: Broadcast,
 ): Promise<SendResult[]> {
   if (opts.expectedChainId !== undefined) {
