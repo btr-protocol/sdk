@@ -156,13 +156,11 @@ export {
 export { verifySignature } from './signature';
 
 // Contract
-export type { WriteOptions } from './contract';
 export {
   Contract,
   ContractRevertError,
   decodeRevert,
   readContract,
-  writeContract,
 } from './contract';
 
 // Multicall
@@ -176,8 +174,6 @@ export type { Client } from './client';
 export {
   createHttpProvider,
   createPrivateKeyClient,
-  createPublicClient,
-  createWalletClient,
   privateKeyToAddress,
 } from './client';
 

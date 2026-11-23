@@ -7,7 +7,6 @@
 import { describe, expect, test } from 'bun:test';
 import { POOL_ABI } from '../abis/Pool.js';
 import { encodeErrorResult, getSelector } from '../eth/abi.js';
-import { Contract } from '../eth/contract.js';
 import type { Address, Eip1193Provider, Hex } from '../eth/types.js';
 import { deposit, swap, withdraw } from './index.js';
 
@@ -93,15 +92,6 @@ describe('wallet-path writers bind the chain when asked', () => {
       withdraw(p2, POOL, { token: TOKEN, lpAmount: 1n, minAmountOut: 1n, expectedChainId: 1 }),
     ).rejects.toThrow(/chain mismatch/);
     expect(s2).toEqual(['eth_chainId']);
-  });
-
-  test('Contract.write refuses another chain before anything is sent', async () => {
-    const { provider, seen } = wallet();
-    const c = new Contract({ address: POOL, abi: POOL_ABI, provider, account: USER });
-    await expect(c.write('deposit', [TOKEN, 1n], { expectedChainId: 1 })).rejects.toThrow(
-      /chain mismatch/,
-    );
-    expect(seen).toEqual(['eth_chainId']);
   });
 });
 

@@ -7,14 +7,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { keccak256 } from './index';
 import { rlpEncode } from './rlp';
-import {
-  estimateGas,
-  ethCall,
-  getChainId,
-  getGasPrice,
-  pendingNonce,
-  sendTransaction as rpcSendTransaction,
-} from './rpc';
+import { estimateGas, ethCall, getChainId, getGasPrice, pendingNonce } from './rpc';
 import { type TransportOpts, httpTransport } from './transport';
 import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types';
 
@@ -23,35 +16,11 @@ import type { Address, Eip1193Provider, Hex, TransactionRequest } from './types'
 // ─────────────────────────────────────────────────────────────
 
 export interface Client {
+  /** Answers `eth_accounts` with {@link account} and signs `eth_sendTransaction` locally, so the
+   *  one writer `send()` drives it like any wallet. */
   provider: Eip1193Provider;
-  account?: Address;
+  account: Address;
   call: (to: Address, data: Hex) => Promise<Hex>;
-  sendTransaction: (tx: Omit<TransactionRequest, 'from'>) => Promise<Hex>;
-  estimateGas: (tx: Omit<TransactionRequest, 'from'>) => Promise<bigint>;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Injected Wallet Client (Browser)
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Create a client from an injected wallet provider
- * Requires user approval for transactions
- */
-export function createWalletClient(provider: Eip1193Provider, account: Address): Client {
-  return {
-    provider,
-    account,
-    call: async (to: Address, data: Hex) => {
-      return ethCall(provider, to, data);
-    },
-    sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
-      return rpcSendTransaction(provider, { ...tx, from: account } as TransactionRequest);
-    },
-    estimateGas: async (tx: Omit<TransactionRequest, 'from'>) => {
-      return estimateGas(provider, { ...tx, from: account } as TransactionRequest);
-    },
-  };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -326,63 +295,39 @@ export function createPrivateKeyClient(
   expectedChainId?: number,
 ): Client {
   // The same chain pins the transport: reads refuse a wrong-chain endpoint too, not only signing.
-  const provider = createHttpProvider(rpcUrl, { chainId: expectedChainId });
+  const http = createHttpProvider(rpcUrl, { chainId: expectedChainId });
   const account = privateKeyToAddress(privateKey);
-
-  return {
-    provider,
-    account,
-    call: async (to: Address, data: Hex) => {
-      return ethCall(provider, to, data);
-    },
-    sendTransaction: async (tx: Omit<TransactionRequest, 'from'>) => {
-      // Allocate here, not inside signTransaction, so a failure at ANY step between allocation and
-      // broadcast (estimateGas, signing, the raw-tx send) returns the nonce to the lane. Left at
-      // the tip, one such failure stranded every later send behind a hole that never healed.
-      const explicit = tx.nonce !== undefined;
-      const nonce = tx.nonce !== undefined ? BigInt(tx.nonce) : await nextNonce(provider, account);
-      try {
-        const signedTx = await signTransaction(
-          provider,
-          { ...tx, from: account, nonce: `0x${nonce.toString(16)}` as Hex } as TransactionRequest,
-          privateKey,
-          expectedChainId,
-        );
-        return (await provider.request({
-          method: 'eth_sendRawTransaction',
-          params: [signedTx],
-        })) as Hex;
-      } catch (e) {
-        if (!explicit) releaseNonce(provider, account, nonce);
-        throw e;
-      }
-    },
-    estimateGas: async (tx: Omit<TransactionRequest, 'from'>) => {
-      return estimateGas(provider, { ...tx, from: account } as TransactionRequest);
-    },
+  const sign = async (tx: TransactionRequest): Promise<Hex> => {
+    if (tx.from && tx.from.toLowerCase() !== account.toLowerCase())
+      throw new Error(`unknown from address ${tx.from}`);
+    // Allocate here, not inside signTransaction, so a failure at ANY step between allocation and
+    // broadcast (estimateGas, signing, the raw-tx send) returns the nonce to the lane. Left at
+    // the tip, one such failure stranded every later send behind a hole that never healed.
+    const explicit = tx.nonce !== undefined;
+    const nonce = tx.nonce !== undefined ? BigInt(tx.nonce) : await nextNonce(http, account);
+    try {
+      const signedTx = await signTransaction(
+        http,
+        { ...tx, from: account, nonce: `0x${nonce.toString(16)}` as Hex },
+        privateKey,
+        expectedChainId,
+      );
+      return (await http.request({
+        method: 'eth_sendRawTransaction',
+        params: [signedTx],
+      })) as Hex;
+    } catch (e) {
+      if (!explicit) releaseNonce(http, account, nonce);
+      throw e;
+    }
   };
-}
-
-// ─────────────────────────────────────────────────────────────
-// Public Client (Read-only)
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Create a read-only client (no account required)
- */
-export function createPublicClient(provider: Eip1193Provider | string): Client {
-  const actualProvider = typeof provider === 'string' ? createHttpProvider(provider) : provider;
-
-  return {
-    provider: actualProvider,
-    call: async (to: Address, data: Hex) => {
-      return ethCall(actualProvider, to, data);
-    },
-    sendTransaction: async () => {
-      throw new Error('Cannot send transactions with read-only client');
-    },
-    estimateGas: async (tx: Omit<TransactionRequest, 'from'>) => {
-      return estimateGas(actualProvider, tx as TransactionRequest);
-    },
+  const provider: Eip1193Provider = {
+    request: (args) =>
+      args.method === 'eth_accounts' || args.method === 'eth_requestAccounts'
+        ? Promise.resolve([account])
+        : args.method === 'eth_sendTransaction'
+          ? sign((args.params as TransactionRequest[])[0])
+          : http.request(args),
   };
+  return { provider, account, call: (to, data) => ethCall(provider, to, data) };
 }

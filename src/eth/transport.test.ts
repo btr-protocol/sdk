@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { createPrivateKeyClient } from './client';
+import { send } from './send';
 import { RpcNetworkError, RpcRevertError, RpcTimeoutError, httpTransport } from './transport';
 
 const realFetch = globalThis.fetch;
@@ -442,5 +443,37 @@ describe('httpTransport attests every endpoint before its first use', () => {
       /no endpoint attests chain/,
     );
     expect(probes).toBe(2); // re-probed, mismatched, evicted
+  });
+});
+
+describe('private-key client through send()', () => {
+  test('send() estimates, signs locally and broadcasts raw: no eth_sendTransaction on the wire', async () => {
+    const methods: string[] = [];
+    const answer: Record<string, unknown> = {
+      eth_chainId: '0x1',
+      eth_estimateGas: '0x5208',
+      eth_getTransactionCount: '0x0',
+      eth_gasPrice: '0x1',
+      eth_sendRawTransaction: `0x${'ab'.repeat(32)}`,
+    };
+    useFetch(async (_url, init) => {
+      const body = jsonBody(init);
+      const one = (r: MockRequest) => {
+        methods.push(String(r.method));
+        return { jsonrpc: '2.0', id: r.id, result: answer[String(r.method)] };
+      };
+      const json = Array.isArray(body) ? body.map(one) : one(body);
+      return new Response(JSON.stringify(json), { status: 200 });
+    });
+    const c = createPrivateKeyClient('http://x', `0x${'11'.repeat(32)}`, 1);
+    const [r] = await send(c.provider, [{ to: c.account, data: '0x' }], {
+      expectedChainId: 1,
+      wait: false,
+    });
+    expect(r.hash).toBe(answer.eth_sendRawTransaction as `0x${string}`);
+    expect(methods).toContain('eth_estimateGas');
+    expect(methods).toContain('eth_sendRawTransaction');
+    expect(methods).not.toContain('eth_sendTransaction');
+    expect(methods).not.toContain('eth_accounts');
   });
 });

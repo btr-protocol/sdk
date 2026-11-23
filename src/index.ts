@@ -70,8 +70,6 @@ export * from "./oracle/index.js";
 export * from "./eth/index.js";
 export type { Client } from "./eth/client.js";
 export {
-  createWalletClient,
-  createPublicClient,
   createHttpProvider,
   createPrivateKeyClient,
   privateKeyToAddress,
