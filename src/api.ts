@@ -51,7 +51,9 @@ function qs(path: string, q: Query = {}): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(q))
     if (v !== undefined && v !== null && v !== "") p.set(k, String(v));
-  const s = p.toString();
+  // The back's gateway refuses `%` in a value (no decoding, one spelling per alias) and a colon
+  // is legal raw in a query: the activity cursor `t:block:logIndex` must not be escaped.
+  const s = p.toString().replace(/%3A/g, ":");
   return s ? `${path}${path.includes("?") ? "&" : "?"}${s}` : path;
 }
 

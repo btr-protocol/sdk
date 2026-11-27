@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { HttpError } from "./api.js";
 import {
   activityCursor,
+  fetchActivityAfter,
   fetchPoolParamsBulk,
   fetchPoolState,
   legNeedsChain,
@@ -134,6 +135,23 @@ test("fetchPoolParamsBulk: one call, sorted dedup addresses, <= 32", async () =>
 test("activityCursor is t:block:logIndex", () => {
   const r = { txHash: "0x3", logIndex: 1, block: 3, t: 3 };
   expect(activityCursor(r)).toBe("3:3:1");
+});
+
+test("fetchActivityAfter keeps the cursor's colons raw: the gateway refuses `%`", async () => {
+  const urls: string[] = [];
+  const f = (async (u: string | URL) => {
+    urls.push(String(u));
+    return new Response(JSON.stringify({ chainId: 143, events: [], nextAfter: null }));
+  }) as unknown as typeof fetch;
+  await fetchActivityAfter(
+    143,
+    "1795812153000:125959243:153",
+    { limit: 200 },
+    { fetch: f, base: "http://t" },
+  );
+  expect(urls).toEqual([
+    "http://t/v1/activity?limit=200&after=1795812153000:125959243:153&chainId=143",
+  ]);
 });
 
 test("MCP pools_state tool shares the store", async () => {
